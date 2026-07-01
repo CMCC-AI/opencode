@@ -61,11 +61,12 @@ import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/
 import { SessionContextUsage } from "@/components/session-context-usage"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
-import { useSessionKey } from "@/pages/session/session-layout"
+import { useSessionLayout } from "@/pages/session/session-layout"
 import { useServerSDK } from "@/context/server-sdk"
 import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { useTabs } from "@/context/tabs"
+import { useLayout } from "@/context/layout"
 import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/session-route"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -262,10 +263,11 @@ export function MessageTimeline(props: {
   const sdk = useSDK()
   const sync = useSync()
   const settings = useSettings()
+  const layout = useLayout()
   const tabs = useTabs()
   const dialog = useDialog()
   const language = useLanguage()
-  const { params, sessionKey } = useSessionKey()
+  const { params, sessionKey, view } = useSessionLayout()
   const ownerSessionKey = sessionKey()
   const cached = timelineCache.get(ownerSessionKey)
   const initialMeasurements = cached?.measurements
@@ -1357,8 +1359,10 @@ export function MessageTimeline(props: {
                 !settings.general.newLayoutDesigns(),
               "w-full": true,
               "pb-4": true,
-              "pr-3": true,
-              "pl-2": settings.general.newLayoutDesigns(),
+              "pr-3": !settings.general.newLayoutDesigns() || view().reviewPanel.opened(),
+              "pr-[56px]": settings.general.newLayoutDesigns() && !view().reviewPanel.opened(),
+              "pl-2": settings.general.newLayoutDesigns() && layout.sidebar.opened(),
+              "pl-[154px]": settings.general.newLayoutDesigns() && !layout.sidebar.opened(),
               "pl-2 md:pl-4": !settings.general.newLayoutDesigns(),
               "md:max-w-200 md:mx-auto 2xl:max-w-[1000px]": props.centered && !settings.general.newLayoutDesigns(),
             }}

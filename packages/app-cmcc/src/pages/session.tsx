@@ -24,6 +24,7 @@ import { createStore } from "solid-js/store"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Select } from "@opencode-ai/ui/select"
 import { Tabs } from "@opencode-ai/ui/tabs"
+import { Icon } from "@opencode-ai/ui/icon"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { previewSelectedLines } from "@opencode-ai/session-ui/pierre/selection-bridge"
 import { Button } from "@opencode-ai/ui/button"
@@ -84,6 +85,9 @@ const emptyFollowups: FollowupItem[] = []
 
 type ChangeMode = "git" | "branch" | "turn"
 type VcsMode = "git" | "branch"
+const CMCC_RIGHT_MIN_WIDTH = 320
+const CMCC_RIGHT_HIDE_THRESHOLD = 120
+const CMCC_RIGHT_RESTORE_THRESHOLD = 180
 
 const sessionViewState = () => ({
   messageId: undefined as string | undefined,
@@ -151,6 +155,9 @@ export default function Page() {
   const [ui, setUi] = createStore({
     pendingMessage: undefined as string | undefined,
     reviewSnap: false,
+    rightSizing: false,
+    rightStartX: 0,
+    rightStartWidth: 0,
     scrollGesture: 0,
     scroll: {
       overflow: false,
@@ -206,6 +213,7 @@ export default function Page() {
   )
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
+  const cmccLayout = createMemo(() => newSessionDesign() && isDesktop())
   const size = createSizing()
   const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
   const desktopFileTreeOpen = createMemo(
@@ -218,11 +226,17 @@ export default function Page() {
   )
   const desktopSidePanelOpen = createMemo(() => desktopReviewOpen() || desktopFileTreeOpen())
   const sessionPanelWidth = createMemo(() => {
+    if (cmccLayout()) return "auto"
     if (!desktopSidePanelOpen()) return "100%"
     if (desktopReviewOpen()) return `${layout.session.width()}px`
     return `calc(100% - ${layout.fileTree.width()}px)`
   })
   const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
+  const cmccRightOpen = createMemo(() => cmccLayout() && !!params.id && view().reviewPanel.opened())
+  const cmccRightWidth = createMemo(() => {
+    if (!cmccRightOpen()) return "0px"
+    return `${Math.max(CMCC_RIGHT_MIN_WIDTH, layout.session.width())}px`
+  })
 
   function normalizeTab(tab: string) {
     if (!tab.startsWith("file://")) return tab
@@ -243,6 +257,11 @@ export default function Page() {
 
   const openReviewPanel = () => {
     if (!view().reviewPanel.opened()) view().reviewPanel.open()
+  }
+
+  const toggleCmccRightPanel = () => {
+    if (!params.id) return
+    view().reviewPanel.toggle()
   }
 
   const info = createMemo(() => (params.id ? sync().session.get(params.id) : undefined))
@@ -732,6 +751,47 @@ export default function Page() {
       if (composer.blocked() || isChildSession()) return
       inputRef?.focus()
     }
+  }
+
+  let rightPreviousUserSelect = ""
+  let rightPreviousCursor = ""
+
+  const stopRightSizing = () => {
+    if (!ui.rightSizing) return
+    setUi("rightSizing", false)
+    document.body.style.userSelect = rightPreviousUserSelect
+    document.body.style.cursor = rightPreviousCursor
+    window.removeEventListener("pointermove", moveRightSizing)
+    window.removeEventListener("pointerup", stopRightSizing)
+    window.removeEventListener("pointercancel", stopRightSizing)
+  }
+
+  const moveRightSizing = (event: PointerEvent) => {
+    const raw = ui.rightStartWidth + ui.rightStartX - event.clientX
+    if (raw <= CMCC_RIGHT_HIDE_THRESHOLD) {
+      view().reviewPanel.close()
+      return
+    }
+    if (!view().reviewPanel.opened() && raw < CMCC_RIGHT_RESTORE_THRESHOLD) return
+    if (!view().reviewPanel.opened()) view().reviewPanel.open()
+    layout.session.resize(Math.max(CMCC_RIGHT_MIN_WIDTH, raw))
+  }
+
+  const startRightSizing = (event: PointerEvent) => {
+    if (!cmccLayout()) return
+    event.preventDefault()
+    rightPreviousUserSelect = document.body.style.userSelect
+    rightPreviousCursor = document.body.style.cursor
+    document.body.style.userSelect = "none"
+    document.body.style.cursor = "col-resize"
+    setUi({
+      rightSizing: true,
+      rightStartX: event.clientX,
+      rightStartWidth: cmccRightOpen() ? Math.max(CMCC_RIGHT_MIN_WIDTH, layout.session.width()) : 0,
+    })
+    window.addEventListener("pointermove", moveRightSizing)
+    window.addEventListener("pointerup", stopRightSizing)
+    window.addEventListener("pointercancel", stopRightSizing)
   }
 
   createEffect(() => {
@@ -1575,6 +1635,7 @@ export default function Page() {
     if (diffTimer !== undefined) window.clearTimeout(diffTimer)
     if (scrollStateFrame !== undefined) cancelAnimationFrame(scrollStateFrame)
     if (fillFrame !== undefined) cancelAnimationFrame(fillFrame)
+    stopRightSizing()
   })
 
   useUsageExceededDialogs()
@@ -1699,19 +1760,35 @@ export default function Page() {
     <div class="relative size-full overflow-hidden flex flex-col">
       {sessionSync() ?? ""}
       <SessionHeader />
+      <Show when={cmccLayout()}>
+        <button
+          type="button"
+          class="absolute right-3 top-2 z-50 flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-icon-icon-muted transition-[background-color,color] duration-150 hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-border-border-active data-[pressed]:bg-v2-overlay-simple-overlay-hover data-[pressed]:text-v2-icon-icon-base disabled:pointer-events-none disabled:opacity-35"
+          data-pressed={view().reviewPanel.opened() ? "" : undefined}
+          title={view().reviewPanel.opened() ? "隐藏右栏" : "展开右栏"}
+          aria-label={view().reviewPanel.opened() ? "隐藏右栏" : "展开右栏"}
+          aria-pressed={view().reviewPanel.opened()}
+          disabled={!params.id}
+          onClick={toggleCmccRightPanel}
+        >
+          <Icon name={view().reviewPanel.opened() ? "layout-right-full" : "layout-right"} class="size-4" />
+        </button>
+      </Show>
       <div
         class="flex-1 min-h-0 flex flex-col md:flex-row"
         classList={{
-          "gap-2 p-2": settings.general.newLayoutDesigns(),
+          "gap-2 p-2": settings.general.newLayoutDesigns() && !cmccLayout(),
         }}
       >
         <Show when={!isDesktop() && !!params.id && !settings.general.newLayoutDesigns()}>{mobileTabs()}</Show>
 
         <div
           classList={{
-            "@container relative shrink-0 flex flex-col min-h-0 h-full flex-1 md:flex-none transition-[width]": true,
+            "@container relative shrink-0 flex flex-col min-h-0 h-full transition-[width]": true,
+            "flex-1": cmccLayout(),
+            "flex-1 md:flex-none": !cmccLayout(),
             "duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
-              !size.active() && !ui.reviewSnap,
+              !size.active() && !ui.reviewSnap && !ui.rightSizing,
           }}
           style={{
             width: sessionPanelWidth(),
@@ -1722,8 +1799,10 @@ export default function Page() {
               "flex-1 min-h-0 flex flex-col": true,
               "bg-v2-background-bg-base": settings.general.newLayoutDesigns(),
               "bg-background-stronger": !settings.general.newLayoutDesigns(),
-              "rounded-[10px] overflow-hidden": settings.general.newLayoutDesigns(),
-              "shadow-[var(--v2-elevation-raised)]": settings.general.newLayoutDesigns() && !!params.id,
+              "rounded-[10px] overflow-hidden": settings.general.newLayoutDesigns() && !cmccLayout(),
+              "shadow-[var(--v2-elevation-raised)]":
+                settings.general.newLayoutDesigns() && !!params.id && !cmccLayout(),
+              "border-r border-v2-border-border-base": cmccLayout(),
             }}
           >
             <Show when={!isDesktop() && !!params.id && settings.general.newLayoutDesigns() && !mobileTabsBottom()}>
@@ -1797,7 +1876,7 @@ export default function Page() {
             <Show when={!!params.id && mobileTabsBottom()}>{mobileTabs(true, true)}</Show>
           </div>
 
-          <Show when={desktopReviewOpen()}>
+          <Show when={desktopReviewOpen() && !cmccLayout()}>
             <div onPointerDown={() => size.start()}>
               <ResizeHandle
                 classList={{
@@ -1816,6 +1895,15 @@ export default function Page() {
           </Show>
         </div>
 
+        <Show when={cmccLayout()}>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+            onPointerDown={startRightSizing}
+          />
+        </Show>
+
         <SessionSidePanel
           canReview={canReview}
           diffs={reviewDiffs}
@@ -1828,6 +1916,9 @@ export default function Page() {
           focusReviewDiff={focusReviewDiff}
           reviewSnap={ui.reviewSnap}
           size={size}
+          open={cmccLayout() ? cmccRightOpen : undefined}
+          width={cmccLayout() ? cmccRightWidth : undefined}
+          plain={cmccLayout()}
         />
       </div>
 

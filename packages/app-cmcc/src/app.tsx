@@ -61,9 +61,10 @@ import {
   sessionHref,
 } from "./utils/session-route"
 import { isSessionNotFoundError } from "./utils/server-errors"
+import { cmccDefaultWorkspace } from "./utils/cmcc-workspace"
 
 import Session from "@/pages/session"
-import { NewHome, LegacyHome } from "@/pages/home"
+import { LegacyHome } from "@/pages/home"
 
 const NewSession = lazy(() => import("@/pages/new-session"))
 
@@ -626,12 +627,35 @@ function Routes() {
         </Route>
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
-        <Route path="/" component={NewHome} />
+        <Route path="/" component={CmccDefaultRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
       <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
     </>
+  )
+}
+
+function CmccDefaultRoute() {
+  const server = useServer()
+  const sync = useServerSync()
+  const tabs = useTabs()
+  const directory = createMemo(() => cmccDefaultWorkspace(sync().data.path.home))
+  let started = false
+
+  createEffect(() => {
+    const dir = directory()
+    if (!dir || started || !tabs.ready()) return
+    started = true
+    server.projects.open(dir)
+    server.projects.touch(dir)
+    tabs.newDraft({ server: server.key, directory: dir })
+  })
+
+  return (
+    <div class="flex size-full items-center justify-center text-v2-text-text-faint">
+      <Splash class="h-10 w-8 opacity-30" />
+    </div>
   )
 }
 

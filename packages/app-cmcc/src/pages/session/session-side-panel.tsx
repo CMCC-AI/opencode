@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createMemo, onCleanup, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Tabs } from "@opencode-ai/ui/tabs"
@@ -8,7 +8,7 @@ import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Mark } from "@opencode-ai/ui/logo"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
-import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 
@@ -20,6 +20,7 @@ import { useFile, type SelectedLineRange } from "@/context/file"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useSettings } from "@/context/settings"
+import { useServerSync } from "@/context/server-sync"
 import { useSync } from "@/context/sync"
 import { createFileTabListSync } from "@/pages/session/file-tab-scroll"
 import { FileTabContent } from "@/pages/session/file-tabs"
@@ -34,9 +35,51 @@ import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 
 type RenderDiff = (SnapshotFileDiff & { file: string }) | VcsFileDiff
+type CmccPanelTab = "plan" | "artifacts" | "browser" | "review"
+type CmccArtifact = {
+  id: string
+  path: string
+  source: string
+  status: "created" | "changed" | "deleted"
+}
 
 function renderDiff(value: SnapshotFileDiff | VcsFileDiff): value is RenderDiff {
   return typeof value.file === "string"
+}
+
+function stringInput(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+function toolPath(part: Part) {
+  if (part.type !== "tool") return
+  const input = part.state.input
+  return (
+    stringInput(input.filePath) ??
+    stringInput(input.file) ??
+    stringInput(input.path) ??
+    stringInput(input.target) ??
+    stringInput(input.filename)
+  )
+}
+
+function artifactStatus(value: RenderDiff["status"]): CmccArtifact["status"] {
+  if (value === "added") return "created"
+  if (value === "deleted") return "deleted"
+  return "changed"
+}
+
+function todoStatusLabel(value: Todo["status"]) {
+  if (value === "completed") return "完成"
+  if (value === "in_progress") return "进行中"
+  if (value === "cancelled") return "取消"
+  return "待处理"
+}
+
+function artifactStatusLabel(value: CmccArtifact["status"]) {
+  if (value === "created") return "新建"
+  if (value === "deleted") return "删除"
+  return "更新"
 }
 
 export function SessionSidePanel(props: {
@@ -51,9 +94,13 @@ export function SessionSidePanel(props: {
   focusReviewDiff: (path: string) => void
   reviewSnap: boolean
   size: Sizing
+  open?: () => boolean
+  width?: () => string
+  plain?: boolean
 }) {
   const layout = useLayout()
   const settings = useSettings()
+  const serverSync = useServerSync()
   const sync = useSync()
   const file = useFile()
   const language = useLanguage()
@@ -64,7 +111,7 @@ export function SessionSidePanel(props: {
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const shown = settings.visibility.fileTree
 
-  const reviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
+  const reviewOpen = createMemo(() => isDesktop() && (props.open?.() ?? view().reviewPanel.opened()))
   const fileOpen = createMemo(
     () =>
       isDesktop() &&
@@ -73,17 +120,67 @@ export function SessionSidePanel(props: {
         opened: layout.fileTree.opened(),
       }),
   )
-  const open = createMemo(() => reviewOpen() || fileOpen())
+  const open = createMemo(() => props.open?.() ?? (reviewOpen() || fileOpen()))
   const reviewTab = createMemo(() => isDesktop())
   const panelWidth = createMemo(() => {
+    const width = props.width?.()
+    if (width) return width
     if (!open()) return "0px"
     if (reviewOpen()) return "auto"
     return `${layout.fileTree.width()}px`
   })
   const treeWidth = createMemo(() => (fileOpen() ? `${layout.fileTree.width()}px` : "0px"))
+  const [cmccActiveTab, setCmccActiveTab] = createSignal<CmccPanelTab>("plan")
+  const [browserDraft, setBrowserDraft] = createSignal("https://www.google.com/search?igu=1")
+  const [browserUrl, setBrowserUrl] = createSignal("https://www.google.com/search?igu=1")
 
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
   const diffFiles = createMemo(() => diffs().map((d) => d.file))
+  const todos = createMemo(() => {
+    if (!params.id) return []
+    return serverSync().session.data.todo[params.id] ?? []
+  })
+  const parts = createMemo(() => {
+    if (!params.id) return []
+    return (sync().data.message[params.id] ?? []).flatMap((message) => sync().data.part[message.id] ?? [])
+  })
+  const artifacts = createMemo(() => {
+    const items = new Map<string, CmccArtifact>()
+
+    for (const diff of diffs()) {
+      items.set(diff.file, {
+        id: `diff:${diff.file}`,
+        path: diff.file,
+        source: "审查变更",
+        status: artifactStatus(diff.status),
+      })
+    }
+
+    for (const part of parts()) {
+      if (part.type === "patch") {
+        for (const path of part.files) {
+          items.set(path, {
+            id: `${part.id}:${path}`,
+            path,
+            source: "补丁产出",
+            status: "changed",
+          })
+        }
+      }
+      if (part.type === "tool" && ["write", "edit", "apply_patch"].includes(part.tool)) {
+        const path = toolPath(part)
+        if (!path) continue
+        items.set(path, {
+          id: `${part.id}:${path}`,
+          path,
+          source: part.tool === "write" ? "文件写入" : "文件编辑",
+          status: part.tool === "write" ? "created" : "changed",
+        })
+      }
+    }
+
+    return [...items.values()]
+  })
   const kinds = createMemo(() => {
     const merge = (a: "add" | "del" | "mix" | undefined, b: "add" | "del" | "mix") => {
       if (!a) return b
@@ -167,6 +264,18 @@ export function SessionSidePanel(props: {
     layout.fileTree.setTab("all")
   }
 
+  const openArtifact = (path: string) => {
+    openTab(file.tab(path))
+  }
+
+  const openBrowser = () => {
+    const value = browserDraft().trim()
+    if (!value) return
+    const url = /^https?:\/\//i.test(value) ? value : `https://${value}`
+    setBrowserDraft(url)
+    setBrowserUrl(url)
+  }
+
   const [store, setStore] = createStore({
     activeDraggable: undefined as string | undefined,
   })
@@ -224,7 +333,8 @@ export function SessionSidePanel(props: {
           "pointer-events-none": !open(),
           "transition-[width] duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
             !props.size.active() && !props.reviewSnap,
-          "rounded-[10px] shadow-[var(--v2-elevation-raised)] overflow-hidden": settings.general.newLayoutDesigns(),
+          "rounded-[10px] shadow-[var(--v2-elevation-raised)] overflow-hidden":
+            settings.general.newLayoutDesigns() && !props.plain,
           "flex-1": reviewOpen(),
         }}
         style={{ width: panelWidth() }}
@@ -245,15 +355,18 @@ export function SessionSidePanel(props: {
               }}
             >
               <div class="size-full min-w-0 h-full bg-background-base">
-                <DragDropProvider
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  collisionDetector={closestCenter}
-                >
-                  <DragDropSensors />
-                  <ConstrainDragYAxis />
-                  <Tabs value={activeTab()} onChange={openTab}>
+                <Show
+                  when={props.plain}
+                  fallback={
+                    <DragDropProvider
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      collisionDetector={closestCenter}
+                    >
+                      <DragDropSensors />
+                      <ConstrainDragYAxis />
+                      <Tabs value={activeTab()} onChange={openTab}>
                     <div class="sticky top-0 shrink-0 flex">
                       <Tabs.List
                         ref={(el: HTMLDivElement) => {
@@ -357,24 +470,42 @@ export function SessionSidePanel(props: {
                     <Show when={activeFileTab()} keyed>
                       {(tab) => <FileTabContent tab={tab} />}
                     </Show>
-                  </Tabs>
-                  <DragOverlay>
-                    <Show when={store.activeDraggable} keyed>
-                      {(tab) => {
-                        const path = file.pathFromTab(tab)
-                        return (
-                          <div data-component="tabs-drag-preview">
-                            <Show when={path}>{(p) => <FileVisual active path={p()} />}</Show>
-                          </div>
-                        )
-                      }}
-                    </Show>
-                  </DragOverlay>
-                </DragDropProvider>
+                      </Tabs>
+                      <DragOverlay>
+                        <Show when={store.activeDraggable} keyed>
+                          {(tab) => {
+                            const path = file.pathFromTab(tab)
+                            return (
+                              <div data-component="tabs-drag-preview">
+                                <Show when={path}>{(p) => <FileVisual active path={p()} />}</Show>
+                              </div>
+                            )
+                          }}
+                        </Show>
+                      </DragOverlay>
+                    </DragDropProvider>
+                  }
+                >
+                  <CmccAssistantPanel
+                    active={cmccActiveTab()}
+                    setActive={setCmccActiveTab}
+                    todos={todos()}
+                    artifacts={artifacts()}
+                    browserDraft={browserDraft()}
+                    browserUrl={browserUrl()}
+                    setBrowserDraft={setBrowserDraft}
+                    openBrowser={openBrowser}
+                    openArtifact={openArtifact}
+                    reviewCount={props.reviewCount()}
+                    canReview={props.canReview()}
+                    reviewPanel={props.reviewPanel}
+                    showReview={reviewOpen() && cmccActiveTab() === "review"}
+                  />
+                </Show>
               </div>
             </div>
 
-            <Show when={shown()}>
+            <Show when={shown() && !props.plain}>
               <div
                 id="file-tree-panel"
                 aria-hidden={!fileOpen()}
@@ -471,5 +602,191 @@ export function SessionSidePanel(props: {
         </Show>
       </aside>
     </Show>
+  )
+}
+
+function CmccAssistantPanel(props: {
+  active: CmccPanelTab
+  setActive: (tab: CmccPanelTab) => void
+  todos: Todo[]
+  artifacts: CmccArtifact[]
+  browserDraft: string
+  browserUrl: string
+  setBrowserDraft: (value: string) => void
+  openBrowser: () => void
+  openArtifact: (path: string) => void
+  reviewCount: number
+  canReview: boolean
+  reviewPanel: () => JSX.Element
+  showReview: boolean
+}) {
+  const tabs = createMemo(() => [
+    { id: "plan" as const, label: "计划", count: props.todos.length },
+    { id: "artifacts" as const, label: "产出", count: props.artifacts.length },
+    { id: "browser" as const, label: "浏览器" },
+    { id: "review" as const, label: "审查", count: props.reviewCount },
+  ])
+
+  return (
+    <div class="flex size-full min-w-0 flex-col bg-v2-background-bg-base">
+      <div class="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 border-b border-v2-border-border-base bg-v2-background-bg-base px-3">
+        <For each={tabs()}>
+          {(tab) => (
+            <button
+              type="button"
+              class="flex h-8 min-w-0 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+              data-selected={props.active === tab.id ? "" : undefined}
+              onClick={() => props.setActive(tab.id)}
+            >
+              <span>{tab.label}</span>
+              <Show when={tab.count !== undefined}>
+                <span class="text-[11px] leading-4 text-v2-text-text-faint">{tab.count}</span>
+              </Show>
+            </button>
+          )}
+        </For>
+      </div>
+      <div class="min-h-0 flex-1 overflow-hidden">
+        <Switch>
+          <Match when={props.active === "plan"}>
+            <CmccPlanPanel todos={props.todos} />
+          </Match>
+          <Match when={props.active === "artifacts"}>
+            <CmccArtifactsPanel artifacts={props.artifacts} openArtifact={props.openArtifact} />
+          </Match>
+          <Match when={props.active === "browser"}>
+            <CmccBrowserPanel
+              draft={props.browserDraft}
+              url={props.browserUrl}
+              setDraft={props.setBrowserDraft}
+              open={props.openBrowser}
+            />
+          </Match>
+          <Match when={props.active === "review"}>
+            <Show
+              when={props.canReview}
+              fallback={<CmccEmptyPanel title="暂无审查内容" description="这里会展示代码审查、变更摘要和回滚相关信息。" />}
+            >
+              <Show when={props.showReview}>{props.reviewPanel()}</Show>
+            </Show>
+          </Match>
+        </Switch>
+      </div>
+    </div>
+  )
+}
+
+function CmccPlanPanel(props: { todos: Todo[] }) {
+  return (
+    <div class="h-full overflow-y-auto px-4 py-4">
+      <Show
+        when={props.todos.length > 0}
+        fallback={<CmccEmptyPanel title="暂无计划" description="当助手制定或执行计划时，步骤会在这里按状态展示。" />}
+      >
+        <div class="space-y-2">
+          <For each={props.todos}>
+            {(todo, index) => (
+              <div class="rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2.5">
+                <div class="flex items-start gap-2">
+                  <div
+                    class="mt-1 size-2 rounded-full bg-v2-icon-icon-muted data-[state=completed]:bg-success data-[state=in_progress]:bg-v2-border-border-active data-[state=cancelled]:bg-v2-text-text-faint"
+                    data-state={todo.status}
+                    aria-hidden="true"
+                  />
+                  <div class="min-w-0 flex-1">
+                    <div class="text-[13px] font-medium leading-5 text-v2-text-text-base">
+                      {index() + 1}. {todo.content}
+                    </div>
+                    <div class="mt-1 flex items-center gap-2 text-[11px] leading-4 text-v2-text-text-faint">
+                      <span>{todoStatusLabel(todo.status)}</span>
+                      <span>{todo.priority}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </For>
+        </div>
+      </Show>
+    </div>
+  )
+}
+
+function CmccArtifactsPanel(props: { artifacts: CmccArtifact[]; openArtifact: (path: string) => void }) {
+  return (
+    <div class="h-full overflow-y-auto px-4 py-4">
+      <Show
+        when={props.artifacts.length > 0}
+        fallback={<CmccEmptyPanel title="暂无文件产出" description="助手生成、修改或补丁涉及的文件会汇总到这里。" />}
+      >
+        <div class="space-y-2">
+          <For each={props.artifacts}>
+            {(item) => (
+              <button
+                type="button"
+                class="flex w-full min-w-0 items-start gap-3 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2.5 text-left hover:bg-v2-overlay-simple-overlay-hover"
+                onClick={() => props.openArtifact(item.path)}
+              >
+                <div class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-v2-background-bg-layer-03 text-[11px] text-v2-text-text-muted">
+                  {artifactStatusLabel(item.status)}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-[13px] font-medium leading-5 text-v2-text-text-base">{item.path}</div>
+                  <div class="mt-1 text-[11px] leading-4 text-v2-text-text-faint">{item.source}</div>
+                </div>
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
+    </div>
+  )
+}
+
+function CmccBrowserPanel(props: {
+  draft: string
+  url: string
+  setDraft: (value: string) => void
+  open: () => void
+}) {
+  return (
+    <div class="flex h-full min-h-0 flex-col">
+      <div class="flex shrink-0 gap-2 border-b border-v2-border-border-base p-3">
+        <input
+          class="h-8 min-w-0 flex-1 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-2 text-[13px] text-v2-text-text-base outline-none focus:border-v2-border-border-active"
+          value={props.draft}
+          onInput={(event) => props.setDraft(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return
+            event.preventDefault()
+            props.open()
+          }}
+        />
+        <button
+          type="button"
+          class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-3 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+          onClick={props.open}
+        >
+          打开
+        </button>
+      </div>
+      <iframe
+        title="浏览器"
+        class="min-h-0 flex-1 border-0 bg-white"
+        src={props.url}
+        sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
+      />
+    </div>
+  )
+}
+
+function CmccEmptyPanel(props: { title: string; description: string }) {
+  return (
+    <div class="flex h-full items-center justify-center px-8 text-center">
+      <div>
+        <div class="text-[14px] font-medium leading-5 text-v2-text-text-base">{props.title}</div>
+        <div class="mt-2 text-[12px] leading-5 text-v2-text-text-muted">{props.description}</div>
+      </div>
+    </div>
   )
 }
