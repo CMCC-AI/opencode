@@ -17,6 +17,7 @@ import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
 import { setV2Toast, ToastRegion } from "@/utils/toast"
 import { cmccDefaultWorkspace, cmccWorkspaceLabel } from "@/utils/cmcc-workspace"
+import { CMCC_EXPERTS, cmccExpertHref } from "@/pages/cmcc-experts"
 import { sortedRootSessions } from "./layout/helpers"
 
 const SIDEBAR_MIN_WIDTH = 220
@@ -161,6 +162,7 @@ function CmccSidebar() {
     startX: 0,
     startWidth: 0,
   })
+  const [expertGroup, setExpertGroup] = createStore({ collapsed: false })
 
   createEffect(() => {
     const dir = directory()
@@ -273,6 +275,12 @@ function CmccSidebar() {
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4 pt-12">
             <CmccSidebarAction icon="new-session" label="新对话" onClick={openNewSession} />
             <CmccSidebarAction icon="magnifying-glass" label="搜索" onClick={() => command.show()} />
+            <CmccExpertGroup
+              collapsed={expertGroup.collapsed}
+              activePath={location.pathname}
+              toggle={() => setExpertGroup("collapsed", !expertGroup.collapsed)}
+              open={(href) => navigate(href)}
+            />
             <CmccSidebarAction icon="task" label="已安排" />
             <CmccSidebarAction icon="mcp" label="插件" />
           </nav>
@@ -375,5 +383,50 @@ function CmccSidebarAction(props: { icon: Parameters<typeof Icon>[0]["name"]; la
       <Icon name={props.icon} class="size-4 shrink-0" />
       <span class="min-w-0 truncate">{props.label}</span>
     </button>
+  )
+}
+
+function CmccExpertGroup(props: {
+  collapsed: boolean
+  activePath: string
+  toggle: () => void
+  open: (href: string) => void
+}) {
+  return (
+    <div class="flex min-w-0 flex-col gap-1">
+      <button
+        type="button"
+        class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[14px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+        aria-expanded={!props.collapsed}
+        onClick={props.toggle}
+      >
+        <Icon
+          name="chevron-down"
+          class="size-4 shrink-0 transition-transform duration-150 ease-in-out"
+          style={{ transform: `rotate(${props.collapsed ? -90 : 0}deg)` }}
+        />
+        <span class="min-w-0 truncate">专家团</span>
+      </button>
+      <Show when={!props.collapsed}>
+        <div class="flex min-w-0 flex-col gap-1 pl-4">
+          <For each={CMCC_EXPERTS}>
+            {(expert) => {
+              const href = cmccExpertHref(expert)
+              return (
+                <button
+                  type="button"
+                  class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+                  data-selected={props.activePath === href ? "" : undefined}
+                  onClick={() => props.open(href)}
+                >
+                  <Icon name="mcp" class="size-4 shrink-0" />
+                  <span class="min-w-0 truncate">{expert.name}</span>
+                </button>
+              )
+            }}
+          </For>
+        </div>
+      </Show>
+    </div>
   )
 }

@@ -51,6 +51,7 @@ import { WslServersProvider } from "@/wsl/context"
 import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout"
 import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
+import { CmccExpertRoute } from "@/pages/cmcc-experts"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 import {
@@ -628,6 +629,7 @@ function Routes() {
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
         <Route path="/" component={CmccDefaultRoute} />
+        <Route path="/expert/:id" component={CmccExpertRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
