@@ -1,4 +1,4 @@
-import { Show, createEffect, createMemo, createResource, untrack } from "solid-js"
+import { Show, createEffect, createResource, untrack } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { NewSessionDesignView } from "@/components/session"
 import { PromptInput } from "@/components/prompt-input"
@@ -35,8 +35,6 @@ export default function NewSessionPage() {
     sessionID: () => route.params.id,
     queryOptions: serverSync().queryOptions,
   })
-  const newSessionWorktree = createMemo(() => "main")
-
   createEffect(() => {
     if (!prompt.ready()) return
     untrack(() => {
@@ -79,8 +77,6 @@ export default function NewSessionPage() {
                       ref={(el) => {
                         inputRef = el
                       }}
-                      newSessionWorktree={newSessionWorktree()}
-                      onNewSessionWorktreeReset={() => {}}
                       onSubmit={() => comments.clear()}
                     />
                   </div>

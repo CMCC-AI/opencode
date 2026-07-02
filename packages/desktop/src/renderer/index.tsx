@@ -209,6 +209,9 @@ const createPlatform = (): Platform => {
       }
       return window.api.openPath(path, app)
     },
+    async createDirectory(path: string) {
+      return window.api.createDirectory(path)
+    },
 
     back() {
       window.history.back()

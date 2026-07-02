@@ -37,6 +37,9 @@ type PlatformBase = {
   /** Open a local path in a local app (desktop only) */
   openPath?(path: string, app?: string): Promise<void>
 
+  /** Create a local directory recursively (desktop only) */
+  createDirectory?(path: string): Promise<void>
+
   /** Restart the app  */
   restart(): Promise<void>
 

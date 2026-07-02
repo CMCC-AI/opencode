@@ -60,6 +60,8 @@ import type {
   ExperimentalWorkspaceSyncListResponses,
   ExperimentalWorkspaceWarpErrors,
   ExperimentalWorkspaceWarpResponses,
+  FileCreateDirectoryErrors,
+  FileCreateDirectoryResponses,
   FileListErrors,
   FileListResponses,
   FilePartInput,
@@ -1889,6 +1891,45 @@ export class File extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  /**
+   * Create directory
+   *
+   * Create a local directory recursively.
+   */
+  public createDirectory<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      path?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileCreateDirectoryResponses, FileCreateDirectoryErrors, ThrowOnError>(
+      {
+        url: "/file/directory",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
   }
 
   /**

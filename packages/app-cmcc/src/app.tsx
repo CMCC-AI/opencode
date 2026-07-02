@@ -62,7 +62,8 @@ import {
   sessionHref,
 } from "./utils/session-route"
 import { isSessionNotFoundError } from "./utils/server-errors"
-import { cmccDefaultWorkspace } from "./utils/cmcc-workspace"
+import { cmccCreateConversationWorkspace } from "./utils/cmcc-workspace"
+import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
 
 import Session from "@/pages/session"
@@ -642,18 +643,29 @@ function Routes() {
 
 function CmccDefaultRoute() {
   const server = useServer()
+  const serverSDK = useServerSDK()
   const sync = useServerSync()
   const tabs = useTabs()
-  const directory = createMemo(() => cmccDefaultWorkspace(sync().data.path.home))
+  const home = createMemo(() => sync().data.path.home)
   let started = false
 
   createEffect(() => {
-    const dir = directory()
-    if (!dir || started || !tabs.ready()) return
+    if (!home() || started || !tabs.ready()) return
     started = true
-    server.projects.open(dir)
-    server.projects.touch(dir)
-    tabs.newDraft({ server: server.key, directory: dir })
+    void cmccCreateConversationWorkspace(home(), (directory) =>
+      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
+    )
+      .then((dir) => {
+        if (!dir) return
+        tabs.newDraft({ server: server.key, directory: dir })
+      })
+      .catch((error) => {
+        showToast({
+          title: "无法创建对话目录",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "error",
+        })
+      })
   })
 
   return (

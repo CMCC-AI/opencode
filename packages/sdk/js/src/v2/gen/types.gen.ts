@@ -8048,6 +8048,34 @@ export type FileReadResponses = {
 
 export type FileReadResponse = FileReadResponses[keyof FileReadResponses]
 
+export type FileCreateDirectoryData = {
+  body?: {
+    path: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/directory"
+}
+
+export type FileCreateDirectoryErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FileCreateDirectoryError = FileCreateDirectoryErrors[keyof FileCreateDirectoryErrors]
+
+export type FileCreateDirectoryResponses = {
+  /**
+   * Created directory
+   */
+  200: unknown
+}
+
 export type FileStatusData = {
   body?: never
   path?: never

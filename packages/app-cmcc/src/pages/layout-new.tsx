@@ -1,24 +1,35 @@
 import type { Session } from "@opencode-ai/sdk/v2/client"
+import { ContextMenu } from "@opencode-ai/ui/context-menu"
 import { Icon } from "@opencode-ai/ui/icon"
 import { createEffect, createMemo, For, onCleanup, Show, Suspense, untrack, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { DebugBar } from "@/components/debug-bar"
 import { HelpButton } from "@/components/help-button"
+import { useDirectoryPicker } from "@/components/directory-picker"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { useCommand } from "@/context/command"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
+import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useTabs } from "@/context/tabs"
 import { setNavigate } from "@/utils/notification-click"
 import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
-import { setV2Toast, ToastRegion } from "@/utils/toast"
-import { cmccDefaultWorkspace, cmccWorkspaceLabel } from "@/utils/cmcc-workspace"
+import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
+import {
+  CMCC_CONVERSATION_WORKSPACES_EVENT,
+  cmccConversationWorkspaces,
+  cmccCreateConversationWorkspace,
+  cmccDefaultWorkspace,
+  cmccForgetConversationWorkspace,
+  cmccIsWorkspaceDirectory,
+  cmccLegacyWorkspace,
+} from "@/utils/cmcc-workspace"
 import { CMCC_EXPERTS, cmccExpertHref } from "@/pages/cmcc-experts"
-import { sortedRootSessions } from "./layout/helpers"
+import { displayName, sortedRootSessions } from "./layout/helpers"
 
 const SIDEBAR_MIN_WIDTH = 220
 const SIDEBAR_MAX_WIDTH = 420
@@ -26,6 +37,10 @@ const SIDEBAR_MAIN_MIN_WIDTH = 560
 const SIDEBAR_HIDE_THRESHOLD = 88
 const SIDEBAR_RESTORE_THRESHOLD = 140
 const CMCC_SIDEBAR_INITIALIZED_KEY = "opencode.cmcc.sidebar.initialized"
+
+function sessionUpdatedAt(session: Session) {
+  return session.time.updated ?? session.time.created
+}
 
 export default function NewLayout(props: ParentProps) {
   const navigate = useNavigate()
@@ -67,9 +82,10 @@ function CmccTopControls() {
   const layout = useLayout()
   const location = useLocation()
   const server = useServer()
+  const serverSDK = useServerSDK()
   const sync = useServerSync()
   const tabs = useTabs()
-  const directory = createMemo(() => cmccDefaultWorkspace(sync().data.path.home))
+  const home = createMemo(() => sync().data.path.home)
   const activeSessionID = createMemo(() => location.pathname.match(/\/session\/([^/?#]+)/)?.[1])
   const [history, setHistory] = createStore({
     stack: [] as string[],
@@ -103,11 +119,20 @@ function CmccTopControls() {
     layout.sidebar.open()
   }
 
-  const openNewSession = () => {
-    const dir = directory()
+  const openNewSession = async () => {
+    const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
+      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
+    ).catch((error) => {
+      showToast({
+        title: "无法创建对话目录",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
+      })
+      return undefined
+    })
     if (!dir || !tabs.ready()) return
-    server.projects.open(dir)
     server.projects.touch(dir)
+    void sync().project.loadSessions(dir, { limit: 64 })
     tabs.newDraft({ server: server.key, directory: dir })
   }
 
@@ -132,7 +157,12 @@ function CmccTopControls() {
         pressed={layout.sidebar.opened()}
         onClick={toggleSidebar}
       />
-      <CmccTopControlButton icon="arrow-left" label="后退" disabled={!canBack()} onClick={() => switchSession("back")} />
+      <CmccTopControlButton
+        icon="arrow-left"
+        label="后退"
+        disabled={!canBack()}
+        onClick={() => switchSession("back")}
+      />
       <CmccTopControlButton
         icon="arrow-right"
         label="前进"
@@ -140,7 +170,7 @@ function CmccTopControls() {
         onClick={() => switchSession("forward")}
       />
       <Show when={!layout.sidebar.opened()}>
-        <CmccTopControlButton icon="new-session" label="新建会话" onClick={openNewSession} />
+        <CmccTopControlButton icon="new-session" label="新建会话" onClick={() => void openNewSession()} />
       </Show>
     </div>
   )
@@ -153,34 +183,70 @@ function CmccSidebar() {
   const navigate = useNavigate()
   const platform = usePlatform()
   const server = useServer()
+  const serverSDK = useServerSDK()
   const sync = useServerSync()
   const tabs = useTabs()
+  const pickDirectory = useDirectoryPicker()
   const openSettings = useSettingsCommand()
-  const directory = createMemo(() => cmccDefaultWorkspace(sync().data.path.home))
+  const home = createMemo(() => sync().data.path.home)
   const [drag, setDrag] = createStore({
     active: false,
     startX: 0,
     startWidth: 0,
   })
   const [expertGroup, setExpertGroup] = createStore({ collapsed: false })
+  const [conversationStore, setConversationStore] = createStore({
+    directories: cmccConversationWorkspaces(),
+  })
+
+  if (typeof window !== "undefined") {
+    const refresh = () => setConversationStore("directories", cmccConversationWorkspaces())
+    window.addEventListener(CMCC_CONVERSATION_WORKSPACES_EVENT, refresh)
+    onCleanup(() => window.removeEventListener(CMCC_CONVERSATION_WORKSPACES_EVENT, refresh))
+  }
+
+  const projects = createMemo(() =>
+    layout.projects.list().filter((project) => !cmccIsWorkspaceDirectory(project.worktree, home())),
+  )
+  const conversationDirectories = createMemo(() => {
+    const legacy = cmccLegacyWorkspace(home())
+    const seen = new Set<string>()
+    return [...conversationStore.directories, legacy].filter((directory): directory is string => {
+      if (!directory || seen.has(directory)) return false
+      seen.add(directory)
+      return cmccIsWorkspaceDirectory(directory, home())
+    })
+  })
+  const conversations = createMemo(() => {
+    return conversationDirectories()
+      .flatMap((directory) =>
+        sortedRootSessions(sync().child(directory, { bootstrap: false })[0], Date.now()).map((session) => ({
+          directory,
+          session,
+        })),
+      )
+      .sort((a, b) => sessionUpdatedAt(b.session) - sessionUpdatedAt(a.session))
+      .slice(0, 64)
+  })
+
+  const loadConversationDirectory = async (directory: string, remembered: Set<string>) => {
+    if (remembered.has(directory)) {
+      await serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true })
+    }
+    await sync().project.loadSessions(directory, { limit: 64 })
+  }
 
   createEffect(() => {
-    const dir = directory()
-    if (!dir) return
-    server.projects.open(dir)
-    server.projects.touch(dir)
-    void sync().project.loadSessions(dir)
+    const remembered = new Set(conversationStore.directories)
+    for (const directory of conversationDirectories()) {
+      void loadConversationDirectory(directory, remembered).catch(() => {
+        if (remembered.has(directory)) cmccForgetConversationWorkspace(directory)
+      })
+    }
   })
 
-  const child = createMemo(() => {
-    const dir = directory()
-    if (!dir) return
-    return sync().child(dir, { bootstrap: false })[0]
-  })
-  const sessions = createMemo(() => {
-    const store = child()
-    if (!store) return []
-    return sortedRootSessions(store, Date.now()).slice(0, 64)
+  createEffect(() => {
+    for (const project of projects()) void sync().project.loadSessions(project.worktree, { limit: 8 })
   })
   const sidebarMaxWidth = createMemo(() => {
     if (typeof window === "undefined") return SIDEBAR_MAX_WIDTH
@@ -234,10 +300,55 @@ function CmccSidebar() {
 
   onCleanup(stopDrag)
 
-  const openNewSession = () => {
-    const dir = directory()
+  const openNewSession = async () => {
+    const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
+      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
+    ).catch((error) => {
+      showToast({
+        title: "无法创建对话目录",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
+      })
+      return undefined
+    })
     if (!dir || !tabs.ready()) return
+    server.projects.touch(dir)
+    void sync().project.loadSessions(dir, { limit: 64 })
     tabs.newDraft({ server: server.key, directory: dir })
+  }
+
+  const openProject = (directory: string) => {
+    server.projects.open(directory)
+    layout.projects.open(directory)
+    layout.projects.expand(directory)
+    server.projects.touch(directory)
+    void sync().project.loadSessions(directory, { limit: 8 })
+  }
+
+  const openProjectNewSession = (directory: string) => {
+    openProject(directory)
+    if (!tabs.ready()) return
+    tabs.newDraft({ server: server.key, directory })
+  }
+
+  const addProject = () => {
+    const conn = server.current
+    if (!conn) return
+    pickDirectory({
+      server: conn,
+      title: "打开项目",
+      multiple: true,
+      onSelect: (result) => {
+        const directories = Array.isArray(result) ? result : result ? [result] : []
+        for (const directory of directories) openProject(directory)
+      },
+    })
+  }
+
+  const openConversationDirectory = async (directory: string) => {
+    if (platform.platform !== "desktop" || !platform.openPath) return
+    await Promise.resolve(platform.createDirectory?.(directory)).catch(() => undefined)
+    await platform.openPath(directory).catch(() => undefined)
   }
 
   const openSession = (session: Session) => {
@@ -273,7 +384,7 @@ function CmccSidebar() {
       >
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4 pt-12">
-            <CmccSidebarAction icon="new-session" label="新对话" onClick={openNewSession} />
+            <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
             <CmccSidebarAction icon="magnifying-glass" label="搜索" onClick={() => command.show()} />
             <CmccExpertGroup
               collapsed={expertGroup.collapsed}
@@ -289,45 +400,113 @@ function CmccSidebar() {
               onClick={() => navigate("/plugins")}
             />
           </nav>
-          <div class="px-3 pb-2 text-[12px] leading-4 text-v2-text-text-faint">通用任务</div>
           <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-            <button
-              type="button"
-              class="mb-3 flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
-              onClick={() => {
-                const dir = directory()
-                if (dir) navigate("/")
-              }}
-            >
-              <Icon name="folder" class="size-4 shrink-0" />
-              <span class="min-w-0 truncate">{cmccWorkspaceLabel(directory(), sync().data.path.home)}</span>
-            </button>
-            <div class="mb-2 px-1 text-[12px] leading-4 text-v2-text-text-faint">对话</div>
+            <CmccSidebarSection label="项目" actionLabel="添加项目" action={addProject} actionIcon="plus" />
             <For
-              each={sessions()}
-              fallback={
-                <div class="px-1 py-3 text-[13px] leading-5 text-v2-text-text-faint">
-                  还没有对话，点“新对话”开始。
-                </div>
-              }
+              each={projects()}
+              fallback={<div class="px-1 py-3 text-14-regular text-v2-text-text-faint">暂无项目</div>}
             >
-              {(session) => (
-                <button
-                  type="button"
-                  class="group flex h-9 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
-                  data-selected={activeSession(session) ? "" : undefined}
-                  onClick={() => openSession(session)}
-                >
-                  <span class="min-w-0 flex-1 truncate">{sessionTitle(session.title) ?? "未命名对话"}</span>
-                  <span class="shrink-0 text-v2-text-text-faint">{timeLabel(session)}</span>
-                </button>
+              {(project) => {
+                const expanded = createMemo(() => project.expanded)
+                const sessions = createMemo(() =>
+                  sortedRootSessions(sync().child(project.worktree, { bootstrap: false })[0], Date.now()).slice(0, 5),
+                )
+
+                return (
+                  <div class="mb-1">
+                    <div
+                      class="group flex h-8 w-full min-w-0 items-center rounded-[6px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+                      data-selected={expanded() ? "" : undefined}
+                    >
+                      <button
+                        type="button"
+                        class="flex h-full min-w-0 flex-1 items-center gap-2 px-2 text-left text-14-medium"
+                        aria-expanded={expanded()}
+                        onClick={() => {
+                          if (expanded()) {
+                            layout.projects.collapse(project.worktree)
+                            return
+                          }
+                          layout.projects.expand(project.worktree)
+                        }}
+                      >
+                        <Icon
+                          name="chevron-down"
+                          class="size-3.5 shrink-0 transition-transform duration-150 ease-in-out"
+                          style={{ transform: `rotate(${expanded() ? 0 : -90}deg)` }}
+                        />
+                        <Icon name="folder" class="size-4 shrink-0" />
+                        <span class="min-w-0 flex-1 truncate">{displayName(project)}</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="mr-1 flex size-6 shrink-0 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
+                        title="新建任务"
+                        aria-label="新建任务"
+                        onClick={() => openProjectNewSession(project.worktree)}
+                      >
+                        <Icon name="plus" class="size-3.5" />
+                      </button>
+                    </div>
+                    <Show when={expanded()}>
+                      <div class="ml-6 mt-1 flex min-w-0 flex-col gap-1">
+                        <For
+                          each={sessions()}
+                          fallback={
+                            <button
+                              type="button"
+                              class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-regular text-v2-text-text-faint hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+                              onClick={() => openProjectNewSession(project.worktree)}
+                            >
+                              <Icon name="new-session" class="size-4 shrink-0" />
+                              <span class="min-w-0 truncate">新建任务</span>
+                            </button>
+                          }
+                        >
+                          {(session) => (
+                            <CmccSessionRow
+                              session={session}
+                              active={activeSession(session)}
+                              timeLabel={timeLabel(session)}
+                              openSession={openSession}
+                            />
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
+                )
+              }}
+            </For>
+            <CmccSidebarSection
+              label="对话"
+              actionLabel="新对话"
+              action={() => void openNewSession()}
+              actionIcon="new-session"
+            />
+            <For
+              each={conversations()}
+              fallback={<div class="px-1 py-3 text-14-regular text-v2-text-text-faint">暂无对话</div>}
+            >
+              {(record) => (
+                <CmccSessionRow
+                  session={record.session}
+                  active={activeSession(record.session)}
+                  timeLabel={timeLabel(record.session)}
+                  openSession={openSession}
+                  openDirectory={
+                    platform.platform === "desktop" && platform.openPath
+                      ? () => void openConversationDirectory(record.directory)
+                      : undefined
+                  }
+                />
               )}
             </For>
           </div>
           <div class="shrink-0 border-t border-v2-border-border-base p-3">
             <button
               type="button"
-              class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+              class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
               onClick={openSettings}
             >
               <Icon name="settings-gear" class="size-4 shrink-0" />
@@ -335,7 +514,7 @@ function CmccSidebar() {
             </button>
             <button
               type="button"
-              class="mt-1 flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+              class="mt-1 flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
               onClick={() => platform.openLink("https://opencode.ai/desktop-feedback")}
             >
               <Icon name="help" class="size-4 shrink-0" />
@@ -386,7 +565,7 @@ function CmccSidebarAction(props: {
   return (
     <button
       type="button"
-      class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[14px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base disabled:opacity-50 data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+      class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base disabled:opacity-50 data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
       onClick={props.onClick}
       disabled={!props.onClick}
       data-selected={props.active ? "" : undefined}
@@ -394,6 +573,67 @@ function CmccSidebarAction(props: {
       <Icon name={props.icon} class="size-4 shrink-0" />
       <span class="min-w-0 truncate">{props.label}</span>
     </button>
+  )
+}
+
+function CmccSidebarSection(props: {
+  label: string
+  actionLabel?: string
+  actionIcon?: Parameters<typeof Icon>[0]["name"]
+  action?: () => void
+}) {
+  return (
+    <div class="mb-2 mt-4 flex h-6 items-center gap-2 px-1 text-14-medium text-v2-text-text-faint first:mt-0">
+      <span class="min-w-0 flex-1 truncate">{props.label}</span>
+      <Show when={props.action && props.actionIcon && props.actionLabel}>
+        <button
+          type="button"
+          class="flex size-6 shrink-0 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
+          title={props.actionLabel}
+          aria-label={props.actionLabel}
+          onClick={() => props.action?.()}
+        >
+          <Icon name={props.actionIcon!} class="size-3.5" />
+        </button>
+      </Show>
+    </div>
+  )
+}
+
+function CmccSessionRow(props: {
+  session: Session
+  active: boolean
+  timeLabel: string
+  openSession: (session: Session) => void
+  openDirectory?: () => void
+}) {
+  const row = (
+    <button
+      type="button"
+      class="group flex h-9 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+      data-selected={props.active ? "" : undefined}
+      onClick={() => props.openSession(props.session)}
+    >
+      <span class="min-w-0 flex-1 truncate">{sessionTitle(props.session.title) ?? "未命名对话"}</span>
+      <span class="shrink-0 text-v2-text-text-faint">{props.timeLabel}</span>
+    </button>
+  )
+
+  return (
+    <Show when={props.openDirectory} fallback={row}>
+      {(openDirectory) => (
+        <ContextMenu>
+          <ContextMenu.Trigger as="div">{row}</ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content>
+              <ContextMenu.Item onSelect={openDirectory()}>
+                <ContextMenu.ItemLabel>打开对话目录</ContextMenu.ItemLabel>
+              </ContextMenu.Item>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </ContextMenu>
+      )}
+    </Show>
   )
 }
 
@@ -407,7 +647,7 @@ function CmccExpertGroup(props: {
     <div class="flex min-w-0 flex-col gap-1">
       <button
         type="button"
-        class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[14px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+        class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
         aria-expanded={!props.collapsed}
         onClick={props.toggle}
       >
@@ -426,7 +666,7 @@ function CmccExpertGroup(props: {
               return (
                 <button
                   type="button"
-                  class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+                  class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-regular text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
                   data-selected={props.activePath === href ? "" : undefined}
                   onClick={() => props.open(href)}
                 >

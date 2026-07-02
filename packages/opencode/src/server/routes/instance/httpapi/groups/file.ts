@@ -2,7 +2,7 @@ import { FileSystem } from "@opencode-ai/core/filesystem"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { LSP } from "@/lsp/lsp"
 import { Schema } from "effect"
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
+import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import {
@@ -35,6 +35,10 @@ export const FindFileQuery = Schema.Struct({
 export const FindSymbolQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   query: Schema.String,
+})
+
+export const CreateDirectoryPayload = Schema.Struct({
+  path: Schema.String,
 })
 
 export const LegacyMatch = Schema.Struct({
@@ -98,6 +102,7 @@ export const FilePaths = {
   findSymbol: "/find/symbol",
   list: "/file",
   content: "/file/content",
+  createDirectory: "/file/directory",
   status: "/file/status",
 } as const
 
@@ -153,6 +158,18 @@ export const FileApi = HttpApi.make("file")
             identifier: "file.read",
             summary: "Read file",
             description: "Read the content of a specified file.",
+          }),
+        ),
+        HttpApiEndpoint.post("createDirectory", FilePaths.createDirectory, {
+          query: WorkspaceRoutingQuery,
+          payload: CreateDirectoryPayload,
+          success: described(Schema.Void, "Created directory"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "file.createDirectory",
+            summary: "Create directory",
+            description: "Create a local directory recursively.",
           }),
         ),
         HttpApiEndpoint.get("status", FilePaths.status, {

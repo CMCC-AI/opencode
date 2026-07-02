@@ -7,8 +7,10 @@ import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath, RelativePath } from "@opencode-ai/core/schema"
 import { Effect, Layer, Option } from "effect"
 import ignore from "ignore"
+import { mkdir } from "node:fs/promises"
+import { homedir } from "node:os"
 import path from "path"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 
 export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handlers) =>
@@ -124,6 +126,16 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       )
     })
 
+    const createDirectory = Effect.fn("FileHttpApi.createDirectory")(function* (ctx: { payload: { path: string } }) {
+      const root = path.resolve(homedir(), "Documents", "DeepInsight")
+      const target = path.resolve(ctx.payload.path)
+      const relative = path.relative(root, target)
+      if (relative.startsWith("..") || path.isAbsolute(relative)) return yield* new HttpApiError.BadRequest({})
+      yield* Effect.tryPromise(() => mkdir(target, { recursive: true })).pipe(
+        Effect.mapError(() => new HttpApiError.BadRequest({})),
+      )
+    })
+
     const status = Effect.fn("FileHttpApi.status")(function* () {
       return []
     })
@@ -134,6 +146,7 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       .handle("findSymbol", findSymbol)
       .handle("list", list)
       .handle("content", content)
+      .handle("createDirectory", createDirectory)
       .handle("status", status)
   }),
 ).pipe(Layer.provide(locationServiceMapLayer))
