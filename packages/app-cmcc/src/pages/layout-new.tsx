@@ -282,7 +282,12 @@ function CmccSidebar() {
               open={(href) => navigate(href)}
             />
             <CmccSidebarAction icon="task" label="已安排" />
-            <CmccSidebarAction icon="mcp" label="插件" />
+            <CmccSidebarAction
+              icon="mcp"
+              label="插件"
+              active={location.pathname === "/plugins"}
+              onClick={() => navigate("/plugins")}
+            />
           </nav>
           <div class="px-3 pb-2 text-[12px] leading-4 text-v2-text-text-faint">通用任务</div>
           <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
@@ -372,13 +377,19 @@ function CmccTopControlButton(props: {
   )
 }
 
-function CmccSidebarAction(props: { icon: Parameters<typeof Icon>[0]["name"]; label: string; onClick?: () => void }) {
+function CmccSidebarAction(props: {
+  icon: Parameters<typeof Icon>[0]["name"]
+  label: string
+  active?: boolean
+  onClick?: () => void
+}) {
   return (
     <button
       type="button"
-      class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[14px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base disabled:opacity-50"
+      class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[14px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base disabled:opacity-50 data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
       onClick={props.onClick}
       disabled={!props.onClick}
+      data-selected={props.active ? "" : undefined}
     >
       <Icon name={props.icon} class="size-4 shrink-0" />
       <span class="min-w-0 truncate">{props.label}</span>

@@ -52,6 +52,7 @@ import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout
 import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
 import { CmccExpertRoute } from "@/pages/cmcc-experts"
+import { CmccPluginHubRoute } from "@/pages/cmcc-plugin-hub"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 import {
@@ -630,6 +631,7 @@ function Routes() {
       <Show when={settings.general.newLayoutDesigns()}>
         <Route path="/" component={CmccDefaultRoute} />
         <Route path="/expert/:id" component={CmccExpertRoute} />
+        <Route path="/plugins" component={CmccPluginHubRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
