@@ -4,6 +4,12 @@ export { pathKey as directoryKey, type PathKey as DirectoryKey } from "@/utils/p
 
 export const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 
+function providerName(id: string, name: string) {
+  if (id === "opencode") return "DeepInsight"
+  if (id === "opencode-go") return "DeepInsight Go"
+  return name.replaceAll("OpenCode", "DeepInsight")
+}
+
 function isAgent(input: unknown): input is Agent {
   if (!input || typeof input !== "object") return false
   const item = input as { name?: unknown; mode?: unknown }
@@ -28,6 +34,7 @@ export function normalizeProviderList(input: ProviderListResponse): NormalizedPr
             provider.id,
             {
               ...provider,
+              name: providerName(provider.id, provider.name),
               models: Object.fromEntries(
                 Object.entries(provider.models).filter(([, info]) => info.status !== "deprecated"),
               ),

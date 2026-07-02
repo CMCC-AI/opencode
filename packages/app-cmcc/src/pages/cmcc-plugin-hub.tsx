@@ -156,7 +156,7 @@ export function CmccPluginHubRoute() {
       <Show when={state.addSkillOpen}>
         <Overlay title="添加技能" close={() => setState("addSkillOpen", false)}>
           <div class="flex flex-col gap-3 text-[13px] leading-5 text-v2-text-text-muted">
-            <p>当前后端支持读取 Skills，但还没有公开的写入接口。可以把技能放到 OpenCode Skills 目录后刷新页面。</p>
+            <p>当前后端支持读取 Skills，但还没有公开的写入接口。可以把技能放到 DeepInsight Skills 目录后刷新页面。</p>
             <div class="rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-02 p-3">
               <div class="mb-2 text-v2-text-text-base">推荐文件结构</div>
               <pre class="overflow-x-auto text-[12px] leading-5 text-v2-text-text-muted">{`my-skill/
@@ -241,7 +241,7 @@ function SkillPanel(props: {
             <MarketCard
               icon="skill"
               name={skill.name}
-              description={skill.description || firstContentLine(skill.content) || "OpenCode Skill"}
+              description={skill.description || firstContentLine(skill.content) || "DeepInsight Skill"}
               meta={skill.location}
             />
           )}
@@ -259,7 +259,7 @@ function McpPanel(props: { items: Array<{ name: string; status: McpStatus }> }) 
             <MarketCard
               icon="mcp"
               name={mcp.name}
-            description={mcpError(mcp.status) || "OpenCode MCP 连接器"}
+            description={mcpError(mcp.status) || "DeepInsight MCP 连接器"}
             meta={mcpStatusLabel[mcp.status.status]}
             status={mcp.status.status}
           />

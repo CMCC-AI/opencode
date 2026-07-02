@@ -18,7 +18,6 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { createStore, produce } from "solid-js/store"
 import { useQuery } from "@tanstack/solid-query"
 import { Button } from "@opencode-ai/ui/button"
-import { Logo } from "@opencode-ai/ui/logo"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { ProjectAvatar } from "@opencode-ai/ui/v2/project-avatar-v2"
@@ -67,6 +66,7 @@ import { useMarked } from "@opencode-ai/ui/context/marked"
 import { preloadMarkdown } from "@opencode-ai/session-ui/markdown-cache"
 import { archiveHomeSession } from "./home-session-archive"
 import { showToast } from "@/utils/toast"
+import { DeepInsightLogo } from "@/components/brand"
 
 const HOME_SESSION_LIMIT = 64
 const HOME_SESSION_HEADER_STICKY_TOP = 12
@@ -1472,7 +1472,9 @@ export function LegacyHome() {
 
   return (
     <div class="mx-auto mt-55 w-full md:w-auto px-4">
-      <Logo class="md:w-xl opacity-12" />
+      <div class="md:w-xl opacity-12 select-none flex justify-center font-sans text-32-bold text-text-strong font-extrabold tracking-tight pb-2">
+        Deep<span class="font-normal">Insight</span>
+      </div>
       <Button
         size="large"
         variant="ghost"

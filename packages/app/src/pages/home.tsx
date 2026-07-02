@@ -1472,7 +1472,9 @@ export function LegacyHome() {
 
   return (
     <div class="mx-auto mt-55 w-full md:w-auto px-4">
-      <Logo class="md:w-xl opacity-12" />
+      <div class="md:w-xl opacity-12 select-none flex justify-center font-sans text-32-bold text-text-strong font-extrabold tracking-tight pb-2">
+        Deep<span class="font-normal">Insight</span>
+      </div>
       <Button
         size="large"
         variant="ghost"
