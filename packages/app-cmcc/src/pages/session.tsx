@@ -86,6 +86,7 @@ const emptyFollowups: FollowupItem[] = []
 type ChangeMode = "git" | "branch" | "turn"
 type VcsMode = "git" | "branch"
 const CMCC_RIGHT_MIN_WIDTH = 320
+const CMCC_MAIN_MIN_WIDTH = 560
 const CMCC_RIGHT_HIDE_THRESHOLD = 120
 const CMCC_RIGHT_RESTORE_THRESHOLD = 180
 
@@ -156,6 +157,7 @@ export default function Page() {
     pendingMessage: undefined as string | undefined,
     reviewSnap: false,
     rightSizing: false,
+    rightMaxWidth: 0,
     rightStartX: 0,
     rightStartWidth: 0,
     scrollGesture: 0,
@@ -233,9 +235,13 @@ export default function Page() {
   })
   const centered = createMemo(() => isDesktop() && !desktopReviewOpen())
   const cmccRightOpen = createMemo(() => cmccLayout() && !!params.id && view().reviewPanel.opened())
+  const cmccRightMaxWidth = createMemo(() => {
+    if (typeof window === "undefined") return 1000
+    return Math.max(CMCC_RIGHT_MIN_WIDTH, window.innerWidth - CMCC_MAIN_MIN_WIDTH)
+  })
   const cmccRightWidth = createMemo(() => {
     if (!cmccRightOpen()) return "0px"
-    return `${Math.max(CMCC_RIGHT_MIN_WIDTH, layout.session.width())}px`
+    return `${Math.min(cmccRightMaxWidth(), Math.max(CMCC_RIGHT_MIN_WIDTH, layout.session.width()))}px`
   })
 
   function normalizeTab(tab: string) {
@@ -774,20 +780,36 @@ export default function Page() {
     }
     if (!view().reviewPanel.opened() && raw < CMCC_RIGHT_RESTORE_THRESHOLD) return
     if (!view().reviewPanel.opened()) view().reviewPanel.open()
-    layout.session.resize(Math.max(CMCC_RIGHT_MIN_WIDTH, raw))
+    size.touch()
+    layout.session.resize(Math.min(ui.rightMaxWidth || cmccRightMaxWidth(), Math.max(CMCC_RIGHT_MIN_WIDTH, raw)))
   }
 
   const startRightSizing = (event: PointerEvent) => {
     if (!cmccLayout()) return
     event.preventDefault()
+    size.start()
     rightPreviousUserSelect = document.body.style.userSelect
     rightPreviousCursor = document.body.style.cursor
     document.body.style.userSelect = "none"
     document.body.style.cursor = "col-resize"
+    const handle = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined
+    const panel = handle?.nextElementSibling
+    const parentWidth = handle?.parentElement?.getBoundingClientRect().width
+    const handleWidth = handle?.getBoundingClientRect().width
+    const rightMaxWidth =
+      parentWidth === undefined || handleWidth === undefined
+        ? cmccRightMaxWidth()
+        : Math.max(CMCC_RIGHT_MIN_WIDTH, parentWidth - handleWidth - CMCC_MAIN_MIN_WIDTH)
     setUi({
       rightSizing: true,
+      rightMaxWidth,
       rightStartX: event.clientX,
-      rightStartWidth: cmccRightOpen() ? Math.max(CMCC_RIGHT_MIN_WIDTH, layout.session.width()) : 0,
+      rightStartWidth:
+        cmccRightOpen() && panel instanceof HTMLElement
+          ? panel.getBoundingClientRect().width
+          : cmccRightOpen()
+            ? Math.max(CMCC_RIGHT_MIN_WIDTH, layout.session.width())
+            : 0,
     })
     window.addEventListener("pointermove", moveRightSizing)
     window.addEventListener("pointerup", stopRightSizing)

@@ -83,6 +83,10 @@ import {
 import { ProjectDragOverlay, SortableProject, type ProjectSidebarContext } from "./layout/sidebar-project"
 import { SidebarContent } from "./layout/sidebar-shell"
 
+const SIDEBAR_MIN_WIDTH = 244
+const SIDEBAR_MAX_WIDTH = 420
+const SIDEBAR_MAIN_MIN_WIDTH = 560
+
 export default function LegacyLayout(props: ParentProps) {
   const serverSDK = useServerSDK()
   const [store, setStore, , ready] = persisted(
@@ -1703,11 +1707,15 @@ export default function LegacyLayout(props: ParentProps) {
   createEffect(() => {
     document.documentElement.style.setProperty(
       "--dialog-left-margin",
-      `${layout.sidebar.opened() ? layout.sidebar.width() : 48}px`,
+      `${layout.sidebar.opened() ? side() : 48}px`,
     )
   })
 
-  const side = createMemo(() => Math.max(layout.sidebar.width(), 244))
+  const sidebarMaxWidth = createMemo(() => {
+    if (typeof window === "undefined") return SIDEBAR_MAX_WIDTH
+    return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, window.innerWidth - SIDEBAR_MAIN_MIN_WIDTH))
+  })
+  const side = createMemo(() => Math.min(sidebarMaxWidth(), Math.max(layout.sidebar.width(), SIDEBAR_MIN_WIDTH)))
   const panel = createMemo(() => Math.max(side() - 64, 0))
 
   const loadedSessionDirs = new Set<string>()
@@ -2288,9 +2296,9 @@ export default function LegacyLayout(props: ParentProps) {
               >
                 <ResizeHandle
                   direction="horizontal"
-                  size={layout.sidebar.width()}
-                  min={244}
-                  max={typeof window === "undefined" ? 1000 : window.innerWidth * 0.3 + 64}
+                  size={side()}
+                  min={SIDEBAR_MIN_WIDTH}
+                  max={sidebarMaxWidth()}
                   onResize={(w) => {
                     setState("sizing", true)
                     if (sizet !== undefined) clearTimeout(sizet)

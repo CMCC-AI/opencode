@@ -335,7 +335,7 @@ export function SessionSidePanel(props: {
             !props.size.active() && !props.reviewSnap,
           "rounded-[10px] shadow-[var(--v2-elevation-raised)] overflow-hidden":
             settings.general.newLayoutDesigns() && !props.plain,
-          "flex-1": reviewOpen(),
+          "flex-1": reviewOpen() && !props.width,
         }}
         style={{ width: panelWidth() }}
       >

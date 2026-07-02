@@ -20,6 +20,8 @@ import { cmccDefaultWorkspace, cmccWorkspaceLabel } from "@/utils/cmcc-workspace
 import { sortedRootSessions } from "./layout/helpers"
 
 const SIDEBAR_MIN_WIDTH = 220
+const SIDEBAR_MAX_WIDTH = 420
+const SIDEBAR_MAIN_MIN_WIDTH = 560
 const SIDEBAR_HIDE_THRESHOLD = 88
 const SIDEBAR_RESTORE_THRESHOLD = 140
 const CMCC_SIDEBAR_INITIALIZED_KEY = "opencode.cmcc.sidebar.initialized"
@@ -178,9 +180,13 @@ function CmccSidebar() {
     if (!store) return []
     return sortedRootSessions(store, Date.now()).slice(0, 64)
   })
+  const sidebarMaxWidth = createMemo(() => {
+    if (typeof window === "undefined") return SIDEBAR_MAX_WIDTH
+    return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, window.innerWidth - SIDEBAR_MAIN_MIN_WIDTH))
+  })
   const width = createMemo(() => {
     if (!layout.sidebar.opened()) return 0
-    return Math.max(SIDEBAR_MIN_WIDTH, layout.sidebar.width())
+    return Math.min(sidebarMaxWidth(), Math.max(SIDEBAR_MIN_WIDTH, layout.sidebar.width()))
   })
   const visible = createMemo(() => layout.sidebar.opened() || drag.active)
 
@@ -205,7 +211,7 @@ function CmccSidebar() {
     }
     if (!layout.sidebar.opened() && raw < SIDEBAR_RESTORE_THRESHOLD) return
     if (!layout.sidebar.opened()) layout.sidebar.open()
-    layout.sidebar.resize(Math.max(SIDEBAR_MIN_WIDTH, raw))
+    layout.sidebar.resize(Math.min(sidebarMaxWidth(), Math.max(SIDEBAR_MIN_WIDTH, raw)))
   }
 
   const startDrag = (event: PointerEvent) => {
