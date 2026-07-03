@@ -1,11 +1,13 @@
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { ContextMenu } from "@opencode-ai/ui/context-menu"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/icon"
 import { createEffect, createMemo, For, onCleanup, Show, Suspense, untrack, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { DebugBar } from "@/components/debug-bar"
 import { HelpButton } from "@/components/help-button"
+import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { useDirectoryPicker } from "@/components/directory-picker"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { useCommand } from "@/context/command"
@@ -331,6 +333,11 @@ function CmccSidebar() {
     tabs.newDraft({ server: server.key, directory })
   }
 
+  const closeProject = (directory: string) => {
+    layout.projects.close(directory)
+    server.projects.close(directory)
+  }
+
   const addProject = () => {
     const conn = server.current
     if (!conn) return
@@ -358,6 +365,47 @@ function CmccSidebar() {
 
   const activeSession = (session: Session) =>
     location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
+
+  const removeSession = (session: Session) => {
+    const [, setStore] = sync().child(session.directory, { bootstrap: false })
+    setStore("session", (list) => list.filter((item) => item.id !== session.id))
+    setStore("sessionTotal", (value) => Math.max(0, value - 1))
+    sync().session.evict(session.id)
+    notifySessionTabsRemoved({ server: server.key, directory: session.directory, sessionIDs: [session.id] })
+    if (activeSession(session) && tabs.ready()) tabs.newDraft({ server: server.key, directory: session.directory })
+  }
+
+  const archiveSession = async (session: Session) => {
+    await serverSDK()
+      .client.session.update({ directory: session.directory, sessionID: session.id, time: { archived: Date.now() } })
+      .then(() => removeSession(session))
+      .catch((error) => {
+        showToast({
+          title: "归档失败",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "error",
+        })
+      })
+  }
+
+  const deleteSession = async (session: Session) => {
+    const name = sessionTitle(session.title) ?? "未命名对话"
+    if (!window.confirm(`删除「${name}」？此操作不可恢复。`)) return
+
+    await serverSDK()
+      .client.session.delete({ sessionID: session.id })
+      .then((result) => {
+        if (!result.data) throw new Error("删除请求未成功")
+        removeSession(session)
+      })
+      .catch((error) => {
+        showToast({
+          title: "删除失败",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "error",
+        })
+      })
+  }
 
   const timeLabel = (session: Session) => {
     const at = session.time.updated ?? session.time.created
@@ -401,7 +449,7 @@ function CmccSidebar() {
             />
           </nav>
           <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-            <CmccSidebarSection label="项目" actionLabel="添加项目" action={addProject} actionIcon="plus" />
+            <CmccSidebarSection label="项目" actionLabel="添加项目" action={addProject} actionIcon="folder-add-left" />
             <For
               each={projects()}
               fallback={<div class="px-1 py-3 text-14-regular text-v2-text-text-faint">暂无项目</div>}
@@ -438,15 +486,35 @@ function CmccSidebar() {
                         <Icon name="folder" class="size-4 shrink-0" />
                         <span class="min-w-0 flex-1 truncate">{displayName(project)}</span>
                       </button>
-                      <button
-                        type="button"
-                        class="mr-1 flex size-6 shrink-0 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
-                        title="新建任务"
-                        aria-label="新建任务"
-                        onClick={() => openProjectNewSession(project.worktree)}
-                      >
-                        <Icon name="plus" class="size-3.5" />
-                      </button>
+                      <div class="mr-1 flex shrink-0 items-center gap-0.5">
+                        <DropdownMenu>
+                          <DropdownMenu.Trigger
+                            as="button"
+                            type="button"
+                            class="flex size-6 shrink-0 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base data-[expanded]:bg-v2-overlay-simple-overlay-hover data-[expanded]:text-v2-icon-icon-base"
+                            title="更多"
+                            aria-label="更多"
+                          >
+                            <Icon name="dot-grid" class="size-3.5" />
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content class="mt-1">
+                              <DropdownMenu.Item onSelect={() => closeProject(project.worktree)}>
+                                <DropdownMenu.ItemLabel>关闭</DropdownMenu.ItemLabel>
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu>
+                        <button
+                          type="button"
+                          class="flex size-6 shrink-0 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
+                          title="新建任务"
+                          aria-label="新建任务"
+                          onClick={() => openProjectNewSession(project.worktree)}
+                        >
+                          <Icon name="edit" class="size-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <Show when={expanded()}>
                       <div class="ml-6 mt-1 flex min-w-0 flex-col gap-1">
@@ -469,6 +537,8 @@ function CmccSidebar() {
                               active={activeSession(session)}
                               timeLabel={timeLabel(session)}
                               openSession={openSession}
+                              archiveSession={archiveSession}
+                              deleteSession={deleteSession}
                             />
                           )}
                         </For>
@@ -494,6 +564,8 @@ function CmccSidebar() {
                   active={activeSession(record.session)}
                   timeLabel={timeLabel(record.session)}
                   openSession={openSession}
+                  archiveSession={archiveSession}
+                  deleteSession={deleteSession}
                   openDirectory={
                     platform.platform === "desktop" && platform.openPath
                       ? () => void openConversationDirectory(record.directory)
@@ -605,35 +677,85 @@ function CmccSessionRow(props: {
   active: boolean
   timeLabel: string
   openSession: (session: Session) => void
+  archiveSession: (session: Session) => void
+  deleteSession: (session: Session) => void
   openDirectory?: () => void
 }) {
+  const menuItems = () => (
+    <>
+      <Show when={props.openDirectory}>
+        {(openDirectory) => (
+          <DropdownMenu.Item onSelect={openDirectory()}>
+            <DropdownMenu.ItemLabel>打开对话目录</DropdownMenu.ItemLabel>
+          </DropdownMenu.Item>
+        )}
+      </Show>
+      <DropdownMenu.Item onSelect={() => props.archiveSession(props.session)}>
+        <DropdownMenu.ItemLabel>归档</DropdownMenu.ItemLabel>
+      </DropdownMenu.Item>
+      <DropdownMenu.Item onSelect={() => props.deleteSession(props.session)}>
+        <DropdownMenu.ItemLabel>删除</DropdownMenu.ItemLabel>
+      </DropdownMenu.Item>
+    </>
+  )
+
+  const contextMenuItems = () => (
+    <>
+      <Show when={props.openDirectory}>
+        {(openDirectory) => (
+          <ContextMenu.Item onSelect={openDirectory()}>
+            <ContextMenu.ItemLabel>打开对话目录</ContextMenu.ItemLabel>
+          </ContextMenu.Item>
+        )}
+      </Show>
+      <ContextMenu.Item onSelect={() => props.archiveSession(props.session)}>
+        <ContextMenu.ItemLabel>归档</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => props.deleteSession(props.session)}>
+        <ContextMenu.ItemLabel>删除</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+    </>
+  )
+
   const row = (
-    <button
-      type="button"
-      class="group flex h-9 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+    <div
+      class="group/session relative flex h-9 w-full min-w-0 items-center rounded-[6px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
       data-selected={props.active ? "" : undefined}
-      onClick={() => props.openSession(props.session)}
     >
-      <span class="min-w-0 flex-1 truncate">{sessionTitle(props.session.title) ?? "未命名对话"}</span>
-      <span class="shrink-0 text-v2-text-text-faint">{props.timeLabel}</span>
-    </button>
+      <button
+        type="button"
+        class="flex h-full w-full min-w-0 items-center gap-2 rounded-[6px] px-2 pr-9 text-left text-14-medium"
+        onClick={() => props.openSession(props.session)}
+      >
+        <span class="min-w-0 flex-1 truncate">{sessionTitle(props.session.title) ?? "未命名对话"}</span>
+        <span class="shrink-0 text-v2-text-text-faint">{props.timeLabel}</span>
+      </button>
+      <div class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100">
+        <DropdownMenu>
+          <DropdownMenu.Trigger
+            as="button"
+            type="button"
+            class="flex size-6 shrink-0 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base data-[expanded]:bg-v2-overlay-simple-overlay-hover data-[expanded]:text-v2-icon-icon-base"
+            title="更多"
+            aria-label="更多"
+          >
+            <Icon name="dot-grid" class="size-3.5" />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="mt-1">{menuItems()}</DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu>
+      </div>
+    </div>
   )
 
   return (
-    <Show when={props.openDirectory} fallback={row}>
-      {(openDirectory) => (
-        <ContextMenu>
-          <ContextMenu.Trigger as="div">{row}</ContextMenu.Trigger>
-          <ContextMenu.Portal>
-            <ContextMenu.Content>
-              <ContextMenu.Item onSelect={openDirectory()}>
-                <ContextMenu.ItemLabel>打开对话目录</ContextMenu.ItemLabel>
-              </ContextMenu.Item>
-            </ContextMenu.Content>
-          </ContextMenu.Portal>
-        </ContextMenu>
-      )}
-    </Show>
+    <ContextMenu>
+      <ContextMenu.Trigger as="div">{row}</ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content>{contextMenuItems()}</ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu>
   )
 }
 
