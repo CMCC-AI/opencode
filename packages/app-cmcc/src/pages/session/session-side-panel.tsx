@@ -48,6 +48,10 @@ type CmccArtifact = {
   status: "created" | "changed" | "deleted"
 }
 
+const [retainedTodos, setRetainedTodos] = createStore({
+  bySession: {} as Record<string, Todo[] | undefined>,
+})
+
 function renderDiff(value: SnapshotFileDiff | VcsFileDiff): value is RenderDiff {
   return typeof value.file === "string"
 }
@@ -155,9 +159,6 @@ export function SessionSidePanel(props: {
 
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
   const diffFiles = createMemo(() => diffs().map((d) => d.file))
-  const [retainedTodos, setRetainedTodos] = createStore({
-    bySession: {} as Record<string, Todo[] | undefined>,
-  })
   const liveTodos = createMemo(() => {
     if (!params.id) return []
     return serverSync().session.data.todo[params.id] ?? []

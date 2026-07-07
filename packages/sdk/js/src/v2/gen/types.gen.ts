@@ -8048,6 +8048,35 @@ export type FileReadResponses = {
 
 export type FileReadResponse = FileReadResponses[keyof FileReadResponses]
 
+export type FileWriteData = {
+  body?: {
+    path: string
+    content: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/write"
+}
+
+export type FileWriteErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type FileWriteError = FileWriteErrors[keyof FileWriteErrors]
+
+export type FileWriteResponses = {
+  /**
+   * Written
+   */
+  200: unknown
+}
+
 export type FileCreateDirectoryData = {
   body?: {
     path: string
@@ -8062,9 +8091,9 @@ export type FileCreateDirectoryData = {
 
 export type FileCreateDirectoryErrors = {
   /**
-   * Bad request
+   * BadRequest | InvalidRequestError
    */
-  400: BadRequestError
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
 }
 
 export type FileCreateDirectoryError = FileCreateDirectoryErrors[keyof FileCreateDirectoryErrors]
