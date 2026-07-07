@@ -3,10 +3,12 @@ import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
+import { Dynamic } from "solid-js/web"
 import type { Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -18,7 +20,9 @@ import { useCommand } from "@/context/command"
 import { useFile, type SelectedLineRange } from "@/context/file"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
+import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
+import { useSDK } from "@/context/sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useSync } from "@/context/sync"
 import { createFileTabListSync } from "@/pages/session/file-tab-scroll"
@@ -33,6 +37,7 @@ import {
 import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { DeepInsightMark } from "@/components/brand"
+import { showToast } from "@/utils/toast"
 
 type RenderDiff = (SnapshotFileDiff & { file: string }) | VcsFileDiff
 type CmccPanelTab = "plan" | "artifacts" | "browser" | "review"
@@ -76,10 +81,23 @@ function todoStatusLabel(value: Todo["status"]) {
   return "待处理"
 }
 
-function artifactStatusLabel(value: CmccArtifact["status"]) {
-  if (value === "created") return "新建"
-  if (value === "deleted") return "删除"
-  return "更新"
+function normalizePathSeparators(value: string) {
+  return value.replaceAll("\\", "/").replace(/\/+$/, "")
+}
+
+function absolutePath(value: string) {
+  return value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith("\\\\")
+}
+
+function parentPath(value: string) {
+  const normalized = normalizePathSeparators(value)
+  const index = normalized.lastIndexOf("/")
+  if (index <= 0) return value
+  return normalized.slice(0, index)
+}
+
+function fileName(value: string) {
+  return normalizePathSeparators(value).split("/").filter(Boolean).at(-1) ?? value
 }
 
 export function SessionSidePanel(props: {
@@ -131,14 +149,30 @@ export function SessionSidePanel(props: {
   })
   const treeWidth = createMemo(() => (fileOpen() ? `${layout.fileTree.width()}px` : "0px"))
   const [cmccActiveTab, setCmccActiveTab] = createSignal<CmccPanelTab>("plan")
+  const [activeArtifact, setActiveArtifact] = createSignal<string>()
   const [browserDraft, setBrowserDraft] = createSignal("https://www.google.com/search?igu=1")
   const [browserUrl, setBrowserUrl] = createSignal("https://www.google.com/search?igu=1")
 
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
   const diffFiles = createMemo(() => diffs().map((d) => d.file))
-  const todos = createMemo(() => {
+  const [retainedTodos, setRetainedTodos] = createStore({
+    bySession: {} as Record<string, Todo[] | undefined>,
+  })
+  const liveTodos = createMemo(() => {
     if (!params.id) return []
     return serverSync().session.data.todo[params.id] ?? []
+  })
+  createEffect(() => {
+    const id = params.id
+    const current = liveTodos()
+    if (!id || current.length === 0) return
+    setRetainedTodos("bySession", id, current)
+  })
+  const todos = createMemo(() => {
+    if (!params.id) return []
+    const current = liveTodos()
+    if (current.length > 0) return current
+    return retainedTodos.bySession[params.id] ?? []
   })
   const parts = createMemo(() => {
     if (!params.id) return []
@@ -265,6 +299,9 @@ export function SessionSidePanel(props: {
   }
 
   const openArtifact = (path: string) => {
+    setActiveArtifact(path)
+    setCmccActiveTab("artifacts")
+    void file.load(path)
     openTab(file.tab(path))
   }
 
@@ -491,6 +528,8 @@ export function SessionSidePanel(props: {
                     setActive={setCmccActiveTab}
                     todos={todos()}
                     artifacts={artifacts()}
+                    activeArtifact={activeArtifact()}
+                    clearActiveArtifact={() => setActiveArtifact(undefined)}
                     browserDraft={browserDraft()}
                     browserUrl={browserUrl()}
                     setBrowserDraft={setBrowserDraft}
@@ -610,6 +649,8 @@ function CmccAssistantPanel(props: {
   setActive: (tab: CmccPanelTab) => void
   todos: Todo[]
   artifacts: CmccArtifact[]
+  activeArtifact?: string
+  clearActiveArtifact: () => void
   browserDraft: string
   browserUrl: string
   setBrowserDraft: (value: string) => void
@@ -652,7 +693,12 @@ function CmccAssistantPanel(props: {
             <CmccPlanPanel todos={props.todos} />
           </Match>
           <Match when={props.active === "artifacts"}>
-            <CmccArtifactsPanel artifacts={props.artifacts} openArtifact={props.openArtifact} />
+            <CmccArtifactsPanel
+              artifacts={props.artifacts}
+              activeArtifact={props.activeArtifact}
+              clearActiveArtifact={props.clearActiveArtifact}
+              openArtifact={props.openArtifact}
+            />
           </Match>
           <Match when={props.active === "browser"}>
             <CmccBrowserPanel
@@ -712,32 +758,161 @@ function CmccPlanPanel(props: { todos: Todo[] }) {
   )
 }
 
-function CmccArtifactsPanel(props: { artifacts: CmccArtifact[]; openArtifact: (path: string) => void }) {
+function CmccArtifactsPanel(props: {
+  artifacts: CmccArtifact[]
+  activeArtifact?: string
+  clearActiveArtifact: () => void
+  openArtifact: (path: string) => void
+}) {
+  const file = useFile()
+  const sdk = useSDK()
+  const platform = usePlatform()
+  const fileComponent = useFileComponent()
+  const [contextMenu, setContextMenu] = createSignal<{ artifact: CmccArtifact; x: number; y: number }>()
+  const selected = createMemo(() => props.artifacts.find((item) => item.path === props.activeArtifact))
+  const state = createMemo(() => {
+    const item = selected()
+    if (!item) return
+    return file.get(item.path)
+  })
+  const content = createMemo(() => state()?.content?.content ?? "")
+  const absoluteArtifactPath = (path: string) => (absolutePath(path) ? path : `${sdk().directory}/${path}`)
+  const openSystemPath = (path: string, folder: boolean) => {
+    if (platform.platform !== "desktop" || !platform.openPath) {
+      showToast({ title: folder ? "无法打开文件夹" : "无法打开文件", description: "当前环境不支持打开本地路径。" })
+      return
+    }
+    platform.openPath(folder ? parentPath(absoluteArtifactPath(path)) : absoluteArtifactPath(path)).catch((error: unknown) => {
+      showToast({
+        title: folder ? "无法打开文件夹" : "无法打开文件",
+        description: error instanceof Error ? error.message : String(error),
+      })
+    })
+  }
+  const openSelectedFolder = () => {
+    const item = selected()
+    if (!item) return
+    openSystemPath(item.path, true)
+  }
+
+  createEffect(() => {
+    const item = selected()
+    if (!item) return
+    void file.load(item.path)
+  })
+
   return (
     <div class="h-full overflow-y-auto px-4 py-4">
       <Show
         when={props.artifacts.length > 0}
         fallback={<CmccEmptyPanel title="暂无文件产出" description="助手生成、修改或补丁涉及的文件会汇总到这里。" />}
       >
-        <div class="space-y-2">
-          <For each={props.artifacts}>
-            {(item) => (
-              <button
-                type="button"
-                class="flex w-full min-w-0 items-start gap-3 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2.5 text-left hover:bg-v2-overlay-simple-overlay-hover"
-                onClick={() => props.openArtifact(item.path)}
+        <Show when={contextMenu()}>
+          {(menu) => (
+            <>
+              <div class="fixed inset-0 z-40" onMouseDown={() => setContextMenu(undefined)} />
+              <div
+                class="fixed z-50 min-w-36 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-02 py-1 shadow-[var(--v2-elevation-raised)]"
+                style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
+                onMouseDown={(event) => event.stopPropagation()}
               >
-                <div class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-v2-background-bg-layer-03 text-[11px] text-v2-text-text-muted">
-                  {artifactStatusLabel(item.status)}
-                </div>
+                <button
+                  type="button"
+                  class="block w-full px-3 py-1.5 text-left text-[13px] leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                  onClick={() => {
+                    openSystemPath(menu().artifact.path, false)
+                    setContextMenu(undefined)
+                  }}
+                >
+                  打开
+                </button>
+                <button
+                  type="button"
+                  class="block w-full px-3 py-1.5 text-left text-[13px] leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                  onClick={() => {
+                    openSystemPath(menu().artifact.path, true)
+                    setContextMenu(undefined)
+                  }}
+                >
+                  打开文件夹
+                </button>
+              </div>
+            </>
+          )}
+        </Show>
+        <Show
+          when={selected()}
+          fallback={
+            <div class="space-y-2">
+              <For each={props.artifacts}>
+                {(item) => (
+                  <button
+                    type="button"
+                    class="flex w-full min-w-0 items-center gap-2 rounded-[6px] px-2 py-1.5 text-left hover:bg-v2-overlay-simple-overlay-hover"
+                    title={item.path}
+                    onClick={() => props.openArtifact(item.path)}
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      setContextMenu({ artifact: item, x: event.clientX, y: event.clientY })
+                    }}
+                  >
+                    <div class="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-v2-border-border-active text-[9px] font-medium uppercase text-white">
+                      {fileName(item.path).split(".").at(-1)?.slice(0, 1) ?? "F"}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate text-[13px] leading-5 text-v2-text-text-base">{fileName(item.path)}</div>
+                    </div>
+                  </button>
+                )}
+              </For>
+            </div>
+          }
+        >
+          {(item) => (
+            <div class="flex min-h-full flex-col">
+              <div class="mb-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                  onClick={props.clearActiveArtifact}
+                >
+                  返回
+                </button>
                 <div class="min-w-0 flex-1">
-                  <div class="truncate text-[13px] font-medium leading-5 text-v2-text-text-base">{item.path}</div>
-                  <div class="mt-1 text-[11px] leading-4 text-v2-text-text-faint">{item.source}</div>
+                  <div class="truncate text-[13px] font-medium leading-5 text-v2-text-text-base">{fileName(item().path)}</div>
+                  <div class="text-[11px] leading-4 text-v2-text-text-faint">{item().source}</div>
                 </div>
-              </button>
-            )}
-          </For>
-        </div>
+                <button
+                  type="button"
+                  class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                  onClick={openSelectedFolder}
+                >
+                  打开文件夹
+                </button>
+              </div>
+              <div class="min-h-0 flex-1 overflow-hidden rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01">
+                <Switch>
+                  <Match when={state()?.loaded}>
+                    <div class="h-full overflow-auto">
+                      <Dynamic
+                        component={fileComponent}
+                        mode="text"
+                        file={{ name: fileName(item().path), contents: content() }}
+                        class="select-text"
+                      />
+                    </div>
+                  </Match>
+                  <Match when={state()?.loading}>
+                    <div class="px-4 py-3 text-[13px] text-v2-text-text-muted">加载中...</div>
+                  </Match>
+                  <Match when={state()?.error}>
+                    {(error) => <div class="px-4 py-3 text-[13px] text-v2-text-text-muted">{error()}</div>}
+                  </Match>
+                </Switch>
+              </div>
+            </div>
+          )}
+        </Show>
       </Show>
     </div>
   )
