@@ -69,6 +69,11 @@ import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
+import {
+  CmccProfessionalDatabasesDialog,
+  CmccPromptActionMenu,
+  type CmccProfessionalDatabase,
+} from "@/components/cmcc-professional-databases"
 
 export type PromptInputState = ReturnType<typeof usePrompt>
 
@@ -215,6 +220,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   let fileInputRef: HTMLInputElement | undefined
   let scrollRef!: HTMLDivElement
   let slashPopoverRef!: HTMLDivElement
+  let cmccActionAnchorRef: HTMLDivElement | undefined
+  let cmccActionMenuRef: HTMLDivElement | undefined
   let restoreEndOnFocus = true
 
   const mirror = { input: false }
@@ -343,6 +350,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     () => prompt.capture(),
     Math.floor(Math.random() * EXAMPLES.length),
   )
+  const [cmccActionMenuOpen, setCmccActionMenuOpen] = createSignal(false)
+  const [cmccActionMenuPosition, setCmccActionMenuPosition] = createSignal<{ left: number; top: number }>()
+  const [cmccDatabaseOpen, setCmccDatabaseOpen] = createSignal(false)
   const buttonsSpring = useSpring(() => (store.mode === "normal" ? 1 : 0), { visualDuration: 0.2, bounce: 0 })
   const motion = (value: number) => ({
     opacity: value,
@@ -553,6 +563,55 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const closePopover = () => setStore("popover", null)
 
+  const positionCmccActionMenu = () => {
+    const rect = cmccActionAnchorRef?.getBoundingClientRect()
+    if (!rect) return
+
+    const width = 218
+    const height = 190
+    setCmccActionMenuPosition({
+      left: Math.min(Math.max(8, rect.left - 4), window.innerWidth - width - 8),
+      top: Math.max(8, rect.top - height - 12),
+    })
+  }
+
+  const toggleCmccActionMenu = () => {
+    if (cmccActionMenuOpen()) {
+      setCmccActionMenuOpen(false)
+      return
+    }
+
+    positionCmccActionMenu()
+    setCmccActionMenuOpen(true)
+  }
+
+  createEffect(() => {
+    if (!cmccActionMenuOpen()) return
+
+    const close = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (cmccActionMenuRef?.contains(target)) return
+      if (target instanceof Element && target.closest('[data-action="prompt-cmcc-actions"]')) return
+      setCmccActionMenuOpen(false)
+    }
+
+    document.addEventListener("pointerdown", close)
+    onCleanup(() => document.removeEventListener("pointerdown", close))
+  })
+
+  createEffect(() => {
+    if (!cmccActionMenuOpen()) return
+
+    positionCmccActionMenu()
+    window.addEventListener("resize", positionCmccActionMenu)
+    window.addEventListener("scroll", positionCmccActionMenu, true)
+    onCleanup(() => {
+      window.removeEventListener("resize", positionCmccActionMenu)
+      window.removeEventListener("scroll", positionCmccActionMenu, true)
+    })
+  })
+
   const resetHistoryNavigation = (force = false) => {
     if (!force && (store.historyIndex < 0 || store.applyingHistory)) return
     setStore("historyIndex", -1)
@@ -566,6 +625,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const setEditorText = (text: string) => {
     clearEditor()
     editorRef.textContent = text
+  }
+
+  const setPlainPrompt = (text: string) => {
+    const images = imageAttachments()
+    setCmccActionMenuOpen(false)
+    setStore("mode", "normal")
+    setStore("popover", null)
+    resetHistoryNavigation(true)
+    setEditorText(text)
+    prompt.set([{ type: "text", content: text, start: 0, end: text.length }, ...images], text.length)
+    focusEditorEnd()
+    queueScroll()
   }
 
   const focusEditorEnd = () => {
@@ -810,6 +881,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     clearEditor()
     prompt.set([...DEFAULT_PROMPT, ...images], 0)
     command.trigger(cmd.id, "slash")
+  }
+
+  const openSkillCommands = () => {
+    setPlainPrompt("/")
+    slashOnInput("")
+    setStore("popover", "slash")
+  }
+
+  const openProfessionalDatabases = () => {
+    setCmccActionMenuOpen(false)
+    setCmccDatabaseOpen(true)
+  }
+
+  const tryProfessionalDatabase = (database: CmccProfessionalDatabase) => {
+    setCmccDatabaseOpen(false)
+    setPlainPrompt(database.prompt)
   }
 
   const {
@@ -1510,6 +1597,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   return (
     <div class="relative size-full flex flex-col gap-0">
       {(promptReady(), null)}
+      <Show when={cmccDatabaseOpen()}>
+        <CmccProfessionalDatabasesDialog
+          onClose={() => setCmccDatabaseOpen(false)}
+          onTry={tryProfessionalDatabase}
+        />
+      </Show>
       <PromptPopover
         popover={store.popover}
         setSlashPopoverRef={(el) => (slashPopoverRef = el)}
@@ -1618,25 +1711,35 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   {fileAttachmentInput()}
                   <TooltipV2
                     placement="top"
-                    value={
-                      <>
-                        {language.t("prompt.action.attachFile")}
-                        <KeybindV2 keys={command.keybindParts("file.attach")} variant="neutral" />
-                      </>
-                    }
+                    value="更多操作"
                   >
-                    <IconButton
-                      data-action="prompt-attach"
-                      type="button"
-                      icon="plus"
-                      variant="ghost"
-                      class="size-7 rounded-md p-[6px] text-v2-icon-icon-muted"
-                      style={buttons()}
-                      onClick={pick}
-                      disabled={store.mode !== "normal"}
-                      tabIndex={store.mode === "normal" ? undefined : -1}
-                      aria-label={language.t("prompt.action.attachFile")}
-                    />
+                    <div ref={(el) => (cmccActionAnchorRef = el)}>
+                      <IconButton
+                        data-action="prompt-cmcc-actions"
+                        type="button"
+                        icon="plus"
+                        variant="ghost"
+                        class="size-7 rounded-md p-[6px] text-v2-icon-icon-muted"
+                        style={buttons()}
+                        onClick={toggleCmccActionMenu}
+                        disabled={store.mode !== "normal"}
+                        tabIndex={store.mode === "normal" ? undefined : -1}
+                        aria-label="打开更多操作"
+                      />
+                      <CmccPromptActionMenu
+                        open={cmccActionMenuOpen()}
+                        position={cmccActionMenuPosition()}
+                        menuRef={(el) => (cmccActionMenuRef = el)}
+                        onAttach={() => {
+                          setCmccActionMenuOpen(false)
+                          pick()
+                        }}
+                        onSkills={openSkillCommands}
+                        onPlugins={() => setPlainPrompt("请帮我推荐并使用适合当前任务的插件：")}
+                        onProfessionalDatabases={openProfessionalDatabases}
+                        onGoal={() => setPlainPrompt("请帮我制定一个目标，并拆解为可执行步骤：")}
+                      />
+                    </div>
                   </TooltipV2>
                   <Show when={showAgentControl()}>
                     <ComposerAgentControl state={agentControlState()} />
