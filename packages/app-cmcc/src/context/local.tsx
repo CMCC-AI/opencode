@@ -1,6 +1,6 @@
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { base64Encode } from "@opencode-ai/core/util/encode"
-import { useParams } from "@solidjs/router"
+import { useParams, useSearchParams } from "@solidjs/router"
 import { batch, createEffect, createMemo, startTransition } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useModels } from "@/context/models"
@@ -57,6 +57,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
   name: "Local",
   init: () => {
     const params = useParams()
+    const [search] = useSearchParams<{ agent?: string }>()
     const sdk = useSDK()
     const sync = useSync()
     const serverSDK = useServerSDK()
@@ -227,6 +228,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         agent.set(item.name)
       },
     }
+    let appliedInitialAgent: string | undefined
+    createEffect(() => {
+      const initialAgent = search.agent
+      if (id() || !initialAgent || appliedInitialAgent === initialAgent) return
+      if (!list().some((item) => item.name === initialAgent)) return
+      appliedInitialAgent = initialAgent
+      agent.set(initialAgent)
+    })
 
     const current = () => {
       const item = firstModel(

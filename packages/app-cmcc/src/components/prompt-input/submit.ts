@@ -191,6 +191,7 @@ type PromptSubmitInput = {
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
   onSubmit?: () => void
+  selectedAgent?: Accessor<string | undefined>
 }
 
 export function createPromptSubmit(input: PromptSubmitInput) {
@@ -300,8 +301,9 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     const currentModel = local.model.current()
     const currentAgent = local.agent.current()
+    const selectedAgent = input.selectedAgent?.()
     const variant = local.model.variant.current()
-    if (!currentModel || !currentAgent) {
+    if (!currentModel || (!currentAgent && !selectedAgent)) {
       showToast({
         title: language.t("prompt.toast.modelAgentRequired.title"),
         description: language.t("prompt.toast.modelAgentRequired.description"),
@@ -362,7 +364,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     let session = input.info()
     if (!session && isNewSession) {
       const created = await client.session
-        .create()
+        .create({ agent: selectedAgent })
         .then((x) => x.data ?? undefined)
         .catch((err) => {
           showToast({
@@ -395,7 +397,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       modelID: currentModel.id,
       providerID: currentModel.provider.id,
     }
-    const agent = currentAgent.name
+    const agent = selectedAgent ?? currentAgent!.name
     const draft: FollowupDraft = {
       sessionID: session.id,
       sessionDirectory,

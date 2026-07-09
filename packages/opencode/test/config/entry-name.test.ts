@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { posix } from "path"
-import { configEntryNameFromPath } from "@/config/entry-name"
+import { configEntryNameFromPath, configExpertAgentNameFromPath } from "@/config/entry-name"
 
 // Use POSIX semantics so the test is deterministic regardless of host OS —
 // production code passes paths through `path.relative` on the runtime
@@ -53,5 +53,23 @@ describe("configEntryNameFromPath", () => {
     const item = "/srv/agents/team/.config/opencode/agents/build.md"
     const relative = posix.relative(dir, item)
     expect(configEntryNameFromPath(relative, AGENT_PREFIXES)).toBe("build")
+  })
+})
+
+describe("configExpertAgentNameFromPath", () => {
+  test("namespaces agents by expert package id", () => {
+    expect(configExpertAgentNameFromPath("experts/trading-agent/agents/market-analyst.md")).toBe(
+      "trading-agent/market-analyst",
+    )
+  })
+
+  test("supports singular agent directories", () => {
+    expect(configExpertAgentNameFromPath("experts/trading-agent/agent/trading-team-lead.md")).toBe(
+      "trading-agent/trading-team-lead",
+    )
+  })
+
+  test("normalizes Windows-style expert agent paths", () => {
+    expect(configExpertAgentNameFromPath("experts\\team\\agents\\nested\\build.md")).toBe("team/nested/build")
   })
 })

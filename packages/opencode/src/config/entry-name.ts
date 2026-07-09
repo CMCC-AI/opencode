@@ -17,3 +17,11 @@ export function configEntryNameFromPath(relativePath: string, prefixes: string[]
   const ext = path.extname(candidate)
   return ext.length ? candidate.slice(0, -ext.length) : candidate
 }
+
+export function configExpertAgentNameFromPath(relativePath: string) {
+  const normalized = relativePath.replaceAll("\\", "/")
+  const match = normalized.match(/^experts\/([^/]+)\/agents?\/(.+)$/)
+  if (!match) return configEntryNameFromPath(relativePath, [])
+  const ext = path.extname(match[2])
+  return `${match[1]}/${ext.length ? match[2].slice(0, -ext.length) : match[2]}`
+}

@@ -9,7 +9,7 @@ import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
 import { Dynamic } from "solid-js/web"
-import type { Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { FileNode, Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 
@@ -47,6 +47,29 @@ type CmccArtifact = {
   source: string
   status: "created" | "changed" | "deleted"
 }
+
+const WORKSPACE_ARTIFACT_LIMIT = 200
+const WORKSPACE_ARTIFACT_MAX_DEPTH = 8
+const WORKSPACE_ARTIFACT_DIRS = new Set(["artifact", "artifacts", "deliverable", "deliverables", "output", "outputs", "report", "reports"])
+const WORKSPACE_ARTIFACT_EXTENSIONS = new Set([
+  "csv",
+  "doc",
+  "docx",
+  "htm",
+  "html",
+  "jpeg",
+  "jpg",
+  "json",
+  "md",
+  "pdf",
+  "png",
+  "ppt",
+  "pptx",
+  "svg",
+  "txt",
+  "xls",
+  "xlsx",
+])
 
 const [retainedTodos, setRetainedTodos] = createStore({
   bySession: {} as Record<string, Todo[] | undefined>,
@@ -104,6 +127,58 @@ function fileName(value: string) {
   return normalizePathSeparators(value).split("/").filter(Boolean).at(-1) ?? value
 }
 
+function normalizeArtifactPath(value: string) {
+  return normalizePathSeparators(value).replace(/^\/+/, "")
+}
+
+function isWorkspaceArtifactFile(value: string) {
+  const ext = fileName(value).split(".").at(-1)?.toLowerCase()
+  return ext ? WORKSPACE_ARTIFACT_EXTENSIONS.has(ext) : false
+}
+
+function isWorkspaceArtifactDir(value: string) {
+  return WORKSPACE_ARTIFACT_DIRS.has(fileName(value).toLowerCase())
+}
+
+async function scanWorkspaceArtifactPaths(list: (path: string) => Promise<FileNode[]>) {
+  const paths = new Set<string>()
+  const queue: { path: string; depth: number }[] = []
+  const root = await list("")
+
+  for (const node of root) {
+    const current = normalizeArtifactPath(node.path)
+    if (!current) continue
+
+    if (node.type === "file" && isWorkspaceArtifactFile(current)) {
+      paths.add(current)
+    }
+    if (node.type === "directory" && isWorkspaceArtifactDir(current)) {
+      queue.push({ path: current, depth: 1 })
+    }
+  }
+
+  while (queue.length > 0 && paths.size < WORKSPACE_ARTIFACT_LIMIT) {
+    const current = queue.shift()
+    if (!current) continue
+
+    const children = await list(current.path)
+    for (const child of children) {
+      const childPath = normalizeArtifactPath(child.path)
+      if (!childPath) continue
+
+      if (child.type === "file") {
+        paths.add(childPath)
+      }
+      if (child.type === "directory" && current.depth < WORKSPACE_ARTIFACT_MAX_DEPTH) {
+        queue.push({ path: childPath, depth: current.depth + 1 })
+      }
+      if (paths.size >= WORKSPACE_ARTIFACT_LIMIT) break
+    }
+  }
+
+  return [...paths].sort((a, b) => a.localeCompare(b))
+}
+
 export function SessionSidePanel(props: {
   canReview: () => boolean
   diffs: () => (SnapshotFileDiff | VcsFileDiff)[]
@@ -125,6 +200,7 @@ export function SessionSidePanel(props: {
   const serverSync = useServerSync()
   const sync = useSync()
   const file = useFile()
+  const sdk = useSDK()
   const language = useLanguage()
   const command = useCommand()
   const dialog = useDialog()
@@ -156,6 +232,7 @@ export function SessionSidePanel(props: {
   const [activeArtifact, setActiveArtifact] = createSignal<string>()
   const [browserDraft, setBrowserDraft] = createSignal("https://www.google.com/search?igu=1")
   const [browserUrl, setBrowserUrl] = createSignal("https://www.google.com/search?igu=1")
+  const [workspaceArtifactPaths, setWorkspaceArtifactPaths] = createSignal<string[]>([])
 
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
   const diffFiles = createMemo(() => diffs().map((d) => d.file))
@@ -214,7 +291,42 @@ export function SessionSidePanel(props: {
       }
     }
 
+    for (const path of workspaceArtifactPaths()) {
+      if (items.has(path)) continue
+      items.set(path, {
+        id: `workspace:${path}`,
+        path,
+        source: "工作目录产出",
+        status: "created",
+      })
+    }
+
     return [...items.values()]
+  })
+
+  createEffect(() => {
+    const directory = sdk().directory
+    const sessionID = params.id
+    if (!sessionID) {
+      setWorkspaceArtifactPaths([])
+      return
+    }
+
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
+
+    const list = (path: string) =>
+      sdk()
+        .client.file.list({ path })
+        .then((result) => result.data ?? [], () => [])
+
+    void scanWorkspaceArtifactPaths(list).then((paths) => {
+      if (cancelled) return
+      if (sdk().directory !== directory || params.id !== sessionID) return
+      setWorkspaceArtifactPaths(paths)
+    })
   })
   const kinds = createMemo(() => {
     const merge = (a: "add" | "del" | "mix" | undefined, b: "add" | "del" | "mix") => {

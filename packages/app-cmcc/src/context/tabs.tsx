@@ -23,6 +23,7 @@ export type DraftTab = {
   server: ServerConnection.Key
   directory: string
   worktree?: string
+  agent?: string
 }
 
 export type Tab = SessionTab | DraftTab
@@ -163,15 +164,18 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
         if (!tab || tab.type !== "draft") throw new Error(`Draft not found: ${draftID}`)
         return tab
       },
-      newDraft(draft: Omit<DraftTab, "type" | "draftID">, prompt?: string) {
+      newDraft(draft: Omit<DraftTab, "type" | "draftID">, prompt?: string, options?: { agent?: string }) {
         const draftID = uuid()
         void startTransition(() => {
           setStore(
             produce((tabs) => {
-              tabs.push({ type: "draft", draftID, ...draft })
+              tabs.push({ type: "draft", draftID, ...draft, agent: options?.agent ?? draft.agent })
             }),
           )
-          navigate(prompt ? `${draftHref(draftID)}&prompt=${encodeURIComponent(prompt)}` : draftHref(draftID))
+          const params = new URLSearchParams({ draftId: draftID })
+          if (prompt) params.set("prompt", prompt)
+          if (options?.agent) params.set("agent", options.agent)
+          navigate(`/new-session?${params.toString()}`)
         })
       },
       updateDraft(draftID: string, draft: Partial<Omit<DraftTab, "type" | "draftID">>) {

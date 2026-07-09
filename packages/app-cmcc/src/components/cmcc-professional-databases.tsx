@@ -1,89 +1,88 @@
 import { createMemo, createSignal, For, Show, type Component } from "solid-js"
 import { Portal } from "solid-js/web"
 import { Icon } from "@opencode-ai/ui/icon"
+import academicIcon from "../assets/professional-databases/academic.png"
+import globalFinanceIcon from "../assets/professional-databases/global-finance.png"
+import ifindIcon from "../assets/professional-databases/ifind.png"
+import imfIcon from "../assets/professional-databases/imf.png"
+import legalIcon from "../assets/professional-databases/legal.png"
+import secIcon from "../assets/professional-databases/sec.png"
+import tianyanchaIcon from "../assets/professional-databases/tianyancha.png"
+import worldBankIcon from "../assets/professional-databases/world-bank.png"
 
 export type CmccProfessionalDatabase = {
   id: string
   name: string
-  shortName: string
   description: string
   detail: string
   prompt: string
-  tone: "blue" | "cyan" | "green" | "red" | "teal" | "indigo" | "orange" | "slate"
+  icon: string
 }
 
 export const CMCC_PROFESSIONAL_DATABASES: CmccProfessionalDatabase[] = [
   {
     id: "ifind",
     name: "同花顺 iFinD 金融数据库",
-    shortName: "iF",
     description: "中国及全球股票、期货、指数等金融数据",
     detail: "面向国内金融市场，覆盖股票行情、公司资料、财务报表与宏观指标。",
     prompt: "帮我去同花顺查一下茅台过去一年股价和2024年的资产负债表",
-    tone: "red",
+    icon: ifindIcon,
   },
   {
     id: "academic",
     name: "学术数据库",
-    shortName: "学",
     description: "期刊、论文、预印本、学位论文、专利等学术信息",
     detail: "检索论文、作者、机构、引用与主题趋势，适合科研调研和文献综述。",
     prompt: "帮我检索近三年关于大模型 Agent 工作流评估的高被引论文，并总结研究趋势",
-    tone: "blue",
+    icon: academicIcon,
   },
   {
     id: "tianyancha",
     name: "天眼查企业数据库",
-    shortName: "企",
     description: "企业工商信息、股权、司法风险等数据",
     detail: "查询企业主体、股东高管、对外投资、经营风险与司法风险。",
     prompt: "帮我查询中国移动的工商信息、股权结构和最近司法风险",
-    tone: "indigo",
+    icon: tianyanchaIcon,
   },
   {
     id: "legal",
     name: "华宇元典法律数据库",
-    shortName: "律",
     description: "中国法律法规、案例数据",
     detail: "检索法规、裁判文书、典型案例与司法观点，适合法律研究场景。",
     prompt: "帮我检索近五年关于数据合规和个人信息保护的典型案例",
-    tone: "cyan",
+    icon: legalIcon,
   },
   {
     id: "world-bank",
     name: "世界银行经济数据库",
-    shortName: "WB",
     description: "全球经济、社会与发展指标，包括 GDP、人口、通胀等",
     detail: "覆盖全球发展指标和宏观数据，适合国家与区域经济对比分析。",
     prompt: "帮我查询中国和美国近十年的 GDP、通胀率和人口数据，并生成对比表",
-    tone: "teal",
+    icon: worldBankIcon,
   },
   {
     id: "global-finance",
     name: "全球金融数据库",
-    shortName: "金",
     description: "全球主要市场股票行情、财经资讯、历史数据",
     detail: "覆盖全球主要市场行情、公司财务、指数表现与财经资讯。",
     prompt: "帮我查询苹果公司过去一年的股价表现、主要财务指标和最新财经资讯",
-    tone: "green",
+    icon: globalFinanceIcon,
   },
   {
     id: "imf",
     name: "IMF 国际货币基金组织数据库",
-    shortName: "IM",
     description: "全球宏观经济与金融数据，包括 GDP、通胀、利率等",
     detail: "适合跨国家宏观指标对比、经济周期分析与政策数据查询。",
     prompt: "帮我查询 2024 年主要经济体 GDP 增速、通胀和利率变化",
-    tone: "orange",
+    icon: imfIcon,
   },
   {
     id: "sec",
     name: "SEC",
-    shortName: "SE",
     description: "美国上市公司公告与监管文件",
     detail: "查询 10-K、10-Q、8-K 等披露文件，提取风险、业务与财务信息。",
     prompt: "帮我查询英伟达最近一年的 10-K 和 10-Q 报告摘要与关键风险",
-    tone: "slate",
+    icon: secIcon,
   },
 ]
 
@@ -92,6 +91,7 @@ type CmccPromptActionMenuProps = {
   position?: { left: number; top: number }
   menuRef: (el: HTMLDivElement) => void
   onAttach: () => void
+  onExperts: () => void
   onSkills: () => void
   onPlugins: () => void
   onProfessionalDatabases: () => void
@@ -111,6 +111,7 @@ export const CmccPromptActionMenu: Component<CmccPromptActionMenuProps> = (props
         onMouseDown={(event) => event.preventDefault()}
       >
         <PromptActionItem icon="link" label="添加文件和图片" onClick={props.onAttach} />
+        <PromptActionItem icon="mcp" label="专家" arrow onClick={props.onExperts} />
         <PromptActionItem icon="brain" label="技能" arrow onClick={props.onSkills} />
         <PromptActionItem icon="mcp" label="插件" arrow onClick={props.onPlugins} />
         <PromptActionItem icon="archive" label="专业数据库" active onClick={props.onProfessionalDatabases} />
@@ -244,20 +245,11 @@ export const CmccProfessionalDatabasesDialog: Component<CmccProfessionalDatabase
 
 function DatabaseMark(props: { database: CmccProfessionalDatabase }) {
   return (
-    <div
-      class="flex size-10 shrink-0 items-center justify-center rounded-[10px] text-[12px] font-semibold leading-4 text-white shadow-sm"
-      classList={{
-        "bg-[#1668c7]": props.database.tone === "blue",
-        "bg-[#20a8d8]": props.database.tone === "cyan",
-        "bg-[#0f9f6e]": props.database.tone === "green",
-        "bg-[#f04444]": props.database.tone === "red",
-        "bg-[#089383]": props.database.tone === "teal",
-        "bg-[#1473e6]": props.database.tone === "indigo",
-        "bg-[#df7a1c]": props.database.tone === "orange",
-        "bg-[#475467]": props.database.tone === "slate",
-      }}
-    >
-      {props.database.shortName}
-    </div>
+    <img
+      src={props.database.icon}
+      alt=""
+      class="size-10 shrink-0 rounded-[10px] object-cover shadow-sm"
+      draggable={false}
+    />
   )
 }

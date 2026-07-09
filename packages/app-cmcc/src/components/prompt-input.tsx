@@ -74,6 +74,8 @@ import {
   CmccPromptActionMenu,
   type CmccProfessionalDatabase,
 } from "@/components/cmcc-professional-databases"
+import { cmccExpertCenterHref, cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
+import { useNavigate } from "@solidjs/router"
 
 export type PromptInputState = ReturnType<typeof usePrompt>
 
@@ -172,6 +174,8 @@ export interface PromptInputProps {
   onAbort?: () => void
   onSubmit?: () => void
   toolbar?: JSX.Element
+  selectedExpertAgent?: string
+  onSelectedExpertAgentChange?: (agent: string | undefined) => void
 }
 
 const EXAMPLES = [
@@ -204,6 +208,7 @@ const EXAMPLES = [
 
 export const PromptInput: Component<PromptInputProps> = (props) => {
   const sdk = useSDK()
+  const navigate = useNavigate()
 
   const sync = useSync()
   const files = useFile()
@@ -353,6 +358,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const [cmccActionMenuOpen, setCmccActionMenuOpen] = createSignal(false)
   const [cmccActionMenuPosition, setCmccActionMenuPosition] = createSignal<{ left: number; top: number }>()
   const [cmccDatabaseOpen, setCmccDatabaseOpen] = createSignal(false)
+  const selectedTeamExpert = createMemo(() => cmccTeamExpertByAgent(props.selectedExpertAgent))
   const buttonsSpring = useSpring(() => (store.mode === "normal" ? 1 : 0), { visualDuration: 0.2, bounce: 0 })
   const motion = (value: number) => ({
     opacity: value,
@@ -568,7 +574,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (!rect) return
 
     const width = 218
-    const height = 190
+    const height = 226
     setCmccActionMenuPosition({
       left: Math.min(Math.max(8, rect.left - 4), window.innerWidth - width - 8),
       top: Math.max(8, rect.top - height - 12),
@@ -892,6 +898,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const openProfessionalDatabases = () => {
     setCmccActionMenuOpen(false)
     setCmccDatabaseOpen(true)
+  }
+
+  const openExpertCenter = () => {
+    setCmccActionMenuOpen(false)
+    navigate(cmccExpertCenterHref())
   }
 
   const tryProfessionalDatabase = (database: CmccProfessionalDatabase) => {
@@ -1376,6 +1387,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       onQueue: props.onQueue,
       onAbort: props.onAbort,
       onSubmit: props.onSubmit,
+      selectedAgent: () => props.selectedExpertAgent,
     })
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -1734,6 +1746,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           setCmccActionMenuOpen(false)
                           pick()
                         }}
+                        onExperts={openExpertCenter}
                         onSkills={openSkillCommands}
                         onPlugins={() => setPlainPrompt("请帮我推荐并使用适合当前任务的插件：")}
                         onProfessionalDatabases={openProfessionalDatabases}
@@ -1741,6 +1754,24 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       />
                     </div>
                   </TooltipV2>
+                  <Show when={selectedTeamExpert()}>
+                    {(expert) => (
+                      <button
+                        type="button"
+                        data-action="prompt-selected-expert"
+                        class="flex h-7 min-w-0 max-w-[210px] items-center gap-1.5 rounded-[7px] bg-v2-background-bg-layer-03 px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                        style={buttons()}
+                        onClick={() => {
+                          props.onSelectedExpertAgentChange?.(undefined)
+                          restoreFocus()
+                        }}
+                        aria-label={`移除${expert().name}`}
+                      >
+                        <Icon name="close" class="size-3.5 shrink-0 text-v2-icon-icon-muted" />
+                        <span class="min-w-0 truncate">{expert().name}</span>
+                      </button>
+                    )}
+                  </Show>
                   <Show when={showAgentControl()}>
                     <ComposerAgentControl state={agentControlState()} />
                   </Show>

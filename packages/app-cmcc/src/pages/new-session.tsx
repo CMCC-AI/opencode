@@ -1,4 +1,4 @@
-import { Show, createEffect, createResource, untrack } from "solid-js"
+import { Show, createEffect, createResource, createSignal, untrack } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { NewSessionDesignView } from "@/components/session"
 import { PromptInput } from "@/components/prompt-input"
@@ -7,6 +7,7 @@ import { useComments } from "@/context/comments"
 import { usePrompt } from "@/context/prompt"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
+import { useTabs } from "@/context/tabs"
 import { createPromptInputController } from "@/pages/session/composer"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
@@ -22,8 +23,20 @@ export default function NewSessionPage() {
   const serverSync = useServerSync()
   const comments = useComments()
   const language = useLanguage()
+  const tabs = useTabs()
   const route = useSessionKey()
-  const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string }>()
+  const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string; agent?: string }>()
+  const draftAgent = () => {
+    if (!searchParams.draftId) return
+    const draft = tabs.store.find((tab) => tab.type === "draft" && tab.draftID === searchParams.draftId)
+    return draft?.type === "draft" ? draft.agent : undefined
+  }
+  const [selectedExpertAgent, setSelectedExpertAgent] = createSignal(searchParams.agent ?? draftAgent())
+
+  const selectExpertAgent = (agent: string | undefined) => {
+    setSelectedExpertAgent(agent)
+    if (searchParams.draftId) tabs.updateDraft(searchParams.draftId, { agent })
+  }
 
   useComposerCommands()
   useSettingsCommand()
@@ -39,9 +52,10 @@ export default function NewSessionPage() {
     if (!prompt.ready()) return
     untrack(() => {
       const text = searchParams.prompt
-      if (!text) return
-      prompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
-      setSearchParams({ ...searchParams, prompt: undefined })
+      const agent = searchParams.agent
+      if (agent) selectExpertAgent(agent)
+      if (text) prompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
+      if (text || agent) setSearchParams({ ...searchParams, prompt: undefined, agent: undefined })
     })
   })
 
@@ -78,6 +92,8 @@ export default function NewSessionPage() {
                         inputRef = el
                       }}
                       onSubmit={() => comments.clear()}
+                      selectedExpertAgent={selectedExpertAgent()}
+                      onSelectedExpertAgentChange={selectExpertAgent}
                     />
                   </div>
                 </Show>

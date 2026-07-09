@@ -30,7 +30,7 @@ import {
   cmccIsWorkspaceDirectory,
   cmccLegacyWorkspace,
 } from "@/utils/cmcc-workspace"
-import { CMCC_EXPERTS, cmccExpertHref } from "@/pages/cmcc-experts"
+import { cmccExpertCenterHref } from "@/utils/cmcc-experts"
 import { displayName, sortedRootSessions } from "./layout/helpers"
 
 const SIDEBAR_MIN_WIDTH = 220
@@ -196,7 +196,6 @@ function CmccSidebar() {
     startX: 0,
     startWidth: 0,
   })
-  const [expertGroup, setExpertGroup] = createStore({ collapsed: false })
   const [conversationStore, setConversationStore] = createStore({
     directories: cmccConversationWorkspaces(),
   })
@@ -435,9 +434,7 @@ function CmccSidebar() {
             <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
             <CmccSidebarAction icon="magnifying-glass" label="搜索" onClick={() => command.show()} />
             <CmccExpertGroup
-              collapsed={expertGroup.collapsed}
               activePath={location.pathname}
-              toggle={() => setExpertGroup("collapsed", !expertGroup.collapsed)}
               open={(href) => navigate(href)}
             />
             <CmccSidebarAction icon="task" label="已安排" />
@@ -760,46 +757,21 @@ function CmccSessionRow(props: {
 }
 
 function CmccExpertGroup(props: {
-  collapsed: boolean
   activePath: string
-  toggle: () => void
   open: (href: string) => void
 }) {
+  const href = cmccExpertCenterHref()
+  const active = () => props.activePath === href || props.activePath.startsWith(`${href}/`)
+
   return (
-    <div class="flex min-w-0 flex-col gap-1">
-      <button
-        type="button"
-        class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
-        aria-expanded={!props.collapsed}
-        onClick={props.toggle}
-      >
-        <Icon
-          name="chevron-down"
-          class="size-4 shrink-0 transition-transform duration-150 ease-in-out"
-          style={{ transform: `rotate(${props.collapsed ? -90 : 0}deg)` }}
-        />
-        <span class="min-w-0 truncate">专家团</span>
-      </button>
-      <Show when={!props.collapsed}>
-        <div class="flex min-w-0 flex-col gap-1 pl-4">
-          <For each={CMCC_EXPERTS}>
-            {(expert) => {
-              const href = cmccExpertHref(expert)
-              return (
-                <button
-                  type="button"
-                  class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-regular text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
-                  data-selected={props.activePath === href ? "" : undefined}
-                  onClick={() => props.open(href)}
-                >
-                  <Icon name="mcp" class="size-4 shrink-0" />
-                  <span class="min-w-0 truncate">{expert.name}</span>
-                </button>
-              )
-            }}
-          </For>
-        </div>
-      </Show>
-    </div>
+    <button
+      type="button"
+      class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+      data-selected={active() ? "" : undefined}
+      onClick={() => props.open(href)}
+    >
+      <Icon name="mcp" class="size-4 shrink-0" />
+      <span class="min-w-0 truncate">专家团</span>
+    </button>
   )
 }
