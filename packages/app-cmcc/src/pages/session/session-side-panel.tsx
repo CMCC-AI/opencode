@@ -269,10 +269,13 @@ export function SessionSidePanel(props: {
     activeArtifact: undefined as string | undefined,
     openArtifacts: [] as string[],
     browser: {
-      draft: "https://www.google.com/search?igu=1",
-      url: "https://www.google.com/search?igu=1",
+      draft: "",
+      url: "",
       document: undefined as string | undefined,
       title: "浏览器",
+      history: [] as string[],
+      historyIndex: -1,
+      revision: 0,
     },
     workspaceArtifactPaths: [] as string[],
   })
@@ -485,6 +488,9 @@ export function SessionSidePanel(props: {
         url: "about:blank",
         document: undefined,
         title: fileName(path),
+        history: [],
+        historyIndex: -1,
+        revision: cmcc.browser.revision + 1,
       })
       void file.load(path).then(() => {
         if (cmcc.activeArtifact !== path) return
@@ -573,7 +579,42 @@ export function SessionSidePanel(props: {
     const value = cmcc.browser.draft.trim()
     if (!value) return
     const url = /^https?:\/\//i.test(value) ? value : `https://${value}`
-    setCmcc("browser", { draft: url, url, document: undefined, title: "浏览器" })
+    const history = [...cmcc.browser.history.slice(0, cmcc.browser.historyIndex + 1), url]
+    setCmcc("browser", {
+      draft: url,
+      url,
+      document: undefined,
+      title: "浏览器",
+      history,
+      historyIndex: history.length - 1,
+      revision: cmcc.browser.revision + 1,
+    })
+  }
+
+  const navigateBrowser = (index: number) => {
+    const url = cmcc.browser.history[index]
+    if (!url) return
+    setCmcc("browser", {
+      draft: url,
+      url,
+      document: undefined,
+      title: "浏览器",
+      historyIndex: index,
+      revision: cmcc.browser.revision + 1,
+    })
+  }
+
+  const closeBrowser = () => {
+    setCmcc("browser", {
+      draft: "",
+      url: "",
+      document: undefined,
+      title: "浏览器",
+      history: [],
+      historyIndex: -1,
+      revision: cmcc.browser.revision + 1,
+    })
+    setCmcc("activeArtifact", undefined)
   }
 
   const [store, setStore] = createStore({
@@ -667,109 +708,111 @@ export function SessionSidePanel(props: {
                       <DragDropSensors />
                       <ConstrainDragYAxis />
                       <Tabs value={activeTab()} onChange={openTab}>
-                    <div class="sticky top-0 shrink-0 flex">
-                      <Tabs.List
-                        ref={(el: HTMLDivElement) => {
-                          const stop = createFileTabListSync({ el, contextOpen })
-                          onCleanup(stop)
-                        }}
-                      >
-                        <Show when={reviewTab() && props.canReview()}>
-                          <Tabs.Trigger value="review">
-                            <div class="flex items-center gap-1.5">
-                              <div>{language.t("session.tab.review")}</div>
-                              <Show when={props.hasReview()}>
-                                <div>{props.reviewCount()}</div>
-                              </Show>
-                            </div>
-                          </Tabs.Trigger>
-                        </Show>
-                        <Show when={contextOpen()}>
-                          <Tabs.Trigger
-                            value="context"
-                            closeButton={
+                        <div class="sticky top-0 shrink-0 flex">
+                          <Tabs.List
+                            ref={(el: HTMLDivElement) => {
+                              const stop = createFileTabListSync({ el, contextOpen })
+                              onCleanup(stop)
+                            }}
+                          >
+                            <Show when={reviewTab() && props.canReview()}>
+                              <Tabs.Trigger value="review">
+                                <div class="flex items-center gap-1.5">
+                                  <div>{language.t("session.tab.review")}</div>
+                                  <Show when={props.hasReview()}>
+                                    <div>{props.reviewCount()}</div>
+                                  </Show>
+                                </div>
+                              </Tabs.Trigger>
+                            </Show>
+                            <Show when={contextOpen()}>
+                              <Tabs.Trigger
+                                value="context"
+                                closeButton={
+                                  <TooltipKeybind
+                                    title={language.t("common.closeTab")}
+                                    keybind={command.keybind("tab.close")}
+                                    placement="bottom"
+                                    gutter={10}
+                                  >
+                                    <IconButton
+                                      icon="close-small"
+                                      variant="ghost"
+                                      class="h-5 w-5"
+                                      onClick={() => tabs().close("context")}
+                                      aria-label={language.t("common.closeTab")}
+                                    />
+                                  </TooltipKeybind>
+                                }
+                                hideCloseButton
+                                onMiddleClick={() => tabs().close("context")}
+                              >
+                                <div class="flex items-center gap-2">
+                                  <SessionContextUsage variant="indicator" />
+                                  <div>{language.t("session.tab.context")}</div>
+                                </div>
+                              </Tabs.Trigger>
+                            </Show>
+                            <SortableProvider ids={openedTabs()}>
+                              <For each={openedTabs()}>
+                                {(tab) => <SortableTab tab={tab} onTabClose={tabs().close} />}
+                              </For>
+                            </SortableProvider>
+                            <div class="bg-background-stronger h-full shrink-0 sticky right-0 z-10 flex items-center justify-center pr-3">
                               <TooltipKeybind
-                                title={language.t("common.closeTab")}
-                                keybind={command.keybind("tab.close")}
-                                placement="bottom"
-                                gutter={10}
+                                title={language.t("command.file.open")}
+                                keybind={command.keybind("file.open")}
+                                class="flex items-center"
                               >
                                 <IconButton
-                                  icon="close-small"
+                                  icon="plus-small"
                                   variant="ghost"
-                                  class="h-5 w-5"
-                                  onClick={() => tabs().close("context")}
-                                  aria-label={language.t("common.closeTab")}
+                                  iconSize="large"
+                                  class="!rounded-md"
+                                  onClick={() => {
+                                    void import("@/components/dialog-select-file").then((x) => {
+                                      dialog.show(() => <x.DialogSelectFile mode="files" onOpenFile={showAllFiles} />)
+                                    })
+                                  }}
+                                  aria-label={language.t("command.file.open")}
                                 />
                               </TooltipKeybind>
-                            }
-                            hideCloseButton
-                            onMiddleClick={() => tabs().close("context")}
-                          >
-                            <div class="flex items-center gap-2">
-                              <SessionContextUsage variant="indicator" />
-                              <div>{language.t("session.tab.context")}</div>
                             </div>
-                          </Tabs.Trigger>
-                        </Show>
-                        <SortableProvider ids={openedTabs()}>
-                          <For each={openedTabs()}>{(tab) => <SortableTab tab={tab} onTabClose={tabs().close} />}</For>
-                        </SortableProvider>
-                        <div class="bg-background-stronger h-full shrink-0 sticky right-0 z-10 flex items-center justify-center pr-3">
-                          <TooltipKeybind
-                            title={language.t("command.file.open")}
-                            keybind={command.keybind("file.open")}
-                            class="flex items-center"
-                          >
-                            <IconButton
-                              icon="plus-small"
-                              variant="ghost"
-                              iconSize="large"
-                              class="!rounded-md"
-                              onClick={() => {
-                                void import("@/components/dialog-select-file").then((x) => {
-                                  dialog.show(() => <x.DialogSelectFile mode="files" onOpenFile={showAllFiles} />)
-                                })
-                              }}
-                              aria-label={language.t("command.file.open")}
-                            />
-                          </TooltipKeybind>
+                          </Tabs.List>
                         </div>
-                      </Tabs.List>
-                    </div>
 
-                    <Show when={reviewTab() && props.canReview()}>
-                      <Tabs.Content value="review" class="flex flex-col h-full overflow-hidden contain-strict">
-                        <Show when={reviewOpen() && activeTab() === "review"}>{props.reviewPanel()}</Show>
-                      </Tabs.Content>
-                    </Show>
+                        <Show when={reviewTab() && props.canReview()}>
+                          <Tabs.Content value="review" class="flex flex-col h-full overflow-hidden contain-strict">
+                            <Show when={reviewOpen() && activeTab() === "review"}>{props.reviewPanel()}</Show>
+                          </Tabs.Content>
+                        </Show>
 
-                    <Tabs.Content value="empty" class="flex flex-col h-full overflow-hidden contain-strict">
-                      <Show when={activeTab() === "empty"}>
-                        <div class="relative pt-2 flex-1 min-h-0 overflow-hidden">
-                          <div class="h-full px-6 pb-42 -mt-4 flex flex-col items-center justify-center text-center gap-6">
-                            <DeepInsightMark class="w-14 opacity-10" />
-                            <div class="text-14-regular text-text-weak max-w-56">
-                              {language.t("session.files.selectToOpen")}
+                        <Tabs.Content value="empty" class="flex flex-col h-full overflow-hidden contain-strict">
+                          <Show when={activeTab() === "empty"}>
+                            <div class="relative pt-2 flex-1 min-h-0 overflow-hidden">
+                              <div class="h-full px-6 pb-42 -mt-4 flex flex-col items-center justify-center text-center gap-6">
+                                <DeepInsightMark class="w-14 opacity-10" />
+                                <div class="text-14-regular text-text-weak max-w-56">
+                                  {language.t("session.files.selectToOpen")}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </Show>
-                    </Tabs.Content>
+                          </Show>
+                        </Tabs.Content>
 
-                    <Show when={contextOpen()}>
-                      <Tabs.Content value="context" class="flex flex-col h-full overflow-hidden contain-strict">
-                        <Show when={activeTab() === "context"}>
-                          <div class="relative pt-2 flex-1 min-h-0 overflow-hidden">
-                            <SessionContextTab />
-                          </div>
+                        <Show when={contextOpen()}>
+                          <Tabs.Content value="context" class="flex flex-col h-full overflow-hidden contain-strict">
+                            <Show when={activeTab() === "context"}>
+                              <div class="relative pt-2 flex-1 min-h-0 overflow-hidden">
+                                <SessionContextTab />
+                              </div>
+                            </Show>
+                          </Tabs.Content>
                         </Show>
-                      </Tabs.Content>
-                    </Show>
 
-                    <Show when={activeFileTab()} keyed>
-                      {(tab) => <FileTabContent tab={tab} />}
-                    </Show>
+                        <Show when={activeFileTab()} keyed>
+                          {(tab) => <FileTabContent tab={tab} />}
+                        </Show>
                       </Tabs>
                       <DragOverlay>
                         <Show when={store.activeDraggable} keyed>
@@ -799,8 +842,18 @@ export function SessionSidePanel(props: {
                     browserUrl={cmcc.browser.url}
                     browserDocument={cmcc.browser.document}
                     browserTitle={cmcc.browser.title}
+                    browserRevision={cmcc.browser.revision}
+                    browserCanGoBack={cmcc.browser.historyIndex > 0}
+                    browserCanGoForward={cmcc.browser.historyIndex < cmcc.browser.history.length - 1}
                     setBrowserDraft={(value) => setCmcc("browser", "draft", value)}
                     openBrowser={openBrowser}
+                    browserBack={() => navigateBrowser(cmcc.browser.historyIndex - 1)}
+                    browserForward={() => navigateBrowser(cmcc.browser.historyIndex + 1)}
+                    browserReload={() => {
+                      if (!cmcc.browser.url && !cmcc.browser.document) return
+                      setCmcc("browser", "revision", (value) => value + 1)
+                    }}
+                    closeBrowser={closeBrowser}
                     openArtifact={openArtifact}
                     reviewCount={props.reviewCount()}
                     canReview={props.canReview()}
@@ -924,8 +977,15 @@ function CmccAssistantPanel(props: {
   browserUrl: string
   browserDocument?: string
   browserTitle: string
+  browserRevision: number
+  browserCanGoBack: boolean
+  browserCanGoForward: boolean
   setBrowserDraft: (value: string) => void
   openBrowser: () => void
+  browserBack: () => void
+  browserForward: () => void
+  browserReload: () => void
+  closeBrowser: () => void
   openArtifact: (path: string) => void
   reviewCount: number
   canReview: boolean
@@ -985,8 +1045,15 @@ function CmccAssistantPanel(props: {
               url={props.browserUrl}
               document={props.browserDocument}
               title={props.browserTitle}
+              revision={props.browserRevision}
+              canGoBack={props.browserCanGoBack}
+              canGoForward={props.browserCanGoForward}
               setDraft={props.setBrowserDraft}
               open={props.openBrowser}
+              back={props.browserBack}
+              forward={props.browserForward}
+              reload={props.browserReload}
+              close={props.closeBrowser}
             />
           </Match>
           <Match when={props.active === "review"}>
@@ -1394,37 +1461,119 @@ function CmccBrowserPanel(props: {
   url: string
   document?: string
   title: string
+  revision: number
+  canGoBack: boolean
+  canGoForward: boolean
   setDraft: (value: string) => void
   open: () => void
+  back: () => void
+  forward: () => void
+  reload: () => void
+  close: () => void
 }) {
+  const buttonClass =
+    "flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-v2-text-text-muted"
+
   return (
     <div class="flex h-full min-h-0 flex-col">
-      <div class="flex shrink-0 gap-2 border-b border-v2-border-border-base p-3">
-        <input
-          class="h-8 min-w-0 flex-1 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-2 text-[13px] text-v2-text-text-base outline-none focus:border-v2-border-border-active"
-          value={props.draft}
-          onInput={(event) => props.setDraft(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return
-            event.preventDefault()
-            props.open()
-          }}
+      <div class="flex h-12 shrink-0 items-center gap-1 border-b border-v2-border-border-base bg-v2-background-bg-base px-3">
+        <IconButton
+          icon="arrow-left"
+          variant="ghost"
+          class={buttonClass}
+          disabled={!props.canGoBack}
+          onClick={props.back}
+          aria-label="后退"
+        />
+        <IconButton
+          icon="arrow-right"
+          variant="ghost"
+          class={buttonClass}
+          disabled={!props.canGoForward}
+          onClick={props.forward}
+          aria-label="前进"
         />
         <button
           type="button"
-          class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-3 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
-          onClick={props.open}
+          class={buttonClass}
+          disabled={!props.url && !props.document}
+          onClick={props.reload}
+          aria-label="刷新"
+          title="刷新"
         >
-          打开
+          <svg viewBox="0 0 20 20" class="size-5" fill="none" aria-hidden="true">
+            <path
+              d="M16.7 6.7V2.9m0 0h-3.8m3.8 0-2.5 2.5A6.7 6.7 0 1 0 16.5 12"
+              stroke="currentColor"
+              stroke-width="1.25"
+              stroke-linecap="square"
+              stroke-linejoin="miter"
+            />
+          </svg>
         </button>
+        <form
+          class="mx-2 min-w-0 flex-1"
+          onSubmit={(event) => {
+            event.preventDefault()
+            props.open()
+          }}
+        >
+          <input
+            aria-label="URL"
+            placeholder="输入 URL"
+            class="h-8 w-full min-w-0 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 text-center text-[13px] text-v2-text-text-base outline-none placeholder:text-v2-text-text-faint focus:border-v2-border-border-active focus:text-left"
+            value={props.draft}
+            onInput={(event) => props.setDraft(event.currentTarget.value)}
+          />
+        </form>
+        <IconButton
+          icon="close"
+          variant="ghost"
+          class={buttonClass}
+          disabled={!props.url && !props.document && !props.draft}
+          onClick={props.close}
+          aria-label="关闭页面"
+        />
       </div>
-      <iframe
-        title={props.title}
-        class="min-h-0 flex-1 border-0 bg-white"
-        src={props.document ? undefined : props.url}
-        srcdoc={props.document}
-        sandbox={props.document ? "allow-forms allow-popups allow-scripts" : "allow-forms allow-popups allow-same-origin allow-scripts"}
-      />
+      <Show
+        when={(props.url || props.document) && props.revision}
+        fallback={
+          <div class="flex min-h-0 flex-1 items-center justify-center px-8 pb-12 text-center">
+            <div class="flex flex-col items-center">
+              <svg
+                viewBox="0 0 48 48"
+                class="size-12 text-v2-text-text-muted"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="2.5" />
+                <path
+                  d="M6 24h36M24 6c6 5 9 11 9 18s-3 13-9 18c-6-5-9-11-9-18s3-13 9-18Z"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                />
+              </svg>
+              <div class="mt-5 text-[20px] font-medium leading-7 text-v2-text-text-base">开始浏览</div>
+              <div class="mt-2 text-[14px] leading-5 text-v2-text-text-muted">输入 URL 以打开页面</div>
+            </div>
+          </div>
+        }
+        keyed
+      >
+        {(_) => (
+          <iframe
+            title={props.title}
+            class="min-h-0 flex-1 border-0 bg-white"
+            src={props.document ? undefined : props.url}
+            srcdoc={props.document}
+            sandbox={
+              props.document
+                ? "allow-forms allow-popups allow-scripts"
+                : "allow-forms allow-popups allow-same-origin allow-scripts"
+            }
+          />
+        )}
+      </Show>
     </div>
   )
 }
