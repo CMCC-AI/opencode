@@ -107,9 +107,10 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
           Effect.gen(function* () {
             const text = item.content.includes(0)
               ? Option.none<string>()
-              : yield* Effect.sync(() => new TextDecoder("utf-8", { fatal: true }).decode(item.content)).pipe(
-                  Effect.option,
-                )
+              : yield* Effect.try({
+                  try: () => new TextDecoder("utf-8", { fatal: true }).decode(item.content),
+                  catch: (cause) => cause,
+                }).pipe(Effect.option)
             return { item, text }
           }),
         ),

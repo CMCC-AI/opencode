@@ -282,6 +282,15 @@ function writeStandardFiles(dir: string) {
   )
 }
 
+function writeBinaryFile(dir: string) {
+  return FSUtil.Service.use((fs) =>
+    fs.writeWithDirs(
+      path.join(dir, "sample.pdf"),
+      Uint8Array.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34, 0x0a, 0x25, 0x93, 0x8c, 0x8b, 0x9e]),
+    ),
+  )
+}
+
 function writeProjectSkill(dir: string) {
   return FSUtil.Service.use((fs) =>
     fs.writeWithDirs(
@@ -375,6 +384,23 @@ describe("HttpApi SDK", () => {
           expectStatus(() => sdk.config.providers(), 200),
           expectStatus(() => sdk.find.files({ query: "hello", limit: 10 }), 200),
         ])
+      }),
+  )
+
+  httpapiInstance(
+    "returns files containing invalid UTF-8 as binary content",
+    { serverPath: "raw", git: false, setup: writeBinaryFile },
+    ({ sdk }) =>
+      Effect.gen(function* () {
+        const file = yield* call(() => sdk.file.read({ path: "sample.pdf" }))
+
+        expect(file.response.status).toBe(200)
+        expect(file.data).toMatchObject({
+          type: "binary",
+          content: "JVBERi0xLjQKJZOMi54=",
+          encoding: "base64",
+          mimeType: "application/pdf",
+        })
       }),
   )
 

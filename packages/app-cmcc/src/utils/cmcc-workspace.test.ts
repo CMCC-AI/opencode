@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import {
   CMCC_LEGACY_WORKSPACE_RELATIVE,
   CMCC_WORKSPACE_RELATIVE,
+  cmccConversationDirectories,
   cmccConversationWorkspace,
   cmccCreateConversationWorkspace,
   cmccDateWorkspace,
@@ -9,6 +10,7 @@ import {
   cmccLegacyWorkspace,
   cmccWorkspaceLabel,
   cmccWorkspaceRoot,
+  cmccWorkspaceSessionPath,
 } from "./cmcc-workspace"
 
 describe("cmcc workspace paths", () => {
@@ -37,6 +39,28 @@ describe("cmcc workspace paths", () => {
     expect(cmccIsWorkspaceDirectory("/Users/levent/.local/share/opencode", undefined)).toBe(true)
     expect(cmccLegacyWorkspace("/Users/levent")).toBe(`/Users/levent/${CMCC_LEGACY_WORKSPACE_RELATIVE}`)
     expect(cmccIsWorkspaceDirectory("/Users/levent/projects/opencode", "/Users/levent")).toBe(false)
+  })
+
+  test("builds the global-project path used to discover persisted conversations", () => {
+    expect(cmccWorkspaceSessionPath("/Users/levent")).toBe("Users/levent/Documents/DeepInsight")
+    expect(cmccWorkspaceSessionPath("C:\\Users\\levent")).toBe("Users/levent/Documents/DeepInsight")
+  })
+
+  test("recovers conversation directories from persisted sessions", () => {
+    expect(
+      cmccConversationDirectories(
+        "/Users/levent",
+        [],
+        [
+          { directory: "/Users/levent/Documents/DeepInsight/2026-07-08/conversation-160000" },
+          { directory: "/Users/levent/Documents/DeepInsight/2026-07-08/conversation-160000" },
+          { directory: "/Users/levent/projects/opencode" },
+        ],
+      ),
+    ).toEqual([
+      "/Users/levent/Documents/DeepInsight/2026-07-08/conversation-160000",
+      "/Users/levent/.local/share/opencode",
+    ])
   })
 
   test("only remembers a conversation workspace after directory creation succeeds", async () => {

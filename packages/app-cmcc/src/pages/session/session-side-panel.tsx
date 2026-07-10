@@ -9,7 +9,7 @@ import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
 import { Dynamic } from "solid-js/web"
-import type { FileNode, Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { FileContent, FileNode, Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 
@@ -38,6 +38,15 @@ import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { DeepInsightMark } from "@/components/brand"
 import { showToast } from "@/utils/toast"
+import { Markdown } from "@opencode-ai/session-ui/markdown"
+import {
+  artifactBuffer,
+  artifactDataUrl,
+  artifactPreviewKind,
+  artifactText,
+  resolveArtifactPath,
+  type ArtifactPreviewKind,
+} from "@/pages/session/artifact-preview"
 
 type RenderDiff = (SnapshotFileDiff & { file: string }) | VcsFileDiff
 type CmccPanelTab = "plan" | "artifacts" | "browser" | "review"
@@ -131,6 +140,20 @@ function normalizeArtifactPath(value: string) {
   return normalizePathSeparators(value).replace(/^\/+/, "")
 }
 
+function workspaceRelativePath(directory: string, value: string) {
+  const root = normalizePathSeparators(directory)
+  const path = normalizePathSeparators(value)
+  if (path === root) return ""
+  if (path.startsWith(`${root}/`)) return path.slice(root.length + 1)
+  return ""
+}
+
+function artifactNodePath(root: string, value: string) {
+  const path = normalizeArtifactPath(value)
+  if (!root || path === root || path.startsWith(`${root}/`)) return path
+  return `${root}/${path}`
+}
+
 function isWorkspaceArtifactFile(value: string) {
   const ext = fileName(value).split(".").at(-1)?.toLowerCase()
   return ext ? WORKSPACE_ARTIFACT_EXTENSIONS.has(ext) : false
@@ -140,20 +163,33 @@ function isWorkspaceArtifactDir(value: string) {
   return WORKSPACE_ARTIFACT_DIRS.has(fileName(value).toLowerCase())
 }
 
-async function scanWorkspaceArtifactPaths(list: (path: string) => Promise<FileNode[]>) {
+function markdownArtifactElement(target: EventTarget | null) {
+  if (!(target instanceof Element)) return undefined
+  const element = target.closest<HTMLElement>("a") ?? target.closest<HTMLElement>("code")
+  if (!element?.closest('[data-component="markdown"]')) return undefined
+  return element
+}
+
+function markdownArtifactCandidate(element: HTMLElement) {
+  if (element instanceof HTMLAnchorElement) return element.getAttribute("href") ?? element.textContent ?? ""
+  return element.textContent ?? ""
+}
+
+async function scanWorkspaceArtifactPaths(list: (path: string) => Promise<FileNode[]>, roots: string[] = []) {
   const paths = new Set<string>()
   const queue: { path: string; depth: number }[] = []
-  const root = await list("")
+  for (const root of new Set(["", ...roots.map(normalizeArtifactPath).filter(Boolean)])) {
+    const nodes = await list(root)
+    for (const node of nodes) {
+      const current = artifactNodePath(root, node.path)
+      if (!current) continue
 
-  for (const node of root) {
-    const current = normalizeArtifactPath(node.path)
-    if (!current) continue
-
-    if (node.type === "file" && isWorkspaceArtifactFile(current)) {
-      paths.add(current)
-    }
-    if (node.type === "directory" && isWorkspaceArtifactDir(current)) {
-      queue.push({ path: current, depth: 1 })
+      if (node.type === "file" && isWorkspaceArtifactFile(current)) {
+        paths.add(current)
+      }
+      if (node.type === "directory" && isWorkspaceArtifactDir(current)) {
+        queue.push({ path: current, depth: 1 })
+      }
     }
   }
 
@@ -228,11 +264,18 @@ export function SessionSidePanel(props: {
     return `${layout.fileTree.width()}px`
   })
   const treeWidth = createMemo(() => (fileOpen() ? `${layout.fileTree.width()}px` : "0px"))
-  const [cmccActiveTab, setCmccActiveTab] = createSignal<CmccPanelTab>("plan")
-  const [activeArtifact, setActiveArtifact] = createSignal<string>()
-  const [browserDraft, setBrowserDraft] = createSignal("https://www.google.com/search?igu=1")
-  const [browserUrl, setBrowserUrl] = createSignal("https://www.google.com/search?igu=1")
-  const [workspaceArtifactPaths, setWorkspaceArtifactPaths] = createSignal<string[]>([])
+  const [cmcc, setCmcc] = createStore({
+    activeTab: "plan" as CmccPanelTab,
+    activeArtifact: undefined as string | undefined,
+    openArtifacts: [] as string[],
+    browser: {
+      draft: "https://www.google.com/search?igu=1",
+      url: "https://www.google.com/search?igu=1",
+      document: undefined as string | undefined,
+      title: "浏览器",
+    },
+    workspaceArtifactPaths: [] as string[],
+  })
 
   const diffs = createMemo(() => props.diffs().filter(renderDiff))
   const diffFiles = createMemo(() => diffs().map((d) => d.file))
@@ -252,10 +295,27 @@ export function SessionSidePanel(props: {
     if (current.length > 0) return current
     return retainedTodos.bySession[params.id] ?? []
   })
-  const parts = createMemo(() => {
+  const messages = createMemo(() => {
     if (!params.id) return []
-    return (sync().data.message[params.id] ?? []).flatMap((message) => sync().data.part[message.id] ?? [])
+    return sync().data.message[params.id] ?? []
   })
+  const parts = createMemo(() => messages().flatMap((message) => sync().data.part[message.id] ?? []))
+  const artifactRoots = createMemo(() =>
+    messages().flatMap((message) => {
+      if (message.role !== "assistant") return []
+      const relative = workspaceRelativePath(sdk().directory, message.path.cwd)
+      return relative ? [relative] : []
+    }),
+  )
+  const artifactRefreshKey = createMemo(() =>
+    parts()
+      .flatMap((part) => {
+        if (part.type === "patch") return [part.id]
+        if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) return [part.id]
+        return []
+      })
+      .join(":"),
+  )
   const artifacts = createMemo(() => {
     const items = new Map<string, CmccArtifact>()
 
@@ -291,7 +351,7 @@ export function SessionSidePanel(props: {
       }
     }
 
-    for (const path of workspaceArtifactPaths()) {
+    for (const path of cmcc.workspaceArtifactPaths) {
       if (items.has(path)) continue
       items.set(path, {
         id: `workspace:${path}`,
@@ -303,12 +363,15 @@ export function SessionSidePanel(props: {
 
     return [...items.values()]
   })
+  const artifactPaths = createMemo(() => artifacts().map((item) => item.path))
 
   createEffect(() => {
     const directory = sdk().directory
     const sessionID = params.id
+    const roots = artifactRoots()
+    artifactRefreshKey()
     if (!sessionID) {
-      setWorkspaceArtifactPaths([])
+      setCmcc("workspaceArtifactPaths", [])
       return
     }
 
@@ -322,10 +385,10 @@ export function SessionSidePanel(props: {
         .client.file.list({ path })
         .then((result) => result.data ?? [], () => [])
 
-    void scanWorkspaceArtifactPaths(list).then((paths) => {
+    void scanWorkspaceArtifactPaths(list, roots).then((paths) => {
       if (cancelled) return
       if (sdk().directory !== directory || params.id !== sessionID) return
-      setWorkspaceArtifactPaths(paths)
+      setCmcc("workspaceArtifactPaths", paths)
     })
   })
   const kinds = createMemo(() => {
@@ -412,18 +475,105 @@ export function SessionSidePanel(props: {
   }
 
   const openArtifact = (path: string) => {
-    setActiveArtifact(path)
-    setCmccActiveTab("artifacts")
+    openReviewPanel()
+    setCmcc("openArtifacts", (current) => (current.includes(path) ? current : [...current, path]))
+    setCmcc("activeArtifact", path)
+    if (artifactPreviewKind(path) === "html") {
+      setCmcc("activeTab", "browser")
+      setCmcc("browser", {
+        draft: path,
+        url: "about:blank",
+        document: undefined,
+        title: fileName(path),
+      })
+      void file.load(path).then(() => {
+        if (cmcc.activeArtifact !== path) return
+        const content = file.get(path)?.content
+        if (!content) return
+        setCmcc("browser", "document", artifactText(content.content, content.encoding))
+      })
+      return
+    }
+
+    setCmcc("activeTab", "artifacts")
     void file.load(path)
     openTab(file.tab(path))
   }
 
+  const closeArtifact = (path: string) => {
+    const index = cmcc.openArtifacts.indexOf(path)
+    const next = cmcc.openArtifacts[index + 1] ?? cmcc.openArtifacts[index - 1]
+    setCmcc("openArtifacts", (current) => current.filter((item) => item !== path))
+    if (cmcc.activeArtifact !== path) return
+    if (next) {
+      openArtifact(next)
+      return
+    }
+    setCmcc("activeArtifact", undefined)
+    setCmcc("activeTab", "artifacts")
+  }
+
+  const activateMarkdownArtifact = (target: EventTarget | null) => {
+    const element = markdownArtifactElement(target)
+    if (!element) return false
+    const path = element.dataset.cmccArtifactPath ?? resolveArtifactPath(markdownArtifactCandidate(element), artifactPaths())
+    if (!path) return false
+    openArtifact(path)
+    return true
+  }
+
+  createEffect(() => {
+    const paths = artifactPaths()
+    queueMicrotask(() => {
+      document.querySelectorAll<HTMLElement>('[data-component="markdown"] :is(a, code)').forEach((element) => {
+        const path = resolveArtifactPath(markdownArtifactCandidate(element), paths)
+        if (!path) {
+          delete element.dataset.cmccArtifactPath
+          if (element.dataset.cmccArtifactInteractive === "true") {
+            delete element.dataset.cmccArtifactInteractive
+            element.removeAttribute("role")
+            element.removeAttribute("tabindex")
+            element.removeAttribute("title")
+          }
+          return
+        }
+
+        element.dataset.cmccArtifactPath = path
+        element.title = "在右侧预览"
+        if (element instanceof HTMLAnchorElement) return
+        element.dataset.cmccArtifactInteractive = "true"
+        element.setAttribute("role", "button")
+        element.tabIndex = 0
+      })
+    })
+  })
+
+  createEffect(() => {
+    const click = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      if (!activateMarkdownArtifact(event.target)) return
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" && event.key !== " ") return
+      if (!activateMarkdownArtifact(event.target)) return
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    window.addEventListener("click", click, true)
+    window.addEventListener("keydown", keydown, true)
+    onCleanup(() => {
+      window.removeEventListener("click", click, true)
+      window.removeEventListener("keydown", keydown, true)
+    })
+  })
+
   const openBrowser = () => {
-    const value = browserDraft().trim()
+    const value = cmcc.browser.draft.trim()
     if (!value) return
     const url = /^https?:\/\//i.test(value) ? value : `https://${value}`
-    setBrowserDraft(url)
-    setBrowserUrl(url)
+    setCmcc("browser", { draft: url, url, document: undefined, title: "浏览器" })
   }
 
   const [store, setStore] = createStore({
@@ -637,21 +787,25 @@ export function SessionSidePanel(props: {
                   }
                 >
                   <CmccAssistantPanel
-                    active={cmccActiveTab()}
-                    setActive={setCmccActiveTab}
+                    active={cmcc.activeTab}
+                    setActive={(tab) => setCmcc("activeTab", tab)}
                     todos={todos()}
                     artifacts={artifacts()}
-                    activeArtifact={activeArtifact()}
-                    clearActiveArtifact={() => setActiveArtifact(undefined)}
-                    browserDraft={browserDraft()}
-                    browserUrl={browserUrl()}
-                    setBrowserDraft={setBrowserDraft}
+                    activeArtifact={cmcc.activeArtifact}
+                    openArtifacts={cmcc.openArtifacts}
+                    clearActiveArtifact={() => setCmcc("activeArtifact", undefined)}
+                    closeArtifact={closeArtifact}
+                    browserDraft={cmcc.browser.draft}
+                    browserUrl={cmcc.browser.url}
+                    browserDocument={cmcc.browser.document}
+                    browserTitle={cmcc.browser.title}
+                    setBrowserDraft={(value) => setCmcc("browser", "draft", value)}
                     openBrowser={openBrowser}
                     openArtifact={openArtifact}
                     reviewCount={props.reviewCount()}
                     canReview={props.canReview()}
                     reviewPanel={props.reviewPanel}
-                    showReview={reviewOpen() && cmccActiveTab() === "review"}
+                    showReview={reviewOpen() && cmcc.activeTab === "review"}
                   />
                 </Show>
               </div>
@@ -763,9 +917,13 @@ function CmccAssistantPanel(props: {
   todos: Todo[]
   artifacts: CmccArtifact[]
   activeArtifact?: string
+  openArtifacts: string[]
   clearActiveArtifact: () => void
+  closeArtifact: (path: string) => void
   browserDraft: string
   browserUrl: string
+  browserDocument?: string
+  browserTitle: string
   setBrowserDraft: (value: string) => void
   openBrowser: () => void
   openArtifact: (path: string) => void
@@ -800,6 +958,14 @@ function CmccAssistantPanel(props: {
           )}
         </For>
       </div>
+      <Show when={props.openArtifacts.length > 0 && (props.active === "artifacts" || props.active === "browser")}>
+        <CmccArtifactTabs
+          paths={props.openArtifacts}
+          active={props.activeArtifact}
+          open={props.openArtifact}
+          close={props.closeArtifact}
+        />
+      </Show>
       <div class="min-h-0 flex-1 overflow-hidden">
         <Switch>
           <Match when={props.active === "plan"}>
@@ -817,6 +983,8 @@ function CmccAssistantPanel(props: {
             <CmccBrowserPanel
               draft={props.browserDraft}
               url={props.browserUrl}
+              document={props.browserDocument}
+              title={props.browserTitle}
               setDraft={props.setBrowserDraft}
               open={props.openBrowser}
             />
@@ -831,6 +999,64 @@ function CmccAssistantPanel(props: {
           </Match>
         </Switch>
       </div>
+    </div>
+  )
+}
+
+function CmccArtifactTabs(props: {
+  paths: string[]
+  active?: string
+  open: (path: string) => void
+  close: (path: string) => void
+}) {
+  return (
+    <div
+      data-cmcc-artifact-tabs
+      class="flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b border-v2-border-border-base bg-v2-background-bg-layer-01 px-2"
+    >
+      <For each={props.paths}>
+        {(path) => {
+          const extension = () => fileName(path).split(".").at(-1)?.toLowerCase() ?? ""
+          return (
+            <div
+              data-cmcc-artifact-tab={path}
+              data-selected={props.active === path ? "" : undefined}
+              class="group flex h-7 max-w-48 shrink-0 items-center rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-02 text-[12px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:border-v2-border-border-active data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+              title={path}
+            >
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-1.5 py-1 pl-2"
+                onClick={() => props.open(path)}
+              >
+                <span
+                  class="flex size-4 shrink-0 items-center justify-center rounded-[3px] text-[8px] font-semibold uppercase text-white"
+                  classList={{
+                    "bg-blue-500": extension() === "doc" || extension() === "docx",
+                    "bg-green-600": extension() === "xls" || extension() === "xlsx",
+                    "bg-red-500": extension() === "pdf" || extension() === "ppt" || extension() === "pptx",
+                    "bg-cyan-600": extension() === "html" || extension() === "htm",
+                    "bg-slate-500": !["doc", "docx", "xls", "xlsx", "pdf", "ppt", "pptx", "html", "htm"].includes(
+                      extension(),
+                    ),
+                  }}
+                >
+                  {extension().slice(0, 1) || "F"}
+                </span>
+                <span class="min-w-0 flex-1 truncate">{fileName(path)}</span>
+              </button>
+              <button
+                type="button"
+                aria-label={`关闭 ${fileName(path)}`}
+                class="mr-1 flex size-4 shrink-0 items-center justify-center rounded text-[14px] leading-none text-v2-text-text-faint opacity-60 hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base group-hover:opacity-100"
+                onClick={() => props.close(path)}
+              >
+                ×
+              </button>
+            </div>
+          )
+        }}
+      </For>
     </div>
   )
 }
@@ -880,7 +1106,6 @@ function CmccArtifactsPanel(props: {
   const file = useFile()
   const sdk = useSDK()
   const platform = usePlatform()
-  const fileComponent = useFileComponent()
   const [contextMenu, setContextMenu] = createSignal<{ artifact: CmccArtifact; x: number; y: number }>()
   const selected = createMemo(() => props.artifacts.find((item) => item.path === props.activeArtifact))
   const state = createMemo(() => {
@@ -888,7 +1113,6 @@ function CmccArtifactsPanel(props: {
     if (!item) return
     return file.get(item.path)
   })
-  const content = createMemo(() => state()?.content?.content ?? "")
   const absoluteArtifactPath = (path: string) => (absolutePath(path) ? path : `${sdk().directory}/${path}`)
   const openSystemPath = (path: string, folder: boolean) => {
     if (platform.platform !== "desktop" || !platform.openPath) {
@@ -915,7 +1139,7 @@ function CmccArtifactsPanel(props: {
   })
 
   return (
-    <div class="h-full overflow-y-auto px-4 py-4">
+    <div class="h-full overflow-hidden px-4 py-4">
       <Show
         when={props.artifacts.length > 0}
         fallback={<CmccEmptyPanel title="暂无文件产出" description="助手生成、修改或补丁涉及的文件会汇总到这里。" />}
@@ -956,7 +1180,7 @@ function CmccArtifactsPanel(props: {
         <Show
           when={selected()}
           fallback={
-            <div class="space-y-2">
+            <div class="h-full space-y-2 overflow-y-auto">
               <For each={props.artifacts}>
                 {(item) => (
                   <button
@@ -982,7 +1206,7 @@ function CmccArtifactsPanel(props: {
           }
         >
           {(item) => (
-            <div class="flex min-h-full flex-col">
+            <div class="flex h-full min-h-0 flex-col">
               <div class="mb-3 flex items-center gap-2">
                 <button
                   type="button"
@@ -1006,14 +1230,9 @@ function CmccArtifactsPanel(props: {
               <div class="min-h-0 flex-1 overflow-hidden rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01">
                 <Switch>
                   <Match when={state()?.loaded}>
-                    <div class="h-full overflow-auto">
-                      <Dynamic
-                        component={fileComponent}
-                        mode="text"
-                        file={{ name: fileName(item().path), contents: content() }}
-                        class="select-text"
-                      />
-                    </div>
+                    <Show when={state()?.content}>
+                      {(content) => <CmccArtifactPreview path={item().path} content={content()} />}
+                    </Show>
                   </Match>
                   <Match when={state()?.loading}>
                     <div class="px-4 py-3 text-[13px] text-v2-text-text-muted">加载中...</div>
@@ -1031,9 +1250,150 @@ function CmccArtifactsPanel(props: {
   )
 }
 
+function CmccArtifactPreview(props: { path: string; content: FileContent }) {
+  const fileComponent = useFileComponent()
+  const kind = createMemo(() => artifactPreviewKind(props.path))
+  const text = createMemo(() => artifactText(props.content.content, props.content.encoding))
+  const data = createMemo(() => artifactBuffer(props.content.content, props.content.encoding))
+
+  return (
+    <Switch>
+      <Match when={kind() === "docx"}>
+        <CmccOfficePreview kind="docx" data={data()} />
+      </Match>
+      <Match when={kind() === "excel"}>
+        <CmccOfficePreview kind="excel" data={data()} />
+      </Match>
+      <Match when={kind() === "pptx"}>
+        <CmccOfficePreview kind="pptx" data={data()} />
+      </Match>
+      <Match when={kind() === "pdf"}>
+        <iframe
+          title={fileName(props.path)}
+          class="size-full border-0 bg-white"
+          src={artifactDataUrl(props.content, "application/pdf")}
+        />
+      </Match>
+      <Match when={kind() === "image"}>
+        <div class="flex size-full items-center justify-center overflow-auto bg-[linear-gradient(45deg,rgba(128,128,128,0.08)_25%,transparent_25%,transparent_75%,rgba(128,128,128,0.08)_75%),linear-gradient(45deg,rgba(128,128,128,0.08)_25%,transparent_25%,transparent_75%,rgba(128,128,128,0.08)_75%)] bg-[length:20px_20px] bg-[position:0_0,10px_10px] p-4">
+          <img
+            src={artifactDataUrl(props.content, props.content.mimeType ?? "image/png")}
+            alt={fileName(props.path)}
+            class="max-h-full max-w-full object-contain"
+          />
+        </div>
+      </Match>
+      <Match when={kind() === "markdown"}>
+        <div class="size-full overflow-auto px-6 py-5">
+          <Markdown text={text()} class="select-text" />
+        </div>
+      </Match>
+      <Match when={kind() === "html"}>
+        <CmccEmptyPanel title="已在浏览器中打开" description="HTML 产出会在右栏浏览器的隔离沙箱中直接运行。" />
+      </Match>
+      <Match when={kind() === "unsupported"}>
+        <CmccEmptyPanel title="暂不支持内嵌预览" description="可使用右上角“打开文件夹”，或通过右键菜单调用系统应用打开。" />
+      </Match>
+      <Match when={true}>
+        <div class="size-full overflow-auto">
+          <Dynamic
+            component={fileComponent}
+            mode="text"
+            file={{ name: fileName(props.path), contents: text() }}
+            class="select-text"
+          />
+        </div>
+      </Match>
+    </Switch>
+  )
+}
+
+function CmccOfficePreview(props: { kind: Extract<ArtifactPreviewKind, "docx" | "excel" | "pptx">; data: ArrayBuffer }) {
+  let container!: HTMLDivElement
+  const [state, setState] = createStore({ loading: true, error: undefined as string | undefined })
+
+  createEffect(() => {
+    const kind = props.kind
+    const data = props.data
+    let active = true
+    let previewer: { preview: (data: ArrayBuffer) => Promise<unknown>; destroy: () => void } | undefined
+    container.replaceChildren()
+    setState({ loading: true, error: undefined })
+
+    const load =
+      kind === "docx"
+        ? import("docx-preview").then((module) => ({
+            preview: (value: ArrayBuffer) =>
+              module.renderAsync(value, container, container, {
+                ignoreWidth: false,
+                ignoreHeight: false,
+                renderHeaders: true,
+                renderFooters: true,
+              }),
+            destroy: () => container.replaceChildren(),
+          }))
+        : kind === "excel"
+          ? Promise.all([import("@js-preview/excel"), import("@js-preview/excel/lib/index.css")]).then(([module]) =>
+              module.default.init(container, { minColLength: 12, minRowLength: 20, showContextmenu: false }),
+            )
+          : import("pptx-preview").then((module) => {
+              const width = Math.max(container.clientWidth - 32, 320)
+              return module.init(container, { width, height: Math.round((width * 9) / 16), mode: "list" })
+            })
+
+    void load
+      .then((instance) => {
+        if (!active) {
+          instance.destroy()
+          return Promise.resolve()
+        }
+        previewer = instance
+        return instance.preview(data)
+      })
+      .then(() => {
+        if (!active) return
+        setState("loading", false)
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        setState({ loading: false, error: error instanceof Error ? error.message : String(error) })
+      })
+
+    onCleanup(() => {
+      active = false
+      previewer?.destroy()
+    })
+  })
+
+  return (
+    <div
+      data-cmcc-office-preview={props.kind}
+      class="relative size-full min-h-0 min-w-0 overflow-hidden bg-white text-black"
+    >
+      <div
+        ref={container}
+        class="size-full min-h-0 min-w-0"
+        classList={{ "overflow-hidden": props.kind === "excel", "overflow-auto": props.kind !== "excel" }}
+      />
+      <Show when={state.loading}>
+        <div class="absolute inset-0 flex items-center justify-center bg-white/90 text-[13px] text-black/60">正在渲染文档...</div>
+      </Show>
+      <Show when={state.error}>
+        {(error) => (
+          <div class="absolute inset-0 flex items-center justify-center bg-white px-8 text-center text-[13px] text-black/60">
+            文档渲染失败：{error()}
+          </div>
+        )}
+      </Show>
+    </div>
+  )
+}
+
 function CmccBrowserPanel(props: {
   draft: string
   url: string
+  document?: string
+  title: string
   setDraft: (value: string) => void
   open: () => void
 }) {
@@ -1059,10 +1419,11 @@ function CmccBrowserPanel(props: {
         </button>
       </div>
       <iframe
-        title="浏览器"
+        title={props.title}
         class="min-h-0 flex-1 border-0 bg-white"
-        src={props.url}
-        sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
+        src={props.document ? undefined : props.url}
+        srcdoc={props.document}
+        sandbox={props.document ? "allow-forms allow-popups allow-scripts" : "allow-forms allow-popups allow-same-origin allow-scripts"}
       />
     </div>
   )

@@ -23,12 +23,14 @@ import { sessionTitle } from "@/utils/session-title"
 import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
 import {
   CMCC_CONVERSATION_WORKSPACES_EVENT,
+  cmccConversationDirectories,
   cmccConversationWorkspaces,
   cmccCreateConversationWorkspace,
   cmccDefaultWorkspace,
   cmccForgetConversationWorkspace,
   cmccIsWorkspaceDirectory,
-  cmccLegacyWorkspace,
+  cmccWorkspaceRoot,
+  cmccWorkspaceSessionPath,
 } from "@/utils/cmcc-workspace"
 import { cmccExpertCenterHref } from "@/utils/cmcc-experts"
 import { displayName, sortedRootSessions } from "./layout/helpers"
@@ -198,6 +200,7 @@ function CmccSidebar() {
   })
   const [conversationStore, setConversationStore] = createStore({
     directories: cmccConversationWorkspaces(),
+    sessions: [] as Session[],
   })
 
   if (typeof window !== "undefined") {
@@ -209,15 +212,9 @@ function CmccSidebar() {
   const projects = createMemo(() =>
     layout.projects.list().filter((project) => !cmccIsWorkspaceDirectory(project.worktree, home())),
   )
-  const conversationDirectories = createMemo(() => {
-    const legacy = cmccLegacyWorkspace(home())
-    const seen = new Set<string>()
-    return [...conversationStore.directories, legacy].filter((directory): directory is string => {
-      if (!directory || seen.has(directory)) return false
-      seen.add(directory)
-      return cmccIsWorkspaceDirectory(directory, home())
-    })
-  })
+  const conversationDirectories = createMemo(() =>
+    cmccConversationDirectories(home(), conversationStore.directories, conversationStore.sessions),
+  )
   const conversations = createMemo(() => {
     return conversationDirectories()
       .flatMap((directory) =>
@@ -236,6 +233,19 @@ function CmccSidebar() {
     }
     await sync().project.loadSessions(directory, { limit: 64 })
   }
+
+  createEffect(() => {
+    const directory = cmccWorkspaceRoot(home())
+    const path = cmccWorkspaceSessionPath(home())
+    if (!directory || !path) return
+    void serverSDK()
+      .client.session.list(
+        { directory, scope: "project", path, roots: true, limit: 200 },
+        { throwOnError: true },
+      )
+      .then((result) => setConversationStore("sessions", result.data ?? []))
+      .catch(() => setConversationStore("sessions", []))
+  })
 
   createEffect(() => {
     const remembered = new Set(conversationStore.directories)

@@ -54,6 +54,12 @@ export function cmccDefaultWorkspace(home: string | undefined) {
   return cmccWorkspaceRoot(home)
 }
 
+export function cmccWorkspaceSessionPath(home: string | undefined) {
+  return cmccWorkspaceRoot(home)
+    ?.replaceAll("\\", "/")
+    .replace(/^(?:[A-Za-z]:)?\/+/, "")
+}
+
 export function cmccIsWorkspaceDirectory(directory: string | undefined, home: string | undefined) {
   if (!directory) return false
   const root = cmccWorkspaceRoot(home)
@@ -77,6 +83,21 @@ export function cmccWorkspaceLabel(directory: string | undefined, home: string |
   if (directory === root) return "~"
   if (directory.startsWith(`${root}/`)) return `~/${directory.slice(root.length + 1)}`
   return directory
+}
+
+export function cmccConversationDirectories(
+  home: string | undefined,
+  remembered: string[],
+  sessions: { directory: string }[],
+) {
+  const seen = new Set<string>()
+  return [...remembered, ...sessions.map((session) => session.directory), cmccLegacyWorkspace(home)].filter(
+    (directory): directory is string => {
+      if (!directory || seen.has(directory)) return false
+      seen.add(directory)
+      return cmccIsWorkspaceDirectory(directory, home)
+    },
+  )
 }
 
 export function cmccConversationWorkspaces() {
