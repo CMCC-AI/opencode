@@ -60,8 +60,12 @@ import type {
   ExperimentalWorkspaceSyncListResponses,
   ExperimentalWorkspaceWarpErrors,
   ExperimentalWorkspaceWarpResponses,
+  FileArchiveErrors,
+  FileArchiveResponses,
   FileCreateDirectoryErrors,
   FileCreateDirectoryResponses,
+  FileDownloadErrors,
+  FileDownloadResponses,
   FileListErrors,
   FileListResponses,
   FilePartInput,
@@ -70,8 +74,6 @@ import type {
   FileReadResponses,
   FileStatusErrors,
   FileStatusResponses,
-  FileWriteErrors,
-  FileWriteResponses,
   FindFilesErrors,
   FindFilesResponses,
   FindSymbolsErrors,
@@ -1896,16 +1898,15 @@ export class File extends HeyApiClient {
   }
 
   /**
-   * Write file
+   * Download file
    *
-   * Write text content to a file inside the current workspace.
+   * Download a file from the current workspace without altering its contents.
    */
-  public write<ThrowOnError extends boolean = false>(
-    parameters?: {
+  public download<ThrowOnError extends boolean = false>(
+    parameters: {
       directory?: string
       workspace?: string
-      path?: string
-      content?: string
+      path: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1916,14 +1917,45 @@ export class File extends HeyApiClient {
           args: [
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
-            { in: "body", key: "path" },
-            { in: "body", key: "content" },
+            { in: "query", key: "path" },
           ],
         },
       ],
     )
-    return (options?.client ?? this.client).post<FileWriteResponses, FileWriteErrors, ThrowOnError>({
-      url: "/file/write",
+    return (options?.client ?? this.client).get<FileDownloadResponses, FileDownloadErrors, ThrowOnError>({
+      url: "/file/download",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Download file archive
+   *
+   * Download selected workspace files as a ZIP archive.
+   */
+  public archive<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      paths?: Array<string>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "paths" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileArchiveResponses, FileArchiveErrors, ThrowOnError>({
+      url: "/file/archive",
       ...options,
       ...params,
       headers: {

@@ -1,5 +1,6 @@
 import * as InstanceState from "@/effect/instance-state"
 import { FileSystem } from "@opencode-ai/core/filesystem"
+import { BlobReader, BlobWriter, ZipWriter } from "@zip.js/zip.js"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -12,6 +13,9 @@ import { homedir } from "node:os"
 import path from "path"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
+
+const ARCHIVE_FILE_LIMIT = 200
+const ARCHIVE_BYTE_LIMIT = 100 * 1024 * 1024
 
 export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handlers) =>
   Effect.gen(function* () {
@@ -127,6 +131,44 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       )
     })
 
+    const download = Effect.fn("FileHttpApi.download")(function* (ctx: { query: { path: string } }) {
+      const directory = (yield* InstanceState.context).directory
+      const target = downloadPath(directory, ctx.query.path)
+      if (!target) return yield* new HttpApiError.BadRequest({})
+      return yield* filesystem(FileSystem.Service.use((fs) => fs.read({ path: target }))).pipe(
+        Effect.map((file) => file.content),
+      )
+    })
+
+    const archive = Effect.fn("FileHttpApi.archive")(function* (ctx: { payload: { paths: readonly string[] } }) {
+      const directory = (yield* InstanceState.context).directory
+      if (ctx.payload.paths.length === 0 || ctx.payload.paths.length > ARCHIVE_FILE_LIMIT)
+        return yield* new HttpApiError.BadRequest({})
+      const targets = ctx.payload.paths.map((value) => downloadPath(directory, value))
+      if (targets.some((target) => target === undefined)) return yield* new HttpApiError.BadRequest({})
+      const paths = [...new Set(targets.filter((target) => target !== undefined))]
+
+      const files = yield* Effect.forEach(
+        paths,
+        (target) =>
+          filesystem(FileSystem.Service.use((fs) => fs.read({ path: target }))).pipe(
+            Effect.map((file) => ({ ...file, path: target.replaceAll("\\", "/") })),
+          ),
+        { concurrency: 8 },
+      )
+      if (files.reduce((total, file) => total + file.content.byteLength, 0) > ARCHIVE_BYTE_LIMIT)
+        return yield* new HttpApiError.BadRequest({})
+
+      const writer = new ZipWriter(new BlobWriter("application/zip"))
+      yield* Effect.forEach(
+        files,
+        (file) => Effect.promise(() => writer.add(file.path, new BlobReader(new Blob([new Uint8Array(file.content)])))),
+        { concurrency: 1, discard: true },
+      )
+      const blob = yield* Effect.promise(() => writer.close())
+      return new Uint8Array(yield* Effect.promise(() => blob.arrayBuffer()))
+    })
+
     const createDirectory = Effect.fn("FileHttpApi.createDirectory")(function* (ctx: { payload: { path: string } }) {
       const root = path.resolve(homedir(), "Documents", "DeepInsight")
       const target = path.resolve(ctx.payload.path)
@@ -147,7 +189,17 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       .handle("findSymbol", findSymbol)
       .handle("list", list)
       .handle("content", content)
+      .handle("download", download)
+      .handle("archive", archive)
       .handle("createDirectory", createDirectory)
       .handle("status", status)
   }),
 ).pipe(Layer.provide(locationServiceMapLayer))
+
+function downloadPath(directory: string, value: string) {
+  const absolute = path.resolve(directory, value)
+  if (!FSUtil.contains(directory, absolute)) return
+  const relative = path.relative(directory, absolute)
+  if (!relative) return
+  return RelativePath.make(relative)
+}

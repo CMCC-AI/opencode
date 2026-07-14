@@ -2,7 +2,7 @@ import { FileSystem } from "@opencode-ai/core/filesystem"
 import { NonNegativeInt } from "@opencode-ai/core/schema"
 import { LSP } from "@/lsp/lsp"
 import { Schema } from "effect"
-import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
+import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import {
@@ -39,6 +39,10 @@ export const FindSymbolQuery = Schema.Struct({
 
 export const CreateDirectoryPayload = Schema.Struct({
   path: Schema.String,
+})
+
+export const ArchivePayload = Schema.Struct({
+  paths: Schema.Array(Schema.String),
 })
 
 export const LegacyMatch = Schema.Struct({
@@ -102,6 +106,8 @@ export const FilePaths = {
   findSymbol: "/find/symbol",
   list: "/file",
   content: "/file/content",
+  download: "/file/download",
+  archive: "/file/archive",
   createDirectory: "/file/directory",
   status: "/file/status",
 } as const
@@ -158,6 +164,29 @@ export const FileApi = HttpApi.make("file")
             identifier: "file.read",
             summary: "Read file",
             description: "Read the content of a specified file.",
+          }),
+        ),
+        HttpApiEndpoint.get("download", FilePaths.download, {
+          query: FileQuery,
+          success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "file.download",
+            summary: "Download file",
+            description: "Download a file from the current workspace without altering its contents.",
+          }),
+        ),
+        HttpApiEndpoint.post("archive", FilePaths.archive, {
+          query: WorkspaceRoutingQuery,
+          payload: ArchivePayload,
+          success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array({ contentType: "application/zip" })),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "file.archive",
+            summary: "Download file archive",
+            description: "Download selected workspace files as a ZIP archive.",
           }),
         ),
         HttpApiEndpoint.post("createDirectory", FilePaths.createDirectory, {

@@ -8048,34 +8048,64 @@ export type FileReadResponses = {
 
 export type FileReadResponse = FileReadResponses[keyof FileReadResponses]
 
-export type FileWriteData = {
-  body?: {
-    path: string
-    content: string
-  }
+export type FileDownloadData = {
+  body?: never
   path?: never
-  query?: {
+  query: {
     directory?: string
     workspace?: string
+    path: string
   }
-  url: "/file/write"
+  url: "/file/download"
 }
 
-export type FileWriteErrors = {
+export type FileDownloadErrors = {
   /**
    * BadRequest | InvalidRequestError
    */
   400: EffectHttpApiErrorBadRequest | InvalidRequestError
 }
 
-export type FileWriteError = FileWriteErrors[keyof FileWriteErrors]
+export type FileDownloadError = FileDownloadErrors[keyof FileDownloadErrors]
 
-export type FileWriteResponses = {
+export type FileDownloadResponses = {
   /**
-   * Written
+   * Success
    */
-  200: unknown
+  200: Blob | File
 }
+
+export type FileDownloadResponse = FileDownloadResponses[keyof FileDownloadResponses]
+
+export type FileArchiveData = {
+  body?: {
+    paths: Array<string>
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/archive"
+}
+
+export type FileArchiveErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type FileArchiveError = FileArchiveErrors[keyof FileArchiveErrors]
+
+export type FileArchiveResponses = {
+  /**
+   * Success
+   */
+  200: Blob | File
+}
+
+export type FileArchiveResponse = FileArchiveResponses[keyof FileArchiveResponses]
 
 export type FileCreateDirectoryData = {
   body?: {

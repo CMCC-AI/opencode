@@ -20,7 +20,6 @@ import { useCommand } from "@/context/command"
 import { useFile, type SelectedLineRange } from "@/context/file"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
-import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { useSDK } from "@/context/sdk"
 import { useServerSync } from "@/context/server-sync"
@@ -121,19 +120,19 @@ function normalizePathSeparators(value: string) {
   return value.replaceAll("\\", "/").replace(/\/+$/, "")
 }
 
-function absolutePath(value: string) {
-  return value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith("\\\\")
-}
-
-function parentPath(value: string) {
-  const normalized = normalizePathSeparators(value)
-  const index = normalized.lastIndexOf("/")
-  if (index <= 0) return value
-  return normalized.slice(0, index)
-}
-
 function fileName(value: string) {
   return normalizePathSeparators(value).split("/").filter(Boolean).at(-1) ?? value
+}
+
+function downloadBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = name
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
 function normalizeArtifactPath(value: string) {
@@ -1172,31 +1171,42 @@ function CmccArtifactsPanel(props: {
 }) {
   const file = useFile()
   const sdk = useSDK()
-  const platform = usePlatform()
   const [contextMenu, setContextMenu] = createSignal<{ artifact: CmccArtifact; x: number; y: number }>()
+  const [downloading, setDownloading] = createSignal<string>()
   const selected = createMemo(() => props.artifacts.find((item) => item.path === props.activeArtifact))
+  const downloadable = createMemo(() => props.artifacts.filter((item) => item.status !== "deleted"))
   const state = createMemo(() => {
     const item = selected()
     if (!item) return
     return file.get(item.path)
   })
-  const absoluteArtifactPath = (path: string) => (absolutePath(path) ? path : `${sdk().directory}/${path}`)
-  const openSystemPath = (path: string, folder: boolean) => {
-    if (platform.platform !== "desktop" || !platform.openPath) {
-      showToast({ title: folder ? "无法打开文件夹" : "无法打开文件", description: "当前环境不支持打开本地路径。" })
-      return
-    }
-    platform.openPath(folder ? parentPath(absoluteArtifactPath(path)) : absoluteArtifactPath(path)).catch((error: unknown) => {
-      showToast({
-        title: folder ? "无法打开文件夹" : "无法打开文件",
-        description: error instanceof Error ? error.message : String(error),
+  const download = (path: string) => {
+    setDownloading(path)
+    void sdk()
+      .client.file.download({ path })
+      .then((result) => {
+        if (!(result.data instanceof Blob)) throw new Error("服务器未返回文件内容")
+        downloadBlob(result.data, fileName(path))
       })
-    })
+      .catch((error: unknown) => {
+        showToast({ title: "下载失败", description: error instanceof Error ? error.message : String(error) })
+      })
+      .finally(() => setDownloading(undefined))
   }
-  const openSelectedFolder = () => {
-    const item = selected()
-    if (!item) return
-    openSystemPath(item.path, true)
+  const downloadAll = () => {
+    const paths = downloadable().map((item) => item.path)
+    if (paths.length === 0) return
+    setDownloading("all")
+    void sdk()
+      .client.file.archive({ paths })
+      .then((result) => {
+        if (!(result.data instanceof Blob)) throw new Error("服务器未返回压缩包")
+        downloadBlob(result.data, "产出文件.zip")
+      })
+      .catch((error: unknown) => {
+        showToast({ title: "批量下载失败", description: error instanceof Error ? error.message : String(error) })
+      })
+      .finally(() => setDownloading(undefined))
   }
 
   createEffect(() => {
@@ -1224,21 +1234,22 @@ function CmccArtifactsPanel(props: {
                   type="button"
                   class="block w-full px-3 py-1.5 text-left text-[13px] leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
                   onClick={() => {
-                    openSystemPath(menu().artifact.path, false)
+                    props.openArtifact(menu().artifact.path)
                     setContextMenu(undefined)
                   }}
                 >
-                  打开
+                  预览
                 </button>
                 <button
                   type="button"
-                  class="block w-full px-3 py-1.5 text-left text-[13px] leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                  disabled={menu().artifact.status === "deleted" || downloading() !== undefined}
+                  class="block w-full px-3 py-1.5 text-left text-[13px] leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => {
-                    openSystemPath(menu().artifact.path, true)
+                    download(menu().artifact.path)
                     setContextMenu(undefined)
                   }}
                 >
-                  打开文件夹
+                  下载
                 </button>
               </div>
             </>
@@ -1247,28 +1258,42 @@ function CmccArtifactsPanel(props: {
         <Show
           when={selected()}
           fallback={
-            <div class="h-full space-y-2 overflow-y-auto">
-              <For each={props.artifacts}>
-                {(item) => (
+            <div class="flex h-full min-h-0 flex-col">
+              <Show when={downloadable().length > 1}>
+                <div class="mb-3 flex justify-end">
                   <button
                     type="button"
-                    class="flex w-full min-w-0 items-center gap-2 rounded-[6px] px-2 py-1.5 text-left hover:bg-v2-overlay-simple-overlay-hover"
-                    title={item.path}
-                    onClick={() => props.openArtifact(item.path)}
-                    onContextMenu={(event) => {
-                      event.preventDefault()
-                      setContextMenu({ artifact: item, x: event.clientX, y: event.clientY })
-                    }}
+                    disabled={downloading() !== undefined}
+                    class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={downloadAll}
                   >
-                    <div class="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-v2-border-border-active text-[9px] font-medium uppercase text-white">
-                      {fileName(item.path).split(".").at(-1)?.slice(0, 1) ?? "F"}
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <div class="truncate text-[13px] leading-5 text-v2-text-text-base">{fileName(item.path)}</div>
-                    </div>
+                    {downloading() === "all" ? "正在打包..." : `全部下载（${downloadable().length}）`}
                   </button>
-                )}
-              </For>
+                </div>
+              </Show>
+              <div class="min-h-0 flex-1 space-y-2 overflow-y-auto">
+                <For each={props.artifacts}>
+                  {(item) => (
+                    <button
+                      type="button"
+                      class="flex w-full min-w-0 items-center gap-2 rounded-[6px] px-2 py-1.5 text-left hover:bg-v2-overlay-simple-overlay-hover"
+                      title={item.path}
+                      onClick={() => props.openArtifact(item.path)}
+                      onContextMenu={(event) => {
+                        event.preventDefault()
+                        setContextMenu({ artifact: item, x: event.clientX, y: event.clientY })
+                      }}
+                    >
+                      <div class="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-v2-border-border-active text-[9px] font-medium uppercase text-white">
+                        {fileName(item.path).split(".").at(-1)?.slice(0, 1) ?? "F"}
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate text-[13px] leading-5 text-v2-text-text-base">{fileName(item.path)}</div>
+                      </div>
+                    </button>
+                  )}
+                </For>
+              </div>
             </div>
           }
         >
@@ -1288,10 +1313,11 @@ function CmccArtifactsPanel(props: {
                 </div>
                 <button
                   type="button"
-                  class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
-                  onClick={openSelectedFolder}
+                  disabled={item().status === "deleted" || downloading() !== undefined}
+                  class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => download(item().path)}
                 >
-                  打开文件夹
+                  {downloading() === item().path ? "下载中..." : "下载"}
                 </button>
               </div>
               <div class="min-h-0 flex-1 overflow-hidden rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01">
@@ -1359,7 +1385,7 @@ function CmccArtifactPreview(props: { path: string; content: FileContent }) {
         <CmccEmptyPanel title="已在浏览器中打开" description="HTML 产出会在右栏浏览器的隔离沙箱中直接运行。" />
       </Match>
       <Match when={kind() === "unsupported"}>
-        <CmccEmptyPanel title="暂不支持内嵌预览" description="可使用右上角“打开文件夹”，或通过右键菜单调用系统应用打开。" />
+        <CmccEmptyPanel title="暂不支持内嵌预览" description="可使用右上角“下载”保存到本地后打开。" />
       </Match>
       <Match when={true}>
         <div class="size-full overflow-auto">

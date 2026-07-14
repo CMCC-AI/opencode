@@ -112,6 +112,11 @@ function call<T>(request: () => Promise<T>) {
   return Effect.promise(request)
 }
 
+function blob(value: unknown) {
+  if (!(value instanceof Blob)) throw new Error("Expected Blob response")
+  return value
+}
+
 function capture(request: () => Promise<SdkResult>) {
   return call(request).pipe(
     Effect.map((result) => ({
@@ -401,6 +406,29 @@ describe("HttpApi SDK", () => {
           encoding: "base64",
           mimeType: "application/pdf",
         })
+      }),
+  )
+
+  httpapiInstance(
+    "downloads files and selected files as a ZIP archive",
+    { serverPath: "raw", git: false, setup: writeStandardFiles },
+    ({ sdk }) =>
+      Effect.gen(function* () {
+        const downloaded = yield* call(() => sdk.file.download({ path: "hello.txt" }))
+        const archived = yield* call(() => sdk.file.archive({ paths: ["hello.txt", "needle.ts"] }))
+        const downloadedBlob = blob(downloaded.data)
+        const archivedBlob = blob(archived.data)
+
+        expect(downloaded.response.status).toBe(200)
+        expect(downloadedBlob).toBeInstanceOf(Blob)
+        expect(yield* call(() => downloadedBlob.text())).toBe("hello")
+        expect(archived.response.status).toBe(200)
+        expect(archivedBlob).toBeInstanceOf(Blob)
+        expect(Array.from(new Uint8Array(yield* call(() => archivedBlob.arrayBuffer())).slice(0, 4))).toEqual([
+          0x50, 0x4b, 0x03, 0x04,
+        ])
+        yield* expectStatus(() => sdk.file.download({ path: "../outside.txt" }), 400)
+        yield* expectStatus(() => sdk.file.archive({ paths: ["hello.txt", "../outside.txt"] }), 400)
       }),
   )
 
