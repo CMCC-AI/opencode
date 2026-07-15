@@ -52,6 +52,7 @@ import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
 import { CmccExpertCenterRoute, CmccExpertRoute } from "@/pages/cmcc-experts"
 import { CmccPluginHubRoute } from "@/pages/cmcc-plugin-hub"
+import { CmccKnowledgeHomeRoute, CmccKnowledgeNotebookRoute } from "@/pages/cmcc-knowledge"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 import {
@@ -63,6 +64,7 @@ import {
 } from "./utils/session-route"
 import { isSessionNotFoundError } from "./utils/server-errors"
 import { cmccCreateConversationWorkspace } from "./utils/cmcc-workspace"
+import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
 
@@ -633,12 +635,36 @@ function Routes() {
         <Route path="/" component={CmccDefaultRoute} />
         <Route path="/expert" component={CmccExpertCenterRoute} />
         <Route path="/expert/:id" component={CmccExpertRoute} />
+        <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />
+        <Route path="/knowledge/:id/session/:sessionID" component={KnowledgeNotebookRoute} />
+        <Route path="/knowledge/:id" component={KnowledgeNotebookRoute} />
         <Route path="/plugins" component={CmccPluginHubRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
       <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
     </>
+  )
+}
+
+function KnowledgeNotebookRoute() {
+  const params = useParams<{ id: string; sessionID?: string }>()
+  const notebook = createMemo(() => cmccKnowledgeNotebooks().find((item) => item.id === params.id))
+  const directory = () => notebook()!.directory
+  const sessionID = () => (params.sessionID === "new" ? undefined : params.sessionID ?? notebook()?.sessionID)
+
+  return (
+    <Show when={notebook()} fallback={<Navigate href="/knowledge" />}>
+      <TargetServerScopedProviders directory={() => notebook()?.directory}>
+        <SDKProvider directory={directory}>
+          <DirectoryDataProvider directory={directory} sessionID={sessionID}>
+            <SessionProviders>
+              <CmccKnowledgeNotebookRoute />
+            </SessionProviders>
+          </DirectoryDataProvider>
+        </SDKProvider>
+      </TargetServerScopedProviders>
+    </Show>
   )
 }
 

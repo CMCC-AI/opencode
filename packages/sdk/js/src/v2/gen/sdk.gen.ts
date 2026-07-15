@@ -66,6 +66,8 @@ import type {
   FileCreateDirectoryResponses,
   FileDownloadErrors,
   FileDownloadResponses,
+  FileKnowledgeGraphErrors,
+  FileKnowledgeGraphResponses,
   FileListErrors,
   FileListResponses,
   FilePartInput,
@@ -2003,6 +2005,36 @@ export class File extends HeyApiClient {
         },
       },
     )
+  }
+
+  /**
+   * Build knowledge graph
+   *
+   * Build a notebook knowledge graph from indexed LLM Wiki Markdown links.
+   */
+  public knowledgeGraph<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<FileKnowledgeGraphResponses, FileKnowledgeGraphErrors, ThrowOnError>({
+      url: "/file/knowledge-graph",
+      ...options,
+      ...params,
+    })
   }
 
   /**

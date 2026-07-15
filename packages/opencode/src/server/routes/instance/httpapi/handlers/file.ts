@@ -13,6 +13,7 @@ import { homedir } from "node:os"
 import path from "path"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
+import { scanKnowledgeGraph } from "@/knowledge/graph"
 
 const ARCHIVE_FILE_LIMIT = 200
 const ARCHIVE_BYTE_LIMIT = 100 * 1024 * 1024
@@ -179,6 +180,11 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       )
     })
 
+    const knowledgeGraph = Effect.fn("FileHttpApi.knowledgeGraph")(function* () {
+      const directory = (yield* InstanceState.context).directory
+      return yield* Effect.tryPromise(() => scanKnowledgeGraph(directory)).pipe(Effect.orDie)
+    })
+
     const status = Effect.fn("FileHttpApi.status")(function* () {
       return []
     })
@@ -192,6 +198,7 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       .handle("download", download)
       .handle("archive", archive)
       .handle("createDirectory", createDirectory)
+      .handle("knowledgeGraph", knowledgeGraph)
       .handle("status", status)
   }),
 ).pipe(Layer.provide(locationServiceMapLayer))

@@ -2288,6 +2288,24 @@ export type FileContent = {
   mimeType?: string
 }
 
+export type KnowledgeGraph = {
+  nodes: Array<{
+    id: string
+    path: string
+    label: string
+    degree: number
+    inDegree: number
+    outDegree: number
+    x: number
+    y: number
+  }>
+  edges: Array<{
+    id: string
+    source: string
+    target: string
+  }>
+}
+
 export type File = {
   path: string
   added: number
@@ -8134,6 +8152,34 @@ export type FileCreateDirectoryResponses = {
    */
   200: unknown
 }
+
+export type FileKnowledgeGraphData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/knowledge-graph"
+}
+
+export type FileKnowledgeGraphErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type FileKnowledgeGraphError = FileKnowledgeGraphErrors[keyof FileKnowledgeGraphErrors]
+
+export type FileKnowledgeGraphResponses = {
+  /**
+   * Knowledge graph
+   */
+  200: KnowledgeGraph
+}
+
+export type FileKnowledgeGraphResponse = FileKnowledgeGraphResponses[keyof FileKnowledgeGraphResponses]
 
 export type FileStatusData = {
   body?: never

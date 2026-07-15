@@ -64,6 +64,23 @@ const withHome = <A, E, R>(home: string, self: Effect.Effect<A, E, R>) =>
   )
 
 describe("skill", () => {
+  it.live("registers the built-in llm-wiki skill", () =>
+    provideTmpdirInstance(
+      () =>
+        Effect.gen(function* () {
+          const skill = yield* Skill.Service
+          expect(yield* skill.require("llm-wiki")).toEqual(
+            expect.objectContaining({
+              name: "llm-wiki",
+              location: "<built-in>",
+              content: expect.stringContaining("01_Raw_Sources"),
+            }),
+          )
+        }),
+      { git: true },
+    ),
+  )
+
   it.effect("formats verbose locations as XML-safe filesystem paths", () =>
     Effect.sync(() => {
       const output = Skill.fmt(

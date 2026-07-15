@@ -33,6 +33,7 @@ import {
   cmccWorkspaceSessionPath,
 } from "@/utils/cmcc-workspace"
 import { cmccExpertCenterHref } from "@/utils/cmcc-experts"
+import { cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
 import { displayName, sortedRootSessions } from "./layout/helpers"
 
 const SIDEBAR_MIN_WIDTH = 220
@@ -83,6 +84,7 @@ export default function NewLayout(props: ParentProps) {
 }
 
 function CmccTopControls() {
+  const navigate = useNavigate()
   const layout = useLayout()
   const location = useLocation()
   const server = useServer()
@@ -90,7 +92,7 @@ function CmccTopControls() {
   const sync = useServerSync()
   const tabs = useTabs()
   const home = createMemo(() => sync().data.path.home)
-  const activeSessionID = createMemo(() => location.pathname.match(/\/session\/([^/?#]+)/)?.[1])
+  const activeSessionPath = createMemo(() => (location.pathname.includes("/session/") ? location.pathname : undefined))
   const [history, setHistory] = createStore({
     stack: [] as string[],
     index: -1,
@@ -99,18 +101,18 @@ function CmccTopControls() {
   const canForward = createMemo(() => history.index >= 0 && history.index < history.stack.length - 1)
 
   createEffect(() => {
-    const id = activeSessionID()
-    if (!id) return
+    const path = activeSessionPath()
+    if (!path) return
 
     const snapshot = untrack(() => ({
       index: history.index,
       stack: history.stack.slice(),
     }))
-    if (snapshot.stack[snapshot.index] === id) return
+    if (snapshot.stack[snapshot.index] === path) return
 
     const base = snapshot.index >= 0 ? snapshot.stack.slice(0, snapshot.index + 1) : []
     setHistory({
-      stack: [...base, id],
+      stack: [...base, path],
       index: base.length,
     })
   })
@@ -124,6 +126,11 @@ function CmccTopControls() {
   }
 
   const openNewSession = async () => {
+    const notebookID = location.pathname.match(/^\/knowledge\/([^/]+)/)?.[1]
+    if (notebookID) {
+      navigate(`/knowledge/${notebookID}/session/new`)
+      return
+    }
     const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
       serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
     ).catch((error) => {
@@ -149,8 +156,7 @@ function CmccTopControls() {
     const next = snapshot.stack[index]
     if (!next) return
     setHistory("index", index)
-    const tab = tabs.addSessionTab({ server: server.key, sessionId: next })
-    tabs.select(tab)
+    navigate(next)
   }
 
   return (
@@ -193,6 +199,10 @@ function CmccSidebar() {
   const pickDirectory = useDirectoryPicker()
   const openSettings = useSettingsCommand()
   const home = createMemo(() => sync().data.path.home)
+  const knowledgeNotebooks = createMemo(() => {
+    location.pathname
+    return cmccKnowledgeNotebooks()
+  })
   const [drag, setDrag] = createStore({
     active: false,
     startX: 0,
@@ -223,6 +233,7 @@ function CmccSidebar() {
           session,
         })),
       )
+      .filter((record) => !cmccKnowledgeNotebookForSession(knowledgeNotebooks(), record.session))
       .sort((a, b) => sessionUpdatedAt(b.session) - sessionUpdatedAt(a.session))
       .slice(0, 64)
   })
@@ -312,6 +323,11 @@ function CmccSidebar() {
   onCleanup(stopDrag)
 
   const openNewSession = async () => {
+    const notebookID = location.pathname.match(/^\/knowledge\/([^/]+)/)?.[1]
+    if (notebookID) {
+      navigate(`/knowledge/${notebookID}/session/new`)
+      return
+    }
     const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
       serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
     ).catch((error) => {
@@ -368,12 +384,20 @@ function CmccSidebar() {
   }
 
   const openSession = (session: Session) => {
+    const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
+    if (notebook) {
+      navigate(`/knowledge/${notebook.id}/session/${session.id}`)
+      return
+    }
     const tab = tabs.addSessionTab({ server: server.key, sessionId: session.id })
     tabs.select(tab)
   }
 
-  const activeSession = (session: Session) =>
-    location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
+  const activeSession = (session: Session) => {
+    const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
+    if (notebook) return location.pathname === `/knowledge/${notebook.id}/session/${session.id}`
+    return location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
+  }
 
   const removeSession = (session: Session) => {
     const [, setStore] = sync().child(session.directory, { bootstrap: false })
@@ -446,6 +470,12 @@ function CmccSidebar() {
             <CmccExpertGroup
               activePath={location.pathname}
               open={(href) => navigate(href)}
+            />
+            <CmccSidebarAction
+              icon="brain"
+              label="知识库"
+              active={location.pathname === "/knowledge" || location.pathname.startsWith("/knowledge/")}
+              onClick={() => navigate("/knowledge")}
             />
             <CmccSidebarAction icon="task" label="已安排" />
             <CmccSidebarAction

@@ -113,24 +113,40 @@ if [[ $upload_mode == delta ]]; then
   fi
 fi
 
+delta_uploaded=0
 if [[ $upload_mode == delta ]]; then
-  echo "Preparing the current remote binary as the delta base"
+  echo "Preparing an immutable remote delta base"
   ssh "$remote" \
-    "rm -rf -- '$remote_stage' && mkdir -p '$remote_stage' && cp '$install_root/current/opencode' '$remote_stage/opencode'"
+    "rm -rf -- '$remote_stage' && mkdir -p '$remote_stage/base' '$remote_stage/release' && cp '$install_root/current/opencode' '$remote_stage/base/opencode'"
 
   echo "Uploading changed binary blocks"
-  rsync --archive --partial --inplace --compress --progress --stats \
+  if rsync --archive --partial --compress --progress --stats \
+    --copy-dest=../base \
     "$stage/opencode" \
-    "$remote:$remote_stage/opencode"
-  rsync --archive --partial \
-    "$stage/VERSION" \
-    "$stage/opencode.env" \
-    "$stage/install-single-server.sh" \
-    "$remote:$remote_stage/"
+    "$remote:$remote_stage/release/" && \
+    rsync --archive --partial \
+      "$stage/VERSION" \
+      "$stage/opencode.env" \
+      "$stage/install-single-server.sh" \
+      "$remote:$remote_stage/release/"; then
+    local_sha256=$(shasum -a 256 "$stage/opencode" | awk '{print $1}')
+    remote_sha256=$(ssh "$remote" "sha256sum '$remote_stage/release/opencode' | awk '{print \$1}'")
+    if [[ $local_sha256 == "$remote_sha256" ]]; then
+      delta_uploaded=1
+    else
+      echo "Delta SHA-256 verification failed; falling back to compressed bundle upload" >&2
+      upload_mode=bundle
+    fi
+  else
+    echo "Delta upload failed; falling back to compressed bundle upload" >&2
+    upload_mode=bundle
+  fi
+fi
 
-  echo "Installing the delta release and restarting the service"
+if [[ $delta_uploaded == 1 ]]; then
+  echo "Installing the verified delta release and restarting the service"
   ssh -t "$remote" \
-    "sudo env OPENCODE_INSTALL_ROOT='$install_root' OPENCODE_BIND_HOST='$bind_host' OPENCODE_PORT='$port' OPENCODE_KEEP_RELEASES='$keep_releases' bash '$remote_stage/install-single-server.sh' '$remote_stage' '$service_user' && rm -rf -- '$remote_stage'"
+    "sudo env OPENCODE_INSTALL_ROOT='$install_root' OPENCODE_BIND_HOST='$bind_host' OPENCODE_PORT='$port' OPENCODE_KEEP_RELEASES='$keep_releases' bash '$remote_stage/release/install-single-server.sh' '$remote_stage/release' '$service_user' && rm -rf -- '$remote_stage'"
 else
   create_bundle
   echo "Uploading one compressed offline bundle"

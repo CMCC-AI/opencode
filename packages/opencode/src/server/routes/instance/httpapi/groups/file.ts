@@ -100,6 +100,28 @@ export const LegacyStatus = Schema.Struct({
   status: Schema.Literals(["added", "deleted", "modified"]),
 }).annotate({ identifier: "File" })
 
+export const KnowledgeGraph = Schema.Struct({
+  nodes: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      path: Schema.String,
+      label: Schema.String,
+      degree: NonNegativeInt,
+      inDegree: NonNegativeInt,
+      outDegree: NonNegativeInt,
+      x: Schema.Number.check(Schema.isFinite()),
+      y: Schema.Number.check(Schema.isFinite()),
+    }),
+  ),
+  edges: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      source: Schema.String,
+      target: Schema.String,
+    }),
+  ),
+}).annotate({ identifier: "KnowledgeGraph" })
+
 export const FilePaths = {
   findText: "/find",
   findFile: "/find/file",
@@ -109,6 +131,7 @@ export const FilePaths = {
   download: "/file/download",
   archive: "/file/archive",
   createDirectory: "/file/directory",
+  knowledgeGraph: "/file/knowledge-graph",
   status: "/file/status",
 } as const
 
@@ -199,6 +222,16 @@ export const FileApi = HttpApi.make("file")
             identifier: "file.createDirectory",
             summary: "Create directory",
             description: "Create a local directory recursively.",
+          }),
+        ),
+        HttpApiEndpoint.get("knowledgeGraph", FilePaths.knowledgeGraph, {
+          query: WorkspaceRoutingQuery,
+          success: described(KnowledgeGraph, "Knowledge graph"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "file.knowledgeGraph",
+            summary: "Build knowledge graph",
+            description: "Build a notebook knowledge graph from indexed LLM Wiki Markdown links.",
           }),
         ),
         HttpApiEndpoint.get("status", FilePaths.status, {

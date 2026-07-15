@@ -80,4 +80,25 @@ describe("file HttpApi", () => {
     expect(symbols.status).toBe(200)
     expect(await symbols.json()).toEqual([])
   })
+
+  test("builds a knowledge graph on the server", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await Bun.write(path.join(tmp.path, "02_LLM_Wiki", "source.md"), "[[Target Alias]]")
+    await Bun.write(
+      path.join(tmp.path, "02_LLM_Wiki", "target.md"),
+      "---\naliases: [Target Alias]\n---\n# Target",
+    )
+
+    const response = await request(FilePaths.knowledgeGraph, tmp.path)
+    const graph = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(graph.nodes).toHaveLength(2)
+    expect(graph.edges).toEqual([
+      expect.objectContaining({
+        source: "02_LLM_Wiki/source.md",
+        target: "02_LLM_Wiki/target.md",
+      }),
+    ])
+  })
 })

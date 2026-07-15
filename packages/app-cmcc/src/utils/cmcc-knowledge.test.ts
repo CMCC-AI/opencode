@@ -1,0 +1,88 @@
+import { describe, expect, test } from "bun:test"
+import {
+  cmccBuildKnowledgeGraph,
+  cmccKnowledgeDirectory,
+  cmccKnowledgeNotebookForSession,
+  cmccKnowledgeNotebooks,
+  cmccRememberKnowledgeSession,
+  cmccSaveKnowledgeNotebooks,
+  type KnowledgeNotebook,
+} from "./cmcc-knowledge"
+
+describe("cmcc knowledge", () => {
+  test("creates a stable notebook directory on posix and windows", () => {
+    expect(cmccKnowledgeDirectory("/Users/test", "政策研究", "12345678-abcd")).toBe(
+      "/Users/test/Documents/DeepInsight/Knowledge/政策研究-12345678",
+    )
+    expect(cmccKnowledgeDirectory("C:\\Users\\test", "Risk Notes", "abcdefgh-1234")).toBe(
+      "C:\\Users\\test\\Documents\\DeepInsight\\Knowledge\\risk-notes-abcdefgh",
+    )
+  })
+
+  test("persists valid notebooks and ignores invalid records", () => {
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    }
+    const notebook: KnowledgeNotebook = {
+      id: "one",
+      name: "研究",
+      description: "",
+      emoji: "📚",
+      directory: "/tmp/one",
+      createdAt: 1,
+      updatedAt: 2,
+      lastOpenedAt: 3,
+    }
+
+    cmccSaveKnowledgeNotebooks([notebook], storage)
+    expect(cmccKnowledgeNotebooks(storage)).toEqual([notebook])
+  })
+
+  test("remembers multiple conversations and resolves their notebook", () => {
+    const notebook: KnowledgeNotebook = {
+      id: "one",
+      name: "研究",
+      description: "",
+      emoji: "📚",
+      directory: "C:\\Knowledge\\Research",
+      createdAt: 1,
+      updatedAt: 2,
+      lastOpenedAt: 3,
+      sessionID: "ses_old",
+    }
+    const remembered = cmccRememberKnowledgeSession(notebook, "ses_new")
+
+    expect(remembered.sessionID).toBe("ses_new")
+    expect(remembered.sessionIDs).toEqual(["ses_new", "ses_old"])
+    expect(
+      cmccKnowledgeNotebookForSession([remembered], {
+        id: "ses_metadata",
+        directory: "/different",
+        metadata: { cmccKnowledgeNotebookID: "one" },
+      }),
+    ).toEqual(remembered)
+    expect(cmccKnowledgeNotebookForSession([remembered], { id: "ses_legacy", directory: "c:/knowledge/research/" })).toEqual(
+      remembered,
+    )
+  })
+
+  test("builds directed wiki-link relationships and resolves aliases", () => {
+    const graph = cmccBuildKnowledgeGraph([
+      { path: "policies/cross-border.md", content: "[[个人信息保护]]\n[[PIPL]]\n[[个人信息保护]]" },
+      { path: "concepts/privacy.md", content: "---\naliases: [个人信息保护, PIPL]\n---\n# 隐私" },
+    ])
+
+    expect(graph.nodes).toHaveLength(2)
+    expect(graph.edges).toEqual([
+      {
+        id: "policies/cross-border.md\u0000concepts/privacy.md",
+        source: "policies/cross-border.md",
+        target: "concepts/privacy.md",
+      },
+    ])
+    expect(graph.nodes.find((node) => node.id === "policies/cross-border.md")?.outDegree).toBe(1)
+    expect(graph.nodes.find((node) => node.id === "concepts/privacy.md")?.inDegree).toBe(1)
+  })
+})

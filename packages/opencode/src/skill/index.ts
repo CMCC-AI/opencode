@@ -33,6 +33,10 @@ const CUSTOMIZE_OPENCODE_SKILL_NAME = "customize-opencode"
 const CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION =
   "Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself."
 const CUSTOMIZE_OPENCODE_SKILL_BODY = SkillPlugin.CustomizeOpencodeContent
+const LLM_WIKI_SKILL_NAME = "llm-wiki"
+const LLM_WIKI_SKILL_DESCRIPTION =
+  "Maintain an LLM Wiki knowledge graph from raw documents and Q&A. Use for ingesting sources, atomic Markdown notes, index.md/log.md maintenance, local wiki Q&A, and grounded synthesis."
+const LLM_WIKI_SKILL_BODY = SkillPlugin.LlmWikiContent
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -280,6 +284,12 @@ const layer = Layer.effect(
           description: CUSTOMIZE_OPENCODE_SKILL_DESCRIPTION,
           location: "<built-in>",
           content: CUSTOMIZE_OPENCODE_SKILL_BODY,
+        }
+        s.skills[LLM_WIKI_SKILL_NAME] = {
+          name: LLM_WIKI_SKILL_NAME,
+          description: LLM_WIKI_SKILL_DESCRIPTION,
+          location: "<built-in>",
+          content: LLM_WIKI_SKILL_BODY,
         }
         yield* loadSkills(s, yield* InstanceState.get(discovered), events)
         return s
