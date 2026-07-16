@@ -30,8 +30,12 @@ import { Identifier } from "@/utils/id"
 import { showToast } from "@/utils/toast"
 import {
   cmccBuildKnowledgeGraph,
+  CMCC_KNOWLEDGE_DELETED_MARKER,
+  cmccKnowledgeDeletedMarkerDirectory,
   cmccKnowledgeDirectory,
   cmccKnowledgeNotebooks,
+  cmccKnowledgeRoot,
+  cmccRecoverKnowledgeNotebooks,
   cmccRememberKnowledgeSession,
   cmccSaveKnowledgeNotebooks,
   cmccUpsertKnowledgeNotebook,
@@ -58,8 +62,50 @@ export function CmccKnowledgeHomeRoute() {
   const serverSDK = useServerSDK()
   const sync = useServerSync()
   const [notebooks, setNotebooks] = createSignal(cmccKnowledgeNotebooks())
+  const [discovering, setDiscovering] = createSignal(true)
   const [dialog, setDialog] = createStore({ open: false, name: "", description: "", creating: false })
+  const [removal, setRemoval] = createStore({ notebook: undefined as KnowledgeNotebook | undefined, removing: false })
+  const [rename, setRename] = createStore({ notebook: undefined as KnowledgeNotebook | undefined, name: "" })
   const recent = createMemo(() => notebooks().slice(0, 12))
+  let discoveredHome = ""
+
+  createEffect(() => {
+    const home = sync().data.path.home
+    if (!home || home === discoveredHome) return
+    discoveredHome = home
+    const root = cmccKnowledgeRoot(home)
+    void serverSDK()
+      .client.file.createDirectory({ path: root }, { throwOnError: true })
+      .then(async () => {
+        const rootClient = serverSDK().createClient({ directory: root, throwOnError: true })
+        const entries = await rootClient.file.list({ path: "" }).then((result) => result.data ?? [])
+        const directories = await Promise.all(
+          entries
+            .filter((entry) => entry.type === "directory" && !entry.name.startsWith("."))
+            .map(async (entry) => {
+              const directory = entry.absolute
+              const client = serverSDK().createClient({ directory, throwOnError: true })
+              const children = await client.file.list({ path: "" }).then((result) => result.data ?? [])
+              if (children.some((child) => child.name === CMCC_KNOWLEDGE_DELETED_MARKER)) return
+              return directory
+            }),
+        )
+        const recovered = cmccRecoverKnowledgeNotebooks(
+          notebooks(),
+          directories.filter((directory): directory is string => directory !== undefined),
+        )
+        cmccSaveKnowledgeNotebooks(recovered)
+        setNotebooks(recovered)
+      })
+      .catch((error) =>
+        showToast({
+          title: "读取知识库目录失败",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "error",
+        }),
+      )
+      .finally(() => setDiscovering(false))
+  })
 
   const createNotebook = async () => {
     const home = sync().data.path.home
@@ -107,6 +153,52 @@ export function CmccKnowledgeHomeRoute() {
     navigate(`/knowledge/${notebook.id}`)
   }
 
+  const removeNotebook = async () => {
+    const notebook = removal.notebook
+    if (!notebook) return
+    setRemoval("removing", true)
+    await serverSDK()
+      .client.file.createDirectory(
+        { path: cmccKnowledgeDeletedMarkerDirectory(notebook.directory) },
+        { throwOnError: true },
+      )
+      .then(() => {
+        const next = notebooks().filter((item) => item.id !== notebook.id)
+        cmccSaveKnowledgeNotebooks(next)
+        setNotebooks(next)
+        setRemoval({ notebook: undefined, removing: false })
+        showToast({ title: `已删除“${notebook.name}”`, description: "知识库已从列表移除，原始目录和文件仍保留在本地。" })
+      })
+      .catch((error) => {
+        setRemoval("removing", false)
+        showToast({
+          title: "删除笔记本失败",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "error",
+        })
+      })
+  }
+
+  const renameNotebook = () => {
+    const notebook = rename.notebook
+    const name = rename.name.trim()
+    if (!notebook) return
+    if (!name) return showToast({ title: "请输入笔记本标题" })
+    const next = cmccUpsertKnowledgeNotebook(notebooks(), { ...notebook, name, updatedAt: Date.now() })
+    cmccSaveKnowledgeNotebooks(next)
+    setNotebooks(next)
+    setRename({ notebook: undefined, name: "" })
+    showToast({ title: "笔记本标题已修改" })
+  }
+
+  const togglePinned = (notebook: KnowledgeNotebook) => {
+    const pinned = !notebook.pinned
+    const next = cmccUpsertKnowledgeNotebook(notebooks(), { ...notebook, pinned, updatedAt: Date.now() })
+    cmccSaveKnowledgeNotebooks(next)
+    setNotebooks(next)
+    showToast({ title: pinned ? `已置顶“${notebook.name}”` : `已取消置顶“${notebook.name}”` })
+  }
+
   return (
     <div class="min-h-0 flex-1 overflow-y-auto bg-v2-background-bg-deep">
       <div class="mx-auto flex w-full max-w-[1320px] flex-col gap-8 px-6 py-7">
@@ -125,6 +217,7 @@ export function CmccKnowledgeHomeRoute() {
             type="button"
             class="flex h-9 shrink-0 items-center gap-2 rounded-[7px] bg-v2-text-text-base px-4 text-[13px] font-medium leading-4 text-v2-background-bg-layer-01 hover:opacity-90"
             onClick={() => setDialog("open", true)}
+            disabled={discovering()}
           >
             <Icon name="plus" class="size-4" />
             新建笔记本
@@ -163,8 +256,9 @@ export function CmccKnowledgeHomeRoute() {
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <button
               type="button"
-              class="group flex min-h-[178px] flex-col items-center justify-center rounded-[12px] border border-dashed border-v2-border-border-strong bg-v2-background-bg-layer-01 text-v2-text-text-muted hover:bg-v2-background-bg-layer-02 hover:text-v2-text-text-base"
+              class="group flex min-h-[178px] flex-col items-center justify-center rounded-[12px] border border-dashed border-v2-border-border-strong bg-v2-background-bg-layer-01 text-v2-text-text-muted hover:bg-v2-background-bg-layer-02 hover:text-v2-text-text-base disabled:cursor-wait disabled:opacity-60"
               onClick={() => setDialog("open", true)}
+              disabled={discovering()}
             >
               <span class="mb-3 flex size-11 items-center justify-center rounded-full bg-v2-background-bg-layer-03">
                 <Icon name="plus" class="size-5" />
@@ -173,13 +267,27 @@ export function CmccKnowledgeHomeRoute() {
             </button>
             <For each={recent()}>
               {(notebook, index) => (
-                <NotebookCard notebook={notebook} index={index()} open={() => openNotebook(notebook)} />
+                <NotebookCard
+                  notebook={notebook}
+                  index={index()}
+                  open={() => openNotebook(notebook)}
+                  remove={() => setRemoval("notebook", notebook)}
+                  rename={() => setRename({ notebook, name: notebook.name })}
+                  togglePinned={() => togglePinned(notebook)}
+                />
               )}
             </For>
           </div>
         </section>
 
-        <Show when={notebooks().length === 0}>
+        <Show when={discovering()}>
+          <div class="flex items-center gap-2 text-[12px] text-v2-text-text-muted">
+            <span class="size-3 animate-spin rounded-full border border-current border-r-transparent" />
+            正在扫描磁盘中的知识库目录...
+          </div>
+        </Show>
+
+        <Show when={!discovering() && notebooks().length === 0}>
           <div class="rounded-[12px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-5 py-4 text-[13px] leading-6 text-v2-text-text-muted">
             还没有笔记本。创建后会先生成一个空白目录，你可以上传文件、拖入材料或导入整个目录。
           </div>
@@ -227,6 +335,83 @@ export function CmccKnowledgeHomeRoute() {
             </button>
           </div>
         </Modal>
+      </Show>
+
+      <Show when={removal.notebook} keyed>
+        {(notebook) => (
+          <Modal title="删除笔记本" close={() => !removal.removing && setRemoval("notebook", undefined)}>
+            <div class="flex flex-col gap-4">
+              <p class="m-0 text-[14px] leading-6 text-v2-text-text-base">
+                确定从 DeepInsight 中删除“{notebook.name}”吗？
+              </p>
+              <div class="rounded-[7px] border border-v2-border-border-base bg-v2-background-bg-layer-02 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
+                为避免误删资料，笔记本会从界面和后续启动扫描中移除，但原始目录及其中的文件不会被物理删除。
+              </div>
+              <div class="flex justify-end gap-2">
+                <button
+                  type="button"
+                  class="h-9 rounded-[7px] border border-v2-border-border-base px-4 text-[13px] text-v2-text-text-base hover:bg-v2-background-bg-layer-02"
+                  disabled={removal.removing}
+                  onClick={() => setRemoval("notebook", undefined)}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  class="flex h-9 items-center gap-2 rounded-[7px] bg-v2-text-text-base px-4 text-[13px] font-medium text-v2-background-bg-layer-01 disabled:opacity-50"
+                  disabled={removal.removing}
+                  onClick={() => void removeNotebook()}
+                >
+                  <Show when={removal.removing} fallback={<Icon name="trash" class="size-4" />}>
+                    <span class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                  </Show>
+                  {removal.removing ? "正在删除..." : "确认删除"}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </Show>
+
+      <Show when={rename.notebook} keyed>
+        {(notebook) => (
+          <Modal title="修改标题" close={() => setRename({ notebook: undefined, name: "" })}>
+            <div class="flex flex-col gap-4">
+              <label class="flex flex-col gap-1.5">
+                <span class="text-[12px] leading-4 text-v2-text-text-muted">笔记本标题</span>
+                <input
+                  autofocus
+                  class="h-10 rounded-[7px] border border-v2-border-border-base bg-v2-background-bg-layer-02 px-3 text-[14px] text-v2-text-text-base outline-none focus:border-v2-border-border-active"
+                  value={rename.name}
+                  onInput={(event) => setRename("name", event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") renameNotebook()
+                  }}
+                />
+              </label>
+              <p class="m-0 text-[12px] leading-5 text-v2-text-text-muted">
+                只修改界面显示标题，不会重命名本地目录，避免影响已有文件和对话路径。
+              </p>
+              <div class="flex justify-end gap-2">
+                <button
+                  type="button"
+                  class="h-9 rounded-[7px] border border-v2-border-border-base px-4 text-[13px] text-v2-text-text-base hover:bg-v2-background-bg-layer-02"
+                  onClick={() => setRename({ notebook: undefined, name: "" })}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  class="h-9 rounded-[7px] bg-v2-text-text-base px-4 text-[13px] font-medium text-v2-background-bg-layer-01 disabled:opacity-50"
+                  disabled={!rename.name.trim() || rename.name.trim() === notebook.name}
+                  onClick={renameNotebook}
+                >
+                  确认修改
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
       </Show>
     </div>
   )
@@ -986,7 +1171,16 @@ export function CmccKnowledgeNotebookRoute() {
   )
 }
 
-function NotebookCard(props: { notebook: KnowledgeNotebook; index: number; open: () => void }) {
+function NotebookCard(props: {
+  notebook: KnowledgeNotebook
+  index: number
+  open: () => void
+  remove: () => void
+  rename: () => void
+  togglePinned: () => void
+}) {
+  const [menuOpen, setMenuOpen] = createSignal(false)
+  let menuElement: HTMLDivElement | undefined
   const gradient = () => {
     const colors = [
       ["#244c48", "#172f33"],
@@ -998,25 +1192,102 @@ function NotebookCard(props: { notebook: KnowledgeNotebook; index: number; open:
     return `linear-gradient(145deg, ${colors[0]}, ${colors[1]})`
   }
 
+  createEffect(() => {
+    if (!menuOpen()) return
+    const close = (event: PointerEvent) => {
+      if (menuElement?.contains(event.target as Node)) return
+      setMenuOpen(false)
+    }
+    document.addEventListener("pointerdown", close)
+    onCleanup(() => document.removeEventListener("pointerdown", close))
+  })
+
   return (
-    <button
-      type="button"
-      class="group flex min-h-[178px] min-w-0 flex-col overflow-hidden rounded-[12px] border border-v2-border-border-base text-left shadow-[var(--v2-elevation-flat)] transition-transform hover:-translate-y-0.5 hover:border-v2-border-border-strong"
-      onClick={props.open}
+    <article
+      class="group relative flex min-h-[178px] min-w-0 flex-col rounded-[12px] border border-v2-border-border-base text-left shadow-[var(--v2-elevation-flat)] transition-transform hover:-translate-y-0.5 hover:border-v2-border-border-strong"
+      classList={{ "z-30": menuOpen() }}
     >
-      <div class="flex min-h-0 flex-1 flex-col justify-between p-4 text-white" style={{ background: gradient() }}>
-        <div class="text-3xl">{props.notebook.emoji}</div>
+      <button
+        type="button"
+        class="flex min-h-0 flex-1 flex-col justify-between rounded-t-[11px] p-4 text-left text-white"
+        style={{ background: gradient() }}
+        onClick={props.open}
+      >
+        <div class="flex items-start gap-2 text-3xl">
+          <span>{props.notebook.emoji}</span>
+          <Show when={props.notebook.pinned}>
+            <span class="text-[14px] leading-5" title="已置顶">
+              📌
+            </span>
+          </Show>
+        </div>
         <div class="min-w-0">
           <h3 class="m-0 line-clamp-2 text-[16px] font-semibold leading-6">{props.notebook.name}</h3>
           <p class="m-0 mt-1 line-clamp-2 text-[11px] leading-4 text-white/65">
             {props.notebook.description || "可对话的个人知识空间"}
           </p>
         </div>
+      </button>
+      <div ref={menuElement} class="absolute right-2.5 top-2.5 z-20">
+        <button
+          type="button"
+          class="flex size-8 items-center justify-center rounded-[7px] text-[22px] leading-none text-white/75 hover:bg-black/20 hover:text-white"
+          aria-label={`更多${props.notebook.name}`}
+          aria-expanded={menuOpen()}
+          onClick={(event) => {
+            event.stopPropagation()
+            setMenuOpen((open) => !open)
+          }}
+        >
+          ⋮
+        </button>
+        <Show when={menuOpen()}>
+          <div class="absolute right-0 top-9 flex w-[148px] flex-col gap-1 rounded-[9px] border border-v2-border-border-base bg-v2-background-bg-layer-02 p-1.5 text-v2-text-text-base shadow-[0_14px_40px_rgba(0,0,0,0.28)]">
+            <NotebookMenuItem
+              icon={<Icon name="trash" class="size-4" />}
+              label="删除"
+              action={() => {
+                setMenuOpen(false)
+                props.remove()
+              }}
+            />
+            <NotebookMenuItem
+              icon={<Icon name="pencil-line" class="size-4" />}
+              label="修改标题"
+              action={() => {
+                setMenuOpen(false)
+                props.rename()
+              }}
+            />
+            <NotebookMenuItem
+              icon={<span class="text-[14px] leading-none">📌</span>}
+              label={props.notebook.pinned ? "取消置顶" : "置顶"}
+              action={() => {
+                setMenuOpen(false)
+                props.togglePinned()
+              }}
+            />
+          </div>
+        </Show>
       </div>
-      <div class="flex h-10 shrink-0 items-center justify-between bg-v2-background-bg-layer-01 px-3 text-[11px] text-v2-text-text-faint">
-        <span>最近打开于 {formatDate(props.notebook.lastOpenedAt)}</span>
-        <span>{props.notebook.sourceCount ?? 0} 个来源</span>
+      <div class="flex h-10 shrink-0 items-center gap-2 rounded-b-[11px] bg-v2-background-bg-layer-01 px-3 text-[11px] text-v2-text-text-faint">
+        <button type="button" class="min-w-0 flex-1 truncate text-left" onClick={props.open}>
+          最近打开于 {formatDate(props.notebook.lastOpenedAt)} · {props.notebook.sourceCount ?? 0} 个来源
+        </button>
       </div>
+    </article>
+  )
+}
+
+function NotebookMenuItem(props: { icon: JSX.Element; label: string; action: () => void }) {
+  return (
+    <button
+      type="button"
+      class="flex h-9 w-full items-center gap-3 rounded-[6px] px-2.5 text-left text-[13px] hover:bg-v2-overlay-simple-overlay-hover"
+      onClick={props.action}
+    >
+      <span class="flex size-5 items-center justify-center text-v2-icon-icon-muted">{props.icon}</span>
+      <span>{props.label}</span>
     </button>
   )
 }
@@ -1114,22 +1385,43 @@ function KnowledgeTreeNode(props: {
   const directory = () => props.file.type === "directory"
   const open = () => props.expanded.includes(props.file.path)
   const children = createMemo(() => fileChildren(props.files, props.file.path))
+  const activate = () => (directory() ? props.toggle(props.file.path) : props.open(props.file))
 
   return (
     <div>
-      <button
-        type="button"
+      <div
         class="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-[5px] pr-2 text-left text-[12px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
         style={{ "padding-left": `${6 + props.level * 13}px` }}
         data-selected={!directory() && props.active === props.file.path ? "" : undefined}
-        onClick={() => (directory() ? props.toggle(props.file.path) : props.open(props.file))}
       >
-        <Show when={directory()} fallback={<span class="w-3" />}>
-          <Icon name="chevron-right" class="size-3 shrink-0 transition-transform" classList={{ "rotate-90": open() }} />
+        <Show when={directory()} fallback={<span class="size-5 shrink-0" />}>
+          <button
+            type="button"
+            class="flex size-5 shrink-0 touch-manipulation items-center justify-center rounded-[4px] hover:bg-v2-overlay-simple-overlay-active"
+            aria-label={`${open() ? "收起" : "展开"}${props.file.name}`}
+            aria-expanded={open()}
+            title={open() ? "收起目录" : "展开目录"}
+            onPointerUp={(event) => activateTreePointer(event, () => props.toggle(props.file.path))}
+            onClick={(event) => activateTreeClick(event, () => props.toggle(props.file.path))}
+          >
+            <Icon
+              name="chevron-right"
+              class="size-3 shrink-0 transition-transform"
+              classList={{ "rotate-90": open() }}
+            />
+          </button>
         </Show>
-        <Icon name={directory() ? "folder" : "code"} class="size-3.5 shrink-0" />
-        <span class="min-w-0 flex-1 truncate">{props.file.name}</span>
-      </button>
+        <button
+          type="button"
+          class="flex h-full min-w-0 flex-1 touch-manipulation items-center gap-1.5 text-left"
+          aria-label={directory() ? `${open() ? "收起" : "展开"}目录 ${props.file.name}` : `打开文档 ${props.file.name}`}
+          onPointerUp={(event) => activateTreePointer(event, activate)}
+          onClick={(event) => activateTreeClick(event, activate)}
+        >
+          <Icon name={directory() ? "folder" : "code"} class="size-3.5 shrink-0" />
+          <span class="min-w-0 flex-1 truncate">{props.file.name}</span>
+        </button>
+      </div>
       <Show when={directory() && open()}>
         <For each={children()}>
           {(file) => (
@@ -1147,6 +1439,16 @@ function KnowledgeTreeNode(props: {
       </Show>
     </div>
   )
+}
+
+function activateTreePointer(event: PointerEvent, action: () => void) {
+  if (event.button !== 0) return
+  action()
+}
+
+function activateTreeClick(event: MouseEvent, action: () => void) {
+  if (event.detail !== 0) return
+  action()
 }
 
 function WorkspaceTab(props: {

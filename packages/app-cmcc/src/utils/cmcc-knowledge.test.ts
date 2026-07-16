@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import {
   cmccBuildKnowledgeGraph,
+  cmccKnowledgeDeletedMarkerDirectory,
   cmccKnowledgeDirectory,
   cmccKnowledgeNotebookForSession,
   cmccKnowledgeNotebooks,
+  cmccRecoverKnowledgeNotebooks,
   cmccRememberKnowledgeSession,
   cmccSaveKnowledgeNotebooks,
   type KnowledgeNotebook,
@@ -16,6 +18,9 @@ describe("cmcc knowledge", () => {
     )
     expect(cmccKnowledgeDirectory("C:\\Users\\test", "Risk Notes", "abcdefgh-1234")).toBe(
       "C:\\Users\\test\\Documents\\DeepInsight\\Knowledge\\risk-notes-abcdefgh",
+    )
+    expect(cmccKnowledgeDeletedMarkerDirectory("C:\\Knowledge\\risk-notes")).toBe(
+      "C:\\Knowledge\\risk-notes\\.deepinsight-deleted",
     )
   })
 
@@ -66,6 +71,53 @@ describe("cmcc knowledge", () => {
     expect(cmccKnowledgeNotebookForSession([remembered], { id: "ses_legacy", directory: "c:/knowledge/research/" })).toEqual(
       remembered,
     )
+  })
+
+  test("recovers notebooks from durable directories and preserves cached metadata", () => {
+    const cached: KnowledgeNotebook = {
+      id: "one",
+      name: "保留名称",
+      description: "已有说明",
+      emoji: "🔬",
+      directory: "/home/Documents/DeepInsight/Knowledge/research-12345678",
+      createdAt: 1,
+      updatedAt: 2,
+      lastOpenedAt: 3,
+    }
+    const recovered = cmccRecoverKnowledgeNotebooks(
+      [cached],
+      [cached.directory, "/home/Documents/DeepInsight/Knowledge/test1-05c44672"],
+      100,
+    )
+
+    expect(recovered).toHaveLength(2)
+    expect(recovered.find((notebook) => notebook.directory === cached.directory)).toEqual(cached)
+    expect(recovered.find((notebook) => notebook.directory.endsWith("test1-05c44672"))).toMatchObject({
+      name: "test1",
+      createdAt: 100,
+      lastOpenedAt: 100,
+    })
+  })
+
+  test("keeps pinned notebooks ahead of recently opened notebooks", () => {
+    const notebook = (id: string, lastOpenedAt: number, pinned = false): KnowledgeNotebook => ({
+      id,
+      name: id,
+      description: "",
+      emoji: "📚",
+      directory: `/tmp/${id}`,
+      createdAt: 1,
+      updatedAt: 1,
+      lastOpenedAt,
+      pinned,
+    })
+
+    expect(
+      cmccRecoverKnowledgeNotebooks(
+        [notebook("recent", 30), notebook("pinned", 10, true), notebook("older", 20)],
+        ["/tmp/recent", "/tmp/pinned", "/tmp/older"],
+      ).map((item) => item.id),
+    ).toEqual(["pinned", "recent", "older"])
   })
 
   test("builds directed wiki-link relationships and resolves aliases", () => {

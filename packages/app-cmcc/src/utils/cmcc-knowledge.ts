@@ -10,6 +10,7 @@ export type KnowledgeNotebook = {
   sessionID?: string
   sessionIDs?: string[]
   sourceCount?: number
+  pinned?: boolean
 }
 
 export type KnowledgeSession = {
@@ -41,6 +42,7 @@ export type KnowledgeGraph = {
 }
 
 export const CMCC_KNOWLEDGE_STORAGE_KEY = "opencode.cmcc.knowledge.notebooks.v1"
+export const CMCC_KNOWLEDGE_DELETED_MARKER = ".deepinsight-deleted"
 
 type KnowledgeStorage = Pick<Storage, "getItem" | "setItem">
 
@@ -52,6 +54,10 @@ export function cmccKnowledgeDirectory(home: string, name: string, id: string) {
   return joinPath(cmccKnowledgeRoot(home), `${slug(name)}-${id.slice(0, 8)}`)
 }
 
+export function cmccKnowledgeDeletedMarkerDirectory(directory: string) {
+  return joinPath(directory, CMCC_KNOWLEDGE_DELETED_MARKER)
+}
+
 export function cmccKnowledgeNotebooks(storage: KnowledgeStorage | undefined = browserStorage()) {
   if (!storage) return []
   const value = storage.getItem(CMCC_KNOWLEDGE_STORAGE_KEY)
@@ -60,7 +66,7 @@ export function cmccKnowledgeNotebooks(storage: KnowledgeStorage | undefined = b
   try {
     const parsed: unknown = JSON.parse(value)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter(isNotebook).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
+    return parsed.filter(isNotebook).sort(compareNotebooks)
   } catch {
     return []
   }
@@ -71,9 +77,34 @@ export function cmccSaveKnowledgeNotebooks(notebooks: KnowledgeNotebook[], stora
 }
 
 export function cmccUpsertKnowledgeNotebook(notebooks: KnowledgeNotebook[], notebook: KnowledgeNotebook) {
-  return [notebook, ...notebooks.filter((item) => item.id !== notebook.id)].sort(
-    (a, b) => b.lastOpenedAt - a.lastOpenedAt,
-  )
+  return [notebook, ...notebooks.filter((item) => item.id !== notebook.id)].sort(compareNotebooks)
+}
+
+export function cmccRecoverKnowledgeNotebooks(
+  notebooks: KnowledgeNotebook[],
+  directories: string[],
+  now = Date.now(),
+) {
+  const cached = new Map(notebooks.map((notebook) => [normalizeDirectory(notebook.directory), notebook]))
+  return [...new Set(directories.map((directory) => directory.replace(/[\\/]+$/, "")))]
+    .map((directory, index) => {
+      const existing = cached.get(normalizeDirectory(directory))
+      if (existing) return existing
+      const folder = basename(directory)
+      const name = folder.replace(/-[a-z0-9]{8}$/i, "").replace(/-+/g, " ").trim() || folder
+      const hash = stableHash(normalizeDirectory(directory))
+      return {
+        id: `recovered-${hash.toString(16).padStart(8, "0")}`,
+        name,
+        description: "",
+        emoji: ["📚", "🧭", "🧠", "🗂️", "🔬", "📊", "🏛️", "🌐"][(hash + index) % 8],
+        directory,
+        createdAt: now,
+        updatedAt: now,
+        lastOpenedAt: now,
+      } satisfies KnowledgeNotebook
+    })
+    .sort(compareNotebooks)
 }
 
 export function cmccRememberKnowledgeSession(notebook: KnowledgeNotebook, sessionID: string) {
@@ -175,6 +206,7 @@ function isNotebook(value: unknown): value is KnowledgeNotebook {
     typeof notebook.createdAt === "number" &&
     typeof notebook.updatedAt === "number" &&
     typeof notebook.lastOpenedAt === "number" &&
+    (notebook.pinned === undefined || typeof notebook.pinned === "boolean") &&
     (notebook.sessionIDs === undefined ||
       (Array.isArray(notebook.sessionIDs) && notebook.sessionIDs.every((sessionID) => typeof sessionID === "string")))
   )
@@ -182,6 +214,14 @@ function isNotebook(value: unknown): value is KnowledgeNotebook {
 
 function normalizeDirectory(value: string) {
   return value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase()
+}
+
+function stableHash(value: string) {
+  return [...value].reduce((hash, character) => Math.imul(hash ^ character.charCodeAt(0), 16777619) >>> 0, 2166136261)
+}
+
+function compareNotebooks(a: KnowledgeNotebook, b: KnowledgeNotebook) {
+  return Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || b.lastOpenedAt - a.lastOpenedAt
 }
 
 function joinPath(root: string, ...parts: string[]) {
