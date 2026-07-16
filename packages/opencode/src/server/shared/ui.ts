@@ -8,8 +8,14 @@ let embeddedUIPromise: Promise<Record<string, string> | null> | undefined
 
 export const UI_UPSTREAM = new URL("https://app.opencode.ai")
 
+const CMCC_EXPERT_FRAME_SOURCES = [
+  "http://152.136.106.161:3001",
+  "http://81.70.174.140:8083",
+  "http://81.70.174.140:8888",
+].join(" ")
+
 export const csp = (hash = "") =>
-  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; connect-src * data:`
+  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; frame-src 'self' ${CMCC_EXPERT_FRAME_SOURCES}; connect-src * data:`
 export const DEFAULT_CSP = csp()
 
 export function themePreloadHash(body: string) {
