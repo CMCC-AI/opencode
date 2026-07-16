@@ -6,9 +6,9 @@ import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath, RelativePath } from "@opencode-ai/core/schema"
-import { Effect, Layer, Option } from "effect"
+import { Effect, Encoding, Layer, Option } from "effect"
 import ignore from "ignore"
-import { mkdir } from "node:fs/promises"
+import { mkdir, rm } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "path"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
@@ -17,6 +17,7 @@ import { scanKnowledgeGraph } from "@/knowledge/graph"
 
 const ARCHIVE_FILE_LIMIT = 200
 const ARCHIVE_BYTE_LIMIT = 100 * 1024 * 1024
+const UPLOAD_BYTE_LIMIT = 25 * 1024 * 1024
 
 export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handlers) =>
   Effect.gen(function* () {
@@ -180,6 +181,36 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       )
     })
 
+    const upload = Effect.fn("FileHttpApi.upload")(function* (ctx: {
+      payload: { path: RelativePath; content: string; encoding: "base64" }
+    }) {
+      const directory = (yield* InstanceState.context).directory
+      const target = path.resolve(directory, ctx.payload.path)
+      if (!FSUtil.contains(directory, target)) return yield* new HttpApiError.BadRequest({})
+      const fs = yield* FSUtil.Service
+      if (yield* fs.existsSafe(target)) return yield* new HttpApiError.BadRequest({})
+      const content = yield* Effect.fromResult(Encoding.decodeBase64(ctx.payload.content)).pipe(
+        Effect.mapError(() => new HttpApiError.BadRequest({})),
+      )
+      if (content.byteLength > UPLOAD_BYTE_LIMIT) return yield* new HttpApiError.BadRequest({})
+      yield* fs.writeWithDirs(target, content).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      return { path: RelativePath.make(path.relative(directory, target).replaceAll("\\", "/")) }
+    })
+
+    const remove = Effect.fn("FileHttpApi.remove")(function* (ctx: {
+      payload: { path: RelativePath; recursive?: boolean }
+    }) {
+      const directory = (yield* InstanceState.context).directory
+      const target = path.resolve(directory, ctx.payload.path)
+      if (!FSUtil.contains(directory, target) || target === path.resolve(directory))
+        return yield* new HttpApiError.BadRequest({})
+      if (!(yield* FSUtil.Service.use((fs) => fs.existsSafe(target)))) return yield* new HttpApiError.BadRequest({})
+      yield* Effect.tryPromise(() => rm(target, { recursive: ctx.payload.recursive ?? false })).pipe(
+        Effect.mapError(() => new HttpApiError.BadRequest({})),
+      )
+      return { path: RelativePath.make(path.relative(directory, target).replaceAll("\\", "/")) }
+    })
+
     const knowledgeGraph = Effect.fn("FileHttpApi.knowledgeGraph")(function* () {
       const directory = (yield* InstanceState.context).directory
       return yield* Effect.tryPromise(() => scanKnowledgeGraph(directory)).pipe(Effect.orDie)
@@ -198,6 +229,8 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       .handle("download", download)
       .handle("archive", archive)
       .handle("createDirectory", createDirectory)
+      .handle("upload", upload)
+      .handle("remove", remove)
       .handle("knowledgeGraph", knowledgeGraph)
       .handle("status", status)
   }),

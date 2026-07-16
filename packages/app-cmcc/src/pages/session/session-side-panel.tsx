@@ -3,17 +3,16 @@ import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { IconButton } from "@opencode-ai/ui/icon-button"
-import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
-import { Dynamic } from "solid-js/web"
 import type { FileContent, FileNode, Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 
 import FileTree from "@/components/file-tree"
+import { ArtifactPreview } from "@/components/artifact-preview"
 import { SessionContextUsage } from "@/components/session-context-usage"
 import { SessionContextTab, SortableTab, FileVisual } from "@/components/session"
 import { useCommand } from "@/context/command"
@@ -37,15 +36,7 @@ import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { DeepInsightMark } from "@/components/brand"
 import { showToast } from "@/utils/toast"
-import { Markdown } from "@opencode-ai/session-ui/markdown"
-import {
-  artifactBuffer,
-  artifactDataUrl,
-  artifactPreviewKind,
-  artifactText,
-  resolveArtifactPath,
-  type ArtifactPreviewKind,
-} from "@/pages/session/artifact-preview"
+import { artifactPreviewKind, artifactText, resolveArtifactPath } from "@/pages/session/artifact-preview"
 
 type RenderDiff = (SnapshotFileDiff & { file: string }) | VcsFileDiff
 type CmccPanelTab = "plan" | "artifacts" | "browser" | "review"
@@ -58,7 +49,16 @@ type CmccArtifact = {
 
 const WORKSPACE_ARTIFACT_LIMIT = 200
 const WORKSPACE_ARTIFACT_MAX_DEPTH = 8
-const WORKSPACE_ARTIFACT_DIRS = new Set(["artifact", "artifacts", "deliverable", "deliverables", "output", "outputs", "report", "reports"])
+const WORKSPACE_ARTIFACT_DIRS = new Set([
+  "artifact",
+  "artifacts",
+  "deliverable",
+  "deliverables",
+  "output",
+  "outputs",
+  "report",
+  "reports",
+])
 const WORKSPACE_ARTIFACT_EXTENSIONS = new Set([
   "csv",
   "doc",
@@ -313,7 +313,8 @@ export function SessionSidePanel(props: {
     parts()
       .flatMap((part) => {
         if (part.type === "patch") return [part.id]
-        if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error")) return [part.id]
+        if (part.type === "tool" && (part.state.status === "completed" || part.state.status === "error"))
+          return [part.id]
         return []
       })
       .join(":"),
@@ -385,7 +386,10 @@ export function SessionSidePanel(props: {
     const list = (path: string) =>
       sdk()
         .client.file.list({ path })
-        .then((result) => result.data ?? [], () => [])
+        .then(
+          (result) => result.data ?? [],
+          () => [],
+        )
 
     void scanWorkspaceArtifactPaths(list, roots).then((paths) => {
       if (cancelled) return
@@ -521,7 +525,8 @@ export function SessionSidePanel(props: {
   const activateMarkdownArtifact = (target: EventTarget | null) => {
     const element = markdownArtifactElement(target)
     if (!element) return false
-    const path = element.dataset.cmccArtifactPath ?? resolveArtifactPath(markdownArtifactCandidate(element), artifactPaths())
+    const path =
+      element.dataset.cmccArtifactPath ?? resolveArtifactPath(markdownArtifactCandidate(element), artifactPaths())
     if (!path) return false
     openArtifact(path)
     return true
@@ -1058,7 +1063,9 @@ function CmccAssistantPanel(props: {
           <Match when={props.active === "review"}>
             <Show
               when={props.canReview}
-              fallback={<CmccEmptyPanel title="暂无审查内容" description="这里会展示代码审查、变更摘要和回滚相关信息。" />}
+              fallback={
+                <CmccEmptyPanel title="暂无审查内容" description="这里会展示代码审查、变更摘要和回滚相关信息。" />
+              }
             >
               <Show when={props.showReview}>{props.reviewPanel()}</Show>
             </Show>
@@ -1308,7 +1315,9 @@ function CmccArtifactsPanel(props: {
                   返回
                 </button>
                 <div class="min-w-0 flex-1">
-                  <div class="truncate text-[13px] font-medium leading-5 text-v2-text-text-base">{fileName(item().path)}</div>
+                  <div class="truncate text-[13px] font-medium leading-5 text-v2-text-text-base">
+                    {fileName(item().path)}
+                  </div>
                   <div class="text-[11px] leading-4 text-v2-text-text-faint">{item().source}</div>
                 </div>
                 <button
@@ -1324,7 +1333,7 @@ function CmccArtifactsPanel(props: {
                 <Switch>
                   <Match when={state()?.loaded}>
                     <Show when={state()?.content}>
-                      {(content) => <CmccArtifactPreview path={item().path} content={content()} />}
+                      {(content) => <ArtifactPreview path={item().path} content={content()} />}
                     </Show>
                   </Match>
                   <Match when={state()?.loading}>
@@ -1338,145 +1347,6 @@ function CmccArtifactsPanel(props: {
             </div>
           )}
         </Show>
-      </Show>
-    </div>
-  )
-}
-
-function CmccArtifactPreview(props: { path: string; content: FileContent }) {
-  const fileComponent = useFileComponent()
-  const kind = createMemo(() => artifactPreviewKind(props.path))
-  const text = createMemo(() => artifactText(props.content.content, props.content.encoding))
-  const data = createMemo(() => artifactBuffer(props.content.content, props.content.encoding))
-
-  return (
-    <Switch>
-      <Match when={kind() === "docx"}>
-        <CmccOfficePreview kind="docx" data={data()} />
-      </Match>
-      <Match when={kind() === "excel"}>
-        <CmccOfficePreview kind="excel" data={data()} />
-      </Match>
-      <Match when={kind() === "pptx"}>
-        <CmccOfficePreview kind="pptx" data={data()} />
-      </Match>
-      <Match when={kind() === "pdf"}>
-        <iframe
-          title={fileName(props.path)}
-          class="size-full border-0 bg-white"
-          src={artifactDataUrl(props.content, "application/pdf")}
-        />
-      </Match>
-      <Match when={kind() === "image"}>
-        <div class="flex size-full items-center justify-center overflow-auto bg-[linear-gradient(45deg,rgba(128,128,128,0.08)_25%,transparent_25%,transparent_75%,rgba(128,128,128,0.08)_75%),linear-gradient(45deg,rgba(128,128,128,0.08)_25%,transparent_25%,transparent_75%,rgba(128,128,128,0.08)_75%)] bg-[length:20px_20px] bg-[position:0_0,10px_10px] p-4">
-          <img
-            src={artifactDataUrl(props.content, props.content.mimeType ?? "image/png")}
-            alt={fileName(props.path)}
-            class="max-h-full max-w-full object-contain"
-          />
-        </div>
-      </Match>
-      <Match when={kind() === "markdown"}>
-        <div class="size-full overflow-auto px-6 py-5">
-          <Markdown text={text()} class="select-text" />
-        </div>
-      </Match>
-      <Match when={kind() === "html"}>
-        <CmccEmptyPanel title="已在浏览器中打开" description="HTML 产出会在右栏浏览器的隔离沙箱中直接运行。" />
-      </Match>
-      <Match when={kind() === "unsupported"}>
-        <CmccEmptyPanel title="暂不支持内嵌预览" description="可使用右上角“下载”保存到本地后打开。" />
-      </Match>
-      <Match when={true}>
-        <div class="size-full overflow-auto">
-          <Dynamic
-            component={fileComponent}
-            mode="text"
-            file={{ name: fileName(props.path), contents: text() }}
-            class="select-text"
-          />
-        </div>
-      </Match>
-    </Switch>
-  )
-}
-
-function CmccOfficePreview(props: { kind: Extract<ArtifactPreviewKind, "docx" | "excel" | "pptx">; data: ArrayBuffer }) {
-  let container!: HTMLDivElement
-  const [state, setState] = createStore({ loading: true, error: undefined as string | undefined })
-
-  createEffect(() => {
-    const kind = props.kind
-    const data = props.data
-    let active = true
-    let previewer: { preview: (data: ArrayBuffer) => Promise<unknown>; destroy: () => void } | undefined
-    container.replaceChildren()
-    setState({ loading: true, error: undefined })
-
-    const load =
-      kind === "docx"
-        ? import("docx-preview").then((module) => ({
-            preview: (value: ArrayBuffer) =>
-              module.renderAsync(value, container, container, {
-                ignoreWidth: false,
-                ignoreHeight: false,
-                renderHeaders: true,
-                renderFooters: true,
-              }),
-            destroy: () => container.replaceChildren(),
-          }))
-        : kind === "excel"
-          ? Promise.all([import("@js-preview/excel"), import("@js-preview/excel/lib/index.css")]).then(([module]) =>
-              module.default.init(container, { minColLength: 12, minRowLength: 20, showContextmenu: false }),
-            )
-          : import("pptx-preview").then((module) => {
-              const width = Math.max(container.clientWidth - 32, 320)
-              return module.init(container, { width, height: Math.round((width * 9) / 16), mode: "list" })
-            })
-
-    void load
-      .then((instance) => {
-        if (!active) {
-          instance.destroy()
-          return Promise.resolve()
-        }
-        previewer = instance
-        return instance.preview(data)
-      })
-      .then(() => {
-        if (!active) return
-        setState("loading", false)
-      })
-      .catch((error: unknown) => {
-        if (!active) return
-        setState({ loading: false, error: error instanceof Error ? error.message : String(error) })
-      })
-
-    onCleanup(() => {
-      active = false
-      previewer?.destroy()
-    })
-  })
-
-  return (
-    <div
-      data-cmcc-office-preview={props.kind}
-      class="relative size-full min-h-0 min-w-0 overflow-hidden bg-white text-black"
-    >
-      <div
-        ref={container}
-        class="size-full min-h-0 min-w-0"
-        classList={{ "overflow-hidden": props.kind === "excel", "overflow-auto": props.kind !== "excel" }}
-      />
-      <Show when={state.loading}>
-        <div class="absolute inset-0 flex items-center justify-center bg-white/90 text-[13px] text-black/60">正在渲染文档...</div>
-      </Show>
-      <Show when={state.error}>
-        {(error) => (
-          <div class="absolute inset-0 flex items-center justify-center bg-white px-8 text-center text-[13px] text-black/60">
-            文档渲染失败：{error()}
-          </div>
-        )}
       </Show>
     </div>
   )
@@ -1566,12 +1436,7 @@ function CmccBrowserPanel(props: {
         fallback={
           <div class="flex min-h-0 flex-1 items-center justify-center px-8 pb-12 text-center">
             <div class="flex flex-col items-center">
-              <svg
-                viewBox="0 0 48 48"
-                class="size-12 text-v2-text-text-muted"
-                fill="none"
-                aria-hidden="true"
-              >
+              <svg viewBox="0 0 48 48" class="size-12 text-v2-text-text-muted" fill="none" aria-hidden="true">
                 <circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="2.5" />
                 <path
                   d="M6 24h36M24 6c6 5 9 11 9 18s-3 13-9 18c-6-5-9-11-9-18s3-13 9-18Z"

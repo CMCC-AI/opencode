@@ -1,5 +1,5 @@
 import { FileSystem } from "@opencode-ai/core/filesystem"
-import { NonNegativeInt } from "@opencode-ai/core/schema"
+import { NonNegativeInt, RelativePath } from "@opencode-ai/core/schema"
 import { LSP } from "@/lsp/lsp"
 import { Schema } from "effect"
 import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
@@ -39,6 +39,25 @@ export const FindSymbolQuery = Schema.Struct({
 
 export const CreateDirectoryPayload = Schema.Struct({
   path: Schema.String,
+})
+
+export const UploadPayload = Schema.Struct({
+  path: RelativePath,
+  content: Schema.String,
+  encoding: Schema.Literal("base64"),
+})
+
+export const UploadResult = Schema.Struct({
+  path: RelativePath,
+})
+
+export const RemovePayload = Schema.Struct({
+  path: RelativePath,
+  recursive: Schema.optional(Schema.Boolean),
+})
+
+export const RemoveResult = Schema.Struct({
+  path: RelativePath,
 })
 
 export const ArchivePayload = Schema.Struct({
@@ -131,6 +150,8 @@ export const FilePaths = {
   download: "/file/download",
   archive: "/file/archive",
   createDirectory: "/file/directory",
+  upload: "/file/upload",
+  remove: "/file",
   knowledgeGraph: "/file/knowledge-graph",
   status: "/file/status",
 } as const
@@ -222,6 +243,32 @@ export const FileApi = HttpApi.make("file")
             identifier: "file.createDirectory",
             summary: "Create directory",
             description: "Create a local directory recursively.",
+          }),
+        ),
+        HttpApiEndpoint.post("upload", FilePaths.upload, {
+          query: WorkspaceRoutingQuery,
+          payload: UploadPayload,
+          success: described(UploadResult, "Uploaded file"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "file.upload",
+            summary: "Upload file",
+            description:
+              "Upload a base64-encoded file into the current workspace without overwriting an existing file.",
+          }),
+        ),
+        HttpApiEndpoint.delete("remove", FilePaths.remove, {
+          query: WorkspaceRoutingQuery,
+          payload: RemovePayload,
+          success: described(RemoveResult, "Deleted path"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "file.remove",
+            summary: "Delete file or directory",
+            description:
+              "Permanently delete a file or directory inside the current workspace. Directories require recursive=true.",
           }),
         ),
         HttpApiEndpoint.get("knowledgeGraph", FilePaths.knowledgeGraph, {

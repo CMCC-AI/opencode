@@ -74,8 +74,12 @@ import type {
   FilePartSource,
   FileReadErrors,
   FileReadResponses,
+  FileRemoveErrors,
+  FileRemoveResponses,
   FileStatusErrors,
   FileStatusResponses,
+  FileUploadErrors,
+  FileUploadResponses,
   FindFilesErrors,
   FindFilesResponses,
   FindSymbolsErrors,
@@ -1836,6 +1840,45 @@ export class Find extends HeyApiClient {
 
 export class File extends HeyApiClient {
   /**
+   * Delete file or directory
+   *
+   * Permanently delete a file or directory inside the current workspace. Directories require recursive=true.
+   */
+  public remove<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      path?: string
+      recursive?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+            { in: "body", key: "recursive" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).delete<FileRemoveResponses, FileRemoveErrors, ThrowOnError>({
+      url: "/file",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
    * List files
    *
    * List files and directories in a specified path.
@@ -2005,6 +2048,47 @@ export class File extends HeyApiClient {
         },
       },
     )
+  }
+
+  /**
+   * Upload file
+   *
+   * Upload a base64-encoded file into the current workspace without overwriting an existing file.
+   */
+  public upload<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      path?: string
+      content?: string
+      encoding?: "base64"
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+            { in: "body", key: "content" },
+            { in: "body", key: "encoding" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileUploadResponses, FileUploadErrors, ThrowOnError>({
+      url: "/file/upload",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
   }
 
   /**

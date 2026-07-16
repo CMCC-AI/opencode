@@ -8008,6 +8008,39 @@ export type FindSymbolsResponses = {
 
 export type FindSymbolsResponse = FindSymbolsResponses[keyof FindSymbolsResponses]
 
+export type FileRemoveData = {
+  body?: {
+    path: string
+    recursive?: boolean
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file"
+}
+
+export type FileRemoveErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type FileRemoveError = FileRemoveErrors[keyof FileRemoveErrors]
+
+export type FileRemoveResponses = {
+  /**
+   * Deleted path
+   */
+  200: {
+    path: string
+  }
+}
+
+export type FileRemoveResponse = FileRemoveResponses[keyof FileRemoveResponses]
+
 export type FileListData = {
   body?: never
   path?: never
@@ -8152,6 +8185,40 @@ export type FileCreateDirectoryResponses = {
    */
   200: unknown
 }
+
+export type FileUploadData = {
+  body?: {
+    path: string
+    content: string
+    encoding: "base64"
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/upload"
+}
+
+export type FileUploadErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type FileUploadError = FileUploadErrors[keyof FileUploadErrors]
+
+export type FileUploadResponses = {
+  /**
+   * Uploaded file
+   */
+  200: {
+    path: string
+  }
+}
+
+export type FileUploadResponse = FileUploadResponses[keyof FileUploadResponses]
 
 export type FileKnowledgeGraphData = {
   body?: never

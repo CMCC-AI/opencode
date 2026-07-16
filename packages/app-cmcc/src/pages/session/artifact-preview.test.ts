@@ -14,6 +14,8 @@ describe("artifact preview", () => {
     expect(artifactPreviewKind("reports/brief.DOCX")).toBe("docx")
     expect(artifactPreviewKind("reports/model.xlsx")).toBe("excel")
     expect(artifactPreviewKind("slides/deck.pptx")).toBe("pptx")
+    expect(artifactPreviewKind("notes/readme.markdown")).toBe("markdown")
+    expect(artifactPreviewKind("source/main.go")).toBe("text")
     expect(artifactPreviewKind("site/index.HTML")).toBe("html")
     expect(artifactPreviewKind("images/chart.svg")).toBe("image")
     expect(artifactPreviewKind("legacy/report.doc")).toBe("unsupported")

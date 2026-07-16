@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   cmccBuildKnowledgeGraph,
+  cmccForgetKnowledgeSession,
   cmccKnowledgeDeletedMarkerDirectory,
   cmccKnowledgeDirectory,
   cmccKnowledgeNotebookForSession,
@@ -71,6 +72,26 @@ describe("cmcc knowledge", () => {
     expect(cmccKnowledgeNotebookForSession([remembered], { id: "ses_legacy", directory: "c:/knowledge/research/" })).toEqual(
       remembered,
     )
+  })
+
+  test("forgets a deleted conversation and promotes the next history item", () => {
+    const notebook: KnowledgeNotebook = {
+      id: "one",
+      name: "研究",
+      description: "",
+      emoji: "📚",
+      directory: "/tmp/one",
+      createdAt: 1,
+      updatedAt: 2,
+      lastOpenedAt: 3,
+      sessionID: "ses_active",
+      sessionIDs: ["ses_active", "ses_next", "ses_older"],
+    }
+
+    expect(cmccForgetKnowledgeSession(notebook, "ses_active", "ses_next")).toMatchObject({
+      sessionID: "ses_next",
+      sessionIDs: ["ses_next", "ses_older"],
+    })
   })
 
   test("recovers notebooks from durable directories and preserves cached metadata", () => {

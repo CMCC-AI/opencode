@@ -115,6 +115,24 @@ export function cmccRememberKnowledgeSession(notebook: KnowledgeNotebook, sessio
   }
 }
 
+export function cmccForgetKnowledgeSession(
+  notebook: KnowledgeNotebook,
+  sessionID: string,
+  fallbackSessionID?: string,
+) {
+  const activeSessionID = notebook.sessionID === sessionID ? fallbackSessionID : notebook.sessionID
+  return {
+    ...notebook,
+    sessionID: activeSessionID,
+    sessionIDs: [
+      ...new Set([
+        ...(activeSessionID ? [activeSessionID] : []),
+        ...(notebook.sessionIDs ?? []).filter((remembered) => remembered !== sessionID),
+      ]),
+    ],
+  }
+}
+
 export function cmccKnowledgeNotebookForSession(notebooks: KnowledgeNotebook[], session: KnowledgeSession) {
   const metadataID = session.metadata?.cmccKnowledgeNotebookID
   if (typeof metadataID === "string") {

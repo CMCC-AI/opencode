@@ -13,13 +13,16 @@ const IMAGE_EXTENSIONS = new Set(["avif", "bmp", "gif", "jpeg", "jpg", "png", "s
 const TEXT_EXTENSIONS = new Set([
   "css",
   "csv",
+  "go",
   "ini",
+  "java",
   "js",
   "json",
   "jsx",
   "log",
   "mjs",
   "py",
+  "rs",
   "sql",
   "toml",
   "ts",
@@ -42,7 +45,7 @@ export function artifactPreviewKind(path: string): ArtifactPreviewKind {
   if (extension === "pptx") return "pptx"
   if (extension === "pdf") return "pdf"
   if (IMAGE_EXTENSIONS.has(extension)) return "image"
-  if (extension === "md" || extension === "mdx") return "markdown"
+  if (extension === "md" || extension === "markdown" || extension === "mdx") return "markdown"
   if (TEXT_EXTENSIONS.has(extension)) return "text"
   return "unsupported"
 }

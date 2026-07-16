@@ -1,19 +1,18 @@
 import type {
   FileContent,
   FileNode,
-  FilePartInput,
   Message,
   OpencodeClient,
   Part,
   Session,
   TextPart,
-  TextPartInput,
 } from "@opencode-ai/sdk/v2/client"
 import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Navigate, useNavigate, useParams } from "@solidjs/router"
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
+import { ArtifactPreview } from "@/components/artifact-preview"
 import { ForceKnowledgeGraph } from "@/components/force-knowledge-graph"
 import { PromptInput } from "@/components/prompt-input"
 import { buildRequestParts } from "@/components/prompt-input/build-request-parts"
@@ -28,10 +27,11 @@ import { useSync } from "@/context/sync"
 import { createPromptInputController } from "@/pages/session/composer"
 import { Identifier } from "@/utils/id"
 import { showToast } from "@/utils/toast"
+import { uuid } from "@/utils/uuid"
 import {
   cmccBuildKnowledgeGraph,
+  cmccForgetKnowledgeSession,
   CMCC_KNOWLEDGE_DELETED_MARKER,
-  cmccKnowledgeDeletedMarkerDirectory,
   cmccKnowledgeDirectory,
   cmccKnowledgeNotebooks,
   cmccKnowledgeRoot,
@@ -52,7 +52,6 @@ type ImportPhase = "idle" | "collecting" | "staging" | "organizing" | "validatin
 
 const notebookEmojis = ["📚", "🧭", "🧠", "🗂️", "🔬", "📊", "🏛️", "🌐"]
 const markdownExtensions = /\.(md|markdown|mdx)$/i
-const textExtensions = /\.(md|markdown|mdx|txt|csv|json|yaml|yml|xml|html|css|js|jsx|ts|tsx|py|go|rs|java|sql)$/i
 const attachmentBatchSize = 6
 const wikiBatchSize = 12
 const maxImportFiles = 1000
@@ -86,7 +85,10 @@ export function CmccKnowledgeHomeRoute() {
               const directory = entry.absolute
               const client = serverSDK().createClient({ directory, throwOnError: true })
               const children = await client.file.list({ path: "" }).then((result) => result.data ?? [])
-              if (children.some((child) => child.name === CMCC_KNOWLEDGE_DELETED_MARKER)) return
+              if (children.some((child) => child.name === CMCC_KNOWLEDGE_DELETED_MARKER)) {
+                await rootClient.file.remove({ path: entry.name, recursive: true }, { throwOnError: true })
+                return
+              }
               return directory
             }),
         )
@@ -113,7 +115,7 @@ export function CmccKnowledgeHomeRoute() {
     if (!home) return showToast({ title: "正在连接工作区，请稍后重试" })
     if (!name) return showToast({ title: "请输入笔记本名称" })
 
-    const id = crypto.randomUUID()
+    const id = uuid()
     const now = Date.now()
     const notebook: KnowledgeNotebook = {
       id,
@@ -156,18 +158,30 @@ export function CmccKnowledgeHomeRoute() {
   const removeNotebook = async () => {
     const notebook = removal.notebook
     if (!notebook) return
+    const home = sync().data.path.home
+    if (!home) return showToast({ title: "正在连接工作区，请稍后重试" })
+    const root = cmccKnowledgeRoot(home)
+    const target = relativeKnowledgePath(root, notebook.directory)
+    if (!target)
+      return showToast({
+        title: "删除笔记本失败",
+        description: "笔记本目录不在 DeepInsight 知识库根目录内。",
+        variant: "error",
+      })
     setRemoval("removing", true)
     await serverSDK()
-      .client.file.createDirectory(
-        { path: cmccKnowledgeDeletedMarkerDirectory(notebook.directory) },
-        { throwOnError: true },
-      )
+      .createClient({ directory: root, throwOnError: true })
+      .file.remove({ path: target, recursive: true }, { throwOnError: true })
       .then(() => {
         const next = notebooks().filter((item) => item.id !== notebook.id)
         cmccSaveKnowledgeNotebooks(next)
         setNotebooks(next)
         setRemoval({ notebook: undefined, removing: false })
-        showToast({ title: `已删除“${notebook.name}”`, description: "知识库已从列表移除，原始目录和文件仍保留在本地。" })
+        showToast({
+          title: `已删除“${notebook.name}”`,
+          description: "知识库目录及其中的全部文件已永久删除。",
+          variant: "success",
+        })
       })
       .catch((error) => {
         setRemoval("removing", false)
@@ -344,8 +358,8 @@ export function CmccKnowledgeHomeRoute() {
               <p class="m-0 text-[14px] leading-6 text-v2-text-text-base">
                 确定从 DeepInsight 中删除“{notebook.name}”吗？
               </p>
-              <div class="rounded-[7px] border border-v2-border-border-base bg-v2-background-bg-layer-02 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
-                为避免误删资料，笔记本会从界面和后续启动扫描中移除，但原始目录及其中的文件不会被物理删除。
+              <div class="rounded-[7px] border border-red-500/35 bg-red-500/8 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
+                此操作会永久删除知识库目录、原始资料、LLM Wiki 产物和其他全部文件，删除后无法恢复。
               </div>
               <div class="flex justify-end gap-2">
                 <button
@@ -452,11 +466,19 @@ export function CmccKnowledgeNotebookRoute() {
     graphQuery: "",
     graphSelection: "",
   })
+  const [fileRemoval, setFileRemoval] = createStore({
+    file: undefined as FileNode | undefined,
+    removing: false,
+  })
+  const [sessionRemoval, setSessionRemoval] = createStore({
+    session: undefined as Session | undefined,
+    removing: false,
+  })
   let inputElement: HTMLInputElement | undefined
   let loadedSession = ""
   const client = createMemo(() => sdk().client)
   const activeSessionID = createMemo(() =>
-    params.sessionID === "new" ? undefined : params.sessionID ?? notebook()?.sessionID,
+    params.sessionID === "new" ? undefined : (params.sessionID ?? notebook()?.sessionID),
   )
   const composerControls = createPromptInputController({
     sessionKey: () => `knowledge:${params.id}`,
@@ -501,13 +523,7 @@ export function CmccKnowledgeNotebookRoute() {
       .list({ directory: activeNotebook.directory, roots: true, limit: 100 })
       .then((result) => {
         const sessions = (result.data ?? [])
-          .filter(
-            (session) =>
-              !session.parentID &&
-              session.time.archived === undefined &&
-              session.metadata?.cmccKnowledgeKind !== "import" &&
-              !session.title.startsWith("知识库导入 ·"),
-          )
+          .filter((session) => !session.parentID && session.time.archived === undefined)
           .toSorted((a, b) => sessionUpdatedAt(b) - sessionUpdatedAt(a))
         setState("sessions", sessions)
         if (params.sessionID === "new" || sessions.some((session) => session.id === activeSessionID())) return
@@ -740,6 +756,34 @@ export function CmccKnowledgeNotebookRoute() {
     setState("activeTab", state.tabs[index - 1]?.path ?? "chat")
   }
 
+  const removeFile = async () => {
+    const file = fileRemoval.file
+    const current = client()
+    if (!file || !current || state.importing) return
+    setFileRemoval("removing", true)
+    await current.file
+      .remove({ path: file.path }, { throwOnError: true })
+      .then(async () => {
+        setState("tabs", (tabs) => tabs.filter((tab) => tab.path !== file.path))
+        setState("contents", (contents) =>
+          Object.fromEntries(Object.entries(contents).filter(([path]) => path !== file.path)),
+        )
+        if (state.activeTab === file.path) setState("activeTab", "chat")
+        if (state.graphSelection === file.path) setState("graphSelection", "")
+        setFileRemoval({ file: undefined, removing: false })
+        await loadFiles()
+        showToast({ title: `已删除“${file.name}”`, description: "文件已从知识库目录永久删除。", variant: "success" })
+      })
+      .catch((error) => {
+        setFileRemoval("removing", false)
+        showToast({
+          title: "删除文档失败",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "error",
+        })
+      })
+  }
+
   const openKnowledgeSession = (session: Session) => {
     const activeNotebook = notebook()
     if (!activeNotebook || state.sending) return
@@ -753,6 +797,47 @@ export function CmccKnowledgeNotebookRoute() {
     if (!activeNotebook || state.sending || state.importing) return
     setState({ activeTab: "chat", messages: [], optimisticPrompt: "" })
     navigate(`/knowledge/${activeNotebook.id}/session/new`)
+  }
+
+  const removeKnowledgeSession = async () => {
+    const session = sessionRemoval.session
+    const activeNotebook = notebook()
+    const current = client()
+    if (!session || !activeNotebook || !current || state.sending || state.importing) return
+    setSessionRemoval("removing", true)
+    await current.session
+      .delete({ sessionID: session.id, directory: activeNotebook.directory }, { throwOnError: true })
+      .then((result) => {
+        if (!result.data) throw new Error("删除请求未成功")
+        const remaining = state.sessions.filter((item) => item.id !== session.id)
+        const deletingActive = activeSessionID() === session.id
+        saveNotebook({
+          ...cmccForgetKnowledgeSession(activeNotebook, session.id, deletingActive ? remaining[0]?.id : undefined),
+          updatedAt: Date.now(),
+        })
+        sync().session.evict(session.id)
+        setState("sessions", remaining)
+        setSessionRemoval({ session: undefined, removing: false })
+        if (deletingActive) {
+          loadedSession = ""
+          setState({ activeTab: "chat", messages: [], optimisticPrompt: "" })
+          navigate(
+            remaining[0]
+              ? `/knowledge/${activeNotebook.id}/session/${remaining[0].id}`
+              : `/knowledge/${activeNotebook.id}/session/new`,
+            { replace: true },
+          )
+        }
+        showToast({ title: "对话已删除", description: "该对话及其消息已永久删除。", variant: "success" })
+      })
+      .catch((error) => {
+        setSessionRemoval("removing", false)
+        showToast({
+          title: "删除对话失败",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "error",
+        })
+      })
   }
 
   const importProgress = (phase: ImportPhase, completed: number, total: number, message: string) =>
@@ -834,6 +919,7 @@ export function CmccKnowledgeNotebookRoute() {
           variant: "error",
         })
       })
+    await loadSessions()
     setState("importing", false)
   }
 
@@ -846,7 +932,8 @@ export function CmccKnowledgeNotebookRoute() {
       showToast({ title: `已忽略超过 25 MB 的文件或超出 ${maxImportFiles} 个的部分` })
     if (accepted.length === 0) return
     importProgress("collecting", 0, accepted.length, `已收集 ${accepted.length} 个文件，准备写入原始资料区`)
-    await runImport(activeNotebook, current, async (sessionID) => {
+    await runImport(activeNotebook, current, async () => {
+      const used = new Set(rawSourcePaths(await listNotebookFiles(current)))
       const batches = chunk(accepted, attachmentBatchSize)
       await batches.reduce(
         (previous, batch, index) =>
@@ -857,32 +944,15 @@ export function CmccKnowledgeNotebookRoute() {
               accepted.length,
               `正在落盘第 ${index + 1}/${batches.length} 批附件`,
             )
-            const fileParts = await Promise.all(
-              batch.map(async (file) => ({
-                type: "file" as const,
-                mime: file.type || mimeFromPath(file.name),
-                filename: file.name,
-                url: await fileDataUrl(file),
-              })),
+            await Promise.all(
+              batch.map(async (file) => {
+                const target = uniqueRawSourcePath(file.name, used)
+                await current.file.upload(
+                  { path: target, content: await fileBase64(file), encoding: "base64" },
+                  { throwOnError: true },
+                )
+              }),
             )
-            const parts: Array<TextPartInput | FilePartInput> = [
-              ...fileParts,
-              {
-                type: "text",
-                text: stageAttachmentsPrompt(
-                  activeNotebook,
-                  batch.map((file) => file.name),
-                  platform.getPathForFile
-                    ? batch
-                        .map((file) => platform.getPathForFile?.(file))
-                        .filter((path): path is string => Boolean(path))
-                    : [],
-                  index + 1,
-                  batches.length,
-                ),
-              },
-            ]
-            await current.session.prompt({ sessionID, system: stagingSystemPrompt(activeNotebook), parts })
             importProgress(
               "staging",
               Math.min((index + 1) * attachmentBatchSize, accepted.length),
@@ -1054,20 +1124,71 @@ export function CmccKnowledgeNotebookRoute() {
                 <div class="max-h-[144px] overflow-y-auto px-2 pb-2">
                   <For
                     each={state.sessions}
-                    fallback={<div class="px-2 py-2 text-[11px] text-v2-text-text-faint">暂无对话，发送问题后自动创建</div>}
+                    fallback={
+                      <div class="px-2 py-2 text-[11px] text-v2-text-text-faint">暂无对话，发送问题后自动创建</div>
+                    }
                   >
-                    {(session) => (
-                      <button
-                        type="button"
-                        class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
-                        data-selected={activeSessionID() === session.id ? "" : undefined}
-                        onClick={() => openKnowledgeSession(session)}
-                      >
-                        <Icon name="brain" class="size-3.5 shrink-0" />
-                        <span class="min-w-0 flex-1 truncate">{knowledgeSessionLabel(session, activeNotebook().name)}</span>
-                        <span class="shrink-0 text-[10px] text-v2-text-text-faint">{knowledgeSessionTime(session)}</span>
-                      </button>
-                    )}
+                    {(session) => {
+                      const [hovered, setHovered] = createSignal(false)
+                      const [focused, setFocused] = createSignal(false)
+                      const deleteVisible = () => hovered() || focused()
+
+                      return (
+                        <div
+                          class="flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+                          data-selected={activeSessionID() === session.id ? "" : undefined}
+                          onMouseEnter={() => setHovered(true)}
+                          onMouseMove={() => setHovered(true)}
+                          onMouseLeave={() => setHovered(false)}
+                          onFocusIn={() => setFocused(true)}
+                          onFocusOut={(event) => {
+                            if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))
+                              return
+                            setFocused(false)
+                          }}
+                        >
+                        <button
+                          type="button"
+                          class="flex h-full min-w-0 flex-1 items-center gap-2 px-2 text-left"
+                          onClick={() => openKnowledgeSession(session)}
+                        >
+                          <Icon
+                            name={session.metadata?.cmccKnowledgeKind === "import" ? "task" : "brain"}
+                            class="size-3.5 shrink-0"
+                          />
+                          <span class="min-w-0 flex-1 truncate">
+                            {knowledgeSessionLabel(session, activeNotebook().name)}
+                          </span>
+                          <span class="shrink-0 text-[10px] text-v2-text-text-faint">
+                            {knowledgeSessionTime(session)}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          class="relative z-10 mr-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed"
+                          style={{
+                            visibility: deleteVisible() ? "visible" : "hidden",
+                            opacity: deleteVisible() ? "1" : "0",
+                            "pointer-events": deleteVisible() ? "auto" : "none",
+                          }}
+                          title="删除对话"
+                          aria-label={`删除对话 ${knowledgeSessionLabel(session, activeNotebook().name)}`}
+                          disabled={state.sending || state.importing || sessionRemoval.removing}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onPointerUp={(event) => {
+                            event.stopPropagation()
+                            activateTreePointer(event, () => setSessionRemoval({ session, removing: false }))
+                          }}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            activateTreeClick(event, () => setSessionRemoval({ session, removing: false }))
+                          }}
+                        >
+                          <Icon name="trash" class="size-3.5" />
+                        </button>
+                        </div>
+                      )
+                    }}
                   </For>
                 </div>
               </div>
@@ -1092,6 +1213,8 @@ export function CmccKnowledgeNotebookRoute() {
                         )
                       }
                       open={(item) => void openFile(item)}
+                      remove={(item) => setFileRemoval({ file: item, removing: false })}
+                      deleting={fileRemoval.removing || state.importing}
                     />
                   )}
                 </For>
@@ -1165,6 +1288,74 @@ export function CmccKnowledgeNotebookRoute() {
               />
             </aside>
           </main>
+          <Show when={fileRemoval.file} keyed>
+            {(file) => (
+              <Modal title="删除文档" close={() => !fileRemoval.removing && setFileRemoval("file", undefined)}>
+                <div class="flex flex-col gap-4">
+                  <p class="m-0 text-[14px] leading-6 text-v2-text-text-base">确定永久删除“{file.name}”吗？</p>
+                  <div class="rounded-[7px] border border-red-500/35 bg-red-500/8 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
+                    文件将从知识库目录中物理删除且无法恢复；如果其他知识页引用了它，相关链接可能失效。
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      class="h-9 rounded-[7px] border border-v2-border-border-base px-4 text-[13px] text-v2-text-text-base hover:bg-v2-background-bg-layer-02"
+                      disabled={fileRemoval.removing}
+                      onClick={() => setFileRemoval("file", undefined)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      class="flex h-9 items-center gap-2 rounded-[7px] bg-red-600 px-4 text-[13px] font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                      disabled={fileRemoval.removing}
+                      onClick={() => void removeFile()}
+                    >
+                      <Show when={fileRemoval.removing} fallback={<Icon name="trash" class="size-4" />}>
+                        <span class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                      </Show>
+                      {fileRemoval.removing ? "正在删除..." : "永久删除"}
+                    </button>
+                  </div>
+                </div>
+              </Modal>
+            )}
+          </Show>
+          <Show when={sessionRemoval.session} keyed>
+            {(session) => (
+              <Modal title="删除对话" close={() => !sessionRemoval.removing && setSessionRemoval("session", undefined)}>
+                <div class="flex flex-col gap-4">
+                  <p class="m-0 text-[14px] leading-6 text-v2-text-text-base">
+                    确定永久删除“{knowledgeSessionLabel(session, activeNotebook().name)}”吗？
+                  </p>
+                  <div class="rounded-[7px] border border-red-500/35 bg-red-500/8 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
+                    此对话及其中的全部消息会被永久删除，删除后无法恢复。知识库文件不会受到影响。
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      class="h-9 rounded-[7px] border border-v2-border-border-base px-4 text-[13px] text-v2-text-text-base hover:bg-v2-background-bg-layer-02"
+                      disabled={sessionRemoval.removing}
+                      onClick={() => setSessionRemoval("session", undefined)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      class="flex h-9 items-center gap-2 rounded-[7px] bg-red-600 px-4 text-[13px] font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                      disabled={sessionRemoval.removing}
+                      onClick={() => void removeKnowledgeSession()}
+                    >
+                      <Show when={sessionRemoval.removing} fallback={<Icon name="trash" class="size-4" />}>
+                        <span class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                      </Show>
+                      {sessionRemoval.removing ? "正在删除..." : "永久删除"}
+                    </button>
+                  </div>
+                </div>
+              </Modal>
+            )}
+          </Show>
         </div>
       )}
     </Show>
@@ -1381,18 +1572,31 @@ function KnowledgeTreeNode(props: {
   expanded: string[]
   toggle: (path: string) => void
   open: (file: FileNode) => void
+  remove: (file: FileNode) => void
+  deleting: boolean
 }) {
   const directory = () => props.file.type === "directory"
   const open = () => props.expanded.includes(props.file.path)
   const children = createMemo(() => fileChildren(props.files, props.file.path))
   const activate = () => (directory() ? props.toggle(props.file.path) : props.open(props.file))
+  const [hovered, setHovered] = createSignal(false)
+  const [focused, setFocused] = createSignal(false)
+  const deleteVisible = () => hovered() || focused()
 
   return (
     <div>
       <div
-        class="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-[5px] pr-2 text-left text-[12px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+        class="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-[5px] pr-1 text-left text-[12px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
         style={{ "padding-left": `${6 + props.level * 13}px` }}
         data-selected={!directory() && props.active === props.file.path ? "" : undefined}
+        onMouseEnter={() => setHovered(true)}
+        onMouseMove={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onFocusIn={() => setFocused(true)}
+        onFocusOut={(event) => {
+          if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return
+          setFocused(false)
+        }}
       >
         <Show when={directory()} fallback={<span class="size-5 shrink-0" />}>
           <button
@@ -1414,13 +1618,40 @@ function KnowledgeTreeNode(props: {
         <button
           type="button"
           class="flex h-full min-w-0 flex-1 touch-manipulation items-center gap-1.5 text-left"
-          aria-label={directory() ? `${open() ? "收起" : "展开"}目录 ${props.file.name}` : `打开文档 ${props.file.name}`}
+          aria-label={
+            directory() ? `${open() ? "收起" : "展开"}目录 ${props.file.name}` : `打开文档 ${props.file.name}`
+          }
           onPointerUp={(event) => activateTreePointer(event, activate)}
           onClick={(event) => activateTreeClick(event, activate)}
         >
           <Icon name={directory() ? "folder" : "code"} class="size-3.5 shrink-0" />
           <span class="min-w-0 flex-1 truncate">{props.file.name}</span>
         </button>
+        <Show when={!directory()}>
+          <button
+            type="button"
+            class="relative z-10 flex size-7 shrink-0 touch-manipulation items-center justify-center rounded-[4px] text-v2-icon-icon-muted hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed"
+            style={{
+              visibility: deleteVisible() ? "visible" : "hidden",
+              opacity: deleteVisible() ? "1" : "0",
+              "pointer-events": deleteVisible() ? "auto" : "none",
+            }}
+            aria-label={`删除文档 ${props.file.name}`}
+            title="删除文档"
+            disabled={props.deleting}
+            onPointerDown={(event) => event.stopPropagation()}
+            onPointerUp={(event) => {
+              event.stopPropagation()
+              activateTreePointer(event, () => props.remove(props.file))
+            }}
+            onClick={(event) => {
+              event.stopPropagation()
+              activateTreeClick(event, () => props.remove(props.file))
+            }}
+          >
+            <Icon name="trash" class="size-3.5" />
+          </button>
+        </Show>
       </div>
       <Show when={directory() && open()}>
         <For each={children()}>
@@ -1433,6 +1664,8 @@ function KnowledgeTreeNode(props: {
               expanded={props.expanded}
               toggle={props.toggle}
               open={props.open}
+              remove={props.remove}
+              deleting={props.deleting}
             />
           )}
         </For>
@@ -1612,12 +1845,6 @@ function DocumentPreview(props: {
   loading: boolean
   openPath?: (path: string, app?: string) => Promise<void>
 }) {
-  const mime = () => props.content?.mimeType ?? mimeFromPath(props.tab?.path ?? "")
-  const dataUrl = () => {
-    if (!props.content || props.content.type !== "binary" || props.content.encoding !== "base64") return
-    return `data:${mime()};base64,${props.content.content}`
-  }
-
   return (
     <div class="flex min-h-0 flex-1 flex-col">
       <Show
@@ -1654,48 +1881,16 @@ function DocumentPreview(props: {
               }
             >
               {(content) => (
-                <Show
-                  when={content().type === "text"}
-                  fallback={
-                    <Show
-                      when={mime().startsWith("image/") && dataUrl()}
-                      fallback={
-                        <Show
-                          when={mime() === "application/pdf" && dataUrl()}
-                          fallback={
-                            <div class="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-                              <Icon name="code" class="size-8 text-v2-icon-icon-muted" />
-                              <div class="text-[14px] font-medium text-v2-text-text-base">暂不支持内嵌预览此文件</div>
-                              <div class="max-w-[440px] text-[12px] leading-5 text-v2-text-text-muted">
-                                文件已保留在笔记本目录中，并可被 DeepInsight 与 llmwiki
-                                使用。你可以通过“系统打开”查看原始文件。
-                              </div>
-                            </div>
-                          }
-                        >
-                          <iframe title={tab().name} class="min-h-0 flex-1 border-0 bg-white" src={dataUrl()} />
-                        </Show>
-                      }
-                    >
-                      <div class="min-h-0 flex-1 overflow-auto p-5">
-                        <img class="mx-auto max-h-full max-w-full object-contain" src={dataUrl()} alt={tab().name} />
-                      </div>
-                    </Show>
-                  }
-                >
-                  <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-                    <Show
-                      when={markdownExtensions.test(tab().path)}
-                      fallback={
-                        <pre class="m-0 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-v2-text-text-base">
-                          {content().content}
-                        </pre>
-                      }
-                    >
-                      <Markdown text={content().content} cacheKey={`knowledge:${tab().path}`} />
-                    </Show>
-                  </div>
-                </Show>
+                <div class="min-h-0 flex-1 overflow-hidden">
+                  <ArtifactPreview
+                    path={tab().path}
+                    content={content()}
+                    markdownCacheKey={`knowledge:${tab().path}`}
+                    htmlTitle="请使用系统打开"
+                    htmlDescription="知识库中的 HTML 文件不会在当前页面执行，可通过右上角“系统打开”查看。"
+                    unsupportedDescription="文件已保留在笔记本目录中，并可被 DeepInsight 与 llmwiki 使用。你可以通过右上角“系统打开”查看原始文件。"
+                  />
+                </div>
               )}
             </Show>
           </>
@@ -1942,6 +2137,16 @@ function basename(path: string) {
   return path.split(/[\\/]/).pop() ?? path
 }
 
+function relativeKnowledgePath(root: string, target: string) {
+  const normalizedRoot = root.replaceAll("\\", "/").replace(/\/+$/, "")
+  const normalizedTarget = target.replaceAll("\\", "/").replace(/\/+$/, "")
+  const prefix = `${normalizedRoot}/`
+  if (!normalizedTarget.toLowerCase().startsWith(prefix.toLowerCase())) return
+  const relative = normalizedTarget.slice(prefix.length)
+  if (!relative || relative.split("/").some((part) => !part || part === "." || part === "..")) return
+  return relative
+}
+
 function absolutePath(directory: string, path: string) {
   const separator = directory.includes("\\") ? "\\" : "/"
   return `${directory.replace(/[\\/]+$/, "")}${separator}${path.replaceAll(/[\\/]/g, separator)}`
@@ -1951,22 +2156,28 @@ function formatDate(value: number) {
   return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(value)
 }
 
-function mimeFromPath(path: string) {
-  const extension = path.split(".").pop()?.toLowerCase()
-  if (extension === "pdf") return "application/pdf"
-  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(extension ?? ""))
-    return `image/${extension === "jpg" ? "jpeg" : extension}`
-  if (markdownExtensions.test(path) || textExtensions.test(path)) return "text/plain"
-  return "application/octet-stream"
-}
-
-function fileDataUrl(file: File) {
+function fileBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
-    reader.addEventListener("load", () => resolve(String(reader.result)))
+    reader.addEventListener("load", () => {
+      const value = String(reader.result)
+      const separator = value.indexOf(",")
+      if (separator === -1) return reject(new Error(`无法编码 ${file.name}`))
+      resolve(value.slice(separator + 1))
+    })
     reader.addEventListener("error", () => reject(reader.error ?? new Error(`无法读取 ${file.name}`)))
     reader.readAsDataURL(file)
   })
+}
+
+function uniqueRawSourcePath(name: string, used: Set<string>, suffix = 1): string {
+  const safe = name.replace(/[\\/\u0000-\u001f]/g, "_").trim() || "file"
+  const extension = safe.lastIndexOf(".") > 0 ? safe.slice(safe.lastIndexOf(".")) : ""
+  const stem = extension ? safe.slice(0, -extension.length) : safe
+  const candidate = `01_Raw_Sources/${stem}${suffix === 1 ? "" : ` (${suffix})`}${extension}`
+  if (used.has(candidate)) return uniqueRawSourcePath(name, used, suffix + 1)
+  used.add(candidate)
+  return candidate
 }
 
 function knowledgeSystemPrompt(notebook: KnowledgeNotebook) {
@@ -1975,18 +2186,6 @@ function knowledgeSystemPrompt(notebook: KnowledgeNotebook) {
 
 function stagingSystemPrompt(notebook: KnowledgeNotebook) {
   return `你正在执行知识库“${notebook.name}”的原始资料落盘阶段，目标目录是 ${notebook.directory}。本阶段只做文件复制和完整性核对：不得调用 llm-wiki，不得总结、拆分或改写内容，不得创建 02_LLM_Wiki、index.md 或 log.md。只有在本批文件全部写入 01_Raw_Sources 后才能回复完成。`
-}
-
-function stageAttachmentsPrompt(
-  notebook: KnowledgeNotebook,
-  names: string[],
-  sourcePaths: string[],
-  batch: number,
-  totalBatches: number,
-) {
-  const paths =
-    sourcePaths.length > 0 ? `\n本机来源路径仅用于追溯：\n${sourcePaths.map((path) => `- ${path}`).join("\n")}` : ""
-  return `这是原始资料落盘阶段的第 ${batch}/${totalBatches} 批。把本次附加的 ${names.length} 个文件逐字节保存到 ${notebook.directory}/01_Raw_Sources/：\n${names.map((name) => `- ${name}`).join("\n")}${paths}\n\n同名文件不得覆盖，使用可追溯的后缀重命名。逐一确认文件已写入后再回复。本阶段禁止调用 skill、禁止分析内容。`
 }
 
 function stageDirectoriesPrompt(notebook: KnowledgeNotebook, paths: string[]) {

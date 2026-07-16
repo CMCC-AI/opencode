@@ -115,23 +115,23 @@ fi
 
 delta_uploaded=0
 if [[ $upload_mode == delta ]]; then
-  echo "Preparing an immutable remote delta base"
-  ssh "$remote" \
-    "rm -rf -- '$remote_stage' && mkdir -p '$remote_stage/base' '$remote_stage/release' && cp '$install_root/current/opencode' '$remote_stage/base/opencode'"
+  echo "Seeding the remote release from the current binary"
+  if ! ssh "$remote" \
+    "rm -rf -- '$remote_stage' && mkdir -p '$remote_stage/release' && cp --reflink=auto --preserve=mode,timestamps '$install_root/current/opencode' '$remote_stage/release/opencode'"; then
+    echo "Unable to prepare the remote delta base; falling back to compressed bundle upload" >&2
+    upload_mode=bundle
+  fi
+fi
 
+if [[ $upload_mode == delta ]]; then
   echo "Uploading changed binary blocks"
-  if rsync --archive --partial --compress --progress --stats \
-    --copy-dest=../base \
-    "$stage/opencode" \
-    "$remote:$remote_stage/release/" && \
-    rsync --archive --partial \
-      "$stage/VERSION" \
-      "$stage/opencode.env" \
-      "$stage/install-single-server.sh" \
-      "$remote:$remote_stage/release/"; then
+  # The seeded destination is the rolling-checksum basis; never let metadata skip the content comparison.
+  if rsync --archive --ignore-times --no-whole-file --partial-dir=.rsync-partial --compress --progress --stats \
+    "$stage/" \
+    "$remote:$remote_stage/release/"; then
     local_sha256=$(shasum -a 256 "$stage/opencode" | awk '{print $1}')
-    remote_sha256=$(ssh "$remote" "sha256sum '$remote_stage/release/opencode' | awk '{print \$1}'")
-    if [[ $local_sha256 == "$remote_sha256" ]]; then
+    if remote_sha256=$(ssh "$remote" "sha256sum '$remote_stage/release/opencode' | awk '{print \$1}'") && \
+      [[ $local_sha256 == "$remote_sha256" ]]; then
       delta_uploaded=1
     else
       echo "Delta SHA-256 verification failed; falling back to compressed bundle upload" >&2

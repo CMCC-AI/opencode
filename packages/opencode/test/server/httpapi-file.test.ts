@@ -9,16 +9,17 @@ import { pollWithTimeout } from "../lib/effect"
 
 const context = Context.empty() as Context.Context<unknown>
 
-function request(route: string, directory: string, query?: Record<string, string>) {
+function request(route: string, directory: string, query?: Record<string, string>, init?: RequestInit) {
   const url = new URL(`http://localhost${route}`)
   for (const [key, value] of Object.entries(query ?? {})) {
     url.searchParams.set(key, value)
   }
+  const headers = new Headers(init?.headers)
+  headers.set("x-opencode-directory", directory)
   return HttpApiApp.webHandler().handler(
     new Request(url, {
-      headers: {
-        "x-opencode-directory": directory,
-      },
+      ...init,
+      headers,
     }),
     context,
   )
@@ -84,10 +85,7 @@ describe("file HttpApi", () => {
   test("builds a knowledge graph on the server", async () => {
     await using tmp = await tmpdir({ git: true })
     await Bun.write(path.join(tmp.path, "02_LLM_Wiki", "source.md"), "[[Target Alias]]")
-    await Bun.write(
-      path.join(tmp.path, "02_LLM_Wiki", "target.md"),
-      "---\naliases: [Target Alias]\n---\n# Target",
-    )
+    await Bun.write(path.join(tmp.path, "02_LLM_Wiki", "target.md"), "---\naliases: [Target Alias]\n---\n# Target")
 
     const response = await request(FilePaths.knowledgeGraph, tmp.path)
     const graph = await response.json()
@@ -100,5 +98,53 @@ describe("file HttpApi", () => {
         target: "02_LLM_Wiki/target.md",
       }),
     ])
+  })
+
+  test("uploads a binary file without allowing traversal or overwrite", async () => {
+    await using tmp = await tmpdir({ git: true })
+    const content = new Uint8Array([0, 1, 2, 255])
+    const upload = (file: string) =>
+      request(FilePaths.upload, tmp.path, undefined, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: file, content: Buffer.from(content).toString("base64"), encoding: "base64" }),
+      })
+
+    const response = await upload("01_Raw_Sources/source.docx")
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ path: "01_Raw_Sources/source.docx" })
+    expect(new Uint8Array(await Bun.file(path.join(tmp.path, "01_Raw_Sources", "source.docx")).arrayBuffer())).toEqual(
+      content,
+    )
+    expect((await upload("01_Raw_Sources/source.docx")).status).toBe(400)
+    expect((await upload("../escape.docx")).status).toBe(400)
+  })
+
+  test("deletes files and directories without escaping or deleting the workspace root", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await Bun.write(path.join(tmp.path, "source.docx"), "source")
+    await Bun.write(path.join(tmp.path, "notebook", "nested", "page.md"), "page")
+    const remove = (target: string, recursive?: boolean) =>
+      request(FilePaths.remove, tmp.path, undefined, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: target, ...(recursive === undefined ? {} : { recursive }) }),
+      })
+
+    const file = await remove("source.docx")
+    expect(file.status).toBe(200)
+    expect(await file.json()).toEqual({ path: "source.docx" })
+    expect(await Bun.file(path.join(tmp.path, "source.docx")).exists()).toBe(false)
+
+    expect((await remove("notebook")).status).toBe(400)
+    expect(await Bun.file(path.join(tmp.path, "notebook", "nested", "page.md")).exists()).toBe(true)
+
+    const directory = await remove("notebook", true)
+    expect(directory.status).toBe(200)
+    expect(await directory.json()).toEqual({ path: "notebook" })
+    expect(await Bun.file(path.join(tmp.path, "notebook")).exists()).toBe(false)
+
+    expect((await remove(".", true)).status).toBe(400)
+    expect((await remove("../outside", true)).status).toBe(400)
   })
 })
