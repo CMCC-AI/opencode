@@ -10,7 +10,7 @@ import type {
 import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Navigate, useNavigate, useParams } from "@solidjs/router"
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
+import { batch, createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { ArtifactPreview } from "@/components/artifact-preview"
 import { ForceKnowledgeGraph } from "@/components/force-knowledge-graph"
@@ -26,6 +26,7 @@ import { useServerSync } from "@/context/server-sync"
 import { useSync } from "@/context/sync"
 import { createPromptInputController } from "@/pages/session/composer"
 import { Identifier } from "@/utils/id"
+import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { uuid } from "@/utils/uuid"
 import {
@@ -55,6 +56,28 @@ const markdownExtensions = /\.(md|markdown|mdx)$/i
 const attachmentBatchSize = 6
 const wikiBatchSize = 12
 const maxImportFiles = 1000
+
+const SIDEBAR_DEFAULT_WIDTH = 260
+const SIDEBAR_MIN_WIDTH = 200
+const SIDEBAR_MAX_WIDTH = 400
+const SIDEBAR_COLLAPSE_THRESHOLD = 100
+const SIDEBAR_RESTORE_THRESHOLD = 140
+const GRAPH_DEFAULT_WIDTH = 340
+const GRAPH_MIN_WIDTH = 260
+const GRAPH_MAX_RATIO = 0.45
+const GRAPH_COLLAPSE_THRESHOLD = 140
+const GRAPH_RESTORE_THRESHOLD = 180
+const CONTENT_MIN_WIDTH = 360
+
+// vertical split: sidebar session list / file tree
+const SESSION_LIST_DEFAULT_HEIGHT = 144
+const SESSION_LIST_MIN_HEIGHT = 60
+const SESSION_LIST_MAX_HEIGHT = 400
+
+// vertical split: graph canvas / detail panel
+const GRAPH_DETAIL_DEFAULT_HEIGHT = 180
+const GRAPH_DETAIL_MIN_HEIGHT = 80
+const GRAPH_DETAIL_MAX_HEIGHT = 400
 
 export function CmccKnowledgeHomeRoute() {
   const navigate = useNavigate()
@@ -492,6 +515,170 @@ export function CmccKnowledgeNotebookRoute() {
   }))
   const rootChildren = createMemo(() => fileChildren(state.files ?? [], ""))
   const activePreview = createMemo(() => state.tabs.find((tab) => tab.path === state.activeTab))
+
+  // --- panel resize state (persisted to localStorage) ---
+  const [panelStore, setPanelStore] = createStore({
+    sidebarOpened: true,
+    sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
+    graphOpened: true,
+    graphWidth: GRAPH_DEFAULT_WIDTH,
+    sessionListHeight: SESSION_LIST_DEFAULT_HEIGHT,
+    graphDetailHeight: GRAPH_DETAIL_DEFAULT_HEIGHT,
+    historyOpened: true,
+    directoryOpened: true,
+  })
+  persisted(Persist.global("knowledge-panels"), [panelStore, setPanelStore])
+
+  const graphMaxWidth = () =>
+    typeof window === "undefined" ? 600 : Math.floor(window.innerWidth * GRAPH_MAX_RATIO)
+
+  // left separator drag (sidebar ↔ content)
+  const [leftDrag, setLeftDrag] = createStore({ active: false, startX: 0, startWidth: 0 })
+
+  const stopLeftDrag = () => {
+    if (!leftDrag.active) return
+    setLeftDrag("active", false)
+    document.body.style.userSelect = ""
+    document.body.style.cursor = ""
+    window.removeEventListener("pointermove", moveLeftDrag)
+    window.removeEventListener("pointerup", stopLeftDrag)
+    window.removeEventListener("pointercancel", stopLeftDrag)
+  }
+
+  const moveLeftDrag = (event: PointerEvent) => {
+    const raw = leftDrag.startWidth + event.clientX - leftDrag.startX
+    if (raw <= SIDEBAR_COLLAPSE_THRESHOLD) {
+      batch(() => {
+        setPanelStore("sidebarOpened", false)
+        setPanelStore("sidebarWidth", SIDEBAR_DEFAULT_WIDTH)
+      })
+      return
+    }
+    if (!panelStore.sidebarOpened && raw < SIDEBAR_RESTORE_THRESHOLD) return
+    if (!panelStore.sidebarOpened) setPanelStore("sidebarOpened", true)
+    setPanelStore("sidebarWidth", Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, raw)))
+  }
+
+  const startLeftDrag = (event: PointerEvent) => {
+    event.preventDefault()
+    document.body.style.userSelect = "none"
+    document.body.style.cursor = "col-resize"
+    setLeftDrag({
+      active: true,
+      startX: event.clientX,
+      startWidth: panelStore.sidebarOpened ? panelStore.sidebarWidth : 0,
+    })
+    window.addEventListener("pointermove", moveLeftDrag)
+    window.addEventListener("pointerup", stopLeftDrag)
+    window.addEventListener("pointercancel", stopLeftDrag)
+  }
+
+  // right separator drag (content ↔ graph)
+  const [rightDrag, setRightDrag] = createStore({ active: false, startX: 0, startWidth: 0 })
+
+  const stopRightDrag = () => {
+    if (!rightDrag.active) return
+    setRightDrag("active", false)
+    document.body.style.userSelect = ""
+    document.body.style.cursor = ""
+    window.removeEventListener("pointermove", moveRightDrag)
+    window.removeEventListener("pointerup", stopRightDrag)
+    window.removeEventListener("pointercancel", stopRightDrag)
+  }
+
+  const moveRightDrag = (event: PointerEvent) => {
+    // right panel grows when pointer moves rightward from the separator's perspective,
+    // but in screen coordinates rightward means the panel shrinks, so invert delta
+    const raw = rightDrag.startWidth - (event.clientX - rightDrag.startX)
+    if (raw <= GRAPH_COLLAPSE_THRESHOLD) {
+      batch(() => {
+        setPanelStore("graphOpened", false)
+        setPanelStore("graphWidth", GRAPH_DEFAULT_WIDTH)
+      })
+      return
+    }
+    if (!panelStore.graphOpened && raw < GRAPH_RESTORE_THRESHOLD) return
+    if (!panelStore.graphOpened) setPanelStore("graphOpened", true)
+    setPanelStore("graphWidth", Math.min(graphMaxWidth(), Math.max(GRAPH_MIN_WIDTH, raw)))
+  }
+
+  const startRightDrag = (event: PointerEvent) => {
+    event.preventDefault()
+    document.body.style.userSelect = "none"
+    document.body.style.cursor = "col-resize"
+    setRightDrag({
+      active: true,
+      startX: event.clientX,
+      startWidth: panelStore.graphOpened ? panelStore.graphWidth : 0,
+    })
+    window.addEventListener("pointermove", moveRightDrag)
+    window.addEventListener("pointerup", stopRightDrag)
+    window.addEventListener("pointercancel", stopRightDrag)
+  }
+
+  onCleanup(() => {
+    stopLeftDrag()
+    stopRightDrag()
+    stopSessionDrag()
+    stopDetailDrag()
+  })
+
+  // vertical separator drag: sidebar session list ↔ file tree
+  const [sessionDrag, setSessionDrag] = createStore({ active: false, startY: 0, startHeight: 0 })
+
+  const stopSessionDrag = () => {
+    if (!sessionDrag.active) return
+    setSessionDrag("active", false)
+    document.body.style.userSelect = ""
+    document.body.style.cursor = ""
+    window.removeEventListener("pointermove", moveSessionDrag)
+    window.removeEventListener("pointerup", stopSessionDrag)
+    window.removeEventListener("pointercancel", stopSessionDrag)
+  }
+
+  const moveSessionDrag = (event: PointerEvent) => {
+    const raw = sessionDrag.startHeight + event.clientY - sessionDrag.startY
+    setPanelStore("sessionListHeight", Math.min(SESSION_LIST_MAX_HEIGHT, Math.max(SESSION_LIST_MIN_HEIGHT, raw)))
+  }
+
+  const startSessionDrag = (event: PointerEvent) => {
+    event.preventDefault()
+    document.body.style.userSelect = "none"
+    document.body.style.cursor = "row-resize"
+    setSessionDrag({ active: true, startY: event.clientY, startHeight: panelStore.sessionListHeight })
+    window.addEventListener("pointermove", moveSessionDrag)
+    window.addEventListener("pointerup", stopSessionDrag)
+    window.addEventListener("pointercancel", stopSessionDrag)
+  }
+
+  // vertical separator drag: graph canvas ↔ detail panel
+  const [detailDrag, setDetailDrag] = createStore({ active: false, startY: 0, startHeight: 0 })
+
+  const stopDetailDrag = () => {
+    if (!detailDrag.active) return
+    setDetailDrag("active", false)
+    document.body.style.userSelect = ""
+    document.body.style.cursor = ""
+    window.removeEventListener("pointermove", moveDetailDrag)
+    window.removeEventListener("pointerup", stopDetailDrag)
+    window.removeEventListener("pointercancel", stopDetailDrag)
+  }
+
+  const moveDetailDrag = (event: PointerEvent) => {
+    // detail is at the bottom, so dragging up = detail grows
+    const raw = detailDrag.startHeight - (event.clientY - detailDrag.startY)
+    setPanelStore("graphDetailHeight", Math.min(GRAPH_DETAIL_MAX_HEIGHT, Math.max(GRAPH_DETAIL_MIN_HEIGHT, raw)))
+  }
+
+  const startDetailDrag = (event: PointerEvent) => {
+    event.preventDefault()
+    document.body.style.userSelect = "none"
+    document.body.style.cursor = "row-resize"
+    setDetailDrag({ active: true, startY: event.clientY, startHeight: panelStore.graphDetailHeight })
+    window.addEventListener("pointermove", moveDetailDrag)
+    window.addEventListener("pointerup", stopDetailDrag)
+    window.addEventListener("pointercancel", stopDetailDrag)
+  }
 
   const saveNotebook = (next: KnowledgeNotebook) => {
     const updated = cmccUpsertKnowledgeNotebook(notebooks(), next)
@@ -1024,6 +1211,17 @@ export function CmccKnowledgeNotebookRoute() {
               </div>
             </div>
             <div class="flex shrink-0 items-center gap-1">
+              <Show when={!panelStore.sidebarOpened}>
+                <button
+                  type="button"
+                  class="flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-[12px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+                  title="展开来源面板"
+                  onClick={() => setPanelStore("sidebarOpened", true)}
+                >
+                  <Icon name="chevron-right" class="size-3.5" />
+                  来源
+                </button>
+              </Show>
               <button
                 type="button"
                 class="flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-[12px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
@@ -1042,12 +1240,32 @@ export function CmccKnowledgeNotebookRoute() {
                   打开目录
                 </button>
               </Show>
+              <Show when={!panelStore.graphOpened}>
+                <button
+                  type="button"
+                  class="flex h-8 items-center gap-1.5 rounded-[6px] px-2.5 text-[12px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+                  title="展开知识图谱"
+                  onClick={() => setPanelStore("graphOpened", true)}
+                >
+                  知识图谱
+                  <Icon name="chevron-left" class="size-3.5" />
+                </button>
+              </Show>
             </div>
           </header>
 
-          <main class="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(220px,270px)_minmax(420px,1fr)_minmax(300px,36%)] overflow-hidden max-[1120px]:grid-cols-[230px_minmax(400px,1fr)]">
-            <aside class="flex min-h-0 min-w-0 flex-col border-r border-v2-border-border-base bg-v2-background-bg-layer-01">
-              <PanelHeader title="来源" meta={`${sourceFiles().length} 个文件`} />
+          <main class="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            <Show when={panelStore.sidebarOpened}>
+            <aside
+              class="flex min-h-0 min-w-0 shrink-0 flex-col border-r border-v2-border-border-base bg-v2-background-bg-layer-01"
+              style={{ width: `${panelStore.sidebarWidth}px` }}
+            >
+              <PanelHeader
+                title="来源"
+                meta={`${sourceFiles().length} 个文件`}
+                collapsible
+                onCollapse={() => setPanelStore("sidebarOpened", false)}
+              />
               <div class="flex shrink-0 flex-col gap-2 border-b border-v2-border-border-base p-3">
                 <div
                   class="flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-[8px] border border-dashed border-v2-border-border-strong bg-v2-background-bg-layer-02 px-3 py-3 text-center data-[active]:border-v2-border-border-active data-[active]:bg-v2-background-bg-layer-03"
@@ -1107,9 +1325,28 @@ export function CmccKnowledgeNotebookRoute() {
                   />
                 </Show>
               </div>
-              <div class="shrink-0 border-b border-v2-border-border-base">
-                <div class="flex h-9 items-center justify-between px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-v2-text-text-faint">
-                  <span>对话历史 · {state.sessions.length}</span>
+              <div
+                class="flex shrink-0 min-h-0 flex-col"
+                style={
+                  !panelStore.historyOpened
+                    ? {}
+                    : !panelStore.directoryOpened
+                    ? { flex: "1 1 0%" }
+                    : { height: `${panelStore.sessionListHeight + 36}px` }
+                }
+              >
+                <div class="flex h-9 shrink-0 items-center justify-between px-3 text-[12px] font-semibold text-v2-text-text-muted">
+                  <button
+                    type="button"
+                    class="flex items-center gap-1.5 text-left hover:text-v2-text-text-base focus:outline-none"
+                    onClick={() => setPanelStore("historyOpened", !panelStore.historyOpened)}
+                  >
+                    <Icon
+                      name={panelStore.historyOpened ? "chevron-down" : "chevron-right"}
+                      class="size-3.5 transition-transform"
+                    />
+                    <span>对话历史 · {state.sessions.length}</span>
+                  </button>
                   <button
                     type="button"
                     class="flex size-6 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base disabled:opacity-40"
@@ -1121,107 +1358,138 @@ export function CmccKnowledgeNotebookRoute() {
                     <Icon name="new-session" class="size-3.5" />
                   </button>
                 </div>
-                <div class="max-h-[144px] overflow-y-auto px-2 pb-2">
-                  <For
-                    each={state.sessions}
-                    fallback={
-                      <div class="px-2 py-2 text-[11px] text-v2-text-text-faint">暂无对话，发送问题后自动创建</div>
-                    }
-                  >
-                    {(session) => {
-                      const [hovered, setHovered] = createSignal(false)
-                      const [focused, setFocused] = createSignal(false)
-                      const deleteVisible = () => hovered() || focused()
+                <Show when={panelStore.historyOpened}>
+                  <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+                    <For
+                      each={state.sessions}
+                      fallback={
+                        <div class="px-2 py-2 text-[11px] text-v2-text-text-faint">暂无对话，发送问题后自动创建</div>
+                      }
+                    >
+                      {(session) => {
+                        const [hovered, setHovered] = createSignal(false)
+                        const [focused, setFocused] = createSignal(false)
+                        const deleteVisible = () => hovered() || focused()
 
-                      return (
-                        <div
-                          class="flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
-                          data-selected={activeSessionID() === session.id ? "" : undefined}
-                          onMouseEnter={() => setHovered(true)}
-                          onMouseMove={() => setHovered(true)}
-                          onMouseLeave={() => setHovered(false)}
-                          onFocusIn={() => setFocused(true)}
-                          onFocusOut={(event) => {
-                            if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))
-                              return
-                            setFocused(false)
-                          }}
-                        >
-                        <button
-                          type="button"
-                          class="flex h-full min-w-0 flex-1 items-center gap-2 px-2 text-left"
-                          onClick={() => openKnowledgeSession(session)}
-                        >
-                          <Icon
-                            name={session.metadata?.cmccKnowledgeKind === "import" ? "task" : "brain"}
-                            class="size-3.5 shrink-0"
-                          />
-                          <span class="min-w-0 flex-1 truncate">
-                            {knowledgeSessionLabel(session, activeNotebook().name)}
-                          </span>
-                          <span class="shrink-0 text-[10px] text-v2-text-text-faint">
-                            {knowledgeSessionTime(session)}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          class="relative z-10 mr-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed"
-                          style={{
-                            visibility: deleteVisible() ? "visible" : "hidden",
-                            opacity: deleteVisible() ? "1" : "0",
-                            "pointer-events": deleteVisible() ? "auto" : "none",
-                          }}
-                          title="删除对话"
-                          aria-label={`删除对话 ${knowledgeSessionLabel(session, activeNotebook().name)}`}
-                          disabled={state.sending || state.importing || sessionRemoval.removing}
-                          onPointerDown={(event) => event.stopPropagation()}
-                          onPointerUp={(event) => {
-                            event.stopPropagation()
-                            activateTreePointer(event, () => setSessionRemoval({ session, removing: false }))
-                          }}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            activateTreeClick(event, () => setSessionRemoval({ session, removing: false }))
-                          }}
-                        >
-                          <Icon name="trash" class="size-3.5" />
-                        </button>
-                        </div>
-                      )
-                    }}
-                  </For>
-                </div>
+                        return (
+                          <div
+                            class="flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+                            data-selected={activeSessionID() === session.id ? "" : undefined}
+                            onMouseEnter={() => setHovered(true)}
+                            onMouseMove={() => setHovered(true)}
+                            onMouseLeave={() => setHovered(false)}
+                            onFocusIn={() => setFocused(true)}
+                            onFocusOut={(event) => {
+                              if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))
+                                return
+                              setFocused(false)
+                            }}
+                          >
+                          <button
+                            type="button"
+                            class="flex h-full min-w-0 flex-1 items-center gap-2 px-2 text-left"
+                            onClick={() => openKnowledgeSession(session)}
+                          >
+                            <Icon
+                              name={session.metadata?.cmccKnowledgeKind === "import" ? "task" : "brain"}
+                              class="size-3.5 shrink-0"
+                            />
+                            <span class="min-w-0 flex-1 truncate">
+                              {knowledgeSessionLabel(session, activeNotebook().name)}
+                            </span>
+                            <span class="shrink-0 text-[10px] text-v2-text-text-faint">
+                              {knowledgeSessionTime(session)}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            class="relative z-10 mr-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed"
+                            style={{
+                              visibility: deleteVisible() ? "visible" : "hidden",
+                              opacity: deleteVisible() ? "1" : "0",
+                              "pointer-events": deleteVisible() ? "auto" : "none",
+                            }}
+                            title="删除对话"
+                            aria-label={`删除对话 ${knowledgeSessionLabel(session, activeNotebook().name)}`}
+                            disabled={state.sending || state.importing || sessionRemoval.removing}
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onPointerUp={(event) => {
+                              event.stopPropagation()
+                              activateTreePointer(event, () => setSessionRemoval({ session, removing: false }))
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              activateTreeClick(event, () => setSessionRemoval({ session, removing: false }))
+                            }}
+                          >
+                            <Icon name="trash" class="size-3.5" />
+                          </button>
+                          </div>
+                        )
+                      }}
+                    </For>
+                  </div>
+                </Show>
               </div>
-              <div class="flex h-9 shrink-0 items-center justify-between px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-v2-text-text-faint">
-                <span>笔记本目录</span>
+
+              <Show when={panelStore.historyOpened && panelStore.directoryOpened}>
+                <div
+                  role="separator"
+                  aria-orientation="horizontal"
+                  class="relative z-10 h-2 w-full shrink-0 cursor-row-resize bg-transparent before:absolute before:inset-x-0 before:top-1/2 before:h-px before:-translate-y-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+                  onPointerDown={startSessionDrag}
+                />
+              </Show>
+
+              <div class="flex h-9 shrink-0 items-center justify-between px-3 text-[12px] font-semibold text-v2-text-text-muted">
+                <button
+                  type="button"
+                  class="flex items-center gap-1.5 text-left hover:text-v2-text-text-base focus:outline-none"
+                  onClick={() => setPanelStore("directoryOpened", !panelStore.directoryOpened)}
+                >
+                  <Icon
+                    name={panelStore.directoryOpened ? "chevron-down" : "chevron-right"}
+                    class="size-3.5 transition-transform"
+                  />
+                  <span>笔记本目录</span>
+                </button>
                 <Show when={state.loading}>
                   <span class="size-3 animate-spin rounded-full border border-current border-r-transparent" />
                 </Show>
               </div>
-              <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-                <For each={rootChildren()} fallback={<EmptyFiles loading={state.loading} />}>
-                  {(file) => (
-                    <KnowledgeTreeNode
-                      file={file}
-                      files={state.files}
-                      level={0}
-                      active={state.activeTab}
-                      expanded={state.expanded}
-                      toggle={(path) =>
-                        setState("expanded", (items) =>
-                          items.includes(path) ? items.filter((item) => item !== path) : [...items, path],
-                        )
-                      }
-                      open={(item) => void openFile(item)}
-                      remove={(item) => setFileRemoval({ file: item, removing: false })}
-                      deleting={fileRemoval.removing || state.importing}
-                    />
-                  )}
-                </For>
-              </div>
+              <Show when={panelStore.directoryOpened}>
+                <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+                  <For each={rootChildren()} fallback={<EmptyFiles loading={state.loading} />}>
+                    {(file) => (
+                      <KnowledgeTreeNode
+                        file={file}
+                        files={state.files}
+                        level={0}
+                        active={state.activeTab}
+                        expanded={state.expanded}
+                        toggle={(path) =>
+                          setState("expanded", (items) =>
+                            items.includes(path) ? items.filter((item) => item !== path) : [...items, path],
+                          )
+                        }
+                        open={(item) => void openFile(item)}
+                        remove={(item) => setFileRemoval({ file: item, removing: false })}
+                        deleting={fileRemoval.removing || state.importing}
+                      />
+                    )}
+                  </For>
+                </div>
+              </Show>
             </aside>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+              onPointerDown={startLeftDrag}
+            />
+            </Show>
 
-            <section class="flex min-h-0 min-w-0 flex-col border-r border-v2-border-border-base bg-v2-background-bg-base">
+            <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-v2-background-bg-base" style={{ "min-width": `${CONTENT_MIN_WIDTH}px` }}>
               <div class="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-v2-border-border-base bg-v2-background-bg-layer-02 px-2 pt-1.5">
                 <WorkspaceTab
                   active={state.activeTab === "chat"}
@@ -1272,7 +1540,17 @@ export function CmccKnowledgeNotebookRoute() {
               </Show>
             </section>
 
-            <aside class="flex min-h-0 min-w-0 flex-col bg-v2-background-bg-layer-01 max-[1120px]:hidden">
+            <Show when={panelStore.graphOpened}>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+              onPointerDown={startRightDrag}
+            />
+            <aside
+              class="flex min-h-0 min-w-0 shrink-0 flex-col border-l border-v2-border-border-base bg-v2-background-bg-layer-01"
+              style={{ width: `${panelStore.graphWidth}px` }}
+            >
               <KnowledgeGraphPanel
                 graph={graph()}
                 mode={state.graphMode}
@@ -1285,8 +1563,12 @@ export function CmccKnowledgeNotebookRoute() {
                   void openFile({ path: node.path })
                 }}
                 clear={() => setState({ graphMode: "all", graphQuery: "", graphSelection: "" })}
+                onCollapse={() => setPanelStore("graphOpened", false)}
+                detailHeight={panelStore.graphDetailHeight}
+                onDetailDrag={startDetailDrag}
               />
             </aside>
+            </Show>
           </main>
           <Show when={fileRemoval.file} keyed>
             {(file) => (
@@ -1515,11 +1797,23 @@ function Modal(props: { title: string; close: () => void; children: import("soli
   )
 }
 
-function PanelHeader(props: { title: string; meta: string }) {
+function PanelHeader(props: { title: string; meta: string; collapsible?: boolean; onCollapse?: () => void }) {
   return (
     <div class="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-v2-border-border-base px-3">
       <h2 class="m-0 text-[13px] font-semibold leading-5 text-v2-text-text-base">{props.title}</h2>
-      <span class="text-[11px] text-v2-text-text-faint">{props.meta}</span>
+      <div class="flex items-center gap-1">
+        <span class="text-[11px] text-v2-text-text-faint">{props.meta}</span>
+        <Show when={props.collapsible && props.onCollapse}>
+          <button
+            type="button"
+            class="flex size-6 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
+            title="折叠面板"
+            onClick={() => props.onCollapse?.()}
+          >
+            <Icon name="chevron-left" class="size-3.5" />
+          </button>
+        </Show>
+      </div>
     </div>
   )
 }
@@ -1909,6 +2203,9 @@ function KnowledgeGraphPanel(props: {
   setQuery: (query: string) => void
   select: (node: KnowledgeGraphNode) => void
   clear: () => void
+  onCollapse?: () => void
+  detailHeight?: number
+  onDetailDrag?: (event: PointerEvent) => void
 }) {
   const [resetKey, setResetKey] = createSignal(0)
   const nodeMap = createMemo(() => new Map(props.graph.nodes.map((node) => [node.id, node])))
@@ -1951,7 +2248,12 @@ function KnowledgeGraphPanel(props: {
 
   return (
     <div class="flex min-h-0 flex-1 flex-col">
-      <PanelHeader title="知识图谱" meta={`${props.graph.nodes.length} 节点 · ${props.graph.edges.length} 关系`} />
+      <PanelHeader
+        title="知识图谱"
+        meta={`${props.graph.nodes.length} 节点 · ${props.graph.edges.length} 关系`}
+        collapsible={!!props.onCollapse}
+        onCollapse={props.onCollapse}
+      />
       <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-v2-border-border-base p-2">
         <GraphModeButton label="全部" active={props.mode === "all"} click={() => props.setMode("all")} />
         <GraphModeButton label="上游" active={props.mode === "upstream"} click={() => props.setMode("upstream")} />
@@ -2004,7 +2306,18 @@ function KnowledgeGraphPanel(props: {
           </div>
         </Show>
       </div>
-      <div class="h-[180px] shrink-0 overflow-y-auto border-t border-v2-border-border-base bg-v2-background-bg-layer-01 p-3">
+      <Show when={props.onDetailDrag}>
+        <div
+          role="separator"
+          aria-orientation="horizontal"
+          class="relative z-10 h-2 w-full shrink-0 cursor-row-resize bg-transparent before:absolute before:inset-x-0 before:top-1/2 before:h-px before:-translate-y-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+          onPointerDown={props.onDetailDrag}
+        />
+      </Show>
+      <div
+        class="shrink-0 overflow-y-auto border-t border-v2-border-border-base bg-v2-background-bg-layer-01 p-3"
+        style={{ height: props.detailHeight ? `${props.detailHeight}px` : "180px" }}
+      >
         <Show
           when={selected()}
           fallback={
