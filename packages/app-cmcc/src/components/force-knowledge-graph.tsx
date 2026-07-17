@@ -1,6 +1,8 @@
 import type { DataSet, Edge, Network, Node, Options } from "vis-network/standalone"
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js"
+import { createStore } from "solid-js/store"
 import type { KnowledgeGraphEdge, KnowledgeGraphNode } from "@/utils/cmcc-knowledge"
+import { Persist, persisted } from "@/utils/persist"
 
 export function ForceKnowledgeGraph(props: {
   nodes: KnowledgeGraphNode[]
@@ -14,9 +16,14 @@ export function ForceKnowledgeGraph(props: {
   const [ready, setReady] = createSignal(false)
   const [simulating, setSimulating] = createSignal(false)
   const [settings, setSettings] = createSignal(false)
-  const [nodeScale, setNodeScale] = createSignal(1.2)
-  const [linkDistance, setLinkDistance] = createSignal(70)
-  const [repulsion, setRepulsion] = createSignal(120)
+  const [preferences, setPreferences] = persisted(
+    Persist.global("knowledge-graph"),
+    createStore({
+      nodeScale: 1.2,
+      linkDistance: 70,
+      repulsion: 120,
+    }),
+  )
   let container: HTMLDivElement | undefined
   let network: Network | undefined
   let nodeData: DataSet<Node> | undefined
@@ -84,9 +91,9 @@ export function ForceKnowledgeGraph(props: {
           avoidOverlap: 0.35,
           centralGravity: 0.08,
           damping: 0.48,
-          gravitationalConstant: -repulsion(),
+          gravitationalConstant: -preferences.repulsion,
           springConstant: 0.08,
-          springLength: linkDistance(),
+          springLength: preferences.linkDistance,
         },
         maxVelocity: 48,
         minVelocity: 0.75,
@@ -106,7 +113,7 @@ export function ForceKnowledgeGraph(props: {
       id: node.id,
       label: node.degree > 0 || active || hit ? truncate(node.label, 24) : "",
       title: `${node.label}\n${node.degree} 个关联`,
-      size: (8 + Math.min(15, Math.sqrt(node.degree) * 3.2)) * nodeScale(),
+      size: (8 + Math.min(15, Math.sqrt(node.degree) * 3.2)) * preferences.nodeScale,
       color: {
         background: dimmed ? withAlpha(background, 0.2) : background,
         border: active || hit ? "#d49a35" : background,
@@ -227,13 +234,13 @@ export function ForceKnowledgeGraph(props: {
     props.selection
     props.matched
     props.query
-    nodeScale()
+    preferences.nodeScale
     if (ready()) syncGraph()
   })
 
   createEffect(
     on(
-      [linkDistance, repulsion],
+      [() => preferences.linkDistance, () => preferences.repulsion],
       () => {
         if (ready()) reheat()
       },
@@ -289,9 +296,30 @@ export function ForceKnowledgeGraph(props: {
       </div>
       <Show when={settings()}>
         <div class="absolute bottom-12 right-2 w-[210px] rounded-[9px] border border-v2-border-border-base bg-v2-background-bg-layer-01/95 p-3 shadow-lg backdrop-blur-sm">
-          <GraphRange label="节点大小" min={0.65} max={1.6} step={0.05} value={nodeScale()} input={setNodeScale} />
-          <GraphRange label="连线距离" min={35} max={180} step={5} value={linkDistance()} input={setLinkDistance} />
-          <GraphRange label="节点斥力" min={30} max={800} step={10} value={repulsion()} input={setRepulsion} />
+          <GraphRange
+            label="节点大小"
+            min={0.65}
+            max={1.6}
+            step={0.05}
+            value={preferences.nodeScale}
+            input={(value) => setPreferences("nodeScale", value)}
+          />
+          <GraphRange
+            label="连线距离"
+            min={35}
+            max={180}
+            step={5}
+            value={preferences.linkDistance}
+            input={(value) => setPreferences("linkDistance", value)}
+          />
+          <GraphRange
+            label="节点斥力"
+            min={30}
+            max={800}
+            step={10}
+            value={preferences.repulsion}
+            input={(value) => setPreferences("repulsion", value)}
+          />
         </div>
       </Show>
     </div>
