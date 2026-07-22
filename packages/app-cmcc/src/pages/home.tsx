@@ -568,7 +568,7 @@ export function NewHome() {
             onScroll={(event) => sessionHeaderOpacity.update(event.currentTarget.scrollTop)}
           >
             <Show when={groups().length > 0 && newSessionProject()}>
-              <div class="pointer-events-none absolute top-3 right-3 z-20 flex">
+              <div class="pointer-events-none absolute top-3 right-3 z-20 flex items-center gap-1">
                 <ButtonV2
                   data-action="home-new-session"
                   variant="ghost-muted"

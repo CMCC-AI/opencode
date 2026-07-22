@@ -13,6 +13,7 @@ import { Navigate, useNavigate, useParams } from "@solidjs/router"
 import { batch, createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { ArtifactPreview } from "@/components/artifact-preview"
+import { ProductIntroButton } from "@/components/dialog-product-intro"
 import { ForceKnowledgeGraph } from "@/components/force-knowledge-graph"
 import { PromptInput } from "@/components/prompt-input"
 import { buildRequestParts } from "@/components/prompt-input/build-request-parts"
@@ -237,9 +238,10 @@ export function CmccKnowledgeHomeRoute() {
   }
 
   return (
-    <div class="min-h-0 flex-1 overflow-y-auto bg-v2-background-bg-deep">
+    <div class="relative min-h-0 flex-1 overflow-y-auto bg-v2-background-bg-deep">
+      <ProductIntroButton class="absolute right-5 top-3 z-30 flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-v2-text-text-base transition-colors hover:bg-v2-background-bg-layer-02" />
       <div class="mx-auto flex w-full max-w-[1320px] flex-col gap-8 px-6 py-7">
-        <header class="flex min-w-0 flex-wrap items-end justify-between gap-5">
+        <header class="relative flex min-w-0 flex-wrap items-end justify-between gap-5">
           <div class="min-w-0">
             <div class="mb-2 flex items-center gap-2 text-[13px] leading-4 text-v2-text-text-muted">
               <Icon name="brain" class="size-4" />
@@ -250,15 +252,17 @@ export function CmccKnowledgeHomeRoute() {
               把文件、研究材料与 DeepInsight 对话组织进笔记本，在同一个工作台中阅读、追问和探索知识关系。
             </p>
           </div>
-          <button
-            type="button"
-            class="flex h-9 shrink-0 items-center gap-2 rounded-[7px] bg-v2-text-text-base px-4 text-[13px] font-medium leading-4 text-v2-background-bg-layer-01 hover:opacity-90"
-            onClick={() => setDialog("open", true)}
-            disabled={discovering()}
-          >
-            <Icon name="plus" class="size-4" />
-            新建笔记本
-          </button>
+          <div class="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              class="flex h-9 shrink-0 items-center gap-2 rounded-[7px] bg-v2-text-text-base px-4 text-[13px] font-medium leading-4 text-v2-background-bg-layer-01 hover:opacity-90"
+              onClick={() => setDialog("open", true)}
+              disabled={discovering()}
+            >
+              <Icon name="plus" class="size-4" />
+              新建笔记本
+            </button>
+          </div>
         </header>
 
         <section class="rounded-[14px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-5">
