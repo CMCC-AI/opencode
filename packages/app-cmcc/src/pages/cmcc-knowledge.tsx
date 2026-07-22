@@ -10,7 +10,7 @@ import type {
 import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router"
-import { batch, createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
+import { batch, createEffect, createMemo, createSignal, For, on, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import createNotebookCardArtwork from "@/assets/knowledge/create-notebook-card.svg"
 import createNotebookTipArtwork from "@/assets/knowledge/create-notebook-tip.svg"
@@ -798,11 +798,13 @@ export function CmccKnowledgeNotebookRoute() {
     setState("loading", false)
   }
 
-  createEffect(() => {
-    if (!client()) return
-    void loadFiles()
-    void loadSessions()
-  })
+  createEffect(
+    on(client, (current) => {
+      if (!current) return
+      void loadFiles()
+      void loadSessions()
+    }),
+  )
 
   createEffect(() => {
     const sessionID = activeSessionID()
@@ -1420,7 +1422,7 @@ export function CmccKnowledgeNotebookRoute() {
 
                         return (
                           <div
-                            class="flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+                            class="relative flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
                             data-selected={activeSessionID() === session.id ? "" : undefined}
                             onMouseEnter={() => setHovered(true)}
                             onMouseMove={() => setHovered(true)}
@@ -1432,45 +1434,46 @@ export function CmccKnowledgeNotebookRoute() {
                               setFocused(false)
                             }}
                           >
-                          <button
-                            type="button"
-                            class="flex h-full min-w-0 flex-1 items-center gap-2 px-2 text-left"
-                            onClick={() => openKnowledgeSession(session)}
-                          >
-                            <Icon
-                              name={session.metadata?.cmccKnowledgeKind === "import" ? "task" : "brain"}
-                              class="size-3.5 shrink-0"
-                            />
-                            <span class="min-w-0 flex-1 truncate">
-                              {knowledgeSessionLabel(session, activeNotebook().name)}
-                            </span>
-                            <span class="shrink-0 text-[10px] text-v2-text-text-faint">
-                              {knowledgeSessionTime(session)}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            class="relative z-10 mr-1 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed"
-                            style={{
-                              visibility: deleteVisible() ? "visible" : "hidden",
-                              opacity: deleteVisible() ? "1" : "0",
-                              "pointer-events": deleteVisible() ? "auto" : "none",
-                            }}
-                            title="删除对话"
-                            aria-label={`删除对话 ${knowledgeSessionLabel(session, activeNotebook().name)}`}
-                            disabled={state.sending || state.importing || sessionRemoval.removing}
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onPointerUp={(event) => {
-                              event.stopPropagation()
-                              activateTreePointer(event, () => setSessionRemoval({ session, removing: false }))
-                            }}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              activateTreeClick(event, () => setSessionRemoval({ session, removing: false }))
-                            }}
-                          >
-                            <Icon name="trash" class="size-3.5" />
-                          </button>
+                            <button
+                              type="button"
+                              class="flex h-full w-full min-w-0 touch-manipulation items-center gap-2 px-2 pr-9 text-left"
+                              aria-current={activeSessionID() === session.id ? "page" : undefined}
+                              onClick={() => openKnowledgeSession(session)}
+                            >
+                              <Icon
+                                name={session.metadata?.cmccKnowledgeKind === "import" ? "task" : "brain"}
+                                class="size-3.5 shrink-0"
+                              />
+                              <span class="min-w-0 flex-1 truncate">
+                                {knowledgeSessionLabel(session, activeNotebook().name)}
+                              </span>
+                              <span class="shrink-0 text-[10px] text-v2-text-text-faint">
+                                {knowledgeSessionTime(session)}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              class="absolute right-1 z-10 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed"
+                              style={{
+                                visibility: deleteVisible() ? "visible" : "hidden",
+                                opacity: deleteVisible() ? "1" : "0",
+                                "pointer-events": deleteVisible() ? "auto" : "none",
+                              }}
+                              title="删除对话"
+                              aria-label={`删除对话 ${knowledgeSessionLabel(session, activeNotebook().name)}`}
+                              disabled={state.sending || state.importing || sessionRemoval.removing}
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onPointerUp={(event) => {
+                                event.stopPropagation()
+                                activateTreePointer(event, () => setSessionRemoval({ session, removing: false }))
+                              }}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                activateTreeClick(event, () => setSessionRemoval({ session, removing: false }))
+                              }}
+                            >
+                              <Icon name="trash" class="size-3.5" />
+                            </button>
                           </div>
                         )
                       }}
