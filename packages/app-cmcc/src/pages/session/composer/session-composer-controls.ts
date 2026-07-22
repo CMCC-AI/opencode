@@ -17,6 +17,7 @@ import { useSync } from "@/context/sync"
 import { useTabs } from "@/context/tabs"
 import { useProviders } from "@/hooks/use-providers"
 import { pathKey } from "@/utils/path-key"
+import { cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
 
 export function createPromptInputController(input: {
   sessionKey: Accessor<string>
@@ -37,7 +38,10 @@ export function createPromptInputController(input: {
   return createMemo<PromptInputControls>(() => ({
     agents: {
       available: sync().data.agent,
-      options: local.agent.list().map((agent) => agent.name),
+      options: local.agent
+        .list()
+        .filter((agent) => !cmccTeamExpertByAgent(agent.name))
+        .map((agent) => agent.name),
       current: local.agent.current()?.name ?? "",
       loading: agentsQuery.isLoading,
       visible: true,

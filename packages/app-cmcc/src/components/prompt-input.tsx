@@ -75,6 +75,8 @@ import {
   type CmccProfessionalDatabase,
 } from "@/components/cmcc-professional-databases"
 import { cmccExpertCenterHref, cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
+import { CmccKnowledgePicker } from "@/components/cmcc-knowledge-picker"
+import { cmccKnowledgeNotebooks, type KnowledgeNotebook } from "@/utils/cmcc-knowledge"
 import { useNavigate } from "@solidjs/router"
 
 export type PromptInputState = ReturnType<typeof usePrompt>
@@ -358,6 +360,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const [cmccActionMenuOpen, setCmccActionMenuOpen] = createSignal(false)
   const [cmccActionMenuPosition, setCmccActionMenuPosition] = createSignal<{ left: number; top: number }>()
   const [cmccDatabaseOpen, setCmccDatabaseOpen] = createSignal(false)
+  const [cmccKnowledgeOpen, setCmccKnowledgeOpen] = createSignal(false)
   const selectedTeamExpert = createMemo(() => cmccTeamExpertByAgent(props.selectedExpertAgent))
   const buttonsSpring = useSpring(() => (store.mode === "normal" ? 1 : 0), { visualDuration: 0.2, bounce: 0 })
   const motion = (value: number) => ({
@@ -574,7 +577,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     if (!rect) return
 
     const width = 218
-    const height = 226
+    const height = newSession() ? 262 : 226
     setCmccActionMenuPosition({
       left: Math.min(Math.max(8, rect.left - 4), window.innerWidth - width - 8),
       top: Math.max(8, rect.top - height - 12),
@@ -898,6 +901,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const openProfessionalDatabases = () => {
     setCmccActionMenuOpen(false)
     setCmccDatabaseOpen(true)
+  }
+
+  const openKnowledge = () => {
+    setCmccActionMenuOpen(false)
+    setCmccKnowledgeOpen(true)
+  }
+
+  const selectKnowledge = (notebook: KnowledgeNotebook) => {
+    const text = prompt
+      .current()
+      .map((part) => ("content" in part ? part.content : ""))
+      .join("")
+      .trim()
+    const query = text ? `?prompt=${encodeURIComponent(text)}` : ""
+    setCmccKnowledgeOpen(false)
+    navigate(`/knowledge/${encodeURIComponent(notebook.id)}/session/new${query}`)
   }
 
   const openExpertCenter = () => {
@@ -1615,6 +1634,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           onTry={tryProfessionalDatabase}
         />
       </Show>
+      <Show when={cmccKnowledgeOpen()}>
+        <CmccKnowledgePicker
+          notebooks={cmccKnowledgeNotebooks()}
+          onClose={() => setCmccKnowledgeOpen(false)}
+          onManage={() => {
+            setCmccKnowledgeOpen(false)
+            navigate("/knowledge")
+          }}
+          onSelect={selectKnowledge}
+        />
+      </Show>
       <PromptPopover
         popover={store.popover}
         setSlashPopoverRef={(el) => (slashPopoverRef = el)}
@@ -1749,6 +1779,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         onExperts={openExpertCenter}
                         onSkills={openSkillCommands}
                         onPlugins={() => setPlainPrompt("请帮我推荐并使用适合当前任务的插件：")}
+                        onKnowledge={newSession() ? openKnowledge : undefined}
                         onProfessionalDatabases={openProfessionalDatabases}
                         onGoal={() => setPlainPrompt("请帮我制定一个目标，并拆解为可执行步骤：")}
                       />

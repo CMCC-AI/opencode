@@ -9,7 +9,7 @@ import type {
 } from "@opencode-ai/sdk/v2/client"
 import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { Icon } from "@opencode-ai/ui/icon"
-import { Navigate, useNavigate, useParams } from "@solidjs/router"
+import { Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { batch, createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { ArtifactPreview } from "@/components/artifact-preview"
@@ -460,6 +460,7 @@ export function CmccKnowledgeHomeRoute() {
 
 export function CmccKnowledgeNotebookRoute() {
   const params = useParams<{ id: string; sessionID?: string }>()
+  const [searchParams, setSearchParams] = useSearchParams<{ prompt?: string }>()
   const navigate = useNavigate()
   const layout = useLayout()
   const platform = usePlatform()
@@ -511,6 +512,13 @@ export function CmccKnowledgeNotebookRoute() {
     sessionKey: () => `knowledge:${params.id}`,
     sessionID: activeSessionID,
     queryOptions: serverSync().queryOptions,
+  })
+  createEffect(() => {
+    if (!composerPrompt.ready()) return
+    const text = searchParams.prompt
+    if (!text) return
+    composerPrompt.set([{ type: "text", content: text, start: 0, end: text.length }], text.length)
+    setSearchParams({ prompt: undefined }, { replace: true })
   })
   const sourceFiles = createMemo(() => (state.files ?? []).filter((item) => item.type === "file"))
   const graph = createMemo<KnowledgeGraph>(() => ({
