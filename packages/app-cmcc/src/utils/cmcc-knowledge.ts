@@ -149,6 +149,12 @@ export function cmccKnowledgeNotebookForSession(notebooks: KnowledgeNotebook[], 
   return notebooks.find((notebook) => normalizeDirectory(notebook.directory) === directory)
 }
 
+export function cmccIsKnowledgeSession(notebooks: KnowledgeNotebook[], session: KnowledgeSession) {
+  if (typeof session.metadata?.cmccKnowledgeNotebookID === "string") return true
+  if (session.metadata?.cmccKnowledgeKind === "chat" || session.metadata?.cmccKnowledgeKind === "import") return true
+  return cmccKnowledgeNotebookForSession(notebooks, session) !== undefined
+}
+
 export function cmccBuildKnowledgeGraph(files: Array<{ path: string; content: string }>): KnowledgeGraph {
   const nodes = files.map((file) => ({
     id: file.path,

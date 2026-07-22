@@ -17,6 +17,7 @@ import { ProductIntroButton } from "@/components/dialog-product-intro"
 import { ForceKnowledgeGraph } from "@/components/force-knowledge-graph"
 import { PromptInput } from "@/components/prompt-input"
 import { buildRequestParts } from "@/components/prompt-input/build-request-parts"
+import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { useLayout } from "@/context/layout"
 import { useLocal } from "@/context/local"
 import { usePlatform } from "@/context/platform"
@@ -193,17 +194,31 @@ export function CmccKnowledgeHomeRoute() {
         variant: "error",
       })
     setRemoval("removing", true)
-    await serverSDK()
-      .createClient({ directory: root, throwOnError: true })
-      .file.remove({ path: target, recursive: true }, { throwOnError: true })
-      .then(() => {
+    const client = serverSDK().createClient({ directory: notebook.directory, throwOnError: true })
+    await client.session
+      .list({ directory: notebook.directory, roots: true, limit: 10_000 }, { throwOnError: true })
+      .then(async (result) => {
+        const sessionIDs = (result.data ?? []).map((session) => session.id)
+        await Promise.all(
+          sessionIDs.map((sessionID) =>
+            client.session.delete({ sessionID, directory: notebook.directory }, { throwOnError: true }),
+          ),
+        )
+        await serverSDK()
+          .createClient({ directory: root, throwOnError: true })
+          .file.remove({ path: target, recursive: true }, { throwOnError: true })
+        return sessionIDs
+      })
+      .then((sessionIDs) => {
         const next = notebooks().filter((item) => item.id !== notebook.id)
         cmccSaveKnowledgeNotebooks(next)
         setNotebooks(next)
+        sessionIDs.forEach(sync().session.evict)
+        notifySessionTabsRemoved({ directory: notebook.directory, sessionIDs })
         setRemoval({ notebook: undefined, removing: false })
         showToast({
           title: `已删除“${notebook.name}”`,
-          description: "知识库目录及其中的全部文件已永久删除。",
+          description: "知识库目录、全部文件及关联对话已永久删除。",
           variant: "success",
         })
       })
@@ -386,7 +401,7 @@ export function CmccKnowledgeHomeRoute() {
                 确定从 DeepInsight 中删除“{notebook.name}”吗？
               </p>
               <div class="rounded-[7px] border border-red-500/35 bg-red-500/8 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
-                此操作会永久删除知识库目录、原始资料、LLM Wiki 产物和其他全部文件，删除后无法恢复。
+                此操作会永久删除知识库目录、关联对话、原始资料、LLM Wiki 产物和其他全部文件，删除后无法恢复。
               </div>
               <div class="flex justify-end gap-2">
                 <button
@@ -704,7 +719,10 @@ export function CmccKnowledgeNotebookRoute() {
     if (!current) return
     await current.session
       .messages({ sessionID, limit: 100 })
-      .then((result) => setState("messages", result.data ?? []))
+      .then((result) => {
+        if (activeSessionID() !== sessionID) return
+        setState("messages", result.data ?? [])
+      })
       .catch((error) =>
         showToast({
           title: "读取知识库对话失败",
@@ -791,6 +809,14 @@ export function CmccKnowledgeNotebookRoute() {
     void loadMessages(sessionID)
   })
 
+  createEffect(() => {
+    const sessionID = activeSessionID()
+    if (!sessionID) return
+    const updated = sync().data.session.find((session) => session.id === sessionID)
+    if (!updated) return
+    setState("sessions", (session) => session.id === sessionID, updated)
+  })
+
   const ensureSession = async () => {
     const activeNotebook = notebook()
     const current = client()
@@ -801,7 +827,6 @@ export function CmccKnowledgeNotebookRoute() {
     return current.session
       .create({
         directory: activeNotebook.directory,
-        title: `知识库 · ${activeNotebook.name} · ${formatImportTime(new Date())}`,
         metadata: { cmccKnowledgeNotebookID: activeNotebook.id, cmccKnowledgeKind: "chat" },
       })
       .then((result) => {
@@ -985,7 +1010,7 @@ export function CmccKnowledgeNotebookRoute() {
 
   const openKnowledgeSession = (session: Session) => {
     const activeNotebook = notebook()
-    if (!activeNotebook || state.sending) return
+    if (!activeNotebook || activeSessionID() === session.id) return
     saveNotebook({ ...cmccRememberKnowledgeSession(activeNotebook, session.id), lastOpenedAt: Date.now() })
     setState({ activeTab: "chat", messages: [], optimisticPrompt: "" })
     navigate(`/knowledge/${activeNotebook.id}/session/${session.id}`)

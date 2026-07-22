@@ -4,6 +4,7 @@ import {
   cmccForgetKnowledgeSession,
   cmccKnowledgeDeletedMarkerDirectory,
   cmccKnowledgeDirectory,
+  cmccIsKnowledgeSession,
   cmccKnowledgeNotebookForSession,
   cmccKnowledgeNotebooks,
   cmccRecoverKnowledgeNotebooks,
@@ -72,6 +73,22 @@ describe("cmcc knowledge", () => {
     expect(cmccKnowledgeNotebookForSession([remembered], { id: "ses_legacy", directory: "c:/knowledge/research/" })).toEqual(
       remembered,
     )
+  })
+
+  test("keeps tagged knowledge sessions classified after their notebook is deleted", () => {
+    expect(
+      cmccIsKnowledgeSession([], {
+        id: "ses_orphaned",
+        directory: "/Users/test/Documents/DeepInsight/Knowledge/deleted",
+        metadata: { cmccKnowledgeNotebookID: "deleted" },
+      }),
+    ).toBe(true)
+    expect(
+      cmccIsKnowledgeSession([], {
+        id: "ses_regular",
+        directory: "/Users/test/Documents/DeepInsight/Conversations/chat",
+      }),
+    ).toBe(false)
   })
 
   test("forgets a deleted conversation and promotes the next history item", () => {

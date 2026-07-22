@@ -33,7 +33,7 @@ import {
   cmccWorkspaceSessionPath,
 } from "@/utils/cmcc-workspace"
 import { cmccExpertCenterHref } from "@/utils/cmcc-experts"
-import { cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
+import { cmccIsKnowledgeSession, cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
 import { displayName, sortedRootSessions } from "./layout/helpers"
 
 const SIDEBAR_MIN_WIDTH = 220
@@ -126,11 +126,6 @@ function CmccTopControls() {
   }
 
   const openNewSession = async () => {
-    const notebookID = location.pathname.match(/^\/knowledge\/([^/]+)/)?.[1]
-    if (notebookID) {
-      navigate(`/knowledge/${notebookID}/session/new`)
-      return
-    }
     const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
       serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
     ).catch((error) => {
@@ -233,7 +228,7 @@ function CmccSidebar() {
           session,
         })),
       )
-      .filter((record) => !cmccKnowledgeNotebookForSession(knowledgeNotebooks(), record.session))
+      .filter((record) => !cmccIsKnowledgeSession(knowledgeNotebooks(), record.session))
       .sort((a, b) => sessionUpdatedAt(b.session) - sessionUpdatedAt(a.session))
       .slice(0, 64)
   })
@@ -323,11 +318,6 @@ function CmccSidebar() {
   onCleanup(stopDrag)
 
   const openNewSession = async () => {
-    const notebookID = location.pathname.match(/^\/knowledge\/([^/]+)/)?.[1]
-    if (notebookID) {
-      navigate(`/knowledge/${notebookID}/session/new`)
-      return
-    }
     const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
       serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
     ).catch((error) => {
