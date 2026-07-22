@@ -101,7 +101,8 @@ export function CmccKnowledgeHomeRoute() {
   const [dialog, setDialog] = createStore({ open: false, name: "", description: "", creating: false })
   const [removal, setRemoval] = createStore({ notebook: undefined as KnowledgeNotebook | undefined, removing: false })
   const [rename, setRename] = createStore({ notebook: undefined as KnowledgeNotebook | undefined, name: "" })
-  const recent = createMemo(() => notebooks().slice(0, 12))
+  const [expanded, setExpanded] = createSignal(false)
+  const displayedNotebooks = createMemo(() => (expanded() ? notebooks() : notebooks().slice(0, 11)))
   let discoveredHome = ""
 
   createEffect(() => {
@@ -271,9 +272,9 @@ export function CmccKnowledgeHomeRoute() {
         alt=""
         class="pointer-events-none absolute inset-x-0 top-0 h-[432px] w-full object-cover object-center mix-blend-multiply max-md:opacity-75 max-sm:h-[360px] max-sm:opacity-35"
       />
-      <div class="relative mx-auto flex min-h-full w-full max-w-[908px] flex-col px-6 pb-12 max-sm:px-4">
-        <header class="relative min-h-[432px] max-sm:min-h-0 max-sm:pb-16 max-sm:pt-16">
-          <div class="relative z-10 max-w-[580px] pt-[100px] max-sm:pt-0">
+      <div class="relative mx-auto flex min-h-full w-full max-w-[1320px] flex-col px-6 pb-12 max-sm:px-4">
+        <header class="relative min-h-[432px] w-full max-sm:min-h-0 max-sm:pb-16 max-sm:pt-16">
+          <div class="relative z-10 max-w-[720px] pt-[100px] max-lg:max-w-[620px] max-sm:pt-0">
             <h1 class="m-0 bg-gradient-to-r from-[#8800ff] to-[#2c5dff] bg-clip-text text-[32px] font-medium leading-10 tracking-[-0.5px] text-transparent max-sm:text-[28px]">
               DeepInsight Wiki
             </h1>
@@ -294,9 +295,18 @@ export function CmccKnowledgeHomeRoute() {
         <section class="min-w-0">
           <div class="mb-3 flex items-center gap-2 text-[#49386e]">
             <h2 class="m-0 text-[18px] font-normal leading-6">最近打开笔记</h2>
-            <span class="text-[16px] leading-6 opacity-40">更多 »</span>
+            <Show when={notebooks().length > 11}>
+              <button
+                type="button"
+                class="text-[14px] leading-6 text-[#49386e]/45 transition-colors hover:text-[#49386e]"
+                aria-expanded={expanded()}
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {expanded() ? "收起 ↑" : `展开全部 (${notebooks().length}) »`}
+              </button>
+            </Show>
           </div>
-          <div class="no-scrollbar flex min-w-0 snap-x gap-4 overflow-x-auto pb-4">
+          <div class="flex min-w-0 flex-wrap gap-4 overflow-visible pb-4">
             <button
               type="button"
               class="group relative h-40 w-[196px] shrink-0 snap-start overflow-hidden rounded-[16px] bg-transparent p-0 text-[#2a155a] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(67,66,116,0.1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff] disabled:cursor-wait disabled:opacity-60"
@@ -306,7 +316,7 @@ export function CmccKnowledgeHomeRoute() {
               <img src={createNotebookCardArtwork} alt="" class="pointer-events-none size-full object-contain" />
               <span class="sr-only">创建笔记</span>
             </button>
-            <For each={recent()}>
+            <For each={displayedNotebooks()}>
               {(notebook, index) => (
                 <NotebookCard
                   notebook={notebook}
