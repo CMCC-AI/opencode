@@ -12,6 +12,17 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { batch, createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
+import createNotebookCardArtwork from "@/assets/knowledge/create-notebook-card.svg"
+import createNotebookTipArtwork from "@/assets/knowledge/create-notebook-tip.svg"
+import featureGraphArtwork from "@/assets/knowledge/feature-graph.svg"
+import featureImportArtwork from "@/assets/knowledge/feature-import.svg"
+import featureParseArtwork from "@/assets/knowledge/feature-parse.svg"
+import featureUpdateArtwork from "@/assets/knowledge/feature-update.svg"
+import infoArtwork from "@/assets/knowledge/info.svg"
+import notebookQaArtwork from "@/assets/knowledge/notebook-qa.webp"
+import notebookSpecCardArtwork from "@/assets/knowledge/notebook-spec-card.svg"
+import uploadDropzoneArtwork from "@/assets/knowledge/upload-dropzone.svg"
+import wikiHeroArtwork from "@/assets/knowledge/wiki-hero.svg"
 import { ArtifactPreview } from "@/components/artifact-preview"
 import { ProductIntroButton } from "@/components/dialog-product-intro"
 import { ForceKnowledgeGraph } from "@/components/force-knowledge-graph"
@@ -253,73 +264,47 @@ export function CmccKnowledgeHomeRoute() {
   }
 
   return (
-    <div class="relative min-h-0 flex-1 overflow-y-auto bg-v2-background-bg-deep">
-      <ProductIntroButton class="absolute right-5 top-3 z-30 flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-v2-text-text-base transition-colors hover:bg-v2-background-bg-layer-02" />
-      <div class="mx-auto flex w-full max-w-[1320px] flex-col gap-8 px-6 py-7">
-        <header class="relative flex min-w-0 flex-wrap items-end justify-between gap-5">
-          <div class="min-w-0">
-            <div class="mb-2 flex items-center gap-2 text-[13px] leading-4 text-v2-text-text-muted">
-              <Icon name="brain" class="size-4" />
-              <span>DeepInsight Knowledge</span>
-            </div>
-            <h1 class="m-0 text-[28px] font-semibold leading-9 text-v2-text-text-base">知识库</h1>
-            <p class="m-0 mt-2 max-w-[720px] text-[14px] leading-6 text-v2-text-text-muted">
-              把文件、研究材料与 DeepInsight 对话组织进笔记本，在同一个工作台中阅读、追问和探索知识关系。
+    <div class="relative size-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent font-['PingFang_SC','Microsoft_YaHei',sans-serif] text-[#2a155a]">
+      <ProductIntroButton class="absolute right-5 top-3 z-30 flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-[#49386e] transition-colors hover:bg-white/55" />
+      <img
+        src={wikiHeroArtwork}
+        alt=""
+        class="pointer-events-none absolute inset-x-0 top-0 h-[432px] w-full object-cover object-center mix-blend-multiply max-md:opacity-75 max-sm:h-[360px] max-sm:opacity-35"
+      />
+      <div class="relative mx-auto flex min-h-full w-full max-w-[908px] flex-col px-6 pb-12 max-sm:px-4">
+        <header class="relative min-h-[432px] max-sm:min-h-0 max-sm:pb-16 max-sm:pt-16">
+          <div class="relative z-10 max-w-[580px] pt-[100px] max-sm:pt-0">
+            <h1 class="m-0 bg-gradient-to-r from-[#8800ff] to-[#2c5dff] bg-clip-text text-[32px] font-medium leading-10 tracking-[-0.5px] text-transparent max-sm:text-[28px]">
+              DeepInsight Wiki
+            </h1>
+            <h2 class="m-0 mt-2 text-[18px] font-medium leading-6 text-[#3c4055]">从原始材料到可对话的知识网络</h2>
+            <p class="m-0 mt-2 text-[16px] leading-6 text-[#585e73] max-sm:text-[14px]">
+              导入文件后，LLM Wiki 会对原始材料进行结构化摄取、语义归档与跨文件关联，并保留每一条知识的来源和上下文。
+              在此基础上，系统构建可追溯的关系图谱，让分散文档从“能被检索”升级为“能被理解、能被追问、能持续校正”的知识网络。
             </p>
-          </div>
-          <div class="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              class="flex h-9 shrink-0 items-center gap-2 rounded-[7px] bg-v2-text-text-base px-4 text-[13px] font-medium leading-4 text-v2-background-bg-layer-01 hover:opacity-90"
-              onClick={() => setDialog("open", true)}
-              disabled={discovering()}
-            >
-              <Icon name="plus" class="size-4" />
-              新建笔记本
-            </button>
+            <div class="mt-4 flex flex-wrap gap-4 max-sm:gap-2">
+              <FeatureStep artwork={featureImportArtwork} label="导入来源" />
+              <FeatureStep artwork={featureParseArtwork} label="llm-wiki 解析" />
+              <FeatureStep artwork={featureGraphArtwork} label="生成图谱" />
+              <FeatureStep artwork={featureUpdateArtwork} label="知识更新" />
+            </div>
           </div>
         </header>
 
-        <section class="rounded-[14px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-5">
-          <div class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-            <div>
-              <div class="mb-3 flex size-10 items-center justify-center rounded-[10px] bg-v2-background-bg-layer-03 text-xl">
-                ✦
-              </div>
-              <h2 class="m-0 text-[19px] font-semibold leading-7 text-v2-text-text-base">
-                从原始材料到可对话的知识网络
-              </h2>
-              <p class="m-0 mt-2 max-w-[680px] text-[13px] leading-6 text-v2-text-text-muted">
-                导入文件后会调用 llm-wiki skill 进行归档、解析和双链组织。原始文件保持可追溯，整理后的 Markdown
-                自动进入关系图谱，并成为当前笔记本对话的上下文。
-              </p>
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <FeatureStep icon="cloud-upload" label="导入来源" />
-              <FeatureStep icon="brain" label="llm-wiki 解析" />
-              <FeatureStep icon="branch" label="生成图谱" />
-            </div>
+        <section class="min-w-0">
+          <div class="mb-3 flex items-center gap-2 text-[#49386e]">
+            <h2 class="m-0 text-[18px] font-normal leading-6">最近打开笔记</h2>
+            <span class="text-[16px] leading-6 opacity-40">更多 »</span>
           </div>
-        </section>
-
-        <section class="flex min-w-0 flex-col gap-4">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h2 class="m-0 text-[18px] font-semibold leading-6 text-v2-text-text-base">最近打开的笔记本</h2>
-              <p class="m-0 mt-1 text-[12px] leading-4 text-v2-text-text-faint">{notebooks().length} 个笔记本</p>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div class="no-scrollbar flex min-w-0 snap-x gap-4 overflow-x-auto pb-4">
             <button
               type="button"
-              class="group flex min-h-[178px] flex-col items-center justify-center rounded-[12px] border border-dashed border-v2-border-border-strong bg-v2-background-bg-layer-01 text-v2-text-text-muted hover:bg-v2-background-bg-layer-02 hover:text-v2-text-text-base disabled:cursor-wait disabled:opacity-60"
+              class="group relative h-40 w-[196px] shrink-0 snap-start overflow-hidden rounded-[16px] bg-transparent p-0 text-[#2a155a] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(67,66,116,0.1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff] disabled:cursor-wait disabled:opacity-60"
               onClick={() => setDialog("open", true)}
               disabled={discovering()}
             >
-              <span class="mb-3 flex size-11 items-center justify-center rounded-full bg-v2-background-bg-layer-03">
-                <Icon name="plus" class="size-5" />
-              </span>
-              <span class="text-[14px] font-medium">新建笔记本</span>
+              <img src={createNotebookCardArtwork} alt="" class="pointer-events-none size-full object-contain" />
+              <span class="sr-only">创建笔记</span>
             </button>
             <For each={recent()}>
               {(notebook, index) => (
@@ -337,58 +322,83 @@ export function CmccKnowledgeHomeRoute() {
         </section>
 
         <Show when={discovering()}>
-          <div class="flex items-center gap-2 text-[12px] text-v2-text-text-muted">
+          <div class="mt-4 flex items-center gap-2 text-[12px] text-[#7f8290]">
             <span class="size-3 animate-spin rounded-full border border-current border-r-transparent" />
             正在扫描磁盘中的知识库目录...
           </div>
         </Show>
 
         <Show when={!discovering() && notebooks().length === 0}>
-          <div class="rounded-[12px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-5 py-4 text-[13px] leading-6 text-v2-text-text-muted">
+          <div class="mt-4 rounded-xl bg-[#f7f7ff] px-5 py-4 text-[13px] leading-6 text-[#7f8290]">
             还没有笔记本。创建后会先生成一个空白目录，你可以上传文件、拖入材料或导入整个目录。
           </div>
         </Show>
       </div>
 
       <Show when={dialog.open}>
-        <Modal title="新建笔记本" close={() => !dialog.creating && setDialog("open", false)}>
-          <div class="flex flex-col gap-4">
-            <label class="flex flex-col gap-1.5">
-              <span class="text-[12px] leading-4 text-v2-text-text-muted">名称</span>
-              <input
-                autofocus
-                class="h-10 rounded-[7px] border border-v2-border-border-base bg-v2-background-bg-layer-02 px-3 text-[14px] text-v2-text-text-base outline-none placeholder:text-v2-text-text-faint focus:border-v2-border-border-active"
-                placeholder="例如：跨境数据合规研究"
-                value={dialog.name}
-                onInput={(event) => setDialog("name", event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void createNotebook()
-                }}
-              />
-            </label>
-            <label class="flex flex-col gap-1.5">
-              <span class="text-[12px] leading-4 text-v2-text-text-muted">说明（可选）</span>
-              <textarea
-                class="min-h-[88px] resize-none rounded-[7px] border border-v2-border-border-base bg-v2-background-bg-layer-02 px-3 py-2 text-[13px] leading-5 text-v2-text-text-base outline-none placeholder:text-v2-text-text-faint focus:border-v2-border-border-active"
-                placeholder="这个笔记本要解决什么问题？"
-                value={dialog.description}
-                onInput={(event) => setDialog("description", event.currentTarget.value)}
-              />
-            </label>
-            <div class="rounded-[7px] border border-v2-border-border-base bg-v2-background-bg-layer-02 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
-              将在当前 DeepInsight 主目录下创建独立的知识库目录，原始材料与 llmwiki 产物都保存在其中。
+        <Modal title="创建笔记本" large close={() => !dialog.creating && setDialog("open", false)}>
+          <div class="flex min-h-0 flex-1 flex-col">
+            <div class="mx-auto flex w-full max-w-[648px] flex-1 flex-col gap-5 overflow-y-auto px-6 pb-6 pt-8 max-sm:pt-6">
+              <label class="flex flex-col gap-2.5">
+                <span class="text-[14px] leading-5 text-[#202231]">名称：</span>
+                <input
+                  autofocus
+                  class="h-12 rounded-lg border border-[#edf0f7] bg-[#f9fbfe] px-6 text-[14px] text-[#202231] outline-none placeholder:text-[#747da8] focus:border-[#8d77fd]"
+                  placeholder="例如：跨境数据合规研究"
+                  value={dialog.name}
+                  onInput={(event) => setDialog("name", event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void createNotebook()
+                  }}
+                />
+              </label>
+              <label class="flex flex-col gap-2.5">
+                <span class="text-[14px] leading-5 text-[#202231]">说明(可选)：</span>
+                <textarea
+                  class="h-[110px] resize-none rounded-lg border border-[#edf0f7] bg-[#f9fbfe] px-6 py-4 text-[14px] leading-5 text-[#202231] outline-none placeholder:text-[#747da8] focus:border-[#8d77fd]"
+                  placeholder="这个笔记本要解决什么问题？"
+                  value={dialog.description}
+                  onInput={(event) => setDialog("description", event.currentTarget.value)}
+                />
+              </label>
+              <div class="relative h-[118px] w-full max-w-[600px] shrink-0 overflow-hidden rounded-[8px] bg-[#f1f5fc] px-6 py-5 text-[14px] leading-6 text-[#6e749f]">
+                <img
+                  src={createNotebookTipArtwork}
+                  alt=""
+                  class="pointer-events-none absolute inset-0 size-full object-cover"
+                />
+                <div class="relative max-w-[552px]">
+                  <div class="flex items-center gap-1 font-semibold">
+                    <img src={infoArtwork} alt="" class="size-4 shrink-0" />
+                    提示：
+                  </div>
+                  <p class="m-0 mt-1">
+                    将在当前 DeepInsight 主目录下创建独立的知识库目录，原始材料与 llmwiki 产物都保存在其中。
+                  </p>
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              class="flex h-10 items-center justify-center gap-2 rounded-[7px] bg-v2-text-text-base px-4 text-[13px] font-medium text-v2-background-bg-layer-01 disabled:opacity-50"
-              disabled={dialog.creating || !dialog.name.trim()}
-              onClick={() => void createNotebook()}
-            >
-              <Show when={dialog.creating} fallback={<Icon name="plus" class="size-4" />}>
-                <span class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-              </Show>
-              {dialog.creating ? "正在创建..." : "创建笔记本"}
-            </button>
+            <footer class="flex h-16 shrink-0 items-center justify-end gap-3 border-t border-black/5 px-6 shadow-[0_-4px_6px_rgba(0,0,0,0.04)]">
+              <button
+                type="button"
+                class="h-9 rounded-lg border border-[#2c5dff] px-4 text-[14px] text-[#2c5dff] hover:bg-[#f4f6ff] disabled:opacity-50"
+                disabled={dialog.creating}
+                onClick={() => setDialog("open", false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                class="flex h-9 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(115deg,#8d77fd_0%,#2c5dff_100%)] px-4 text-[14px] font-medium text-white disabled:opacity-50"
+                disabled={dialog.creating || !dialog.name.trim()}
+                onClick={() => void createNotebook()}
+              >
+                <Show when={dialog.creating}>
+                  <span class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+                </Show>
+                {dialog.creating ? "正在创建..." : "创建任务笔记本"}
+              </button>
+            </footer>
           </div>
         </Modal>
       </Show>
@@ -1223,9 +1233,9 @@ export function CmccKnowledgeNotebookRoute() {
   return (
     <Show when={notebook()} fallback={<Navigate href="/knowledge" />}>
       {(activeNotebook) => (
-        <div class="flex size-full min-h-0 min-w-0 flex-col bg-v2-background-bg-deep">
+        <div class="flex size-full min-h-0 min-w-0 flex-col bg-transparent">
           <header
-            class="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 transition-[padding-left] duration-200 motion-reduce:transition-none"
+            class="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-v2-border-border-base bg-transparent px-3 transition-[padding-left] duration-200 motion-reduce:transition-none"
             style={{ "padding-left": layout.sidebar.opened() ? "12px" : "164px" }}
           >
             <div class="flex min-w-0 items-center gap-2">
@@ -1294,7 +1304,7 @@ export function CmccKnowledgeNotebookRoute() {
           <main class="flex min-h-0 min-w-0 flex-1 overflow-hidden">
             <Show when={panelStore.sidebarOpened}>
             <aside
-              class="flex min-h-0 min-w-0 shrink-0 flex-col border-r border-v2-border-border-base bg-v2-background-bg-layer-01"
+              class="flex min-h-0 min-w-0 shrink-0 flex-col border-r border-v2-border-border-base bg-transparent"
               style={{ width: `${panelStore.sidebarWidth}px` }}
             >
               <PanelHeader
@@ -1303,9 +1313,9 @@ export function CmccKnowledgeNotebookRoute() {
                 collapsible
                 onCollapse={() => setPanelStore("sidebarOpened", false)}
               />
-              <div class="flex shrink-0 flex-col gap-2 border-b border-v2-border-border-base p-3">
+              <div class="flex shrink-0 flex-col items-center gap-2 border-b border-v2-border-border-base px-[5px] py-3">
                 <div
-                  class="flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-[8px] border border-dashed border-v2-border-border-strong bg-v2-background-bg-layer-02 px-3 py-3 text-center data-[active]:border-v2-border-border-active data-[active]:bg-v2-background-bg-layer-03"
+                  class="relative flex h-[125px] w-[250px] shrink-0 flex-col items-center gap-1.5 overflow-hidden rounded-[8px] px-3 pb-2 pt-[54px] text-center data-[active]:ring-2 data-[active]:ring-[#0057ff]/25"
                   data-active={state.dropActive ? "" : undefined}
                   onDragOver={(event) => {
                     event.preventDefault()
@@ -1318,11 +1328,11 @@ export function CmccKnowledgeNotebookRoute() {
                     void importFiles([...(event.dataTransfer?.files ?? [])])
                   }}
                 >
-                  <Icon name="cloud-upload" class="size-5 text-v2-icon-icon-muted" />
-                  <div class="text-[12px] leading-4 text-v2-text-text-muted">
+                  <img src={uploadDropzoneArtwork} alt="" class="pointer-events-none absolute inset-0 size-full object-fill" />
+                  <div class="relative text-[12px] leading-4 text-v2-text-text-muted">
                     {state.importing ? "资料正在分阶段入库..." : "拖拽文件到这里"}
                   </div>
-                  <div class="flex flex-wrap justify-center gap-1.5">
+                  <div class="relative flex flex-wrap justify-center gap-1.5">
                     <button
                       type="button"
                       class="h-7 rounded-[6px] bg-v2-text-text-base px-2.5 text-[11px] font-medium text-v2-background-bg-layer-01 disabled:opacity-50"
@@ -1526,8 +1536,8 @@ export function CmccKnowledgeNotebookRoute() {
             />
             </Show>
 
-            <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-v2-background-bg-base" style={{ "min-width": `${CONTENT_MIN_WIDTH}px` }}>
-              <div class="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-v2-border-border-base bg-v2-background-bg-layer-02 px-2 pt-1.5">
+            <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent" style={{ "min-width": `${CONTENT_MIN_WIDTH}px` }}>
+              <div class="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-v2-border-border-base bg-transparent px-2 pt-1.5">
                 <WorkspaceTab
                   active={state.activeTab === "chat"}
                   label="DeepInsight 对话"
@@ -1585,7 +1595,7 @@ export function CmccKnowledgeNotebookRoute() {
               onPointerDown={startRightDrag}
             />
             <aside
-              class="flex min-h-0 min-w-0 shrink-0 flex-col border-l border-v2-border-border-base bg-v2-background-bg-layer-01"
+              class="flex min-h-0 min-w-0 shrink-0 flex-col border-l border-v2-border-border-base bg-transparent"
               style={{ width: `${panelStore.graphWidth}px` }}
             >
               <KnowledgeGraphPanel
@@ -1693,13 +1703,13 @@ function NotebookCard(props: {
   let menuElement: HTMLDivElement | undefined
   const gradient = () => {
     const colors = [
-      ["#244c48", "#172f33"],
-      ["#4b3d58", "#2b283a"],
-      ["#4a4632", "#2f3027"],
-      ["#36495c", "#252f3a"],
-      ["#563a3d", "#33282c"],
+      ["#e4eaff", "#f4f1ff", "#2a155a"],
+      ["#ddf8fb", "#f1f7ff", "#0c4852"],
+      ["#e5efff", "#f7f3ff", "#273e6f"],
+      ["#f0e8ff", "#f5f5ff", "#513467"],
+      ["#dcf4ff", "#edf0ff", "#1f4567"],
     ][props.index % 5]
-    return `linear-gradient(145deg, ${colors[0]}, ${colors[1]})`
+    return { background: `linear-gradient(163deg, ${colors[0]} 3%, ${colors[1]} 62%)`, color: colors[2] }
   }
 
   createEffect(() => {
@@ -1714,34 +1724,48 @@ function NotebookCard(props: {
 
   return (
     <article
-      class="group relative flex min-h-[178px] min-w-0 flex-col rounded-[12px] border border-v2-border-border-base text-left shadow-[var(--v2-elevation-flat)] transition-transform hover:-translate-y-0.5 hover:border-v2-border-border-strong"
+      class="group relative h-40 w-[196px] shrink-0 snap-start rounded-[16px] text-left transition-transform hover:-translate-y-0.5"
       classList={{ "z-30": menuOpen() }}
     >
       <button
         type="button"
-        class="flex min-h-0 flex-1 flex-col justify-between rounded-t-[11px] p-4 text-left text-white"
-        style={{ background: gradient() }}
+        class="relative flex size-full min-w-0 flex-col overflow-hidden rounded-[16px] p-4 pb-9 text-left shadow-[0_8px_24px_rgba(67,66,116,0.06)] transition-shadow group-hover:shadow-[0_12px_28px_rgba(67,66,116,0.12)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff]"
+        style={gradient()}
         onClick={props.open}
       >
-        <div class="flex items-start gap-2 text-3xl">
-          <span>{props.notebook.emoji}</span>
+        <Show when={props.index % 2 === 0}>
+          <img src={notebookSpecCardArtwork} alt="" class="pointer-events-none absolute inset-0 size-full object-contain" />
+        </Show>
+        <Show when={props.index % 2 !== 0}>
+          <img
+            src={notebookQaArtwork}
+            alt=""
+            class="pointer-events-none absolute inset-x-0 top-[57px] h-[82px] w-full object-cover opacity-95 transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        </Show>
+        <span class="absolute inset-x-0 top-0 h-[57px]" style={gradient()} />
+        <div class="relative z-10 flex min-w-0 items-start gap-2 pr-4">
+          <div class="min-w-0">
+            <h3 class="m-0 truncate text-[16px] font-medium leading-5">{props.notebook.name}</h3>
+            <p class="m-0 mt-1 line-clamp-1 text-[11px] leading-4 opacity-60">
+              {props.notebook.description || "可对话的个人知识空间"}
+            </p>
+          </div>
           <Show when={props.notebook.pinned}>
-            <span class="text-[14px] leading-5" title="已置顶">
+            <span class="shrink-0 text-[12px] leading-5" title="已置顶">
               📌
             </span>
           </Show>
         </div>
-        <div class="min-w-0">
-          <h3 class="m-0 line-clamp-2 text-[16px] font-semibold leading-6">{props.notebook.name}</h3>
-          <p class="m-0 mt-1 line-clamp-2 text-[11px] leading-4 text-white/65">
-            {props.notebook.description || "可对话的个人知识空间"}
-          </p>
-        </div>
+        <span class="absolute inset-x-0 bottom-0 h-[29px] bg-white/80" />
+        <span class="absolute inset-x-4 bottom-1 truncate text-[12px] leading-5 text-[#49386e]">
+          最近打开于 {formatDate(props.notebook.lastOpenedAt)} · {props.notebook.sourceCount ?? 0} 个来源
+        </span>
       </button>
       <div ref={menuElement} class="absolute right-2.5 top-2.5 z-20">
         <button
           type="button"
-          class="flex size-8 items-center justify-center rounded-[7px] text-[22px] leading-none text-white/75 hover:bg-black/20 hover:text-white"
+          class="flex size-7 items-center justify-center rounded-lg text-[20px] leading-none text-[#49386e]/35 opacity-0 transition-opacity hover:bg-white/55 hover:text-[#49386e] group-hover:opacity-100 focus:opacity-100"
           aria-label={`更多${props.notebook.name}`}
           aria-expanded={menuOpen()}
           onClick={(event) => {
@@ -1752,7 +1776,7 @@ function NotebookCard(props: {
           ⋮
         </button>
         <Show when={menuOpen()}>
-          <div class="absolute right-0 top-9 flex w-[148px] flex-col gap-1 rounded-[9px] border border-v2-border-border-base bg-v2-background-bg-layer-02 p-1.5 text-v2-text-text-base shadow-[0_14px_40px_rgba(0,0,0,0.28)]">
+          <div class="absolute right-0 top-8 flex w-[148px] flex-col gap-1 rounded-xl border border-[#e5e1f1] bg-[#ffffff] p-1.5 text-[#2a155a] shadow-[0_14px_40px_rgba(57,44,94,0.18)]">
             <NotebookMenuItem
               icon={<Icon name="trash" class="size-4" />}
               label="删除"
@@ -1780,11 +1804,6 @@ function NotebookCard(props: {
           </div>
         </Show>
       </div>
-      <div class="flex h-10 shrink-0 items-center gap-2 rounded-b-[11px] bg-v2-background-bg-layer-01 px-3 text-[11px] text-v2-text-text-faint">
-        <button type="button" class="min-w-0 flex-1 truncate text-left" onClick={props.open}>
-          最近打开于 {formatDate(props.notebook.lastOpenedAt)} · {props.notebook.sourceCount ?? 0} 个来源
-        </button>
-      </div>
     </article>
   )
 }
@@ -1802,24 +1821,28 @@ function NotebookMenuItem(props: { icon: JSX.Element; label: string; action: () 
   )
 }
 
-function FeatureStep(props: { icon: Parameters<typeof Icon>[0]["name"]; label: string }) {
+function FeatureStep(props: { artwork: string; label: string }) {
   return (
-    <div class="flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-[9px] bg-v2-background-bg-layer-02 px-2 text-center text-[12px] text-v2-text-text-muted">
-      <Icon name={props.icon} class="size-5 text-v2-icon-icon-base" />
-      <span>{props.label}</span>
-    </div>
+    <img src={props.artwork} alt={props.label} class="h-10 w-auto shrink-0 max-sm:h-9" />
   )
 }
 
-function Modal(props: { title: string; close: () => void; children: import("solid-js").JSX.Element }) {
+function Modal(props: { title: string; close: () => void; children: import("solid-js").JSX.Element; large?: boolean }) {
   return (
     <div class="fixed inset-0 z-[220] flex items-center justify-center bg-black/55 px-4 py-6" onClick={props.close}>
       <section
-        class="w-full max-w-[480px] rounded-[12px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.34)]"
+        class="flex w-full flex-col rounded-[12px] border border-v2-border-border-base bg-v2-background-bg-layer-01 shadow-[0_24px_80px_rgba(0,0,0,0.34)]"
+        classList={{
+          "h-[600px] max-h-[calc(100vh-48px)] max-w-[800px] overflow-hidden": props.large,
+          "max-w-[480px] p-5": !props.large,
+        }}
         onClick={(event) => event.stopPropagation()}
       >
-        <header class="mb-5 flex items-center justify-between gap-3">
-          <h2 class="m-0 text-[18px] font-semibold leading-6 text-v2-text-text-base">{props.title}</h2>
+        <header
+          class="flex shrink-0 items-center justify-between gap-3"
+          classList={{ "h-16 border-b border-[#edf0f7] px-5": props.large, "mb-5": !props.large }}
+        >
+          <h2 class="m-0 text-[16px] font-semibold leading-6 text-v2-text-text-base">{props.title}</h2>
           <button
             type="button"
             class="flex size-8 items-center justify-center rounded-[6px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
@@ -2141,7 +2164,7 @@ function ChatWorkspace(props: {
           </div>
         </Show>
       </div>
-      <div class="shrink-0 border-t border-v2-border-border-base bg-v2-background-bg-layer-01 p-3">
+      <div class="shrink-0 border-t border-v2-border-border-base bg-transparent p-3">
         <Show when={props.importing}>
           <div class="mx-auto mb-2 max-w-[780px] rounded-[8px] border border-v2-border-border-base bg-v2-background-bg-layer-02 px-3 py-2 text-[11px] leading-5 text-v2-text-text-muted">
             资料入库期间暂时锁定对话，避免重复调用 skill 或读取到不完整索引。{props.importMessage}
@@ -2316,7 +2339,7 @@ function KnowledgeGraphPanel(props: {
           <Icon name="reset" class="size-3.5" />
         </button>
       </div>
-      <div class="relative min-h-[280px] flex-1 overflow-hidden bg-v2-background-bg-deep">
+      <div class="relative min-h-[280px] flex-1 overflow-hidden bg-transparent">
         <Show
           when={props.graph.nodes.length > 0}
           fallback={
@@ -2352,7 +2375,7 @@ function KnowledgeGraphPanel(props: {
         />
       </Show>
       <div
-        class="shrink-0 overflow-y-auto border-t border-v2-border-border-base bg-v2-background-bg-layer-01 p-3"
+        class="shrink-0 overflow-y-auto border-t border-v2-border-border-base bg-transparent p-3"
         style={{ height: props.detailHeight ? `${props.detailHeight}px` : "180px" }}
       >
         <Show

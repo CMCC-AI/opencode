@@ -36,7 +36,7 @@ import { cmccExpertCenterHref } from "@/utils/cmcc-experts"
 import { cmccIsKnowledgeSession, cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
 import { displayName, sortedRootSessions } from "./layout/helpers"
 
-const SIDEBAR_MIN_WIDTH = 220
+const SIDEBAR_MIN_WIDTH = 280
 const SIDEBAR_MAX_WIDTH = 420
 const SIDEBAR_MAIN_MIN_WIDTH = 560
 const SIDEBAR_HIDE_THRESHOLD = 88
@@ -72,8 +72,39 @@ export default function NewLayout(props: ParentProps) {
       <CmccTopControls />
       <main class="flex-1 min-h-0 min-w-0 overflow-hidden flex items-stretch contain-strict">
         <CmccSidebar />
-        <section class="min-w-0 min-h-0 flex-1 flex flex-col">
-          <Suspense>{props.children}</Suspense>
+        <section class="relative min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden bg-white">
+          <svg
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-0 size-full"
+            viewBox="0 0 1160 900"
+            fill="none"
+            preserveAspectRatio="none"
+          >
+            <rect width="1160" height="900" fill="white" />
+            <g opacity="0.1" filter="url(#cmcc-content-yellow-glow)">
+              <ellipse cx="982.5" cy="174" rx="180.5" ry="180" fill="#fdffa3" />
+            </g>
+            <g opacity="0.2" filter="url(#cmcc-content-blue-glow)">
+              <circle cx="1002.27" cy="745.205" r="197.838" fill="#a3d4ff" />
+            </g>
+            <g opacity="0.1" filter="url(#cmcc-content-pink-glow)">
+              <circle cx="166.187" cy="204.128" r="198.043" fill="#e689dd" />
+            </g>
+            <defs>
+              <filter id="cmcc-content-yellow-glow" x="502" y="-306" width="961" height="960" filterUnits="userSpaceOnUse">
+                <feGaussianBlur stdDeviation="150" />
+              </filter>
+              <filter id="cmcc-content-blue-glow" x="504.43" y="247.367" width="995.675" height="995.676" filterUnits="userSpaceOnUse">
+                <feGaussianBlur stdDeviation="150" />
+              </filter>
+              <filter id="cmcc-content-pink-glow" x="-411.856" y="-373.914" width="1156.09" height="1156.09" filterUnits="userSpaceOnUse">
+                <feGaussianBlur stdDeviation="190" />
+              </filter>
+            </defs>
+          </svg>
+          <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+            <Suspense>{props.children}</Suspense>
+          </div>
         </section>
       </main>
       {import.meta.env.DEV && <DebugBar inline />}
@@ -445,7 +476,7 @@ function CmccSidebar() {
         aria-label="CMCC conversations"
         aria-hidden={!visible()}
         inert={!visible()}
-        class="h-full shrink-0 overflow-hidden border-r border-v2-border-border-base bg-v2-background-bg-layer-01"
+        class="h-full shrink-0 overflow-hidden border-r border-v2-border-border-base bg-[linear-gradient(180deg,#d9e9ff_0%,#eae6ff_100%)]"
         classList={{
           "transition-[width] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none":
             !drag.active,
