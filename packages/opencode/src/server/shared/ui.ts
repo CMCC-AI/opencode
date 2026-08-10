@@ -15,7 +15,7 @@ const CMCC_EXPERT_FRAME_SOURCES = [
 ].join(" ")
 
 export const csp = (hash = "") =>
-  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; frame-src 'self' ${CMCC_EXPERT_FRAME_SOURCES}; connect-src * data:`
+  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; media-src 'self' data:; frame-src 'self' ${CMCC_EXPERT_FRAME_SOURCES}; connect-src * data: blob:`
 export const DEFAULT_CSP = csp()
 
 export function themePreloadHash(body: string) {

@@ -62,7 +62,6 @@ import { ServerRowMenu } from "@/components/server/server-row-menu"
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
 import { Persist, persisted } from "@/utils/persist"
-import { useMarked } from "@opencode-ai/ui/context/marked"
 import { preloadMarkdown } from "@opencode-ai/session-ui/markdown-cache"
 import { archiveHomeSession } from "./home-session-archive"
 import { showToast } from "@/utils/toast"
@@ -251,7 +250,6 @@ export function NewHome() {
   const tabs = useTabs()
   const command = useCommand()
   const notification = useNotification()
-  const marked = useMarked()
   const openSettings = useSettingsCommand()
   let focusSessionSearch: (() => void) | undefined
   const [state, setState] = createStore({
@@ -350,7 +348,7 @@ export function NewHome() {
                   (ctx.sync.session.data.message[record.session.id] ?? []).flatMap((message) =>
                     (ctx.sync.session.data.part[message.id] ?? []).flatMap((part) => {
                       if (part.type !== "text" || !part.text) return []
-                      return preloadMarkdown(part.text, part.id, marked)
+                      return preloadMarkdown(part.text, part.id)
                     }),
                   ),
                 )

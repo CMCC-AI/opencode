@@ -326,7 +326,7 @@ describe("HttpApi UI fallback", () => {
     }),
   )
 
-  it.live("allows embedded UI terminal wasm and theme preload CSP", () =>
+  it.live("allows embedded UI terminal wasm, blob attachments, and theme preload CSP", () =>
     Effect.gen(function* () {
       const script = 'document.documentElement.dataset.theme = "dark"'
 
@@ -354,7 +354,8 @@ describe("HttpApi UI fallback", () => {
       expect(csp).toContain(
         "frame-src 'self' http://152.136.106.161:3001 http://81.70.174.140:8083 http://81.70.174.140:8888",
       )
-      expect(csp).toContain("connect-src * data:")
+      expect(csp).toContain("img-src 'self' data: https: blob:")
+      expect(csp).toContain("connect-src * data: blob:")
     }),
   )
 

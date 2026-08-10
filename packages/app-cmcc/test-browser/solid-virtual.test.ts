@@ -27,7 +27,7 @@ test("reactive count updates preserve measured row sizes", () => {
   })
 })
 
-test("logical scroll offset includes pending measurement adjustments", () => {
+test("scroll offset includes measurement adjustments", () => {
   createRoot((dispose) => {
     const virtualizer = createVirtualizer<HTMLDivElement, HTMLDivElement>({
       count: 2,
@@ -37,11 +37,10 @@ test("logical scroll offset includes pending measurement adjustments", () => {
       initialRect: { width: 800, height: 60 },
     })
 
+    expect(virtualizer.scrollOffset).toBe(100)
     virtualizer.getTotalSize()
     virtualizer.resizeItem(0, 100)
-
-    expect(virtualizer.scrollOffset).toBe(100)
-    expect(virtualizer.getLogicalScrollOffset()).toBe(140)
+    expect(virtualizer.scrollOffset).toBe(140)
     dispose()
   })
 })
