@@ -10,7 +10,6 @@ import { HelpButton } from "@/components/help-button"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { useDirectoryPicker } from "@/components/directory-picker"
 import { useSettingsCommand } from "@/components/settings-dialog"
-import { useCommand } from "@/context/command"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
@@ -32,7 +31,6 @@ import {
   cmccWorkspaceRoot,
   cmccWorkspaceSessionPath,
 } from "@/utils/cmcc-workspace"
-import { cmccExpertCenterHref } from "@/utils/cmcc-experts"
 import { cmccIsKnowledgeSession, cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
 import { displayName, sortedRootSessions } from "./layout/helpers"
 
@@ -213,7 +211,6 @@ function CmccTopControls() {
 }
 
 function CmccSidebar() {
-  const command = useCommand()
   const layout = useLayout()
   const location = useLocation()
   const navigate = useNavigate()
@@ -365,6 +362,13 @@ function CmccSidebar() {
     tabs.newDraft({ server: server.key, directory: dir })
   }
 
+  const openPendingProduct = (name: string) => {
+    showToast({
+      title: `${name} 待接入`,
+      description: "当前版本还没有配置对应的应用地址。",
+    })
+  }
+
   const openProject = (directory: string) => {
     server.projects.open(directory)
     layout.projects.open(directory)
@@ -487,24 +491,37 @@ function CmccSidebar() {
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4 pt-12">
             <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
-            <CmccSidebarAction icon="magnifying-glass" label="搜索" onClick={() => command.show()} />
-            <CmccExpertGroup
-              activePath={location.pathname}
-              open={(href) => navigate(href)}
+            <CmccSidebarAction
+              icon="glasses"
+              label="深度研究"
+              active={location.pathname === "/expert/chat"}
+              onClick={() => navigate("/expert/chat")}
+            />
+            <CmccSidebarAction
+              icon="mcp"
+              label="产业洞察"
+              active={
+                location.pathname === "/expert" ||
+                (location.pathname.startsWith("/expert/") &&
+                  location.pathname !== "/expert/chat" &&
+                  location.pathname !== "/expert/workspace")
+              }
+              onClick={() => navigate("/expert")}
             />
             <CmccSidebarAction
               icon="brain"
-              label="知识库"
+              label="AI Wiki"
               active={location.pathname === "/knowledge" || location.pathname.startsWith("/knowledge/")}
               onClick={() => navigate("/knowledge")}
             />
-            <CmccSidebarAction icon="task" label="已安排" />
             <CmccSidebarAction
-              icon="mcp"
-              label="插件"
-              active={location.pathname === "/plugins"}
-              onClick={() => navigate("/plugins")}
+              icon="branch"
+              label="DeepTrack 行业追踪"
+              active={location.pathname === "/expert/workspace"}
+              onClick={() => navigate("/expert/workspace")}
             />
+            <CmccSidebarAction icon="review" label="DeepXiv 前沿论文" onClick={() => openPendingProduct("DeepXiv 前沿论文")} />
+            <CmccSidebarAction icon="photo" label="DeepLens 拍照即懂" onClick={() => openPendingProduct("DeepLens 拍照即懂")} />
           </nav>
           <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
             <CmccSidebarSection label="项目" actionLabel="添加项目" action={addProject} actionIcon="folder-add-left" />
@@ -814,25 +831,5 @@ function CmccSessionRow(props: {
         <ContextMenu.Content>{contextMenuItems()}</ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu>
-  )
-}
-
-function CmccExpertGroup(props: {
-  activePath: string
-  open: (href: string) => void
-}) {
-  const href = cmccExpertCenterHref()
-  const active = () => props.activePath === href || props.activePath.startsWith(`${href}/`)
-
-  return (
-    <button
-      type="button"
-      class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
-      data-selected={active() ? "" : undefined}
-      onClick={() => props.open(href)}
-    >
-      <Icon name="mcp" class="size-4 shrink-0" />
-      <span class="min-w-0 truncate">专家团</span>
-    </button>
   )
 }
