@@ -60,6 +60,11 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
 
 const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
 const INDUSTRY_EXPERTS = CMCC_EXPERTS.filter((expert) => expert.id !== "chat" && expert.id !== "workspace")
+const EXPERT_AVATARS = import.meta.glob("../../../../.opencode/experts/*/avatars/*.png", {
+  eager: true,
+  import: "default",
+  query: "?url",
+}) as Record<string, string>
 
 export function CmccExpertCenterRoute() {
   const navigate = useNavigate()
@@ -436,12 +441,26 @@ function TagList(props: { tags: readonly string[]; compact?: boolean }) {
 }
 
 function MemberCard(props: { member: TeamMember }) {
+  const avatar = createMemo(() => memberAvatar(props.member))
+
   return (
     <div class="min-w-0 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-3">
       <div class="flex min-w-0 items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="truncate text-[14px] font-medium leading-5 text-v2-text-text-base">{props.member.name}</div>
-          <div class="truncate text-[12px] leading-4 text-v2-text-text-muted">{props.member.profession}</div>
+        <div class="flex min-w-0 items-center gap-3">
+          <Show
+            when={avatar()}
+            fallback={
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-v2-background-bg-layer-03 text-[13px] font-semibold text-v2-text-text-base">
+                {props.member.name.slice(0, 1)}
+              </div>
+            }
+          >
+            {(source) => <img src={source()} alt="" class="size-10 shrink-0 rounded-full object-cover" />}
+          </Show>
+          <div class="min-w-0">
+            <div class="truncate text-[14px] font-medium leading-5 text-v2-text-text-base">{props.member.name}</div>
+            <div class="truncate text-[12px] leading-4 text-v2-text-text-muted">{props.member.profession}</div>
+          </div>
         </div>
         <Show when={props.member.role === "lead"}>
           <span class="rounded-[4px] bg-v2-background-bg-layer-03 px-2 py-1 text-[11px] leading-3 text-v2-text-text-muted">
@@ -455,15 +474,30 @@ function MemberCard(props: { member: TeamMember }) {
 }
 
 function DialogMember(props: { member: TeamMember }) {
+  const avatar = createMemo(() => memberAvatar(props.member))
+
   return (
     <div class="flex min-w-0 items-center gap-2 rounded-full border border-[#e5e7ef] bg-white p-1 pr-3">
-      <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,#8d77ff,#536dff)] text-[12px] font-semibold text-white shadow-[0_3px_8px_rgba(83,109,255,0.2)]">
-        {props.member.name.slice(0, 1)}
-      </div>
+      <Show
+        when={avatar()}
+        fallback={
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,#8d77ff,#536dff)] text-[12px] font-semibold text-white shadow-[0_3px_8px_rgba(83,109,255,0.2)]">
+            {props.member.name.slice(0, 1)}
+          </div>
+        }
+      >
+        {(source) => <img src={source()} alt="" class="size-9 shrink-0 rounded-full object-cover" />}
+      </Show>
       <div class="min-w-0">
         <div class="truncate text-[12px] font-medium leading-4 text-[#252839]">{props.member.profession}</div>
         <div class="truncate text-[11px] leading-4 text-[#8b91a3]">{props.member.name}</div>
       </div>
     </div>
   )
+}
+
+function memberAvatar(member: TeamMember) {
+  const [team, agent] = member.id.split("/")
+  if (!team || !agent) return
+  return EXPERT_AVATARS[`../../../../.opencode/experts/${team}/avatars/${agent}.png`]
 }
