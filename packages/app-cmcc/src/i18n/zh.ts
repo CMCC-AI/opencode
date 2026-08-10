@@ -93,8 +93,8 @@ export const dict = {
   "command.model.variant.cycle": "切换思考强度",
   "command.model.variant.cycle.description": "切换到下一个强度等级",
 
-  "command.prompt.mode.shell": "Shell",
-  "command.prompt.mode.normal": "Prompt",
+  "command.prompt.mode.shell": "命令",
+  "command.prompt.mode.normal": "提问",
 
   "command.permissions.autoaccept.enable": "自动接受权限",
   "command.permissions.autoaccept.disable": "停止自动接受权限",
@@ -250,12 +250,12 @@ export const dict = {
   "common.attachment": "附件",
 
   "prompt.placeholder.shell": "输入 shell 命令... {{example}}",
-  "prompt.placeholder.normal": '随便问点什么... "{{example}}"',
-  "prompt.placeholder.simple": "随便问点什么...",
+  "prompt.placeholder.normal": '请输入问题，例如：“{{example}}”',
+  "prompt.placeholder.simple": "请输入问题...",
   "prompt.placeholder.summarizeComments": "总结评论…",
   "prompt.placeholder.summarizeComment": "总结该评论…",
-  "prompt.mode.shell": "Shell",
-  "prompt.mode.normal": "Prompt",
+  "prompt.mode.shell": "命令",
+  "prompt.mode.normal": "提问",
   "prompt.mode.shell.exit": "按 esc 退出",
   "prompt.example.1": "修复代码库中的一个 TODO",
   "prompt.example.2": "这个项目的技术栈是什么？",

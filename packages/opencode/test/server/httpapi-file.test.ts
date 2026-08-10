@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { Context, Effect } from "effect"
 import path from "path"
+import { symlink } from "node:fs/promises"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
 import { FilePaths } from "../../src/server/routes/instance/httpapi/groups/file"
 import { resetDatabase } from "../fixture/db"
@@ -51,6 +52,66 @@ describe("file HttpApi", () => {
 
     expect(status.status).toBe(200)
     expect(await status.json()).toEqual([])
+  })
+
+  test("streams PDF previews with byte range and path protection", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await using outside = await tmpdir({ git: true })
+    const pdf = new TextEncoder().encode("%PDF-1.7\npreview-body")
+    await Bun.write(path.join(tmp.path, "source.pdf"), pdf)
+    await Bun.write(path.join(tmp.path, "source.txt"), pdf)
+    await Bun.write(path.join(outside.path, "outside.pdf"), pdf)
+    await symlink(path.join(outside.path, "outside.pdf"), path.join(tmp.path, "linked.pdf"))
+
+    const full = await request(FilePaths.preview, tmp.path, { path: "source.pdf", auth_token: "test-token" })
+    expect(full.status).toBe(200)
+    expect(full.headers.get("content-type")).toBe("application/pdf")
+    expect(full.headers.get("accept-ranges")).toBe("bytes")
+    expect(full.headers.get("content-length")).toBe(pdf.byteLength.toString())
+    expect(full.headers.get("etag")).toMatch(/^W\/"[0-9a-f]+-[0-9a-f]+"$/)
+    expect(new Uint8Array(await full.arrayBuffer())).toEqual(pdf)
+
+    const partial = await request(
+      FilePaths.preview,
+      tmp.path,
+      { path: "source.pdf" },
+      { headers: { Range: "bytes=5-9" } },
+    )
+    expect(partial.status).toBe(206)
+    expect(partial.headers.get("content-range")).toBe(`bytes 5-9/${pdf.byteLength}`)
+    expect(partial.headers.get("content-length")).toBe("5")
+    expect(new TextDecoder().decode(await partial.arrayBuffer())).toBe("1.7\np")
+
+    const staleRange = await request(
+      FilePaths.preview,
+      tmp.path,
+      { path: "source.pdf" },
+      { headers: { Range: "bytes=5-9", "If-Range": 'W/"stale"' } },
+    )
+    expect(staleRange.status).toBe(200)
+    expect(new Uint8Array(await staleRange.arrayBuffer())).toEqual(pdf)
+
+    const suffix = await request(
+      FilePaths.preview,
+      tmp.path,
+      { path: "source.pdf" },
+      { headers: { Range: "bytes=-4" } },
+    )
+    expect(suffix.status).toBe(206)
+    expect(new TextDecoder().decode(await suffix.arrayBuffer())).toBe("body")
+
+    const unsatisfiable = await request(
+      FilePaths.preview,
+      tmp.path,
+      { path: "source.pdf" },
+      { headers: { Range: `bytes=${pdf.byteLength}-` } },
+    )
+    expect(unsatisfiable.status).toBe(416)
+    expect(unsatisfiable.headers.get("content-range")).toBe(`bytes */${pdf.byteLength}`)
+
+    expect((await request(FilePaths.preview, tmp.path, { path: "source.txt" })).status).toBe(400)
+    expect((await request(FilePaths.preview, tmp.path, { path: "../outside.pdf" })).status).toBe(400)
+    expect((await request(FilePaths.preview, tmp.path, { path: "linked.pdf" })).status).toBe(400)
   })
 
   test("serves search endpoints", async () => {

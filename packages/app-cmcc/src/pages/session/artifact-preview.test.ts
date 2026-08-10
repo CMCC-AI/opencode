@@ -4,6 +4,7 @@ import {
   artifactBuffer,
   artifactDataUrl,
   artifactExtension,
+  artifactImageMimeType,
   artifactPreviewKind,
   artifactText,
   resolveArtifactPath,
@@ -18,6 +19,8 @@ describe("artifact preview", () => {
     expect(artifactPreviewKind("source/main.go")).toBe("text")
     expect(artifactPreviewKind("site/index.HTML")).toBe("html")
     expect(artifactPreviewKind("images/chart.svg")).toBe("image")
+    expect(artifactPreviewKind("images/chart.PNG")).toBe("image")
+    expect(artifactPreviewKind("images/photo.JPG")).toBe("image")
     expect(artifactPreviewKind("legacy/report.doc")).toBe("unsupported")
   })
 
@@ -39,6 +42,13 @@ describe("artifact preview", () => {
     expect(artifactDataUrl({ content: "aGVsbG8=", encoding: "base64" }, "application/pdf")).toBe(
       "data:application/pdf;base64,aGVsbG8=",
     )
+  })
+
+  test("infers image MIME types from filenames when servers omit them", () => {
+    expect(artifactImageMimeType("images/logo.SVG")).toBe("image/svg+xml")
+    expect(artifactImageMimeType("images/photo.jpg")).toBe("image/jpeg")
+    expect(artifactImageMimeType("images/chart.png", "application/octet-stream")).toBe("image/png")
+    expect(artifactImageMimeType("images/chart.png", "image/x-custom")).toBe("image/x-custom")
   })
 
   test("resolves inline filenames and relative links to known artifacts", () => {

@@ -1586,7 +1586,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const designPlaceholder = () => {
     if (store.mode === "shell") return placeholder()
-    return "Ask anything, / for commands, @ for context..."
+    return language.t("prompt.placeholder.simple")
+  }
+
+  const agentLabel = (agent: string) => {
+    if (language.locale() === "zh") {
+      if (agent === "plan") return "计划"
+      if (agent === "build") return "构建"
+    }
+    if (language.locale() === "zht") {
+      if (agent === "plan") return "計劃"
+      if (agent === "build") return "建置"
+    }
+    return agent
   }
 
   const modelControlState = createMemo<ComposerModelControlState>(() => ({
@@ -1619,6 +1631,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     keybind: command.keybindParts("agent.cycle"),
     options: props.controls.agents.options,
     current: props.controls.agents.current,
+    label: agentLabel,
     style: control(),
     onSelect: (value) => {
       props.controls.agents.select(value)
@@ -2069,6 +2082,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             size="normal"
                             options={props.controls.agents.options}
                             current={props.controls.agents.current}
+                            label={agentLabel}
                             onSelect={(value) => {
                               props.controls.agents.select(value)
                               restoreFocus()
@@ -2209,6 +2223,7 @@ type ComposerAgentControlState = {
   keybind: string[]
   options: string[]
   current: string
+  label: (value: string) => string
   style: JSX.CSSProperties | undefined
   onSelect: (value: string | undefined) => void
 }
@@ -2247,6 +2262,7 @@ function ComposerAgentControl(props: { state: ComposerAgentControlState }) {
           size="normal"
           options={props.state.options}
           current={props.state.current}
+          label={props.state.label}
           onSelect={props.state.onSelect}
           class="max-w-[175px] justify-start text-v2-text-text-faint [&_[data-component=icon]]:text-v2-icon-icon-muted"
           valueClass="truncate pl-5 text-[13px] font-[440] leading-5 text-v2-text-text-faint"
