@@ -1,6 +1,6 @@
 import { Icon } from "@opencode-ai/ui/icon"
 import { For, Show, type Component } from "solid-js"
-import type { KnowledgeNotebook } from "@/utils/cmcc-knowledge"
+import type { KnowledgeNotebook } from "@cmcc/utils/cmcc-knowledge"
 
 type CmccKnowledgePickerProps = {
   notebooks: KnowledgeNotebook[]

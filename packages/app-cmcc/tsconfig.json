@@ -12,15 +12,43 @@
     "jsxImportSource": "solid-js",
     "allowJs": true,
     "resolveJsonModule": true,
+    "types": ["vite/client", "bun"],
     "strict": true,
     "noEmit": false,
     "emitDeclarationOnly": true,
     "outDir": "node_modules/.ts-dist",
     "isolatedModules": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@cmcc/*": ["./src/*"]
     }
   },
-  "include": ["src", "package.json"],
+  "references": [{ "path": "../app" }],
+  "include": [
+    "src/entry.tsx",
+    "src/product.tsx",
+    "src/env.d.ts",
+    "src/components/artifact-preview.tsx",
+    "src/components/brand.tsx",
+    "src/components/cmcc-knowledge-picker.tsx",
+    "src/components/cmcc-professional-databases.tsx",
+    "src/components/dialog-product-intro.tsx",
+    "src/components/excel-preview.tsx",
+    "src/components/force-knowledge-graph.tsx",
+    "src/components/prompt-accessory.tsx",
+    "src/components/sidebar-rail.tsx",
+    "src/pages/cmcc-experts.tsx",
+    "src/pages/cmcc-knowledge.tsx",
+    "src/pages/cmcc-plugin-hub.tsx",
+    "src/pages/session/artifact-preview.ts",
+    "src/pages/session/artifact-preview.test.ts",
+    "src/pages/session/excel-preview.ts",
+    "src/pages/session/excel-preview.test.ts",
+    "src/utils/cmcc-experts.ts",
+    "src/utils/cmcc-knowledge.ts",
+    "src/utils/cmcc-knowledge.test.ts",
+    "src/utils/cmcc-workspace.ts",
+    "src/utils/cmcc-workspace.test.ts",
+    "package.json"
+  ],
   "exclude": ["dist", "ts-dist"]
 }

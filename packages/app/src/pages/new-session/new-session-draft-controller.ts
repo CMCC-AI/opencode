@@ -5,6 +5,7 @@ import { useComments } from "@/context/comments"
 import { useLocal } from "@/context/local"
 import { usePrompt } from "@/context/prompt"
 import { useServerSync } from "@/context/server-sync"
+import { useTabs } from "@/context/tabs"
 import { createPromptInputController, createPromptProjectControls } from "@/pages/session/composer"
 import { createPromptModelSelection } from "@/pages/session/composer/prompt-model-selection"
 import { useSessionKey } from "@/pages/session/session-layout"
@@ -15,9 +16,20 @@ export function createNewSessionDraftController(workspace: { worktree: () => str
   const serverSync = useServerSync()
   const comments = useComments()
   const local = useLocal()
+  const tabs = useTabs()
   const route = useSessionKey()
   const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string }>()
   const model = createPromptModelSelection({ agent: () => local.agent.current() })
+
+  createEffect(() => {
+    const id = searchParams.draftId
+    if (!id) return
+    const draft = tabs.store.find((item) => item.type === "draft" && item.draftID === id)
+    if (draft?.type !== "draft" || !draft.agent) return
+    if (!local.agent.list().some((item) => item.name === draft.agent)) return
+    if (local.agent.current()?.name === draft.agent) return
+    local.agent.set(draft.agent)
+  })
 
   useComposerCommands({ model })
 

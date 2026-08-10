@@ -2,20 +2,17 @@ import { Navigate, useNavigate, useParams } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { Portal } from "solid-js/web"
-import { useServer } from "@/context/server"
-import { useServerSDK } from "@/context/server-sdk"
-import { useServerSync } from "@/context/server-sync"
-import { useTabs } from "@/context/tabs"
-import expertFinance from "@/assets/experts/scene-13.png"
-import expertGeneral from "@/assets/experts/scene-15.png"
-import expertIndustry from "@/assets/experts/scene-06.png"
-import expertInvestment from "@/assets/experts/scene-17.png"
-import expertTrading from "@/assets/experts/scene-14.png"
-import expertHero from "@/assets/experts/scene-05.png"
-import expertSkillResearch from "@/assets/experts/detail-skill-research.png"
-import expertSkillReview from "@/assets/experts/detail-skill-review.png"
-import expertSkillWriting from "@/assets/experts/detail-skill-writing.png"
-import { cmccCreateConversationWorkspace } from "@/utils/cmcc-workspace"
+import { showToast, useServer, useServerSDK, useServerSync, useTabs } from "@opencode-ai/app/extension"
+import expertFinance from "@cmcc/assets/experts/scene-13.png"
+import expertGeneral from "@cmcc/assets/experts/scene-15.png"
+import expertIndustry from "@cmcc/assets/experts/scene-06.png"
+import expertInvestment from "@cmcc/assets/experts/scene-17.png"
+import expertTrading from "@cmcc/assets/experts/scene-14.png"
+import expertHero from "@cmcc/assets/experts/scene-05.png"
+import expertSkillResearch from "@cmcc/assets/experts/detail-skill-research.png"
+import expertSkillReview from "@cmcc/assets/experts/detail-skill-review.png"
+import expertSkillWriting from "@cmcc/assets/experts/detail-skill-writing.png"
+import { cmccCreateConversationWorkspace } from "@cmcc/utils/cmcc-workspace"
 import {
   CMCC_EXPERTS,
   CMCC_TEAM_EXPERTS,
@@ -25,8 +22,7 @@ import {
   type ExternalExpert,
   type TeamExpert,
   type TeamMember,
-} from "@/utils/cmcc-experts"
-import { showToast } from "@/utils/toast"
+} from "@cmcc/utils/cmcc-experts"
 
 export { CMCC_EXPERTS, cmccExpertCenterHref, cmccExpertHref }
 
@@ -416,7 +412,7 @@ function useCmccExpertDraftLauncher() {
 
     server.projects.touch(dir)
     void sync().project.loadSessions(dir, { limit: 64 })
-    tabs.newDraft({ server: server.key, directory: dir }, prompt, { agent: expert.leadAgent })
+    tabs.newDraft({ server: server.key, directory: dir, agent: expert.leadAgent }, prompt)
   }
 }
 

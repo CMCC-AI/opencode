@@ -3,11 +3,8 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { useQuery, useQueryClient } from "@tanstack/solid-query"
 import { createMemo, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
-import { useServerSDK } from "@/context/server-sdk"
-import { useServerSync } from "@/context/server-sync"
-import { directoryKey } from "@/context/global-sync/utils"
-import { cmccDefaultWorkspace } from "@/utils/cmcc-workspace"
-import { showToast } from "@/utils/toast"
+import { directoryKey, showToast, useServerSDK, useServerSync } from "@opencode-ai/app/extension"
+import { cmccDefaultWorkspace } from "@cmcc/utils/cmcc-workspace"
 
 type HubTab = "skills" | "mcp"
 
@@ -18,6 +15,8 @@ const mcpStatusLabel: Record<McpStatus["status"], string> = {
   needs_client_registration: "需要注册",
   disabled: "未启用",
 }
+
+type CmccMcpStatus = McpStatus | { status: "pending" }
 
 export function CmccPluginHubRoute() {
   const serverSDK = useServerSDK()
@@ -251,7 +250,7 @@ function SkillPanel(props: {
   )
 }
 
-function McpPanel(props: { items: Array<{ name: string; status: McpStatus }> }) {
+function McpPanel(props: { items: Array<{ name: string; status: CmccMcpStatus }> }) {
   return (
     <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <For each={props.items} fallback={<EmptyState label="还没有配置 MCP 连接器" />}>
@@ -259,8 +258,10 @@ function McpPanel(props: { items: Array<{ name: string; status: McpStatus }> }) 
             <MarketCard
               icon="mcp"
               name={mcp.name}
-            description={mcpError(mcp.status) || "DeepInsight MCP 连接器"}
-            meta={mcpStatusLabel[mcp.status.status]}
+            description={
+              mcp.status.status === "pending" ? "正在建立连接" : mcpError(mcp.status) || "DeepInsight MCP 连接器"
+            }
+            meta={mcp.status.status === "pending" ? "连接中" : mcpStatusLabel[mcp.status.status]}
             status={mcp.status.status}
           />
         )}
@@ -274,7 +275,7 @@ function MarketCard(props: {
   name: string
   description: string
   meta: string
-  status?: McpStatus["status"]
+  status?: CmccMcpStatus["status"]
 }) {
   return (
     <div class="group flex min-h-[92px] min-w-0 items-start gap-3 rounded-[8px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-4 hover:border-v2-border-border-strong hover:bg-v2-background-bg-layer-02">
@@ -292,7 +293,13 @@ function MarketCard(props: {
         <p class="mt-2 truncate text-[11px] leading-4 text-v2-text-text-faint">{props.meta}</p>
       </div>
       <span class="shrink-0 rounded-full border border-v2-border-border-base px-2 py-1 text-[11px] leading-4 text-v2-text-text-faint">
-        {props.icon === "skill" ? "可用" : props.status ? mcpStatusLabel[props.status] : "可用"}
+        {props.icon === "skill"
+          ? "可用"
+          : props.status === "pending"
+            ? "连接中"
+            : props.status
+              ? mcpStatusLabel[props.status]
+              : "可用"}
       </span>
     </div>
   )

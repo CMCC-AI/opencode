@@ -4,38 +4,45 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { batch, createEffect, createMemo, createSignal, For, on, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
-import createNotebookCardArtwork from "@/assets/knowledge/create-notebook-card.svg"
-import createNotebookTipArtwork from "@/assets/knowledge/create-notebook-tip.svg"
-import featureGraphArtwork from "@/assets/knowledge/feature-graph.svg"
-import featureImportArtwork from "@/assets/knowledge/feature-import.svg"
-import featureParseArtwork from "@/assets/knowledge/feature-parse.svg"
-import featureUpdateArtwork from "@/assets/knowledge/feature-update.svg"
-import infoArtwork from "@/assets/knowledge/info.svg"
-import notebookQaArtwork from "@/assets/knowledge/notebook-qa.webp"
-import notebookSpecCardArtwork from "@/assets/knowledge/notebook-spec-card.svg"
-import uploadDropzoneArtwork from "@/assets/knowledge/upload-dropzone.svg"
-import wikiHeroArtwork from "@/assets/knowledge/wiki-hero.svg"
-import { ArtifactPreview } from "@/components/artifact-preview"
-import { ProductIntroButton } from "@/components/dialog-product-intro"
-import { ForceKnowledgeGraph } from "@/components/force-knowledge-graph"
-import { PromptInput } from "@/components/prompt-input"
-import { buildRequestParts } from "@/components/prompt-input/build-request-parts"
-import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
-import { useLayout } from "@/context/layout"
-import { useLocal } from "@/context/local"
-import { usePlatform } from "@/context/platform"
-import { DEFAULT_PROMPT, type ImageAttachmentPart, type Prompt, usePrompt } from "@/context/prompt"
-import { useSDK } from "@/context/sdk"
-import { useServerSDK } from "@/context/server-sdk"
-import { useServerSync } from "@/context/server-sync"
-import { useSettings } from "@/context/settings"
-import { useSync } from "@/context/sync"
-import { createPromptInputController } from "@/pages/session/composer"
-import { Identifier } from "@/utils/id"
-import { Persist, persisted } from "@/utils/persist"
-import { authTokenFromCredentials } from "@/utils/server"
-import { showToast } from "@/utils/toast"
-import { uuid } from "@/utils/uuid"
+import {
+  DEFAULT_PROMPT,
+  Identifier,
+  Persist,
+  PromptInput,
+  authTokenFromCredentials,
+  blobDataUrl,
+  buildRequestParts,
+  createPromptInputController,
+  notifySessionTabsRemoved,
+  persisted,
+  showToast,
+  useLayout,
+  useLocal,
+  usePlatform,
+  usePrompt,
+  useSDK,
+  useServerSDK,
+  useServerSync,
+  useSettings,
+  useSync,
+  uuid,
+  type ImageAttachmentPart,
+  type Prompt,
+} from "@opencode-ai/app/extension"
+import createNotebookCardArtwork from "@cmcc/assets/knowledge/create-notebook-card.svg"
+import createNotebookTipArtwork from "@cmcc/assets/knowledge/create-notebook-tip.svg"
+import featureGraphArtwork from "@cmcc/assets/knowledge/feature-graph.svg"
+import featureImportArtwork from "@cmcc/assets/knowledge/feature-import.svg"
+import featureParseArtwork from "@cmcc/assets/knowledge/feature-parse.svg"
+import featureUpdateArtwork from "@cmcc/assets/knowledge/feature-update.svg"
+import infoArtwork from "@cmcc/assets/knowledge/info.svg"
+import notebookQaArtwork from "@cmcc/assets/knowledge/notebook-qa.webp"
+import notebookSpecCardArtwork from "@cmcc/assets/knowledge/notebook-spec-card.svg"
+import uploadDropzoneArtwork from "@cmcc/assets/knowledge/upload-dropzone.svg"
+import wikiHeroArtwork from "@cmcc/assets/knowledge/wiki-hero.svg"
+import { ArtifactPreview } from "@cmcc/components/artifact-preview"
+import { ProductIntroButton } from "@cmcc/components/dialog-product-intro"
+import { ForceKnowledgeGraph } from "@cmcc/components/force-knowledge-graph"
 import {
   cmccBuildKnowledgeGraph,
   cmccForgetKnowledgeSession,
@@ -51,7 +58,7 @@ import {
   type KnowledgeGraph,
   type KnowledgeGraphNode,
   type KnowledgeNotebook,
-} from "@/utils/cmcc-knowledge"
+} from "@cmcc/utils/cmcc-knowledge"
 
 type ChatMessage = { info: Message; parts: Part[] }
 type PreviewTab = { path: string; name: string }
@@ -935,10 +942,18 @@ export function CmccKnowledgeNotebookRoute() {
 
     const context = target.context.items().slice()
     const messageID = Identifier.ascending("message")
+    const images = await Promise.all(
+      currentPrompt
+        .filter((part): part is ImageAttachmentPart => part.type === "image")
+        .map(async (attachment) => ({
+          ...attachment,
+          dataUrl: await blobDataUrl(attachment.blob, attachment.mime),
+        })),
+    )
     const requestParts = buildRequestParts({
       prompt: currentPrompt,
       context,
-      images: currentPrompt.filter((part): part is ImageAttachmentPart => part.type === "image"),
+      images,
       text: value,
       sessionID,
       messageID,

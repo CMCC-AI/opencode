@@ -1,4 +1,11 @@
-export { AppBaseProviders, AppInterface } from "./app"
+export { AppBaseProviders, AppDirectoryScope, AppInterface } from "./app"
+export {
+  ProductProvider,
+  useProduct,
+  type ProductExtension,
+  type ProductPromptController,
+  type ProductRoute,
+} from "./context/product"
 export { useLayout } from "./context/layout"
 export { useServerSDK } from "./context/server-sdk"
 export { useServerSync } from "./context/server-sync"
@@ -8,7 +15,7 @@ export { useTabs } from "./context/tabs"
 export { useProviders } from "./hooks/use-providers"
 export { ACCEPTED_FILE_EXTENSIONS, ACCEPTED_FILE_TYPES, filePickerFilters } from "./constants/file-picker"
 export { useCommand } from "./context/command"
-export { loadLocaleDict, normalizeLocale, type Locale, useLanguage } from "./context/language"
+export { loadInitialLocale, loadLocaleDict, normalizeLocale, type Locale, useLanguage } from "./context/language"
 export { useWslServers } from "./wsl/context"
 export { type DisplayBackend, type FatalRendererErrorLog, type Platform, PlatformProvider } from "./context/platform"
 export { type UpdaterPlatform, type UpdaterState } from "./updater"
@@ -27,4 +34,6 @@ export {
   type WslServersState,
 } from "./wsl/types"
 export { ServerConnection } from "./context/server"
-export { createDraftStore, type DraftStore } from "./utils/draft-store"
+export { normalizeServerUrl } from "./context/server"
+export { authFromToken } from "./utils/server"
+export { createBrowserDraftStore, createDraftStore, type DraftStore } from "./utils/draft-store"

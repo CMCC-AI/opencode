@@ -18,6 +18,7 @@ export function DirectoryDataProvider(
     directory: string | Accessor<string>
     draftID?: string
     server?: Accessor<ServerConnection.Key | undefined>
+    sessionID?: Accessor<string | undefined>
   }>,
 ) {
   const location = useLocation()
@@ -26,6 +27,7 @@ export function DirectoryDataProvider(
   const sync = useSync()
   const serverSync = useServerSync()
   const directory = () => (typeof props.directory === "function" ? props.directory() : props.directory)
+  const sessionID = () => (props.sessionID ? props.sessionID() : params.id)
   const slug = createMemo(() => base64Encode(directory()))
   const href = (sessionID: string) => {
     const server = props.server?.()
@@ -43,7 +45,7 @@ export function DirectoryDataProvider(
   })
 
   createResource(
-    () => params.id,
+    sessionID,
     (id) =>
       sync()
         .session.sync(id)
@@ -51,10 +53,10 @@ export function DirectoryDataProvider(
   )
 
   createEffect(() => {
-    const sessionID = params.id
-    if (!sessionID) return
-    serverSync().session.pin(sessionID)
-    onCleanup(() => serverSync().session.unpin(sessionID))
+    const id = sessionID()
+    if (!id) return
+    serverSync().session.pin(id)
+    onCleanup(() => serverSync().session.unpin(id))
   })
 
   return (
@@ -63,7 +65,7 @@ export function DirectoryDataProvider(
         <DataProvider
           data={sync().data}
           directory={directory}
-          sessionID={params.id}
+          sessionID={sessionID()}
           onNavigateToSession={(sessionID: string) => navigate(href(sessionID))}
           onSessionHref={href}
         >

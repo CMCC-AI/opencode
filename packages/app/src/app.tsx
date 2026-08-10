@@ -52,6 +52,7 @@ import { NotificationProvider } from "@/context/notification"
 import { PermissionProvider } from "@/context/permission"
 import { usePlatform } from "@/context/platform"
 import { PromptProvider } from "@/context/prompt"
+import { ProductProvider, type ProductExtension, useProduct } from "@/context/product"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider, useSettings } from "@/context/settings"
 import { TabsProvider, useTabs, type DraftTab } from "@/context/tabs"
@@ -390,45 +391,72 @@ function DraftProviders(props: ParentProps) {
   )
 }
 
+export function AppDirectoryScope(
+  props: ParentProps<{
+    directory: string | (() => string)
+    sessionID?: () => string | undefined
+  }>,
+) {
+  return (
+    <SDKProvider directory={props.directory}>
+      <DirectoryDataProvider directory={props.directory} sessionID={props.sessionID}>
+        <FileProvider>
+          <PromptProvider>
+            <CommentsProvider>{props.children}</CommentsProvider>
+          </PromptProvider>
+        </FileProvider>
+      </DirectoryDataProvider>
+    </SDKProvider>
+  )
+}
+
 export function AppBaseProviders(
   props: ParentProps<{
     locale?: Locale
     onNativeTranslations?: Parameters<typeof LanguageProvider>[0]["onNativeTranslations"]
+    product?: ProductExtension
   }>,
 ) {
   return (
-    <MetaProvider>
-      <Font />
-      <ThemeProvider
-        onThemeApplied={(_, mode, scheme) => {
-          void window.api?.setTitlebar?.({ mode, scheme })
-        }}
-      >
-        <LanguageProvider locale={props.locale} onNativeTranslations={props.onNativeTranslations}>
-          <UiI18nBridge>
-            <ErrorBoundary
-              fallback={(error) => {
-                Sentry.captureException(error)
-                return <ErrorPage error={error} />
-              }}
-            >
-              <QueryProvider>
-                <WslServersProvider>
-                  <DialogProvider>
-                    <FileComponentProvider component={File}>{props.children}</FileComponentProvider>
-                  </DialogProvider>
-                </WslServersProvider>
-              </QueryProvider>
-            </ErrorBoundary>
-          </UiI18nBridge>
-        </LanguageProvider>
-      </ThemeProvider>
-    </MetaProvider>
+    <ProductProvider value={props.product}>
+      <MetaProvider>
+        <Font />
+        <ThemeProvider
+          onThemeApplied={(_, mode, scheme) => {
+            void window.api?.setTitlebar?.({ mode, scheme })
+          }}
+        >
+          <LanguageProvider
+            locale={props.locale}
+            onNativeTranslations={props.onNativeTranslations}
+            transformTranslation={props.product?.transformTranslation}
+          >
+            <UiI18nBridge>
+              <ErrorBoundary
+                fallback={(error) => {
+                  Sentry.captureException(error)
+                  return <ErrorPage error={error} />
+                }}
+              >
+                <QueryProvider>
+                  <WslServersProvider>
+                    <DialogProvider>
+                      <FileComponentProvider component={File}>{props.children}</FileComponentProvider>
+                    </DialogProvider>
+                  </WslServersProvider>
+                </QueryProvider>
+              </ErrorBoundary>
+            </UiI18nBridge>
+          </LanguageProvider>
+        </ThemeProvider>
+      </MetaProvider>
+    </ProductProvider>
   )
 }
 
 function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean; startup?: Promise<void> }>) {
   const server = useServer()
+  const product = useProduct()
   const checkServerHealth = useCheckServerHealth()
 
   const [checkMode, setCheckMode] = createSignal<"blocking" | "background">("blocking")
@@ -491,7 +519,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean; start
       </Show>
       <Show when={loading()}>
         <div class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background-base">
-          <Splash class="w-16 h-20 opacity-50 animate-pulse" />
+          <Dynamic component={product.mark ?? Splash} class="w-16 h-20 opacity-50 animate-pulse" />
         </div>
       </Show>
     </>
@@ -500,6 +528,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean; start
 
 function ConnectionError(props: { onRetry?: () => void; onServerSelected?: (key: ServerConnection.Key) => void }) {
   const language = useLanguage()
+  const product = useProduct()
   const server = useServer()
   const others = () => server.list.filter((s) => ServerConnection.key(s) !== server.key)
   const name = createMemo(() => server.name || server.key)
@@ -512,7 +541,7 @@ function ConnectionError(props: { onRetry?: () => void; onServerSelected?: (key:
   return (
     <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base gap-6 p-6">
       <div class="flex flex-col items-center max-w-md text-center">
-        <Splash class="w-12 h-15 mb-4" />
+        <Dynamic component={product.mark ?? Splash} class="w-12 h-15 mb-4" />
         <p class="text-14-regular text-text-base">
           {unreachable()[0]}
           <span class="text-text-strong font-medium">{name()}</span>
@@ -594,7 +623,9 @@ export function AppInterface(props: {
                       <NotificationProvider>
                         <ServerShell>
                           <Show when={useSettings().general.newLayoutDesigns()} fallback={routerProps.children}>
-                            <NewAppLayout serverScoped={props.serverScoped}>{routerProps.children}</NewAppLayout>
+                            <NewAppLayout serverScoped={props.serverScoped}>
+                              {routerProps.children}
+                            </NewAppLayout>
                           </Show>
                         </ServerShell>
                       </NotificationProvider>
@@ -614,6 +645,7 @@ export function AppInterface(props: {
 
 function Routes(props: { serverScoped?: JSX.Element }) {
   const settings = useSettings()
+  const product = useProduct()
 
   return (
     <>
@@ -636,7 +668,8 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         </Route>
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
-        <Route path="/" component={NewHome} />
+        <Route path="/" component={product.home ?? NewHome} />
+        <For each={product.routes}>{(route) => <Route path={route.path} component={route.component} />}</For>
         <Route path="/:dir/session/:id" component={NewLayoutLegacySessionRedirect} />
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>

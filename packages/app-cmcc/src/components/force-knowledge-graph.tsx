@@ -1,8 +1,8 @@
 import type { DataSet, Edge, Network, Node, Options } from "vis-network/standalone"
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
-import type { KnowledgeGraphEdge, KnowledgeGraphNode } from "@/utils/cmcc-knowledge"
-import { Persist, persisted } from "@/utils/persist"
+import type { KnowledgeGraphEdge, KnowledgeGraphNode } from "@cmcc/utils/cmcc-knowledge"
+import { Persist, persisted } from "@opencode-ai/app/extension"
 
 export function ForceKnowledgeGraph(props: {
   nodes: KnowledgeGraphNode[]

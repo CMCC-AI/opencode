@@ -1,6 +1,6 @@
 import { For, Show, createEffect, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
-import { parseExcelPreview, type ExcelPreviewWorkbook } from "@/pages/session/excel-preview"
+import { parseExcelPreview, type ExcelPreviewWorkbook } from "@cmcc/pages/session/excel-preview"
 
 export function ExcelPreview(props: { data: ArrayBuffer }) {
   const [state, setState] = createStore({

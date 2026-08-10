@@ -4,7 +4,7 @@ import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { Match, Show, Switch, createEffect, createMemo, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
-import { ExcelPreview } from "@/components/excel-preview"
+import { ExcelPreview } from "@cmcc/components/excel-preview"
 import {
   artifactBuffer,
   artifactDataUrl,
@@ -12,7 +12,7 @@ import {
   artifactPreviewKind,
   artifactText,
   type ArtifactPreviewKind,
-} from "@/pages/session/artifact-preview"
+} from "@cmcc/pages/session/artifact-preview"
 
 export function ArtifactPreview(props: {
   path: string

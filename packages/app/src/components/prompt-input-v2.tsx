@@ -7,6 +7,7 @@ import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
 import { createEffect, createMemo, on, Show } from "solid-js"
+import { Dynamic } from "solid-js/web"
 import { ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
 import type { PromptInputProps } from "@/components/prompt-input/contracts"
@@ -22,6 +23,7 @@ import { useLayout } from "@/context/layout"
 import { usePermission } from "@/context/permission"
 import { type ImageAttachmentPart, usePrompt } from "@/context/prompt"
 import { usePlatform } from "@/context/platform"
+import { useProduct } from "@/context/product"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
@@ -48,6 +50,7 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
   const dialog = useDialog()
   const command = useCommand()
   const language = useLanguage()
+  const product = useProduct()
 
   return (
     <div class="flex flex-col gap-3">
@@ -74,6 +77,22 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
           />
         }
       />
+      <Show when={product.promptAccessory}>
+        {(Accessory) => (
+          <Dynamic
+            component={Accessory()}
+            controller={{
+              attach: props.controller.attach,
+              openCommands: props.controller.openCommands,
+              restoreFocus: props.controller.restoreFocus,
+              setText: (value) => {
+                props.controller.onInput(value, [{ type: "text", content: value, start: 0, end: value.length }], value.length)
+              },
+              text: props.controller.value,
+            }}
+          />
+        )}
+      </Show>
     </div>
   )
 }

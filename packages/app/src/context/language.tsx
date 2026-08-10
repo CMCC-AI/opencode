@@ -166,7 +166,11 @@ export function loadInitialLocale() {
 export const { use: useLanguage, provider: LanguageProvider } = createSimpleContext({
   name: "Language",
   gate: false,
-  init: (props: { locale?: Locale; onNativeTranslations?: (bundle: DesktopNativeBundle) => void }) => {
+  init: (props: {
+    locale?: Locale
+    onNativeTranslations?: (bundle: DesktopNativeBundle) => void
+    transformTranslation?: (value: string) => string
+  }) => {
     const initial = props.locale ?? readStoredLocale() ?? detectLocale()
     const [store, setStore, _, ready] = persisted(
       Persist.global("language", ["language.v1"]),
@@ -189,17 +193,22 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
       initialValue: dicts.get(initial) ?? base,
     })
 
-    const t = i18n.translator(() => dict() ?? base, i18n.resolveTemplate) as (
+    const translate = i18n.translator(() => dict() ?? base, i18n.resolveTemplate) as (
       key: keyof Dictionary,
       params?: Record<string, string | number | boolean>,
     ) => string
+    const t = (key: keyof Dictionary, params?: Record<string, string | number | boolean>) => {
+      const value = translate(key, params)
+      return props.transformTranslation?.(value) ?? value
+    }
 
     const plural = (key: PluralKey, count: number, params?: Record<string, string | number | boolean>) => {
       const category = pluralCategory(intl(), count)
       const current = (dict.loading ? base : (dict() ?? base)) as Record<string, string>
       const candidate = `${key}.${category}`
       const fallback = `${key}.other`
-      return i18n.resolveTemplate(current[candidate] ?? current[fallback] ?? fallback, { ...params, count })
+      const value = i18n.resolveTemplate(current[candidate] ?? current[fallback] ?? fallback, { ...params, count })
+      return props.transformTranslation?.(value) ?? value
     }
 
     const label = (value: Locale) => DESKTOP_NATIVE_LABELS[value]
@@ -217,7 +226,10 @@ export const { use: useLanguage, provider: LanguageProvider } = createSimpleCont
       const current = dict()
       if (!current) return
       props.onNativeTranslations(
-        createDesktopNativeBundle(locale(), (key) => current[key] ?? DESKTOP_NATIVE_ENGLISH[key]),
+        createDesktopNativeBundle(locale(), (key) => {
+          const value = current[key] ?? DESKTOP_NATIVE_ENGLISH[key]
+          return props.transformTranslation?.(value) ?? value
+        }),
       )
     })
 

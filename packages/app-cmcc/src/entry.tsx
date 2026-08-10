@@ -1,15 +1,21 @@
 // @refresh reload
 
-import * as Sentry from "@sentry/solid"
+import { init } from "@sentry/solid"
 import { render } from "solid-js/web"
-import { AppBaseProviders, AppInterface } from "@/app"
-import { type Platform, PlatformProvider } from "@/context/platform"
-import { dict as en } from "@/i18n/en"
-import { dict as zh } from "@/i18n/zh"
-import { handleNotificationClick } from "@/utils/notification-click"
-import { authFromToken } from "@/utils/server"
+import {
+  AppBaseProviders,
+  AppInterface,
+  authFromToken,
+  createBrowserDraftStore,
+  loadInitialLocale,
+  normalizeServerUrl,
+  type Platform,
+  PlatformProvider,
+  ServerConnection,
+} from "@opencode-ai/app"
+import { cmccProduct } from "@cmcc/product"
+import "@cmcc/index.css"
 import pkg from "../package.json"
-import { normalizeServerUrl, ServerConnection } from "./context/server"
 
 const DEFAULT_SERVER_URL_KEY = "opencode.settings.dat:defaultServerUrl"
 const SERVER_URL_PARAM = "server"
@@ -25,9 +31,8 @@ const getLocale = () => {
 }
 
 const getRootNotFoundError = () => {
-  const key = "error.dev.rootNotFound" as const
-  const locale = getLocale()
-  return locale === "zh" ? (zh[key] ?? en[key]) : en[key]
+  if (getLocale() === "zh") return "找不到应用挂载节点 #root"
+  return "Could not find the application root element #root"
 }
 
 const getStorage = (key: string) => {
@@ -61,7 +66,7 @@ const readServerUrlParam = () => {
   return normalizeServerUrl(url)
 }
 
-const notify: Platform["notify"] = async (title, description, href) => {
+const notify: Platform["notify"] = async (title, description, onClick) => {
   if (!("Notification" in window)) return
 
   const permission =
@@ -80,21 +85,17 @@ const notify: Platform["notify"] = async (title, description, href) => {
   })
 
   notification.onclick = () => {
-    handleNotificationClick(href)
+    window.focus()
+    onClick?.()
     notification.close()
   }
 }
 
-const openLink: Platform["openLink"] = (url) => {
-  window.open(url, "_blank")
-}
-
-const back: Platform["back"] = () => {
-  window.history.back()
-}
-
-const forward: Platform["forward"] = () => {
-  window.history.forward()
+const openExternal: Platform["openExternal"] = (value) => {
+  if (!URL.canParse(value)) return
+  const url = new URL(value)
+  if (url.protocol !== "http:" && url.protocol !== "https:" && url.protocol !== "mailto:") return
+  window.open(url.href, "_blank", "noopener,noreferrer")
 }
 
 const restart: Platform["restart"] = async () => {
@@ -137,10 +138,9 @@ const clearLaunchParams = () => {
 
 const platform: Platform = {
   platform: "web",
+  draftStore: createBrowserDraftStore(),
   version: pkg.version,
-  openLink,
-  back,
-  forward,
+  openExternal,
   restart,
   notify,
   getDefaultServer: async () => {
@@ -151,7 +151,7 @@ const platform: Platform = {
 }
 
 if (import.meta.env.VITE_SENTRY_DSN) {
-  Sentry.init({
+  init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     environment: import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.MODE,
     release: import.meta.env.VITE_SENTRY_RELEASE ?? `web@${pkg.version}`,
@@ -169,32 +169,35 @@ if (import.meta.env.VITE_SENTRY_DSN) {
   })
 }
 
-if (root instanceof HTMLElement) {
-  const auth = authFromToken(new URLSearchParams(location.search).get("auth_token"))
-  const defaultUrl = getDefaultUrl()
-  clearLaunchParams()
-  const servers = Array.from(new Set([getCurrentUrl(), defaultUrl])).map(
-    (url): ServerConnection.Http => ({
-      type: "http",
-      authToken: !!auth,
-      http: {
-        url,
-        ...auth,
-      },
-    }),
-  )
-  render(
-    () => (
-      <PlatformProvider value={platform}>
-        <AppBaseProviders>
-          <AppInterface
-            defaultServer={ServerConnection.Key.make(defaultUrl)}
-            canonicalLocalServer={ServerConnection.Key.make(defaultUrl)}
-            servers={servers}
-          />
-        </AppBaseProviders>
-      </PlatformProvider>
-    ),
-    root,
-  )
-}
+if (root instanceof HTMLElement)
+  void loadInitialLocale().then((locale) => {
+    const auth = authFromToken(new URLSearchParams(location.search).get("auth_token"))
+    const defaultUrl = getDefaultUrl()
+    clearLaunchParams()
+    const servers = Array.from(new Set([getCurrentUrl(), defaultUrl])).map(
+      (url): ServerConnection.Http => ({
+        type: "http",
+        authToken: !!auth,
+        http: {
+          url,
+          ...auth,
+        },
+      }),
+    )
+    const canonical = servers.find((item) => item.http.url === getCurrentUrl()) ?? servers[0]
+    render(
+      () => (
+        <PlatformProvider value={platform}>
+          <AppBaseProviders locale={locale} product={cmccProduct}>
+            <AppInterface
+              defaultServer={ServerConnection.Key.make(defaultUrl)}
+              canonicalLocalServer={ServerConnection.key(canonical)}
+              servers={servers}
+              disableHealthCheck
+            />
+          </AppBaseProviders>
+        </PlatformProvider>
+      ),
+      root,
+    )
+  })
