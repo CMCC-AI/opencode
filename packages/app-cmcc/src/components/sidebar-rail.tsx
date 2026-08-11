@@ -2,6 +2,7 @@ import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { For } from "solid-js"
+import { useDockApi } from "@cmcc/dockapi"
 
 const items = [
   { label: "专家团", icon: "glasses" as const, href: "/expert" },
@@ -10,6 +11,7 @@ const items = [
 ]
 
 export function CmccSidebarRail(props: { mobile?: boolean }) {
+  const dockapi = useDockApi()
   const location = useLocation()
   const navigate = useNavigate()
   return (
@@ -27,6 +29,15 @@ export function CmccSidebarRail(props: { mobile?: boolean }) {
           </Tooltip>
         )}
       </For>
+      <Tooltip placement={props.mobile ? "bottom" : "right"} value={`退出登录 · ${dockapi.user?.name ?? "当前用户"}`}>
+        <IconButton
+          icon="arrow-left"
+          variant="ghost"
+          size="large"
+          aria-label="退出登录"
+          onClick={() => void dockapi.auth.logout()}
+        />
+      </Tooltip>
     </div>
   )
 }

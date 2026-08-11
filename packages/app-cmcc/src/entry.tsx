@@ -14,6 +14,8 @@ import {
   ServerConnection,
 } from "@opencode-ai/app"
 import { cmccProduct } from "@cmcc/product"
+import { DockApiAuthGate } from "@cmcc/components/dockapi-auth-gate"
+import { DockApiProvider } from "@cmcc/dockapi"
 import "@cmcc/index.css"
 import pkg from "../package.json"
 
@@ -171,7 +173,14 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 
 if (root instanceof HTMLElement)
   void loadInitialLocale().then((locale) => {
-    const auth = authFromToken(new URLSearchParams(location.search).get("auth_token"))
+    const queryAuth = authFromToken(new URLSearchParams(location.search).get("auth_token"))
+    const configuredUsername = import.meta.env.VITE_OPENCODE_SERVER_USERNAME?.trim()
+    const configuredPassword = import.meta.env.VITE_OPENCODE_SERVER_PASSWORD
+    const auth =
+      queryAuth ??
+      (configuredUsername && configuredPassword !== undefined
+        ? { username: configuredUsername, password: configuredPassword }
+        : undefined)
     const defaultUrl = getDefaultUrl()
     clearLaunchParams()
     const servers = Array.from(new Set([getCurrentUrl(), defaultUrl])).map(
@@ -189,12 +198,16 @@ if (root instanceof HTMLElement)
       () => (
         <PlatformProvider value={platform}>
           <AppBaseProviders locale={locale} product={cmccProduct}>
-            <AppInterface
-              defaultServer={ServerConnection.Key.make(defaultUrl)}
-              canonicalLocalServer={ServerConnection.key(canonical)}
-              servers={servers}
-              disableHealthCheck
-            />
+            <DockApiProvider>
+              <DockApiAuthGate>
+                <AppInterface
+                  defaultServer={ServerConnection.Key.make(defaultUrl)}
+                  canonicalLocalServer={ServerConnection.key(canonical)}
+                  servers={servers}
+                  disableHealthCheck
+                />
+              </DockApiAuthGate>
+            </DockApiProvider>
           </AppBaseProviders>
         </PlatformProvider>
       ),

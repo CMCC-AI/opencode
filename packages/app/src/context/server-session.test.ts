@@ -140,7 +140,10 @@ const retryImmediately: typeof retry = async (task, options = {}) => {
   }
 }
 
-function setup(sessions: Record<string, Session>) {
+function setup(
+  sessions: Record<string, Session>,
+  options?: { resolve?: (sessionID: string) => Promise<Session | undefined> },
+) {
   const get: unknown[] = []
   const messages: unknown[] = []
   const client = {
@@ -158,7 +161,7 @@ function setup(sessions: Record<string, Session>) {
       todo: async () => ({ data: [] }),
     },
   } as unknown as OpencodeClient
-  return { get, messages, store: createServerSession(client) }
+  return { get, messages, store: createServerSession(client, options) }
 }
 
 describe("server session", () => {
@@ -221,6 +224,14 @@ describe("server session", () => {
     expect(result.root.id).toBe("root")
     expect(ctx.get).toEqual([{ sessionID: "child" }, { sessionID: "root" }])
     expect(ctx.store.lineage.peek("child")).toEqual(result)
+  })
+
+  test("uses a product session resolver before the server fallback", async () => {
+    const product = session("product")
+    const ctx = setup({}, { resolve: async (sessionID) => (sessionID === product.id ? product : undefined) })
+
+    expect(await ctx.store.resolve(product.id)).toEqual(product)
+    expect(ctx.get).toEqual([])
   })
 
   test("loads session content through the server client", async () => {

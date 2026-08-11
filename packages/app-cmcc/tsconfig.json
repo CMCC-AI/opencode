@@ -26,11 +26,13 @@
   "include": [
     "src/entry.tsx",
     "src/product.tsx",
+    "src/dockapi.tsx",
     "src/env.d.ts",
     "src/components/artifact-preview.tsx",
     "src/components/brand.tsx",
     "src/components/cmcc-knowledge-picker.tsx",
     "src/components/cmcc-professional-databases.tsx",
+    "src/components/dockapi-auth-gate.tsx",
     "src/components/dialog-product-intro.tsx",
     "src/components/excel-preview.tsx",
     "src/components/force-knowledge-graph.tsx",

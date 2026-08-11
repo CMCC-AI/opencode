@@ -20,6 +20,7 @@ import { showToast } from "@/utils/toast"
 import { canStartTabDrag, isTabCloseTarget } from "./titlebar-tab-gesture"
 import { adjacentTabKey, mergeVisibleTabOrder } from "./titlebar-tab-order"
 import type { Session } from "@opencode-ai/sdk/v2"
+import { useProductSession } from "@/context/product"
 
 function SessionTabSlot(props: {
   tab: SessionTab
@@ -83,6 +84,7 @@ function SessionTabEntry(props: {
 }) {
   const tabs = useTabs()
   const language = useLanguage()
+  const productSession = useProductSession()
   const sdk = createMemo(() => props.serverCtx()?.sdk ?? null)
   const cachedSession = createMemo(() => props.serverCtx()?.sync.session.peek(props.tab.sessionId))
   const persisted = createMemo(() => tabs.info[props.id])
@@ -105,7 +107,9 @@ function SessionTabEntry(props: {
 
     ctx.sync.session.remember({ ...value, title })
     try {
-      await ctx.sdk.api.session.rename({ sessionID: value.id, title })
+      const rename = productSession?.owns(value.id) ? productSession.rename : undefined
+      if (rename) await rename(value.id, title)
+      if (!rename) await ctx.sdk.api.session.rename({ sessionID: value.id, title })
     } catch (err) {
       const current = session()
       const currentCtx = props.serverCtx()

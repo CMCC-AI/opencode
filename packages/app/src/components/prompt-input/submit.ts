@@ -23,6 +23,7 @@ import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
 import { Event } from "@opencode-ai/schema/event"
 import { blobDataUrl } from "@/utils/draft-store"
+import type { ProductSessionAdapter } from "@/context/product"
 
 type PendingPrompt = {
   abort: AbortController
@@ -229,11 +230,13 @@ type PromptSubmitInput = {
   onAbort?: () => void
   onSubmit?: () => void
   model?: ModelSelection
+  productSession?: ProductSessionAdapter
 }
 
 export function createPromptSubmit(input: PromptSubmitInput) {
   const navigate = useNavigate()
   const sdk = useSDK()
+  const productSession = input.productSession
   const sync = useSync()
   const serverSync = useServerSync()
   const local = useLocal()
@@ -353,13 +356,14 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     const projectDirectory = sdk().directory
     const permissionState = permission.currentServerState()
     const isNewSession = !params.id
+    const isProductSession = isNewSession && !!productSession?.managesDirectory(projectDirectory)
     const shouldAutoAccept = isNewSession && input.autoAccept()
     const worktreeSelection = input.newSessionWorktree?.() || "main"
 
     let sessionDirectory = projectDirectory
     let client = sdk().client
 
-    if (isNewSession) {
+    if (isNewSession && !isProductSession) {
       if (worktreeSelection === "create") {
         const createdWorktree = await client.worktree
           .create({ directory: projectDirectory })
@@ -400,20 +404,29 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     let session = input.info()
     if (!session && isNewSession) {
-      const created = await sdk()
-        .api.session.create({
-          agent: currentAgent.name,
-          model: { id: currentModel.id, providerID: currentModel.provider.id, variant },
-          location: { directory: sessionDirectory },
+      const created = await (
+        isProductSession && productSession?.create
+          ? productSession.create({
+              directory: sessionDirectory,
+              query: text,
+              agent: currentAgent.name,
+              model: { providerID: currentModel.provider.id, modelID: currentModel.id },
+              variant,
+            })
+          : sdk()
+              .api.session.create({
+                agent: currentAgent.name,
+                model: { id: currentModel.id, providerID: currentModel.provider.id, variant },
+                location: { directory: sessionDirectory },
+              })
+              .then(normalizeSessionInfo)
+      ).catch((err) => {
+        showToast({
+          title: language.t("prompt.toast.sessionCreateFailed.title"),
+          description: errorMessage(err),
         })
-        .then(normalizeSessionInfo)
-        .catch((err) => {
-          showToast({
-            title: language.t("prompt.toast.sessionCreateFailed.title"),
-            description: errorMessage(err),
-          })
-          return undefined
-        })
+        return undefined
+      })
       if (created) {
         seed(sessionDirectory, created)
         session = created

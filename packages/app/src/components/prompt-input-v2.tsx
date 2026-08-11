@@ -23,7 +23,7 @@ import { useLayout } from "@/context/layout"
 import { usePermission } from "@/context/permission"
 import { type ImageAttachmentPart, usePrompt } from "@/context/prompt"
 import { usePlatform } from "@/context/platform"
-import { useProduct } from "@/context/product"
+import { useProduct, useProductSession } from "@/context/product"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 import { createSessionTabs } from "@/pages/session/helpers"
@@ -86,7 +86,11 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
               openCommands: props.controller.openCommands,
               restoreFocus: props.controller.restoreFocus,
               setText: (value) => {
-                props.controller.onInput(value, [{ type: "text", content: value, start: 0, end: value.length }], value.length)
+                props.controller.onInput(
+                  value,
+                  [{ type: "text", content: value, start: 0, end: value.length }],
+                  value.length,
+                )
               },
               text: props.controller.value,
             }}
@@ -98,6 +102,7 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
 }
 
 export function usePromptInputV2Controller(props: PromptInputV2ControllerProps): PromptInputV2ComposerController {
+  const productSession = useProductSession()
   const sdk = useSDK()
   const sync = useSync()
   const files = useFile()
@@ -215,6 +220,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     return permission.isAutoAccepting(id, sdk().directory)
   })
   const submission = createPromptSubmit({
+    productSession,
     prompt,
     info,
     imageAttachments: attachments,

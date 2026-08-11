@@ -4,6 +4,7 @@ import type {
   Path,
   Project,
   ProviderAuthResponse,
+  Session,
   SessionStatus,
 } from "@opencode-ai/sdk/v2/client"
 import { showToast } from "@/utils/toast"
@@ -59,6 +60,8 @@ import type {
 } from "@opencode-ai/client/promise"
 import { toggleMcp } from "./global-sync/mcp"
 import { createServerSession, type ServerSession } from "./server-session"
+import { useProductSession } from "./product"
+import { normalizeSessionInfo } from "@/utils/session"
 
 type GlobalStore = {
   ready: boolean
@@ -204,6 +207,7 @@ export type QueryOptionsApi = ReturnType<typeof makeQueryOptionsApi>
 
 export function createServerSyncContextInner(serverSDK: ServerSDK) {
   const language = useLanguage()
+  const productSession = useProductSession()
   const owner = getOwner()
   if (!owner) throw new Error("ServerSync must be created within owner")
 
@@ -224,8 +228,17 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     return sdk
   }
 
+  const loadSession = async (sessionID: string, directory: string): Promise<Session> => {
+    if ((await serverSDK.protocol) !== "v1") return serverSDK.api.session.get({ sessionID }).then(normalizeSessionInfo)
+    const session = await sdkFor(directory).session.get({ sessionID })
+    if (!session.data) throw new Error(`Session not found: ${sessionID}`)
+    return session.data
+  }
+
+  const resolveSession = productSession?.resolve
   const session = createServerSession(serverSDK.client, serverSDK.api.session, serverSDK.api.message, {
     protocol: serverSDK.protocol,
+    resolve: resolveSession ? (sessionID) => resolveSession({ sessionID, load: loadSession }) : undefined,
   })
   const queryOptionsApi = makeQueryOptionsApi(
     serverSDK.scope,
@@ -415,49 +428,54 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     const promise = queryClient
       .fetchQuery({
         ...queryOptionsApi.sessions(key),
-        queryFn: () =>
-          serverSDK.protocol
-            .then((protocol) =>
-              protocol === "v1"
-                ? loadRootSessionsV1({ client: sdkFor(directory), directory, limit })
-                : loadRootSessions({ api: serverSDK.api.session, directory, limit }),
-            )
-            .then((x) => {
-              const nonArchived = (x.data ?? [])
-                .filter((s) => !!s?.id)
-                .filter((s) => !s.time?.archived)
-                .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-              const limit = Math.max(store.limit, options?.limit ?? 0, sessionMeta.get(key)?.limit ?? 0)
-              const childSessions = store.session.filter((s) => !!s.parentID)
-              const next = trimSessions([...nonArchived, ...childSessions], {
-                limit,
-                permission: session.data.permission,
-              })
-              batch(() => {
-                next.forEach(session.remember)
-                setStore(
-                  "sessionTotal",
-                  estimateRootSessionTotal({
-                    count: nonArchived.length,
-                    limit: x.limit,
-                    limited: x.limited,
-                  }),
-                )
-                setStore("session", reconcile(next, { key: "id" }))
-              })
-              sessionMeta.set(key, { limit })
-            })
-            .catch((err) => {
-              console.error("Failed to load sessions", err)
-              const project = getFilename(directory)
-              showToast({
-                variant: "error",
-                title: language.t("toast.session.listFailed.title", { project }),
-                description: formatServerError(err, language.t),
-              })
-            })
-            .then(() => null),
+        queryFn: async () => {
+          const managed = await productSession?.list?.({ directory, load: loadSession })
+          if (managed) return { data: managed, limit: managed.length, limited: false, managed: true }
+          const response = await serverSDK.protocol.then((protocol) =>
+            protocol === "v1"
+              ? loadRootSessionsV1({ client: sdkFor(directory), directory, limit })
+              : loadRootSessions({ api: serverSDK.api.session, directory, limit }),
+          )
+          return { ...response, managed: false }
+        },
       })
+      .then((x) => {
+        const nonArchived = (x.data ?? [])
+          .filter((s) => !!s?.id)
+          .filter((s) => !s.time?.archived)
+          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+        const retained = Math.max(store.limit, options?.limit ?? 0, sessionMeta.get(key)?.limit ?? 0)
+        const childSessions = store.session.filter((s) => !!s.parentID)
+        const next = x.managed
+          ? [...nonArchived, ...childSessions]
+          : trimSessions([...nonArchived, ...childSessions], {
+              limit: retained,
+              permission: session.data.permission,
+            })
+        batch(() => {
+          next.forEach(session.remember)
+          setStore(
+            "sessionTotal",
+            estimateRootSessionTotal({
+              count: nonArchived.length,
+              limit: x.limit,
+              limited: x.limited,
+            }),
+          )
+          setStore("session", reconcile(next, { key: "id" }))
+        })
+        sessionMeta.set(key, { limit: x.managed ? Number.MAX_SAFE_INTEGER : retained })
+      })
+      .catch((err) => {
+        console.error("Failed to load sessions", err)
+        const project = getFilename(directory)
+        showToast({
+          variant: "error",
+          title: language.t("toast.session.listFailed.title", { project }),
+          description: formatServerError(err, language.t),
+        })
+      })
+      .then(() => null)
       .then(() => {})
 
     sessionLoads.set(key, promise)

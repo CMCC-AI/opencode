@@ -12,7 +12,7 @@ import expertHero from "@cmcc/assets/experts/scene-05.png"
 import expertSkillResearch from "@cmcc/assets/experts/detail-skill-research.png"
 import expertSkillReview from "@cmcc/assets/experts/detail-skill-review.png"
 import expertSkillWriting from "@cmcc/assets/experts/detail-skill-writing.png"
-import { cmccCreateConversationWorkspace } from "@cmcc/utils/cmcc-workspace"
+import { useDockApi } from "@cmcc/dockapi"
 import {
   CMCC_EXPERTS,
   CMCC_TEAM_EXPERTS,
@@ -311,10 +311,18 @@ function ExpertDetailDialog(props: {
                         props.onOpenExternal(props.expert)
                       }}
                     >
-                      <img src={capability.image} alt="" class="size-[50px] shrink-0 object-contain transition group-hover:scale-105" />
+                      <img
+                        src={capability.image}
+                        alt=""
+                        class="size-[50px] shrink-0 object-contain transition group-hover:scale-105"
+                      />
                       <span class="min-w-0">
-                        <span class="block truncate text-[13px] font-medium leading-5 text-[#252839]">{capability.title}</span>
-                        <span class="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-[#7c8398]">{capability.description}</span>
+                        <span class="block truncate text-[13px] font-medium leading-5 text-[#252839]">
+                          {capability.title}
+                        </span>
+                        <span class="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-[#7c8398]">
+                          {capability.description}
+                        </span>
                       </span>
                     </button>
                   )}
@@ -373,22 +381,13 @@ function ExpertDetailDialog(props: {
 
 function useCmccExpertDraftLauncher() {
   const server = useServer()
+  const dockapi = useDockApi()
   const serverSDK = useServerSDK()
   const sync = useServerSync()
   const tabs = useTabs()
-  const home = createMemo(() => sync().data.path.home)
 
   return async (expert: TeamExpert, prompt = expert.defaultPrompt) => {
-    const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
-      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
-    ).catch((error) => {
-      showToast({
-        title: "无法创建专家团对话",
-        description: error instanceof Error ? error.message : String(error),
-        variant: "error",
-      })
-      return undefined
-    })
+    const dir = dockapi.workspace?.directoryPath
     if (!dir || !tabs.ready()) return
 
     const agents = await serverSDK()
@@ -411,7 +410,7 @@ function useCmccExpertDraftLauncher() {
     }
 
     server.projects.touch(dir)
-    void sync().project.loadSessions(dir, { limit: 64 })
+    void sync().project.loadSessions(dir)
     tabs.newDraft({ server: server.key, directory: dir, agent: expert.leadAgent }, prompt)
   }
 }

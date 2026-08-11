@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { createStore } from "solid-js/store"
 import type { Prompt, PromptStore } from "@/context/prompt"
 import type { ModelSelection } from "@/context/local"
+import type { ProductSessionAdapter } from "@/context/product"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
 
@@ -305,6 +306,65 @@ beforeEach(() => {
 })
 
 describe("prompt submit worktree selection", () => {
+  test("delegates managed new sessions to the product adapter", async () => {
+    const created: Parameters<NonNullable<ProductSessionAdapter["create"]>>[0][] = []
+    const productSession: ProductSessionAdapter = {
+      directory: () => "/repo/main",
+      managesDirectory: (directory) => directory === "/repo/main",
+      owns: (sessionID) => sessionID === "dock-session",
+      create: async (input) => {
+        created.push(input)
+        return {
+          id: "dock-session",
+          slug: "dock-session",
+          projectID: "project",
+          directory: input.directory,
+          title: "Dock session",
+          version: "1",
+          time: { created: 1, updated: 1 },
+        }
+      },
+    }
+    const submit = createPromptSubmit({
+      productSession,
+      prompt,
+      info: () => undefined,
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "shell",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      newSessionWorktree: () => selected,
+      onNewSessionWorktreeReset: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+
+    expect(created).toEqual([
+      {
+        directory: "/repo/main",
+        query: "ls",
+        agent: "agent",
+        model: { providerID: "provider", modelID: "model" },
+        variant: undefined,
+      },
+    ])
+    expect(createdClients).toEqual([])
+    expect(createdSessions).toEqual([])
+    expect(sentShell).toEqual([
+      expect.objectContaining({ sessionID: "dock-session", id: expect.stringMatching(/^evt_/), command: "ls" }),
+    ])
+    expect(promoted).toEqual([{ directory: "/repo/main", sessionID: "dock-session" }])
+  })
+
   test("reads the latest worktree accessor value per submit", async () => {
     const submit = createPromptSubmit({
       prompt,

@@ -70,6 +70,7 @@ import { useTabs } from "@/context/tabs"
 import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/session-route"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
+import { useProductSession } from "@/context/product"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { sessionTitle } from "@/utils/session-title"
 import { scheduleConnectedMeasure } from "./measure"
@@ -260,6 +261,7 @@ export function MessageTimeline(props: {
 
   const navigate = useNavigate()
   const serverSDK = useServerSDK()
+  const productSession = useProductSession()
   const sdk = useSDK()
   const sync = useSync()
   const settings = useSettings()
@@ -673,8 +675,11 @@ export function MessageTimeline(props: {
   }))
 
   const titleMutation = useMutation(() => ({
-    mutationFn: (input: { id: string; title: string }) =>
-      sdk().api.session.rename({ sessionID: input.id, title: input.title }),
+    mutationFn: (input: { id: string; title: string }) => {
+      const rename = productSession?.owns(input.id) ? productSession.rename : undefined
+      if (rename) return rename(input.id, input.title)
+      return sdk().api.session.rename({ sessionID: input.id, title: input.title })
+    },
     onSuccess: (_, input) => {
       sync().set(
         produce((draft) => {
@@ -833,6 +838,7 @@ export function MessageTimeline(props: {
   }
 
   const archiveSession = async (sessionID: string) => {
+    if (productSession?.canArchive?.(sessionID) === false) return
     const session = sync().session.get(sessionID)
     if (!session) return
     if ((await sdk().protocol) !== "v1") return
@@ -870,8 +876,8 @@ export function MessageTimeline(props: {
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    const result = await sdk()
-      .api.session.remove({ sessionID })
+    const remove = productSession?.owns(sessionID) ? productSession.remove : undefined
+    const result = await (remove ? remove(sessionID) : sdk().api.session.remove({ sessionID }))
       .then(() => true)
       .catch((err) => {
         showToast({
@@ -1593,9 +1599,11 @@ export function MessageTimeline(props: {
                                 <DropdownMenu.Item onSelect={() => exportSession(id)}>
                                   <DropdownMenu.ItemLabel>{language.t("common.export")}</DropdownMenu.ItemLabel>
                                 </DropdownMenu.Item>
-                                <DropdownMenu.Item onSelect={() => void archiveSession(id)}>
-                                  <DropdownMenu.ItemLabel>{language.t("common.archive")}</DropdownMenu.ItemLabel>
-                                </DropdownMenu.Item>
+                                <Show when={productSession?.canArchive?.(id) !== false}>
+                                  <DropdownMenu.Item onSelect={() => void archiveSession(id)}>
+                                    <DropdownMenu.ItemLabel>{language.t("common.archive")}</DropdownMenu.ItemLabel>
+                                  </DropdownMenu.Item>
+                                </Show>
                                 <DropdownMenu.Separator />
                                 <DropdownMenu.Item
                                   onSelect={() => dialog.show(() => <DialogDeleteSession sessionID={id} />)}
@@ -1667,9 +1675,11 @@ export function MessageTimeline(props: {
                               <MenuV2.Item onSelect={() => exportSession(id)}>
                                 {language.t("common.export")}...
                               </MenuV2.Item>
-                              <MenuV2.Item onSelect={() => void archiveSession(id)}>
-                                {language.t("common.archive")}
-                              </MenuV2.Item>
+                              <Show when={productSession?.canArchive?.(id) !== false}>
+                                <MenuV2.Item onSelect={() => void archiveSession(id)}>
+                                  {language.t("common.archive")}
+                                </MenuV2.Item>
+                              </Show>
                               <MenuV2.Separator />
                               <MenuV2.Item onSelect={() => dialog.show(() => <DialogDeleteSession sessionID={id} />)}>
                                 {language.t("common.delete")}...

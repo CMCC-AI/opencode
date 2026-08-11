@@ -13,6 +13,7 @@ import { useGlobal } from "./global"
 import { ServerScope } from "@/utils/server-scope"
 import { detectServerProtocol, type ServerProtocol } from "@/utils/server-protocol"
 import { createCompatibleApi, type CompatibleApi } from "@/utils/server-compat"
+import { useProductSession } from "./product"
 
 const isAbortError = (error: unknown) =>
   error !== null && typeof error === "object" && "name" in error && error.name === "AbortError"
@@ -186,6 +187,7 @@ type ServerSDKBase = {
 
 function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerScope): ServerSDKBase {
   const platform = usePlatform()
+  const productSession = useProductSession()
   const abort = new AbortController()
 
   const eventFetch = (() => {
@@ -273,22 +275,38 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
         abort.signal.addEventListener("abort", onAbort)
         try {
           const kind = await protocol
-          const events =
-            kind === "v1"
-              ? (await eventSdk.global.event({ signal: attempt.signal })).stream
-              : eventApi.event.subscribe({ signal: attempt.signal })
+          const eventDirectory = productSession?.eventDirectory?.()
           let yielded = Date.now()
-          for await (const event of events) {
-            streamErrorLogged = false
-            const legacy = "payload" in event
-            if (legacy && event.payload.type === "sync") continue
-            const directory = legacy ? (event.directory ?? "global") : (event.location?.directory ?? "global")
-            const payload = legacy ? (event.payload as Event) : adaptServerEvent(event)
-            if (enqueueServerEvent(queue, { directory, payload })) schedule()
+          if (kind === "v1" && eventDirectory) {
+            const events = await eventSdk.event.subscribe({ directory: eventDirectory }, { signal: attempt.signal })
+            for await (const payload of events.stream) {
+              streamErrorLogged = false
+              if (payload.type !== "server.connected") {
+                if (enqueueServerEvent(queue, { directory: eventDirectory, payload: payload as Event })) schedule()
+              }
 
-            if (Date.now() - yielded < STREAM_YIELD_MS) continue
-            yielded = Date.now()
-            await wait(0)
+              if (Date.now() - yielded < STREAM_YIELD_MS) continue
+              yielded = Date.now()
+              await wait(0)
+            }
+          }
+          if (kind !== "v1" || !eventDirectory) {
+            const events =
+              kind === "v1"
+                ? (await eventSdk.global.event({ signal: attempt.signal })).stream
+                : eventApi.event.subscribe({ signal: attempt.signal })
+            for await (const event of events) {
+              streamErrorLogged = false
+              const legacy = "payload" in event
+              if (legacy && event.payload.type === "sync") continue
+              const directory = legacy ? (event.directory ?? "global") : (event.location?.directory ?? "global")
+              const payload = legacy ? (event.payload as Event) : adaptServerEvent(event)
+              if (enqueueServerEvent(queue, { directory, payload })) schedule()
+
+              if (Date.now() - yielded < STREAM_YIELD_MS) continue
+              yielded = Date.now()
+              await wait(0)
+            }
           }
         } catch (error) {
           if (!isStreamClosed(error, attempt?.signal) && !streamErrorLogged) {

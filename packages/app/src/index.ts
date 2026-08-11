@@ -2,9 +2,11 @@ export { AppBaseProviders, AppDirectoryScope, AppInterface } from "./app"
 export {
   ProductProvider,
   useProduct,
+  useProductSession,
   type ProductExtension,
   type ProductPromptController,
   type ProductRoute,
+  type ProductSessionAdapter,
 } from "./context/product"
 export { useLayout } from "./context/layout"
 export { useServerSDK } from "./context/server-sdk"

@@ -183,7 +183,11 @@ function reconcileFetched<T extends { id: string }>(
   return options.compare ? items.sort(options.compare) : items
 }
 
-type ServerSessionOptions = { retry?: typeof retry; protocol?: Promise<"v1" | "v2"> }
+type ServerSessionOptions = {
+  retry?: typeof retry
+  protocol?: Promise<"v1" | "v2">
+  resolve?: (sessionID: string) => Promise<Session | undefined>
+}
 
 export function createServerSession(
   client: OpencodeClient,
@@ -301,18 +305,20 @@ export function createServerSession(
     return session
   }
 
-  const resolve = (sessionID: string, options?: { force?: boolean }) => {
+  const resolve = (sessionID: string, input?: { force?: boolean }) => {
     const cached = data.info[sessionID]
-    if (cached && !options?.force) return Promise.resolve(cached)
+    if (cached && !input?.force) return Promise.resolve(cached)
     const pending = requests.get(sessionID)
     if (pending) return pending
     const active = generation(sessionID)
-    const request = sessionApi
-      ? sessionApi.get({ sessionID }).then(normalizeSessionInfo)
-      : client.session.get({ sessionID }).then((result) => {
-          if (!result.data) throw sessionNotFoundError(sessionID)
-          return result.data
-        })
+    const fallback = () =>
+      sessionApi
+        ? sessionApi.get({ sessionID }).then(normalizeSessionInfo)
+        : client.session.get({ sessionID }).then((result) => {
+            if (!result.data) throw sessionNotFoundError(sessionID)
+            return result.data
+          })
+    const request = options?.resolve ? options.resolve(sessionID).then((result) => result ?? fallback()) : fallback()
     const resolved = request.then((result) => {
       if (generations.get(sessionID) !== active) return result
       return remember(result)

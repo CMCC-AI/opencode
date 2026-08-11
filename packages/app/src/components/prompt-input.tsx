@@ -50,6 +50,7 @@ import { useCommand } from "@/context/command"
 import { usePermission } from "@/context/permission"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
+import { useProductSession } from "@/context/product"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
 import { createPromptAttachments } from "./prompt-input/attachments"
@@ -115,6 +116,7 @@ const EXAMPLES = [
 ] as const
 
 export const PromptInput: Component<PromptInputProps> = (props) => {
+  const productSession = useProductSession()
   const sdk = useSDK()
 
   const sync = useSync()
@@ -1201,6 +1203,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const { abort, handleSubmit } =
     props.submission ??
     createPromptSubmit({
+      productSession,
       prompt,
       info,
       imageAttachments,

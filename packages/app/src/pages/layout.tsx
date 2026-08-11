@@ -40,6 +40,7 @@ import { clearWorkspaceTerminals } from "@/context/terminal"
 import { pickSessionCacheEvictions } from "@/context/global-sync/session-cache"
 import { useNotification } from "@/context/notification"
 import { usePermission } from "@/context/permission"
+import { useProductSession } from "@/context/product"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { retry } from "@opencode-ai/core/util/retry"
 import { playSoundById } from "@/utils/sound"
@@ -107,6 +108,7 @@ export default function LegacyLayout(props: ParentProps) {
 
   const params = useParams()
   const serverSync = useServerSync()
+  const productSession = useProductSession()
   const layout = useLayout()
   const layoutReady = createMemo(() => layout.ready())
   const platform = usePlatform()
@@ -869,6 +871,7 @@ export default function LegacyLayout(props: ParentProps) {
   }
 
   async function archiveSession(session: Session) {
+    if (productSession?.canArchive?.(session.id) === false) return
     if ((await serverSDK().protocol) !== "v1") return
     const [store, setStore] = serverSync().child(session.directory)
     const sessions = store.session ?? []
@@ -977,7 +980,7 @@ export default function LegacyLayout(props: ParentProps) {
         title: language.t("command.session.archive"),
         category: language.t("command.category.session"),
         keybind: "mod+shift+backspace",
-        disabled: !params.dir || !params.id,
+        disabled: !params.dir || !params.id || productSession?.canArchive?.(params.id) === false,
         onSelect: () => {
           const session = currentSessions().find((s) => s.id === params.id)
           if (session) void archiveSession(session)
@@ -1878,6 +1881,7 @@ export default function LegacyLayout(props: ParentProps) {
     clearHoverProjectSoon,
     prefetchSession,
     archiveSession,
+    canArchive: (session) => productSession?.canArchive?.(session.id) !== false,
     workspaceName,
     renameWorkspace,
     editorOpen,
@@ -1924,6 +1928,7 @@ export default function LegacyLayout(props: ParentProps) {
       clearHoverProjectSoon,
       prefetchSession,
       archiveSession,
+      canArchive: (session) => productSession?.canArchive?.(session.id) !== false,
     },
   }
 
