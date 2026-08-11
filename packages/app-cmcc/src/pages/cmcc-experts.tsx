@@ -3,10 +3,10 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { createMemo, createSignal, For, Show } from "solid-js"
 import { Portal } from "solid-js/web"
 import { useServer } from "@/context/server"
+import { useDockApi } from "@/context/dockapi"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useTabs } from "@/context/tabs"
-import { cmccCreateConversationWorkspace } from "@/utils/cmcc-workspace"
 import {
   CMCC_EXPERTS,
   CMCC_TEAM_EXPERTS,
@@ -294,22 +294,13 @@ function ExpertDetailDialog(props: {
 
 function useCmccExpertDraftLauncher() {
   const server = useServer()
+  const dockapi = useDockApi()
   const serverSDK = useServerSDK()
   const sync = useServerSync()
   const tabs = useTabs()
-  const home = createMemo(() => sync().data.path.home)
 
   return async (expert: TeamExpert, prompt = expert.defaultPrompt) => {
-    const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
-      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
-    ).catch((error) => {
-      showToast({
-        title: "无法创建专家团对话",
-        description: error instanceof Error ? error.message : String(error),
-        variant: "error",
-      })
-      return undefined
-    })
+    const dir = dockapi.workspace?.directoryPath
     if (!dir || !tabs.ready()) return
 
     const agents = await serverSDK()
@@ -331,8 +322,7 @@ function useCmccExpertDraftLauncher() {
       return
     }
 
-    server.projects.touch(dir)
-    void sync().project.loadSessions(dir, { limit: 64 })
+    void sync().project.loadSessions(dir)
     tabs.newDraft({ server: server.key, directory: dir }, prompt, { agent: expert.leadAgent })
   }
 }

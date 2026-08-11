@@ -20,6 +20,7 @@ import { setCursorPosition } from "./editor-dom"
 import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
+import { asOpenCodeSession, DockApiError, useDockApi } from "@/context/dockapi"
 
 type PendingPrompt = {
   abort: AbortController
@@ -199,6 +200,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const sdk = useSDK()
   const sync = useSync()
   const serverSync = useServerSync()
+  const dockapi = useDockApi()
   const local = useLocal()
   const permission = usePermission()
   const prompt = input.prompt
@@ -314,15 +316,16 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     input.addToHistory(currentPrompt, mode)
     input.resetHistoryNavigation()
 
-    const projectDirectory = sdk().directory
+    const projectDirectory = dockapi.workspace?.directoryPath ?? sdk().directory
     const isNewSession = !params.id
+    const isDockApiRootSession = isNewSession && projectDirectory === dockapi.workspace?.directoryPath
     const shouldAutoAccept = isNewSession && input.autoAccept()
     const worktreeSelection = input.newSessionWorktree?.() || "main"
 
     let sessionDirectory = projectDirectory
     let client = sdk().client
 
-    if (isNewSession) {
+    if (isNewSession && !isDockApiRootSession) {
       if (worktreeSelection === "create") {
         const createdWorktree = await client.worktree
           .create({ directory: projectDirectory })
@@ -363,16 +366,24 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     let session = input.info()
     if (!session && isNewSession) {
-      const created = await client.session
-        .create({ agent: selectedAgent })
-        .then((x) => x.data ?? undefined)
-        .catch((err) => {
+      const created = await (async () => {
+        try {
+          if (isDockApiRootSession) {
+            if (!text.trim()) throw new DockApiError("新会话需要输入文本问题")
+            const binding = await dockapi.sessions.create({ query: text })
+            const openCodeSession = asOpenCodeSession(binding.openCodeSession)
+            if (!openCodeSession) throw new DockApiError("业务会话未返回有效的 OpenCode session")
+            return { ...openCodeSession, title: binding.title, directory: binding.directoryPath }
+          }
+          return (await client.session.create({ agent: selectedAgent })).data ?? undefined
+        } catch (err) {
           showToast({
             title: language.t("prompt.toast.sessionCreateFailed.title"),
             description: errorMessage(err),
           })
           return undefined
-        })
+        }
+      })()
       if (created) {
         seed(sessionDirectory, created)
         session = created

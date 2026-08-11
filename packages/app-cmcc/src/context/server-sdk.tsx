@@ -10,6 +10,7 @@ import { ServerConnection, useServer } from "./server"
 import { createRefCountMap } from "@/utils/refcount"
 import { useGlobal } from "./global"
 import { ServerScope } from "@/utils/server-scope"
+import { useDockApi } from "./dockapi"
 
 const isAbortError = (error: unknown) =>
   error !== null && typeof error === "object" && "name" in error && error.name === "AbortError"
@@ -78,6 +79,9 @@ export function resumeStreamAfterPageShow(event: PageTransitionEvent, start: () 
 
 function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerScope) {
   const platform = usePlatform()
+  const dockapi = useDockApi()
+  const directory = dockapi.workspace?.directoryPath
+  if (!directory) throw new Error("DockAPI workspace is unavailable")
   const abort = new AbortController()
 
   const eventFetch = (() => {
@@ -174,28 +178,30 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
         }
         abort.signal.addEventListener("abort", onAbort)
         try {
-          const events = await eventSdk.global.event({
-            signal: attempt.signal,
-            onSseError: (error) => {
-              if (isStreamClosed(error, attempt?.signal)) return
-              if (streamErrorLogged) return
-              streamErrorLogged = true
-              console.error("[global-sdk] event stream error", {
-                url: server.http.url,
-                fetch: eventFetch ? "platform" : "webview",
-                error,
-              })
+          const events = await eventSdk.event.subscribe(
+            { directory },
+            {
+              signal: attempt.signal,
+              onSseError: (error) => {
+                if (isStreamClosed(error, attempt?.signal)) return
+                if (streamErrorLogged) return
+                streamErrorLogged = true
+                console.error("[directory-sdk] event stream error", {
+                  url: server.http.url,
+                  directory,
+                  fetch: eventFetch ? "platform" : "webview",
+                  error,
+                })
+              },
             },
-          })
+          )
           let yielded = Date.now()
           resetHeartbeat()
-          for await (const event of events.stream) {
+          for await (const payload of events.stream) {
             resetHeartbeat()
             streamErrorLogged = false
-            if (event.payload.type !== "sync") {
-              const directory = event.directory ?? "global"
-              const payload = event.payload as Event
-              if (enqueueServerEvent(queue, { directory, payload })) schedule()
+            if (payload.type !== "server.connected" && payload.type !== "server.heartbeat") {
+              if (enqueueServerEvent(queue, { directory, payload: payload as Event })) schedule()
             }
 
             if (Date.now() - yielded < STREAM_YIELD_MS) continue
@@ -205,8 +211,9 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
         } catch (error) {
           if (!isStreamClosed(error, attempt?.signal) && !streamErrorLogged) {
             streamErrorLogged = true
-            console.error("[global-sdk] event stream failed", {
+            console.error("[directory-sdk] event stream failed", {
               url: server.http.url,
+              directory,
               fetch: eventFetch ? "platform" : "webview",
               error,
             })

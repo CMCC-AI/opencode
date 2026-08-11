@@ -63,7 +63,7 @@ import {
   sessionHref,
 } from "./utils/session-route"
 import { isSessionNotFoundError } from "./utils/server-errors"
-import { cmccCreateConversationWorkspace } from "./utils/cmcc-workspace"
+import { useDockApi } from "./context/dockapi"
 import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
@@ -133,18 +133,26 @@ function ResolvedTargetSessionRoute() {
   const settings = useSettings()
   const tabs = useTabs()
   const sync = useServerSync()
+  const dockapi = useDockApi()
   const serverKey = createMemo(() => requireServerKey(params.serverKey))
   const cached = createMemo(() => sync().session.lineage.peek(params.id))
+  const binding = createMemo(() => dockapi.sessions.findByOpenCodeId(params.id))
   const [resolved] = createResource(
     () => {
       if (cached()) return
-      return { id: params.id, server: serverKey(), sync: sync() }
+      return { id: params.id, server: serverKey(), sync: sync(), binding: binding() }
     },
-    ({ id, server, sync }) =>
-      sync.session.lineage.resolve(id).catch((error) => {
+    async ({ id, server, sync, binding }) => {
+      if (binding) {
+        await sync.project.loadSessions(binding.directoryPath)
+        const loaded = sync.session.lineage.peek(id)
+        if (loaded) return loaded
+      }
+      return sync.session.lineage.resolve(id).catch((error) => {
         if (isSessionNotFoundError(error, id)) tabs.removeSessionTab({ server, sessionId: id })
         throw error
-      }),
+      })
+    },
   )
   const current = createMemo(() => selectSessionLineage(params.id, cached(), resolved()))
   const directory = createMemo(() => current()?.session.directory)
@@ -670,29 +678,15 @@ function KnowledgeNotebookRoute() {
 
 function CmccDefaultRoute() {
   const server = useServer()
-  const serverSDK = useServerSDK()
-  const sync = useServerSync()
+  const dockapi = useDockApi()
   const tabs = useTabs()
-  const home = createMemo(() => sync().data.path.home)
   let started = false
 
   createEffect(() => {
-    if (!home() || started || !tabs.ready()) return
+    const directory = dockapi.workspace?.directoryPath
+    if (!directory || started || !tabs.ready()) return
     started = true
-    void cmccCreateConversationWorkspace(home(), (directory) =>
-      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
-    )
-      .then((dir) => {
-        if (!dir) return
-        tabs.newDraft({ server: server.key, directory: dir })
-      })
-      .catch((error) => {
-        showToast({
-          title: "无法创建对话目录",
-          description: error instanceof Error ? error.message : String(error),
-          variant: "error",
-        })
-      })
+    tabs.newDraft({ server: server.key, directory })
   })
 
   return (

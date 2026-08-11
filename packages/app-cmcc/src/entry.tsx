@@ -10,6 +10,8 @@ import { handleNotificationClick } from "@/utils/notification-click"
 import { authFromToken } from "@/utils/server"
 import pkg from "../package.json"
 import { normalizeServerUrl, ServerConnection } from "./context/server"
+import { DockApiProvider } from "@/context/dockapi"
+import { DockApiAuthGate } from "@/components/dockapi-auth-gate"
 
 const DEFAULT_SERVER_URL_KEY = "opencode.settings.dat:defaultServerUrl"
 const SERVER_URL_PARAM = "server"
@@ -170,7 +172,14 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 }
 
 if (root instanceof HTMLElement) {
-  const auth = authFromToken(new URLSearchParams(location.search).get("auth_token"))
+  const queryAuth = authFromToken(new URLSearchParams(location.search).get("auth_token"))
+  const configuredUsername = import.meta.env.VITE_OPENCODE_SERVER_USERNAME?.trim()
+  const configuredPassword = import.meta.env.VITE_OPENCODE_SERVER_PASSWORD
+  const auth =
+    queryAuth ??
+    (configuredUsername && configuredPassword !== undefined
+      ? { username: configuredUsername, password: configuredPassword }
+      : undefined)
   const defaultUrl = getDefaultUrl()
   clearLaunchParams()
   const servers = Array.from(new Set([getCurrentUrl(), defaultUrl])).map(
@@ -187,11 +196,15 @@ if (root instanceof HTMLElement) {
     () => (
       <PlatformProvider value={platform}>
         <AppBaseProviders>
-          <AppInterface
-            defaultServer={ServerConnection.Key.make(defaultUrl)}
-            canonicalLocalServer={ServerConnection.Key.make(defaultUrl)}
-            servers={servers}
-          />
+          <DockApiProvider>
+            <DockApiAuthGate>
+              <AppInterface
+                defaultServer={ServerConnection.Key.make(defaultUrl)}
+                canonicalLocalServer={ServerConnection.Key.make(defaultUrl)}
+                servers={servers}
+              />
+            </DockApiAuthGate>
+          </DockApiProvider>
         </AppBaseProviders>
       </PlatformProvider>
     ),

@@ -63,6 +63,7 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { useServerSDK } from "@/context/server-sdk"
+import { useDockApi } from "@/context/dockapi"
 import { usePlatform } from "@/context/platform"
 import { useSettings } from "@/context/settings"
 import { useTabs } from "@/context/tabs"
@@ -260,6 +261,7 @@ export function MessageTimeline(props: {
 
   const navigate = useNavigate()
   const serverSDK = useServerSDK()
+  const dockapi = useDockApi()
   const sdk = useSDK()
   const sync = useSync()
   const settings = useSettings()
@@ -646,8 +648,13 @@ export function MessageTimeline(props: {
   }))
 
   const titleMutation = useMutation(() => ({
-    mutationFn: (input: { id: string; title: string }) =>
-      sdk().client.session.update({ sessionID: input.id, title: input.title }),
+    mutationFn: async (input: { id: string; title: string }) => {
+      if (dockapi.sessions.findByOpenCodeId(input.id)) {
+        await dockapi.sessions.updateTitle(input.id, input.title)
+        return
+      }
+      return sdk().client.session.update({ sessionID: input.id, title: input.title })
+    },
     onSuccess: (_, input) => {
       sync().set(
         produce((draft) => {
@@ -783,6 +790,7 @@ export function MessageTimeline(props: {
   }
 
   const archiveSession = async (sessionID: string) => {
+    if (dockapi.sessions.findByOpenCodeId(sessionID)) return
     const session = sync().session.get(sessionID)
     if (!session) return
 
@@ -819,9 +827,11 @@ export function MessageTimeline(props: {
     const index = sessions.findIndex((s) => s.id === sessionID)
     const nextSession = index === -1 ? undefined : (sessions[index + 1] ?? sessions[index - 1])
 
-    const result = await sdk()
-      .client.session.delete({ sessionID })
-      .then((x) => x.data)
+    const result = await (dockapi.sessions.findByOpenCodeId(sessionID)
+      ? dockapi.sessions.remove(sessionID).then(() => true)
+      : sdk()
+          .client.session.delete({ sessionID })
+          .then((x) => x.data))
       .catch((err) => {
         showToast({
           title: language.t("session.delete.failed.title"),
@@ -1525,9 +1535,11 @@ export function MessageTimeline(props: {
                                     </DropdownMenu.ItemLabel>
                                   </DropdownMenu.Item>
                                 </Show>
-                                <DropdownMenu.Item onSelect={() => void archiveSession(id)}>
-                                  <DropdownMenu.ItemLabel>{language.t("common.archive")}</DropdownMenu.ItemLabel>
-                                </DropdownMenu.Item>
+                                <Show when={!dockapi.sessions.findByOpenCodeId(id)}>
+                                  <DropdownMenu.Item onSelect={() => void archiveSession(id)}>
+                                    <DropdownMenu.ItemLabel>{language.t("common.archive")}</DropdownMenu.ItemLabel>
+                                  </DropdownMenu.Item>
+                                </Show>
                                 <DropdownMenu.Separator />
                                 <DropdownMenu.Item
                                   onSelect={() => dialog.show(() => <DialogDeleteSession sessionID={id} />)}
@@ -1596,9 +1608,11 @@ export function MessageTimeline(props: {
                                   {language.t("session.share.action.share")}...
                                 </MenuV2.Item>
                               </Show>
-                              <MenuV2.Item onSelect={() => void archiveSession(id)}>
-                                {language.t("common.archive")}
-                              </MenuV2.Item>
+                              <Show when={!dockapi.sessions.findByOpenCodeId(id)}>
+                                <MenuV2.Item onSelect={() => void archiveSession(id)}>
+                                  {language.t("common.archive")}
+                                </MenuV2.Item>
+                              </Show>
                               <MenuV2.Separator />
                               <MenuV2.Item onSelect={() => dialog.show(() => <DialogDeleteSession sessionID={id} />)}>
                                 {language.t("common.delete")}...

@@ -5,6 +5,7 @@ import type {
   Path,
   Project,
   ProviderAuthResponse,
+  Session,
 } from "@opencode-ai/sdk/v2/client"
 import { showToast } from "@/utils/toast"
 import { getFilename } from "@opencode-ai/core/util/path"
@@ -46,6 +47,7 @@ import type { ServerScope } from "@/utils/server-scope"
 import { persisted } from "@/utils/persist"
 import { toggleMcp } from "./global-sync/mcp"
 import { createServerSession } from "./server-session"
+import { useDockApi } from "./dockapi"
 
 type GlobalStore = {
   ready: boolean
@@ -101,6 +103,7 @@ export type QueryOptionsApi = ReturnType<typeof makeQueryOptionsApi>
 
 export function createServerSyncContextInner(serverSDK: ServerSDK) {
   const language = useLanguage()
+  const dockapi = useDockApi()
   const owner = getOwner()
   if (!owner) throw new Error("ServerSync must be created within owner")
 
@@ -273,26 +276,58 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     }
 
     const limit = Math.max(retainedLimit + SESSION_RECENT_LIMIT, SESSION_RECENT_LIMIT)
+    const dockApiDirectory = dockapi.workspace?.directoryPath
     const promise = queryClient
       .fetchQuery({
         ...queryOptionsApi.sessions(key),
-        queryFn: () =>
-          loadRootSessionsWithFallback({
+        queryFn: () => {
+          if (dockApiDirectory === directory) {
+            return dockapi.sessions.list().then(async (bindings) => {
+              const settled = await Promise.allSettled(
+                bindings
+                  .filter((binding) => binding.directoryPath === directory)
+                  .map(async (binding) => {
+                    const response = await sdkFor(directory).session.get({ sessionID: binding.openCodeSessionId })
+                    if (!response.data) throw new Error(`Session not found: ${binding.openCodeSessionId}`)
+                    return { ...response.data, title: binding.title, directory: binding.directoryPath } satisfies Session
+                  }),
+              )
+              const failed = settled.filter((result) => result.status === "rejected")
+              if (failed.length > 0) {
+                showToast({
+                  variant: "warning",
+                  title: "部分历史会话加载失败",
+                  description: `${failed.length} 条业务会话没有取得对应的 OpenCode 会话详情`,
+                })
+              }
+              return {
+                data: settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])),
+                limit: bindings.length,
+                limited: false,
+              }
+            })
+          }
+          return loadRootSessionsWithFallback({
             directory,
             limit,
             list: (query) => serverSDK.client.session.list(query),
           })
+        },
+      })
             .then((x) => {
               const nonArchived = (x.data ?? [])
                 .filter((s) => !!s?.id)
                 .filter((s) => !s.time?.archived)
                 .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-              const limit = Math.max(store.limit, options?.limit ?? 0, sessionMeta.get(key)?.limit ?? 0)
+              const retained = Math.max(store.limit, options?.limit ?? 0, sessionMeta.get(key)?.limit ?? 0)
               const childSessions = store.session.filter((s) => !!s.parentID)
-              const next = trimSessions([...nonArchived, ...childSessions], {
-                limit,
-                permission: session.data.permission,
-              })
+              const next =
+                dockApiDirectory === directory
+                  ? [...nonArchived, ...childSessions].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+                  : trimSessions([...nonArchived, ...childSessions], {
+                      limit: retained,
+                      permission: session.data.permission,
+                    })
               batch(() => {
                 next.forEach(session.remember)
                 setStore(
@@ -305,7 +340,9 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
                 )
                 setStore("session", reconcile(next, { key: "id" }))
               })
-              sessionMeta.set(key, { limit })
+              sessionMeta.set(key, {
+                limit: dockApiDirectory === directory ? Number.MAX_SAFE_INTEGER : retained,
+              })
             })
             .catch((err) => {
               console.error("Failed to load sessions", err)
@@ -316,8 +353,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
                 description: formatServerError(err, language.t),
               })
             })
-            .then(() => null),
-      })
+            .then(() => null)
       .then(() => {})
 
     sessionLoads.set(key, promise)

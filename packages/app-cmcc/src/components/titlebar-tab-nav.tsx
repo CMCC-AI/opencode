@@ -5,6 +5,7 @@ import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
+import { useDockApi } from "@/context/dockapi"
 import { ServerConnection } from "@/context/server"
 import { projectForSession } from "@/pages/layout/helpers"
 import { SessionTabAvatar } from "@/pages/layout/session-tab-avatar"
@@ -47,6 +48,7 @@ export function TabNavItem(props: {
     props.onClose()
   }
   const global = useGlobal()
+  const dockapi = useDockApi()
   const serverCtx = createMemo(() => {
     const conn = global.servers.list().find((item) => ServerConnection.key(item) === props.server)
     if (conn) return global.ensureServerCtx(conn)
@@ -97,6 +99,10 @@ export function TabNavItem(props: {
     const ctx = serverCtx()
     const session = props.session()
     if (!ctx || !session) return
+    if (dockapi.sessions.findByOpenCodeId(session.id)) {
+      await dockapi.sessions.updateTitle(session.id, title)
+      return
+    }
     const client = ctx.sdk.createClient({ directory: session.directory, throwOnError: true })
     await client.session.update({ sessionID: session.id, title })
   }
