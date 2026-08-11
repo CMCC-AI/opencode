@@ -370,10 +370,12 @@ function LegacyServerScopedShell(props: ServerScopedShellProps) {
 }
 
 function NewAppLayout(props: ParentProps<{ serverScoped?: JSX.Element }>) {
+  const product = useProduct()
+
   return (
     <SelectedServerProviders>
       <ServerScopedProviders serverScoped={props.serverScoped}>
-        <NewLayout>{props.children}</NewLayout>
+        <Dynamic component={product.layout ?? NewLayout}>{props.children}</Dynamic>
       </ServerScopedProviders>
     </SelectedServerProviders>
   )

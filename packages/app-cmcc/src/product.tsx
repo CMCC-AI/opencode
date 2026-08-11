@@ -13,10 +13,12 @@ import { DeepInsightMark, DeepInsightWordmark } from "@cmcc/components/brand"
 import { CmccPromptMenu } from "@cmcc/components/prompt-accessory"
 import { CmccNewSessionHome } from "@cmcc/components/new-session-home"
 import { CmccSidebarRail } from "@cmcc/components/sidebar-rail"
+import CmccLayout from "@cmcc/pages/cmcc-layout"
 import { CmccExpertCenterRoute, CmccExpertRoute } from "@cmcc/pages/cmcc-experts"
 import { CmccKnowledgeHomeRoute, CmccKnowledgeNotebookRoute } from "@cmcc/pages/cmcc-knowledge"
 import { CmccPluginHubRoute } from "@cmcc/pages/cmcc-plugin-hub"
 import { cmccKnowledgeNotebooks } from "@cmcc/utils/cmcc-knowledge"
+import { cmccTeamExpertByAgent } from "@cmcc/utils/cmcc-experts"
 import { cmccCreateConversationWorkspace } from "@cmcc/utils/cmcc-workspace"
 
 export const cmccProduct: ProductExtension = {
@@ -25,6 +27,8 @@ export const cmccProduct: ProductExtension = {
   mark: DeepInsightMark,
   wordmark: DeepInsightWordmark,
   home: CmccHomeRoute,
+  layout: CmccLayout,
+  agentLabel: (agent) => cmccTeamExpertByAgent(agent)?.name,
   sidebarRail: CmccSidebarRail,
   promptMenu: CmccPromptMenu,
   sidebarClass: "bg-[linear-gradient(180deg,#d9e9ff_0%,#eae6ff_100%)]",

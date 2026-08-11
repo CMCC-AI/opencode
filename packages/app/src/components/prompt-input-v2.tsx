@@ -44,6 +44,8 @@ export type PromptInputV2ComposerProps = {
 export type PromptInputV2ControllerProps = Omit<PromptInputProps, "class" | "submission">
 export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly model: PromptInputProps["controls"]["model"]
+  readonly selectedAgent?: string
+  readonly clearSelectedAgent?: () => void
 }
 
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
@@ -60,6 +62,11 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
     },
     text: props.controller.value,
   })
+  const selectedAgentLabel = createMemo(() => {
+    const agent = props.controller.selectedAgent
+    if (!agent) return
+    return product.agentLabel?.(agent)
+  })
 
   return (
     <div class="flex flex-col gap-3">
@@ -69,6 +76,25 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
         class={props.class}
         formClass={product.promptClass}
         addMenu={product.promptMenu ? <Dynamic component={product.promptMenu} controller={productController()} /> : undefined}
+        leadingControl={
+          <Show when={selectedAgentLabel()} keyed>
+            {(label) => (
+              <button
+                type="button"
+                data-action="prompt-selected-expert"
+                class="flex h-7 min-w-0 max-w-[210px] items-center gap-1.5 rounded-[7px] bg-v2-background-bg-layer-03 px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                onClick={() => {
+                  props.controller.clearSelectedAgent?.()
+                  props.controller.restoreFocus()
+                }}
+                aria-label={`移除${label}`}
+              >
+                <Icon name="close" class="size-3.5 shrink-0 text-v2-icon-icon-muted" />
+                <span class="min-w-0 truncate">{label}</span>
+              </button>
+            )}
+          </Show>
+        }
         variantControlVisible={!product.hideModelVariants && !props.controller.model.loading}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
@@ -112,6 +138,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  const product = useProduct()
   const prompt = props.state ?? usePrompt()
   let editor: HTMLDivElement | undefined
 
@@ -244,6 +271,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     onAbort: props.onAbort,
     onSubmit: props.onSubmit,
     model: props.controls.model.selection,
+    selectedAgent: () => props.selectedAgent,
   })
 
   const referenceDescription = (reference: ReferenceInfo) =>
@@ -410,9 +438,10 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     view: {
       placeholder: designPlaceholder,
       get agent() {
-        return props.controls.agents.visible && props.controls.agents.options.length > 0
+        const options = props.controls.agents.options.filter((name) => !product.agentLabel?.(name))
+        return props.controls.agents.visible && options.length > 0
           ? {
-              options: () => props.controls.agents.options.map((name) => ({ id: name, label: name })),
+              options: () => options.map((name) => ({ id: name, label: name })),
               current: () => props.controls.agents.current,
               onSelect: (value: string) => props.controls.agents.select(value),
               keybind: () => command.keybindParts("agent.cycle"),
@@ -433,7 +462,11 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       },
     },
   })
-  Object.defineProperty(controller, "model", { get: () => props.controls.model })
+  Object.defineProperties(controller, {
+    model: { get: () => props.controls.model },
+    selectedAgent: { get: () => props.selectedAgent },
+    clearSelectedAgent: { get: () => () => props.onSelectedAgentChange?.(undefined) },
+  })
 
   command.register("prompt-input", () => [
     {

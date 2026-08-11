@@ -21,7 +21,9 @@ const copied = [
     Array.from(new Bun.Glob(pattern).scanSync({ cwd: source, onlyFiles: true })).map((file) => `src/${file}`),
   ),
   ...["e2e/**/*", "test-browser/**/*", "happydom.ts", "playwright.config.ts"].flatMap((pattern) =>
-    Array.from(new Bun.Glob(pattern).scanSync({ cwd: root, onlyFiles: true })),
+    Array.from(new Bun.Glob(pattern).scanSync({ cwd: root, onlyFiles: true })).filter(
+      (file) => !file.startsWith("e2e/playwright-report/") && !file.startsWith("e2e/test-results/"),
+    ),
   ),
 ]
 

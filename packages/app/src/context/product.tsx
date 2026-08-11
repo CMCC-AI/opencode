@@ -20,6 +20,8 @@ export type ProductExtension = {
   mark?: Component<{ class?: string }>
   wordmark?: Component<{ class?: string }>
   home?: Component
+  layout?: Component<ParentProps>
+  agentLabel?: (agent: string) => string | undefined
   routes?: readonly ProductRoute[]
   sidebarRail?: Component<{ mobile?: boolean }>
   promptAccessory?: Component<{ controller: ProductPromptController }>

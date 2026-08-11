@@ -54,4 +54,6 @@ export interface PromptInputProps {
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
   onSubmit?: () => void
+  selectedAgent?: string
+  onSelectedAgentChange?: (agent: string | undefined) => void
 }

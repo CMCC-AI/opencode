@@ -229,6 +229,7 @@ type PromptSubmitInput = {
   onAbort?: () => void
   onSubmit?: () => void
   model?: ModelSelection
+  selectedAgent?: Accessor<string | undefined>
 }
 
 export function createPromptSubmit(input: PromptSubmitInput) {
@@ -346,6 +347,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       })
       return
     }
+    const agent = input.selectedAgent?.() ?? currentAgent.name
 
     input.addToHistory(currentPrompt, mode)
     input.resetHistoryNavigation()
@@ -402,7 +404,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     if (!session && isNewSession) {
       const created = await sdk()
         .api.session.create({
-          agent: currentAgent.name,
+          agent,
           model: { id: currentModel.id, providerID: currentModel.provider.id, variant },
           location: { directory: sessionDirectory },
         })
@@ -421,7 +423,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           if (!session) return
           if (shouldAutoAccept) permissionState.enableAutoAccept(session.id, sessionDirectory)
           local.session.promote(sessionDirectory, session.id, {
-            agent: currentAgent.name,
+            agent,
             model: { providerID: currentModel.provider.id, modelID: currentModel.id },
             variant: variant ?? null,
           })
@@ -445,7 +447,6 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       modelID: currentModel.id,
       providerID: currentModel.provider.id,
     }
-    const agent = currentAgent.name
     const draft: FollowupDraft = {
       sessionID: session.id,
       sessionDirectory,
