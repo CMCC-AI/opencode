@@ -50,6 +50,7 @@ import { WslServersProvider } from "@/wsl/context"
 import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout"
 import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
+import { CmccDeepXivRoute } from "@/pages/cmcc-deepxiv"
 import { CmccExpertCenterRoute, CmccExpertRoute } from "@/pages/cmcc-experts"
 import { CmccPluginHubRoute } from "@/pages/cmcc-plugin-hub"
 import { CmccKnowledgeHomeRoute, CmccKnowledgeNotebookRoute } from "@/pages/cmcc-knowledge"
@@ -638,6 +639,8 @@ function Routes() {
         <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />
         <Route path="/knowledge/:id/session/:sessionID" component={KnowledgeNotebookRoute} />
         <Route path="/knowledge/:id" component={KnowledgeNotebookRoute} />
+        <Route path="/deepxiv" component={CmccDeepXivRoute} />
+        <Route path="/deepxiv/" component={CmccDeepXivRoute} />
         <Route path="/plugins" component={CmccPluginHubRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
