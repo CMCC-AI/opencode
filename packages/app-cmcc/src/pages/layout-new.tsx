@@ -22,6 +22,7 @@ import { sessionTitle } from "@/utils/session-title"
 import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
 import { cmccExpertCenterHref } from "@/utils/cmcc-experts"
 import { sortedRootSessions } from "./layout/helpers"
+import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 
 const SIDEBAR_MIN_WIDTH = 280
 const SIDEBAR_MAX_WIDTH = 420
@@ -36,10 +37,19 @@ function sessionUpdatedAt(session: Session) {
 
 export default function NewLayout(props: ParentProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const layout = useLayout()
+  const [persistentViews, setPersistentViews] = createStore({
+    deepXivMounted: isDeepXivPath(location.pathname),
+  })
   setNavigate(navigate)
 
   createEffect(() => setV2Toast(true))
+  // Preserve the embedded app's in-memory state across APP-CMCC menu changes;
+  // the same-site proxy restores its Cookie independently after a real reload.
+  createEffect(() => {
+    if (isDeepXivPath(location.pathname)) setPersistentViews("deepXivMounted", true)
+  })
   createEffect(() => {
     if (!layout.ready()) return
     if (typeof localStorage === "undefined") return
@@ -91,6 +101,9 @@ export default function NewLayout(props: ParentProps) {
           </svg>
           <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
             <Suspense>{props.children}</Suspense>
+            <Show when={persistentViews.deepXivMounted}>
+              <CmccDeepXivFrame active={isDeepXivPath(location.pathname)} />
+            </Show>
           </div>
         </section>
       </main>
@@ -353,6 +366,12 @@ function CmccSidebar() {
               label="插件"
               active={location.pathname === "/plugins"}
               onClick={() => navigate("/plugins")}
+            />
+            <CmccSidebarAction
+              icon="review"
+              label="DeepXiv 前沿论文"
+              active={isDeepXivPath(location.pathname)}
+              onClick={() => navigate("/deepxiv")}
             />
           </nav>
           <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
