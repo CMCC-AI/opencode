@@ -45,6 +45,20 @@ export const DeepInsightLogo = (props: SvgClassProps) => {
   )
 }
 
+export function DeepInsightBrand(props: { class?: string }) {
+  return (
+    <div class={`flex items-center gap-3 ${props.class ?? ""}`}>
+      <DeepInsightMark class="h-12 w-10 shrink-0 text-[#315cff]" />
+      <div class="min-w-0">
+        <div class="bg-[linear-gradient(90deg,#315cff,#7037d9)] bg-clip-text text-xl font-bold text-transparent">
+          DeepInsight深度洞察
+        </div>
+        <div class="text-[10px] tracking-[0.28em] text-[#6f7890]">把握产业脉搏，洞察市场先机</div>
+      </div>
+    </div>
+  )
+}
+
 export function DeepInsightWordmark(props: Pick<ComponentProps<"svg">, "class">) {
   return (
     <svg

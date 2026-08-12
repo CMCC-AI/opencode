@@ -20,6 +20,7 @@ import { setNavigate } from "@/utils/notification-click"
 import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
 import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
+import { DeepInsightBrand } from "@/components/brand"
 import {
   CMCC_CONVERSATION_WORKSPACES_EVENT,
   cmccConversationDirectories,
@@ -489,7 +490,10 @@ function CmccSidebar() {
         style={{ width: `${width()}px` }}
       >
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
-          <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4 pt-12">
+          <div class="shrink-0 px-4 pb-6 pt-5">
+            <DeepInsightBrand />
+          </div>
+          <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4">
             <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
             <CmccSidebarAction
               icon="glasses"
