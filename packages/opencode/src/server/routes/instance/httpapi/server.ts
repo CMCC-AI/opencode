@@ -1,6 +1,13 @@
 import { Config as EffectConfig, Context, Effect, Layer } from "effect"
 import { HttpApiBuilder, OpenApi } from "effect/unstable/httpapi"
-import { HttpClient, HttpMiddleware, HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
+import {
+  HttpClient,
+  HttpEffect,
+  HttpMiddleware,
+  HttpRouter,
+  HttpServer,
+  HttpServerResponse,
+} from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import * as Observability from "@opencode-ai/core/observability"
@@ -110,7 +117,7 @@ import { instanceContextLayer } from "./middleware/instance-context"
 import { workspaceRoutingLayer } from "./middleware/workspace-routing"
 import { disposeMiddleware } from "./lifecycle"
 import { memoMap } from "@opencode-ai/core/effect/memo-map"
-import { compressionLayer } from "./middleware/compression"
+import { compressionLayer, isStreamingRequest } from "./middleware/compression"
 import { corsVaryFix } from "./middleware/cors-vary"
 import { errorLayer } from "./middleware/error"
 import { fenceLayer } from "./middleware/fence"
@@ -118,14 +125,28 @@ import { schemaErrorLayer } from "./middleware/schema-error"
 
 export const context = Context.makeUnsafe<unknown>(new Map())
 
-const cors = (corsOptions?: CorsOptions) =>
-  HttpRouter.middleware(
-    HttpMiddleware.cors({
-      allowedOrigins: (origin) => isAllowedCorsOrigin(origin, corsOptions),
-      maxAge: 86_400,
-    }),
+const cors = (corsOptions?: CorsOptions) => {
+  const middleware = HttpMiddleware.cors({
+    allowedOrigins: (origin) => isAllowedCorsOrigin(origin, corsOptions),
+    maxAge: 86_400,
+  })
+  return HttpRouter.middleware(
+    (effect) =>
+      Effect.gen(function* () {
+        const response = yield* middleware(effect)
+        yield* HttpEffect.appendPreResponseHandler((request, finalResponse) => {
+          if (isStreamingRequest(request.method, request.url)) return Effect.succeed(finalResponse)
+          const vary = finalResponse.headers["vary"]
+          if (!vary) return Effect.succeed(HttpServerResponse.setHeader(finalResponse, "vary", "Accept-Encoding"))
+          const tokens = vary.split(",").map((token) => token.trim().toLowerCase())
+          if (tokens.includes("accept-encoding") || tokens.includes("*")) return Effect.succeed(finalResponse)
+          return Effect.succeed(HttpServerResponse.setHeader(finalResponse, "vary", `${vary}, Accept-Encoding`))
+        })
+        return response
+      }),
     { global: true },
   )
+}
 
 // Route tree:
 // - rootApiRoutes: typed /global/* and control routes; auth is declared by RootHttpApi.

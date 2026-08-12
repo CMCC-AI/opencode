@@ -48,12 +48,8 @@ import { TabsProvider, useTabs, type DraftTab } from "@/context/tabs"
 import { SDKProvider, useSDK } from "@/context/sdk"
 import { WslServersProvider } from "@/wsl/context"
 import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout"
-import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
 import { CmccDeepXivRoute } from "@/pages/cmcc-deepxiv"
-import { CmccExpertCenterRoute, CmccExpertRoute } from "@/pages/cmcc-experts"
-import { CmccPluginHubRoute } from "@/pages/cmcc-plugin-hub"
-import { CmccKnowledgeHomeRoute, CmccKnowledgeNotebookRoute } from "@/pages/cmcc-knowledge"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 import {
@@ -64,15 +60,30 @@ import {
   sessionHref,
 } from "./utils/session-route"
 import { isSessionNotFoundError } from "./utils/server-errors"
-import { cmccCreateConversationWorkspace } from "./utils/cmcc-workspace"
+import { cmccCreateConversationWorkspace, cmccIsWorkspaceDirectory } from "./utils/cmcc-workspace"
 import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
 
-import Session from "@/pages/session"
-import { LegacyHome } from "@/pages/home"
-
+const LegacyLayout = lazy(() => import("@/pages/layout"))
+const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
+const LegacyHome = lazy(() => import("@/pages/home").then((module) => ({ default: module.LegacyHome })))
+const CmccExpertCenterRoute = lazy(() =>
+  import("@/pages/cmcc-experts").then((module) => ({ default: module.CmccExpertCenterRoute })),
+)
+const CmccExpertRoute = lazy(() =>
+  import("@/pages/cmcc-experts").then((module) => ({ default: module.CmccExpertRoute })),
+)
+const CmccPluginHubRoute = lazy(() =>
+  import("@/pages/cmcc-plugin-hub").then((module) => ({ default: module.CmccPluginHubRoute })),
+)
+const CmccKnowledgeHomeRoute = lazy(() =>
+  import("@/pages/cmcc-knowledge").then((module) => ({ default: module.CmccKnowledgeHomeRoute })),
+)
+const CmccKnowledgeNotebookRoute = lazy(() =>
+  import("@/pages/cmcc-knowledge").then((module) => ({ default: module.CmccKnowledgeNotebookRoute })),
+)
 
 const SessionRoute = () => {
   const settings = useSettings()
@@ -654,7 +665,7 @@ function KnowledgeNotebookRoute() {
   const params = useParams<{ id: string; sessionID?: string }>()
   const notebook = createMemo(() => cmccKnowledgeNotebooks().find((item) => item.id === params.id))
   const directory = () => notebook()!.directory
-  const sessionID = () => (params.sessionID === "new" ? undefined : params.sessionID ?? notebook()?.sessionID)
+  const sessionID = () => (params.sessionID === "new" ? undefined : (params.sessionID ?? notebook()?.sessionID))
 
   return (
     <Show when={notebook()} fallback={<Navigate href="/knowledge" />}>
@@ -682,6 +693,14 @@ function CmccDefaultRoute() {
   createEffect(() => {
     if (!home() || started || !tabs.ready()) return
     started = true
+    const existing =
+      tabs.store.find(
+        (tab) => tab.type === "draft" && tab.server === server.key && cmccIsWorkspaceDirectory(tab.directory, home()),
+      ) ?? tabs.store.find((tab) => tab.type === "draft" && tab.server === server.key)
+    if (existing) {
+      tabs.select(existing)
+      return
+    }
     void cmccCreateConversationWorkspace(home(), (directory) =>
       serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
     )

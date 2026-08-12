@@ -299,30 +299,44 @@ describe("HttpApi UI fallback", () => {
     }),
   )
 
-  it.live("serves embedded UI assets when Bun can read them but access reports missing", () =>
+  it.live("caches embedded hashed assets and serves conditional requests", () =>
     Effect.gen(function* () {
       let readPath: string | undefined
+      let reads = 0
 
       const fs = yield* FSUtil.Service
-      const response = yield* serveEmbeddedUIEffect(
-        "/assets/app.js",
-        {
-          ...fs,
-          existsSafe: () => Effect.die("embedded UI should not rely on filesystem access checks"),
-          readFile: (path) => {
-            readPath = path
-            return path === "/$bunfs/root/assets/app.js"
-              ? Effect.succeed(new TextEncoder().encode("console.log('embedded')"))
-              : Effect.die(`unexpected embedded UI path: ${path}`)
-          },
+      const embeddedWebUI = { "assets/app-abc12345.js": "/$bunfs/root/assets/app-abc12345.js" }
+      const embeddedFs = {
+        ...fs,
+        existsSafe: () => Effect.die("embedded UI should not rely on filesystem access checks"),
+        readFile: (path: string) => {
+          reads++
+          readPath = path
+          return path === "/$bunfs/root/assets/app-abc12345.js"
+            ? Effect.succeed(new TextEncoder().encode("console.log('embedded')"))
+            : Effect.die(`unexpected embedded UI path: ${path}`)
         },
-        { "assets/app.js": "/$bunfs/root/assets/app.js" },
-      ).pipe(Effect.map(HttpServerResponse.toWeb))
+      }
+      const response = yield* serveEmbeddedUIEffect("/assets/app-abc12345.js", embeddedFs, embeddedWebUI).pipe(
+        Effect.map(HttpServerResponse.toWeb),
+      )
+      const etag = response.headers.get("etag") ?? ""
+      const notModified = yield* serveEmbeddedUIEffect("/assets/app-abc12345.js", embeddedFs, embeddedWebUI, {
+        ifNoneMatch: etag,
+      }).pipe(Effect.map(HttpServerResponse.toWeb))
 
       expect(response.status).toBe(200)
-      expect(readPath).toBe("/$bunfs/root/assets/app.js")
+      expect(readPath).toBe("/$bunfs/root/assets/app-abc12345.js")
+      expect(reads).toBe(1)
       expect(response.headers.get("content-type")).toContain("text/javascript")
+      expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable")
+      expect(response.headers.get("vary")).toBe("Accept-Encoding")
+      expect(etag).toMatch(/^W\/"[0-9a-f]{64}"$/)
       expect(yield* responseText(response)).toBe("console.log('embedded')")
+      expect(notModified.status).toBe(304)
+      expect(notModified.headers.get("etag")).toBe(etag)
+      expect(notModified.headers.get("vary")).toBe("Accept-Encoding")
+      expect(yield* responseText(notModified)).toBe("")
     }),
   )
 
@@ -349,6 +363,9 @@ describe("HttpApi UI fallback", () => {
       ).pipe(Effect.map(HttpServerResponse.toWeb))
 
       const csp = response.headers.get("content-security-policy") ?? ""
+      expect(response.headers.get("cache-control")).toBe("no-cache")
+      expect(response.headers.get("etag")).toMatch(/^W\/"[0-9a-f]{64}"$/)
+      expect(response.headers.get("vary")).toBe("Accept-Encoding")
       expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval'")
       expect(csp).toContain(`'sha256-${createHash("sha256").update(script).digest("base64")}'`)
       expect(csp).toContain(

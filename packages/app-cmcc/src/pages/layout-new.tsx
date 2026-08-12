@@ -21,12 +21,7 @@ import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
 import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
 import {
-  CMCC_CONVERSATION_WORKSPACES_EVENT,
-  cmccConversationDirectories,
-  cmccConversationWorkspaces,
   cmccCreateConversationWorkspace,
-  cmccDefaultWorkspace,
-  cmccForgetConversationWorkspace,
   cmccIsWorkspaceDirectory,
   cmccWorkspaceRoot,
   cmccWorkspaceSessionPath,
@@ -40,6 +35,7 @@ const SIDEBAR_MAX_WIDTH = 420
 const SIDEBAR_MAIN_MIN_WIDTH = 560
 const SIDEBAR_HIDE_THRESHOLD = 88
 const SIDEBAR_RESTORE_THRESHOLD = 140
+const SIDEBAR_SESSION_LIMIT = 64
 const CMCC_SIDEBAR_INITIALIZED_KEY = "opencode.cmcc.sidebar.initialized"
 
 function sessionUpdatedAt(session: Session) {
@@ -99,13 +95,34 @@ export default function NewLayout(props: ParentProps) {
               <circle cx="166.187" cy="204.128" r="198.043" fill="#e689dd" />
             </g>
             <defs>
-              <filter id="cmcc-content-yellow-glow" x="502" y="-306" width="961" height="960" filterUnits="userSpaceOnUse">
+              <filter
+                id="cmcc-content-yellow-glow"
+                x="502"
+                y="-306"
+                width="961"
+                height="960"
+                filterUnits="userSpaceOnUse"
+              >
                 <feGaussianBlur stdDeviation="150" />
               </filter>
-              <filter id="cmcc-content-blue-glow" x="504.43" y="247.367" width="995.675" height="995.676" filterUnits="userSpaceOnUse">
+              <filter
+                id="cmcc-content-blue-glow"
+                x="504.43"
+                y="247.367"
+                width="995.675"
+                height="995.676"
+                filterUnits="userSpaceOnUse"
+              >
                 <feGaussianBlur stdDeviation="150" />
               </filter>
-              <filter id="cmcc-content-pink-glow" x="-411.856" y="-373.914" width="1156.09" height="1156.09" filterUnits="userSpaceOnUse">
+              <filter
+                id="cmcc-content-pink-glow"
+                x="-411.856"
+                y="-373.914"
+                width="1156.09"
+                height="1156.09"
+                filterUnits="userSpaceOnUse"
+              >
                 <feGaussianBlur stdDeviation="190" />
               </filter>
             </defs>
@@ -244,42 +261,19 @@ function CmccSidebar() {
     startX: 0,
     startWidth: 0,
   })
-  const [conversationStore, setConversationStore] = createStore({
-    directories: cmccConversationWorkspaces(),
-    sessions: [] as Session[],
-  })
-
-  if (typeof window !== "undefined") {
-    const refresh = () => setConversationStore("directories", cmccConversationWorkspaces())
-    window.addEventListener(CMCC_CONVERSATION_WORKSPACES_EVENT, refresh)
-    onCleanup(() => window.removeEventListener(CMCC_CONVERSATION_WORKSPACES_EVENT, refresh))
-  }
-
   const projects = createMemo(() =>
     layout.projects.list().filter((project) => !cmccIsWorkspaceDirectory(project.worktree, home())),
   )
-  const conversationDirectories = createMemo(() =>
-    cmccConversationDirectories(home(), conversationStore.directories, conversationStore.sessions),
-  )
-  const conversations = createMemo(() => {
-    return conversationDirectories()
-      .flatMap((directory) =>
-        sortedRootSessions(sync().child(directory, { bootstrap: false })[0], Date.now()).map((session) => ({
-          directory,
-          session,
-        })),
-      )
-      .filter((record) => !cmccIsKnowledgeSession(knowledgeNotebooks(), record.session))
+  const conversations = createMemo(() =>
+    Object.values(sync().session.data.info)
+      .filter((session): session is Session => !!session)
+      .filter((session) => cmccIsWorkspaceDirectory(session.directory, home()))
+      .filter((session) => !session.parentID && !session.time.archived)
+      .filter((session) => !cmccIsKnowledgeSession(knowledgeNotebooks(), session))
+      .map((session) => ({ directory: session.directory, session }))
       .sort((a, b) => sessionUpdatedAt(b.session) - sessionUpdatedAt(a.session))
-      .slice(0, 64)
-  })
-
-  const loadConversationDirectory = async (directory: string, remembered: Set<string>) => {
-    if (remembered.has(directory)) {
-      await serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true })
-    }
-    await sync().project.loadSessions(directory, { limit: 64 })
-  }
+      .slice(0, SIDEBAR_SESSION_LIMIT),
+  )
 
   createEffect(() => {
     const directory = cmccWorkspaceRoot(home())
@@ -287,24 +281,17 @@ function CmccSidebar() {
     if (!directory || !path) return
     void serverSDK()
       .client.session.list(
-        { directory, scope: "project", path, roots: true, limit: 200 },
+        { directory, scope: "project", path, roots: true, limit: SIDEBAR_SESSION_LIMIT },
         { throwOnError: true },
       )
-      .then((result) => setConversationStore("sessions", result.data ?? []))
-      .catch(() => setConversationStore("sessions", []))
+      .then((result) => result.data?.forEach((session) => sync().session.remember(session)))
+      .catch(() => undefined)
   })
 
   createEffect(() => {
-    const remembered = new Set(conversationStore.directories)
-    for (const directory of conversationDirectories()) {
-      void loadConversationDirectory(directory, remembered).catch(() => {
-        if (remembered.has(directory)) cmccForgetConversationWorkspace(directory)
-      })
-    }
-  })
-
-  createEffect(() => {
-    for (const project of projects()) void sync().project.loadSessions(project.worktree, { limit: 8 })
+    projects()
+      .filter((project) => project.expanded)
+      .forEach((project) => void sync().project.loadSessions(project.worktree, { limit: 8 }))
   })
   const sidebarMaxWidth = createMemo(() => {
     if (typeof window === "undefined") return SIDEBAR_MAX_WIDTH
@@ -434,13 +421,13 @@ function CmccSidebar() {
   const activeSession = (session: Session) => {
     const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
     if (notebook) return location.pathname === `/knowledge/${notebook.id}/session/${session.id}`
-    return location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
+    return (
+      location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
+    )
   }
 
   const removeSession = (session: Session) => {
-    const [, setStore] = sync().child(session.directory, { bootstrap: false })
-    setStore("session", (list) => list.filter((item) => item.id !== session.id))
-    setStore("sessionTotal", (value) => Math.max(0, value - 1))
+    sync().session.set("info", session.id, undefined)
     sync().session.evict(session.id)
     notifySessionTabsRemoved({ server: server.key, directory: session.directory, sessionIDs: [session.id] })
     if (activeSession(session) && tabs.ready()) tabs.newDraft({ server: server.key, directory: session.directory })
@@ -539,7 +526,11 @@ function CmccSidebar() {
               active={isDeepXivPath(location.pathname)}
               onClick={() => navigate("/deepxiv")}
             />
-            <CmccSidebarAction icon="photo" label="DeepLens 拍照即懂" onClick={() => openPendingProduct("DeepLens 拍照即懂")} />
+            <CmccSidebarAction
+              icon="photo"
+              label="DeepLens 拍照即懂"
+              onClick={() => openPendingProduct("DeepLens 拍照即懂")}
+            />
           </nav>
           <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
             <CmccSidebarSection label="项目" actionLabel="添加项目" action={addProject} actionIcon="folder-add-left" />
