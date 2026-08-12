@@ -93,10 +93,8 @@ type CmccPromptActionMenuProps = {
   onAttach: () => void
   onExperts: () => void
   onSkills: () => void
-  onPlugins: () => void
   onKnowledge?: () => void
   onProfessionalDatabases: () => void
-  onGoal: () => void
 }
 
 export const CmccPromptActionMenu: Component<CmccPromptActionMenuProps> = (props) => (
@@ -112,14 +110,12 @@ export const CmccPromptActionMenu: Component<CmccPromptActionMenuProps> = (props
         onMouseDown={(event) => event.preventDefault()}
       >
         <PromptActionItem icon="link" label="添加文件和图片" onClick={props.onAttach} />
+        <PromptActionItem icon="archive" label="专业数据库" active onClick={props.onProfessionalDatabases} />
         <PromptActionItem icon="mcp" label="专家" arrow onClick={props.onExperts} />
         <PromptActionItem icon="brain" label="技能" arrow onClick={props.onSkills} />
-        <PromptActionItem icon="mcp" label="插件" arrow onClick={props.onPlugins} />
         <Show when={props.onKnowledge}>
           {(onKnowledge) => <PromptActionItem icon="brain" label="知识库" arrow onClick={onKnowledge()} />}
         </Show>
-        <PromptActionItem icon="archive" label="专业数据库" active onClick={props.onProfessionalDatabases} />
-        <PromptActionItem icon="task" label="目标" onClick={props.onGoal} />
       </div>
     </Portal>
   </Show>
