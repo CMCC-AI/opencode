@@ -295,7 +295,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
               const failed = settled.filter((result) => result.status === "rejected")
               if (failed.length > 0) {
                 showToast({
-                  variant: "warning",
+                  variant: "default",
                   title: "部分历史会话加载失败",
                   description: `${failed.length} 条业务会话没有取得对应的 OpenCode 会话详情`,
                 })

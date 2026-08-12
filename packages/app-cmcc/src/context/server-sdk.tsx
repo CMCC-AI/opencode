@@ -200,7 +200,8 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
           for await (const payload of events.stream) {
             resetHeartbeat()
             streamErrorLogged = false
-            if (payload.type !== "server.connected" && payload.type !== "server.heartbeat") {
+            const type = payload.type as string
+            if (type !== "server.connected" && type !== "server.heartbeat") {
               if (enqueueServerEvent(queue, { directory, payload: payload as Event })) schedule()
             }
 
