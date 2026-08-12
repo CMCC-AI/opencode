@@ -55,6 +55,8 @@ export type ProductExtension = {
   promptClass?: string
   hideModelProviders?: boolean
   hideModelVariants?: boolean
+  newSessionHome?: Component<{ children: JSX.Element }>
+  promptPlaceholder?: string
   session?: () => ProductSessionAdapter
   transformTranslation?: (value: string) => string
 }
