@@ -8,6 +8,7 @@ import { CmccSidebarRail } from "@cmcc/components/sidebar-rail"
 import { CmccExpertCenterRoute, CmccExpertRoute } from "@cmcc/pages/cmcc-experts"
 import { CmccKnowledgeHomeRoute, CmccKnowledgeNotebookRoute } from "@cmcc/pages/cmcc-knowledge"
 import { CmccPluginHubRoute } from "@cmcc/pages/cmcc-plugin-hub"
+import { CmccDeepXivPersistentView, CmccDeepXivRoute } from "@cmcc/pages/cmcc-deepxiv"
 import { useDockApi, useDockApiSession } from "@cmcc/dockapi"
 import { cmccKnowledgeNotebooks } from "@cmcc/utils/cmcc-knowledge"
 
@@ -17,6 +18,7 @@ export const cmccProduct: ProductExtension = {
   mark: DeepInsightMark,
   wordmark: DeepInsightWordmark,
   home: CmccHomeRoute,
+  persistentView: CmccDeepXivPersistentView,
   sidebarRail: CmccSidebarRail,
   promptMenu: CmccPromptMenu,
   sidebarClass: "bg-[linear-gradient(180deg,#d9e9ff_0%,#eae6ff_100%)]",
@@ -32,6 +34,8 @@ export const cmccProduct: ProductExtension = {
     { path: "/knowledge", component: CmccKnowledgeHomeRoute },
     { path: "/knowledge/:id/session/:sessionID", component: CmccKnowledgeRoute },
     { path: "/knowledge/:id", component: CmccKnowledgeRoute },
+    { path: "/deepxiv", component: CmccDeepXivRoute },
+    { path: "/deepxiv/", component: CmccDeepXivRoute },
     { path: "/plugins", component: CmccPluginHubRoute },
   ],
   transformTranslation: (value) => value.replaceAll("OpenCode", "DeepInsight").replaceAll("opencode", "DeepInsight"),

@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_DEEPTRADING_API_KEY?: string
   readonly VITE_DOCKAPI_URL?: string
   readonly VITE_DOCKAPI_AGENT_TYPE?: string
+  readonly VITE_DEEPXIV_PROXY_PORT?: string
+  readonly VITE_DEEPXIV_URL?: string
 
   readonly VITE_SENTRY_DSN?: string
   readonly VITE_SENTRY_ENVIRONMENT?: string

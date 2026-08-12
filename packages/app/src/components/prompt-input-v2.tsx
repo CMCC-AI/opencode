@@ -113,6 +113,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  const product = useProduct()
   const prompt = props.state ?? usePrompt()
   let editor: HTMLDivElement | undefined
 

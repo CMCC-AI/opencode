@@ -7,6 +7,7 @@ import { useDockApi } from "@cmcc/dockapi"
 const items = [
   { label: "专家团", icon: "glasses" as const, href: "/expert" },
   { label: "知识库", icon: "brain" as const, href: "/knowledge" },
+  { label: "DeepXiv 前沿论文", icon: "review" as const, href: "/deepxiv" },
   { label: "插件中心", icon: "mcp" as const, href: "/plugins" },
 ]
 

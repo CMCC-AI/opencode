@@ -47,6 +47,7 @@ export type ProductExtension = {
   mark?: Component<{ class?: string }>
   wordmark?: Component<{ class?: string }>
   home?: Component
+  persistentView?: Component
   routes?: readonly ProductRoute[]
   sidebarRail?: Component<{ mobile?: boolean }>
   promptAccessory?: Component<{ controller: ProductPromptController }>
