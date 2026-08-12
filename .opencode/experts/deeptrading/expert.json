@@ -1,0 +1,185 @@
+{
+  "id": "deeptrading",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "deeptrading/deeptrading-team-lead",
+  "teamInfo": {
+    "leadAgent": "deeptrading/deeptrading-team-lead",
+    "memberAgents": [
+      "deeptrading/dt-intake",
+      "deeptrading/dt-market-analyst",
+      "deeptrading/dt-sentiment-analyst",
+      "deeptrading/dt-news-analyst",
+      "deeptrading/dt-fundamentals-analyst",
+      "deeptrading/dt-research-manager",
+      "deeptrading/dt-trader",
+      "deeptrading/dt-report-writer",
+      "deeptrading/dt-viz"
+    ]
+  },
+  "displayName": {
+    "en": "DeepTrading A-Share Research Team",
+    "zh": "DeepTrading A股投研专家团"
+  },
+  "profession": {
+    "en": "DeepTrading A-Share Research Team",
+    "zh": "DeepTrading A股投研专家团"
+  },
+  "displayDescription": {
+    "en": "Multi-agent A-share research team: stock identification, 4D parallel analysis, trading plan and 7-chapter visual report delivery.",
+    "zh": "A股多智能体投研团队：标的识别、四维并行分析、交易方案与七章可视报告，一站式投研交付。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "08-FinanceInvestment",
+  "defaultInitPrompt": {
+    "zh": "研究一下贵州茅台最近怎么样",
+    "en": "Research Kweichow Moutai's recent performance"
+  },
+  "members": [
+    {
+      "id": "deeptrading/deeptrading-team-lead",
+      "name": {
+        "en": "He Zhi Zhou",
+        "zh": "何执舟"
+      },
+      "profession": {
+        "en": "A-Share Research Orchestration Expert",
+        "zh": "A股投研全流程编排专家"
+      },
+      "avatar": "avatars/deeptrading-team-lead.png",
+      "role": "lead",
+      "originalId": "deeptrading-team-lead"
+    },
+    {
+      "id": "deeptrading/dt-intake",
+      "name": {
+        "en": "A He",
+        "zh": "阿核"
+      },
+      "profession": {
+        "en": "Information Confirmation Specialist",
+        "zh": "信息确认员"
+      },
+      "avatar": "avatars/dt-intake.png",
+      "role": "member",
+      "originalId": "dt-intake"
+    },
+    {
+      "id": "deeptrading/dt-market-analyst",
+      "name": {
+        "en": "A Bo",
+        "zh": "阿波"
+      },
+      "profession": {
+        "en": "Market Analysis Expert",
+        "zh": "市场分析专家"
+      },
+      "avatar": "avatars/dt-market-analyst.png",
+      "role": "member",
+      "originalId": "dt-market-analyst"
+    },
+    {
+      "id": "deeptrading/dt-sentiment-analyst",
+      "name": {
+        "en": "A Yan",
+        "zh": "阿言"
+      },
+      "profession": {
+        "en": "Sentiment Analysis Expert",
+        "zh": "舆情分析专家"
+      },
+      "avatar": "avatars/dt-sentiment-analyst.png",
+      "role": "member",
+      "originalId": "dt-sentiment-analyst"
+    },
+    {
+      "id": "deeptrading/dt-news-analyst",
+      "name": {
+        "en": "A Xun",
+        "zh": "阿讯"
+      },
+      "profession": {
+        "en": "News Analysis Expert",
+        "zh": "新闻分析专家"
+      },
+      "avatar": "avatars/dt-news-analyst.png",
+      "role": "member",
+      "originalId": "dt-news-analyst"
+    },
+    {
+      "id": "deeptrading/dt-fundamentals-analyst",
+      "name": {
+        "en": "A Ji",
+        "zh": "阿基"
+      },
+      "profession": {
+        "en": "Fundamentals Analysis Expert",
+        "zh": "基本面分析专家"
+      },
+      "avatar": "avatars/dt-fundamentals-analyst.png",
+      "role": "member",
+      "originalId": "dt-fundamentals-analyst"
+    },
+    {
+      "id": "deeptrading/dt-research-manager",
+      "name": {
+        "en": "A Li",
+        "zh": "阿理"
+      },
+      "profession": {
+        "en": "Investment Decision Manager",
+        "zh": "投资决策经理"
+      },
+      "avatar": "avatars/dt-research-manager.png",
+      "role": "member",
+      "originalId": "dt-research-manager"
+    },
+    {
+      "id": "deeptrading/dt-trader",
+      "name": {
+        "en": "Yan Zhi Sun",
+        "zh": "严止损"
+      },
+      "profession": {
+        "en": "Position/Stop-Loss/Risk Control Expert",
+        "zh": "仓位/止盈止损/风控执行方案专家"
+      },
+      "avatar": "avatars/dt-trader.png",
+      "role": "member",
+      "originalId": "dt-trader"
+    },
+    {
+      "id": "deeptrading/dt-report-writer",
+      "name": {
+        "en": "A Hui (Writer)",
+        "zh": "阿汇"
+      },
+      "profession": {
+        "en": "Report Writing Expert",
+        "zh": "报告撰写专家"
+      },
+      "avatar": "avatars/dt-report-writer.png",
+      "role": "member",
+      "originalId": "dt-report-writer"
+    },
+    {
+      "id": "deeptrading/dt-viz",
+      "name": {
+        "en": "A Hui (Visualizer)",
+        "zh": "阿绘"
+      },
+      "profession": {
+        "en": "Visualization Expert",
+        "zh": "可视化专家"
+      },
+      "avatar": "avatars/dt-viz.png",
+      "role": "member",
+      "originalId": "dt-viz"
+    }
+  ],
+  "original": {
+    "name": "deeptrading",
+    "version": "1.0.0",
+    "description": "Self-contained A-share trading research expert team with multi-agent orchestration"
+  }
+}

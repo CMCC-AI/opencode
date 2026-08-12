@@ -1,0 +1,110 @@
+{
+  "id": "shoppers-pro",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "shoppers-pro/shoppers-pro-team-lead",
+  "teamInfo": {
+    "leadAgent": "shoppers-pro/shoppers-pro-team-lead",
+    "memberAgents": [
+      "shoppers-pro/need-insight",
+      "shoppers-pro/product-discoverer",
+      "shoppers-pro/reputation-scout",
+      "shoppers-pro/card-editor"
+    ]
+  },
+  "displayName": {
+    "en": "Shoppers Pro",
+    "zh": "好买手"
+  },
+  "profession": {
+    "en": "AI Shopping Decision Expert Team",
+    "zh": "全品类AI购买决策专家团"
+  },
+  "displayDescription": {
+    "en": "Full-category AI shopping decision team. Empathetic need insight, multi-platform price comparison, real reputation analysis, and actionable buying recommendations.",
+    "zh": "全品类购买决策专家团。务实需求洞察+各平台比价+真实口碑分析+推荐指数，给你可点击的购买决策报告。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "07-SalesCommerce",
+  "defaultInitPrompt": {
+    "zh": "给父母买一台三千元左右的手机，操作简单、续航好，推荐一些并给购买入口",
+    "en": "Help me pick a phone around 3000 CNY for my parents, easy to use with good battery life"
+  },
+  "members": [
+    {
+      "id": "shoppers-pro/shoppers-pro-team-lead",
+      "name": {
+        "en": "Shen Haoke",
+        "zh": "申浩客"
+      },
+      "profession": {
+        "en": "Chief Buying Advisor",
+        "zh": "首席选购顾问"
+      },
+      "avatar": "avatars/shoppers-pro-team-lead.png",
+      "role": "lead",
+      "originalId": "shoppers-pro-team-lead"
+    },
+    {
+      "id": "shoppers-pro/need-insight",
+      "name": {
+        "en": "Lin Xueqing",
+        "zh": "林雪晴"
+      },
+      "profession": {
+        "en": "Need Insight Analyst",
+        "zh": "需求洞察师"
+      },
+      "avatar": "avatars/need-insight.png",
+      "role": "member",
+      "originalId": "need-insight"
+    },
+    {
+      "id": "shoppers-pro/product-discoverer",
+      "name": {
+        "en": "Sou Kuangbiao",
+        "zh": "搜旷标"
+      },
+      "profession": {
+        "en": "Product Discovery Specialist",
+        "zh": "商品发现师"
+      },
+      "avatar": "avatars/product-discoverer.png",
+      "role": "member",
+      "originalId": "product-discoverer"
+    },
+    {
+      "id": "shoppers-pro/reputation-scout",
+      "name": {
+        "en": "Yan Buhuang",
+        "zh": "严不慌"
+      },
+      "profession": {
+        "en": "Reputation Analyst",
+        "zh": "口碑分析员"
+      },
+      "avatar": "avatars/reputation-scout.png",
+      "role": "member",
+      "originalId": "reputation-scout"
+    },
+    {
+      "id": "shoppers-pro/card-editor",
+      "name": {
+        "en": "Zhen Cuohua",
+        "zh": "甄措花"
+      },
+      "profession": {
+        "en": "Recommendation Editor",
+        "zh": "推荐编辑师"
+      },
+      "avatar": "avatars/card-editor.png",
+      "role": "member",
+      "originalId": "card-editor"
+    }
+  ],
+  "original": {
+    "name": "shoppers-pro",
+    "version": "1.0.0",
+    "description": "AI shopping decision expert team - empathetic need insight + product discovery + reputation analysis + buying recommendations"
+  }
+}

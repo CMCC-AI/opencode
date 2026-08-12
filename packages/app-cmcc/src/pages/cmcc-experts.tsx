@@ -56,6 +56,16 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     summary: "汇集投资大师视角，输出可信的组合决策",
     image: expertInvestment,
   },
+  deeptrading: {
+    eyebrow: "AI + A股投研",
+    summary: "多智能体协作完成标的识别、四维分析与可视化报告",
+    image: expertFinance,
+  },
+  "shoppers-pro": {
+    eyebrow: "AI + 推荐",
+    summary: "务实需求洞察、多平台比价、真实口碑分析，交付可点击的购买决策报告",
+    image: expertHero,
+  },
 }
 
 const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
