@@ -44,6 +44,8 @@ export type PromptInputV2Props = {
   variantControlVisible?: boolean
   attachKeybind?: string[]
   attachShortcut?: string
+  addMenu?: JSX.Element
+  formClass?: string
 }
 
 export function PromptInputV2(props: PromptInputV2Props) {
@@ -110,7 +112,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
       <form
         data-component="prompt-input-v2"
         data-dock-border-underlay={props.borderUnderlay ? "v2" : undefined}
-        class="group/prompt-input relative min-h-[96px] w-full overflow-clip rounded-xl bg-v2-background-bg-base"
+        class={`group/prompt-input relative min-h-[96px] w-full overflow-clip rounded-xl bg-v2-background-bg-base ${props.formClass ?? ""}`}
         classList={{
           "shadow-[var(--v2-elevation-raised)]": !props.borderUnderlay,
           "border border-v2-icon-icon-info border-dashed": state.drag === "active",
@@ -202,7 +204,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
             inert={state.mode === "shell" ? true : undefined}
             style={buttons()}
           >
-            <PromptInputV2AddMenu
+            <Show when={props.addMenu} fallback={<PromptInputV2AddMenu
               disabled={state.mode === "shell"}
               title={i18n.t("ui.promptInput.add")}
               keybind={props.attachKeybind ?? ["Mod", "U"]}
@@ -215,7 +217,9 @@ export function PromptInputV2(props: PromptInputV2Props) {
               onCommands={props.controller.openCommands}
               onContext={props.controller.openContext}
               onShell={props.controller.openShell}
-            />
+            />}>
+              {props.addMenu}
+            </Show>
             <Show when={view.agent} keyed>
               {(control) => (
                 <PromptInputV2ConfiguredSelect

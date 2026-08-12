@@ -51,6 +51,15 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
   const command = useCommand()
   const language = useLanguage()
   const product = useProduct()
+  const productController = () => ({
+    attach: props.controller.attach,
+    openCommands: props.controller.openCommands,
+    restoreFocus: props.controller.restoreFocus,
+    setText: (value: string) => {
+      props.controller.onInput(value, [{ type: "text" as const, content: value, start: 0, end: value.length }], value.length)
+    },
+    text: props.controller.value,
+  })
 
   return (
     <div class="flex flex-col gap-3">
@@ -58,11 +67,14 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
         controller={props.controller}
         borderUnderlay={props.borderUnderlay}
         class={props.class}
-        variantControlVisible={!props.controller.model.loading}
+        formClass={product.promptClass}
+        addMenu={product.promptMenu ? <Dynamic component={product.promptMenu} controller={productController()} /> : undefined}
+        variantControlVisible={!product.hideModelVariants && !props.controller.model.loading}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
         modelControl={
           <PromptInputV2ModelControl
+            hideProvider={product.hideModelProviders}
             loading={props.controller.model.loading}
             paid={props.controller.model.paid}
             title={language.t("command.model.choose")}
@@ -81,15 +93,7 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
         {(Accessory) => (
           <Dynamic
             component={Accessory()}
-            controller={{
-              attach: props.controller.attach,
-              openCommands: props.controller.openCommands,
-              restoreFocus: props.controller.restoreFocus,
-              setText: (value) => {
-                props.controller.onInput(value, [{ type: "text", content: value, start: 0, end: value.length }], value.length)
-              },
-              text: props.controller.value,
-            }}
+            controller={productController()}
           />
         )}
       </Show>
@@ -488,6 +492,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
 }
 
 function PromptInputV2ModelControl(props: {
+  hideProvider?: boolean
   loading: boolean
   paid: boolean
   title: string
@@ -501,7 +506,7 @@ function PromptInputV2ModelControl(props: {
   const shouldAnimate = createMemo<boolean>((previous) => previous ?? props.loading)
   const content = () => (
     <>
-      <Show when={props.providerID}>
+      <Show when={!props.hideProvider && props.providerID}>
         {(providerID) => (
           <ProviderIcon
             id={providerID()}
