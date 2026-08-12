@@ -38,6 +38,7 @@
     "src/components/prompt-accessory.tsx",
     "src/components/sidebar-rail.tsx",
     "src/pages/cmcc-experts.tsx",
+    "src/pages/cmcc-deepxiv.tsx",
     "src/pages/cmcc-layout.tsx",
     "src/pages/cmcc-knowledge.tsx",
     "src/pages/cmcc-plugin-hub.tsx",

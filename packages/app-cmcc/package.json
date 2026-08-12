@@ -13,9 +13,11 @@
     "typecheck": "bun run check:thin && tsgo -b",
     "start": "vite",
     "dev": "vite",
+    "deepxiv:proxy": "bun ./scripts/run-deepxiv-proxy.ts",
+    "test:deepxiv-proxy": "bun test ./scripts/deepxiv-proxy.test.ts",
     "build": "bun run check:thin && vite build",
     "serve": "vite preview",
-    "test": "bun run check:thin && bun test ./src",
+    "test": "bun run check:thin && bun test ./src && bun run test:deepxiv-proxy",
     "test:watch": "bun test --watch ./src"
   },
   "license": "MIT",

@@ -17,6 +17,7 @@ import CmccLayout from "@cmcc/pages/cmcc-layout"
 import { CmccExpertCenterRoute, CmccExpertRoute } from "@cmcc/pages/cmcc-experts"
 import { CmccKnowledgeHomeRoute, CmccKnowledgeNotebookRoute } from "@cmcc/pages/cmcc-knowledge"
 import { CmccPluginHubRoute } from "@cmcc/pages/cmcc-plugin-hub"
+import { CmccDeepXivRoute } from "@cmcc/pages/cmcc-deepxiv"
 import { cmccKnowledgeNotebooks } from "@cmcc/utils/cmcc-knowledge"
 import { cmccTeamExpertByAgent } from "@cmcc/utils/cmcc-experts"
 import { cmccCreateConversationWorkspace } from "@cmcc/utils/cmcc-workspace"
@@ -43,6 +44,8 @@ export const cmccProduct: ProductExtension = {
     { path: "/knowledge", component: CmccKnowledgeHomeRoute },
     { path: "/knowledge/:id/session/:sessionID", component: CmccKnowledgeRoute },
     { path: "/knowledge/:id", component: CmccKnowledgeRoute },
+    { path: "/deepxiv", component: CmccDeepXivRoute },
+    { path: "/deepxiv/", component: CmccDeepXivRoute },
     { path: "/plugins", component: CmccPluginHubRoute },
   ],
   transformTranslation: (value) => value.replaceAll("OpenCode", "DeepInsight").replaceAll("opencode", "DeepInsight"),
