@@ -1,5 +1,6 @@
 import type { ProductPromptController } from "@opencode-ai/app"
 import { Icon } from "@opencode-ai/ui/icon"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { useNavigate } from "@solidjs/router"
 import { createSignal, Show } from "solid-js"
 import { CmccKnowledgePicker } from "@cmcc/components/cmcc-knowledge-picker"
@@ -9,7 +10,7 @@ import {
 } from "@cmcc/components/cmcc-professional-databases"
 import { cmccKnowledgeNotebooks } from "@cmcc/utils/cmcc-knowledge"
 
-export function CmccPromptAccessory(props: { controller: ProductPromptController }) {
+export function CmccPromptMenu(props: { controller: ProductPromptController }) {
   const navigate = useNavigate()
   const [knowledge, setKnowledge] = createSignal(false)
   const [databases, setDatabases] = createSignal(false)
@@ -22,13 +23,20 @@ export function CmccPromptAccessory(props: { controller: ProductPromptController
 
   return (
     <>
-      <div class="flex min-w-0 flex-wrap items-center gap-1 px-1 text-v2-text-text-muted">
-        <AccessoryButton icon="link" label="附件" onClick={props.controller.attach} />
-        <AccessoryButton icon="mcp" label="专家" onClick={() => navigate("/expert")} />
-        <AccessoryButton icon="brain" label="知识库" onClick={() => setKnowledge(true)} />
-        <AccessoryButton icon="archive" label="专业数据库" onClick={() => setDatabases(true)} />
-        <AccessoryButton icon="task" label="技能" onClick={props.controller.openCommands} />
-      </div>
+      <DropdownMenu>
+        <DropdownMenu.Trigger as="button" type="button" class="grid size-7 place-items-center rounded-md hover:bg-v2-overlay-simple-overlay-hover">
+          <Icon name="plus" class="size-4" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content class="w-[218px]">
+            <DropdownMenu.Item onSelect={props.controller.attach}><Icon name="link" />添加文件和图片</DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => setDatabases(true)}><Icon name="archive" />专业数据库</DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => navigate("/expert")}><Icon name="mcp" />专家</DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={props.controller.openCommands}><Icon name="task" />技能</DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => setKnowledge(true)}><Icon name="brain" />知识库</DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu>
       <Show when={knowledge()}>
         <CmccKnowledgePicker
           notebooks={cmccKnowledgeNotebooks()}
@@ -45,22 +53,5 @@ export function CmccPromptAccessory(props: { controller: ProductPromptController
         <CmccProfessionalDatabasesDialog onClose={() => setDatabases(false)} onTry={selectDatabase} />
       </Show>
     </>
-  )
-}
-
-function AccessoryButton(props: {
-  icon: "link" | "mcp" | "brain" | "archive" | "task"
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      class="flex h-7 items-center gap-1.5 rounded-[7px] px-2 text-[12px] hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
-      onClick={props.onClick}
-    >
-      <Icon name={props.icon} class="size-3.5" />
-      <span>{props.label}</span>
-    </button>
   )
 }

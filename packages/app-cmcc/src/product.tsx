@@ -2,7 +2,7 @@ import { AppDirectoryScope, type ProductExtension, useServer, useServerSync, use
 import { Navigate, useParams } from "@solidjs/router"
 import { createEffect, createMemo, Show } from "solid-js"
 import { DeepInsightMark, DeepInsightWordmark } from "@cmcc/components/brand"
-import { CmccPromptAccessory } from "@cmcc/components/prompt-accessory"
+import { CmccPromptMenu } from "@cmcc/components/prompt-accessory"
 import { CmccSidebarRail } from "@cmcc/components/sidebar-rail"
 import { CmccExpertCenterRoute, CmccExpertRoute } from "@cmcc/pages/cmcc-experts"
 import { CmccKnowledgeHomeRoute, CmccKnowledgeNotebookRoute } from "@cmcc/pages/cmcc-knowledge"
@@ -17,7 +17,11 @@ export const cmccProduct: ProductExtension = {
   wordmark: DeepInsightWordmark,
   home: CmccHomeRoute,
   sidebarRail: CmccSidebarRail,
-  promptAccessory: CmccPromptAccessory,
+  promptMenu: CmccPromptMenu,
+  sidebarClass: "bg-[linear-gradient(180deg,#d9e9ff_0%,#eae6ff_100%)]",
+  promptClass: "rounded-[16px] border border-[#2c5dff] shadow-[0_4px_8px_rgba(50,6,249,0.15)]",
+  hideModelProviders: true,
+  hideModelVariants: true,
   session: useDockApiSession,
   routes: [
     { path: "/expert", component: CmccExpertCenterRoute },

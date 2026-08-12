@@ -1,6 +1,6 @@
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import type { Session } from "@opencode-ai/sdk/v2/client"
-import type { Component, ParentProps } from "solid-js"
+import type { Component, JSX, ParentProps } from "solid-js"
 
 export type ProductRoute = {
   path: string
@@ -50,6 +50,11 @@ export type ProductExtension = {
   routes?: readonly ProductRoute[]
   sidebarRail?: Component<{ mobile?: boolean }>
   promptAccessory?: Component<{ controller: ProductPromptController }>
+  promptMenu?: Component<{ controller: ProductPromptController }>
+  sidebarClass?: string
+  promptClass?: string
+  hideModelProviders?: boolean
+  hideModelVariants?: boolean
   session?: () => ProductSessionAdapter
   transformTranslation?: (value: string) => string
 }

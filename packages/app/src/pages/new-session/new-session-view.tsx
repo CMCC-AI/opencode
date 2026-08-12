@@ -40,13 +40,13 @@ export function NewSessionView(props: {
         data-component="session-new-design"
         class="relative flex-1 min-h-0 overflow-hidden rounded-[10px] bg-v2-background-bg-deep"
       >
-        <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
+        <div class="absolute inset-x-0 top-[14%] flex justify-center px-6">
           <div class={NEW_SESSION_CONTENT_WIDTH}>
             <Dynamic
               component={product.wordmark ?? WordmarkV2}
               class="h-auto w-full text-v2-background-bg-inverse"
             />
-            <div class="mt-8 flex flex-col gap-8">
+            <div class="mt-12 flex flex-col gap-8">
               <PromptInputV2Composer controller={props.input} />
               <Show when={props.project.empty()}>
                 <PromptProjectAddButton controller={props.project} />
@@ -74,7 +74,7 @@ export function NewSessionView(props: {
             </div>
           </div>
         </div>
-        <ProviderTip />
+        <Show when={!product.hideModelProviders}><ProviderTip /></Show>
       </div>
     </div>
   )
