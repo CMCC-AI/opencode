@@ -1586,6 +1586,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const designPlaceholder = () => {
     if (store.mode === "shell") return placeholder()
+    if (newSession()) return "请告诉我您要研究的问题？ @ 引用对话文件，/ 调用技能与指令"
     return language.t("prompt.placeholder.simple")
   }
 
@@ -1682,7 +1683,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               data-component={newSession() ? "session-new-composer" : "session-composer"}
               onSubmit={handleSubmit}
               classList={{
-                "group/prompt-input min-h-[96px] w-full rounded-[16px] border border-[#2c5dff] bg-v2-background-bg-base shadow-[0_4px_8px_rgba(50,6,249,0.15)]": true,
+                "group/prompt-input w-full rounded-[16px] border border-[#2c5dff] bg-v2-background-bg-base shadow-[0_4px_8px_rgba(50,6,249,0.15)]": true,
+                "min-h-[150px]": newSession(),
+                "min-h-[96px]": !newSession(),
                 "border-icon-info-active border-dashed": store.draggingType !== null,
                 [props.class ?? ""]: !!props.class,
               }}
@@ -1715,7 +1718,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 removeLabel={language.t("prompt.attachment.remove")}
               />
               <div
-                class="relative min-h-[52px]"
+                classList={{ "relative min-h-[52px]": true, "min-h-[96px]": newSession() }}
                 onMouseDown={(e) => {
                   const target = e.target
                   if (!(target instanceof HTMLElement)) return
