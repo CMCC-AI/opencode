@@ -28,6 +28,8 @@ export type ProductExtension = {
   promptClass?: string
   hideModelProviders?: boolean
   hideModelVariants?: boolean
+  newSessionHome?: Component<{ children: JSX.Element }>
+  promptPlaceholder?: string
   transformTranslation?: (value: string) => string
 }
 

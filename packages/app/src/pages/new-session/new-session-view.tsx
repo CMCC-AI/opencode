@@ -33,49 +33,60 @@ export function NewSessionView(props: {
   workspace: NewSessionWorkspaceController
 }) {
   const product = useProduct()
+  const content = () => (
+    <>
+      <PromptInputV2Composer controller={props.input} />
+      <Show when={props.project.empty()}>
+        <PromptProjectAddButton controller={props.project} />
+      </Show>
+      <Show when={props.project.selected()}>
+        <div class="flex min-h-7 min-w-0 flex-col items-center justify-center gap-0 text-v2-text-text-faint sm:flex-row">
+          <PromptProjectSelector controller={props.project} placement="bottom" />
+          <Show when={props.workspace.bar.visible()} fallback={<PromptGitStatus branch={props.workspace.bar.branch()} noGit={!props.workspace.project.git()} />}>
+            <PromptWorkspaceSelector
+              value={props.workspace.selection.value()}
+              projectRoot={props.workspace.project.root()}
+              workspaces={props.workspace.project.workspaces()}
+              branch={props.workspace.bar.branch()}
+              onChange={props.workspace.selection.set}
+              onDone={props.input.restoreFocus}
+            />
+          </Show>
+        </div>
+      </Show>
+    </>
+  )
 
   return (
     <div class="@container relative flex flex-col min-h-0 h-full flex-1">
-      <div
-        data-component="session-new-design"
-        class="relative flex-1 min-h-0 overflow-hidden rounded-[10px] bg-v2-background-bg-deep"
-      >
-        <div class="absolute inset-x-0 top-[14%] flex justify-center px-6">
-          <div class={NEW_SESSION_CONTENT_WIDTH}>
-            <Dynamic
-              component={product.wordmark ?? WordmarkV2}
-              class="h-auto w-full text-v2-background-bg-inverse"
-            />
-            <div class="mt-12 flex flex-col gap-8">
-              <PromptInputV2Composer controller={props.input} />
-              <Show when={props.project.empty()}>
-                <PromptProjectAddButton controller={props.project} />
-              </Show>
-              <Show when={props.project.selected()}>
-                <div class="flex min-h-7 min-w-0 flex-col items-center justify-center gap-0 text-v2-text-text-faint sm:flex-row">
-                  <PromptProjectSelector controller={props.project} placement="bottom" />
-                  <Show
-                    when={props.workspace.bar.visible()}
-                    fallback={
-                      <PromptGitStatus branch={props.workspace.bar.branch()} noGit={!props.workspace.project.git()} />
-                    }
-                  >
-                    <PromptWorkspaceSelector
-                      value={props.workspace.selection.value()}
-                      projectRoot={props.workspace.project.root()}
-                      workspaces={props.workspace.project.workspaces()}
-                      branch={props.workspace.bar.branch()}
-                      onChange={props.workspace.selection.set}
-                      onDone={props.input.restoreFocus}
-                    />
-                  </Show>
-                </div>
-              </Show>
+      <Show
+        when={product.newSessionHome}
+        fallback={
+          <div
+            data-component="session-new-design"
+            class="relative flex-1 min-h-0 overflow-hidden rounded-[10px] bg-v2-background-bg-deep"
+          >
+            <div class="absolute inset-x-0 top-[14%] flex justify-center px-6">
+              <div class={NEW_SESSION_CONTENT_WIDTH}>
+                <Dynamic
+                  component={product.wordmark ?? WordmarkV2}
+                  class="h-auto w-full text-v2-background-bg-inverse"
+                />
+                <div class="mt-12 flex flex-col gap-8">{content()}</div>
+              </div>
             </div>
+            <Show when={!product.hideModelProviders}>
+              <ProviderTip />
+            </Show>
           </div>
-        </div>
-        <Show when={!product.hideModelProviders}><ProviderTip /></Show>
-      </div>
+        }
+      >
+        {(Home) => (
+          <Dynamic component={Home()}>
+            <div class="flex flex-col gap-8">{content()}</div>
+          </Dynamic>
+        )}
+      </Show>
     </div>
   )
 }
