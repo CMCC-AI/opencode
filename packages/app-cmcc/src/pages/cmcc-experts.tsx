@@ -7,6 +7,15 @@ import { useDockApi } from "@/context/dockapi"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useTabs } from "@/context/tabs"
+import expertFinance from "@/assets/experts/scene-13.png"
+import expertGeneral from "@/assets/experts/scene-15.png"
+import expertIndustry from "@/assets/experts/scene-06.png"
+import expertInvestment from "@/assets/experts/scene-17.png"
+import expertTrading from "@/assets/experts/scene-14.png"
+import expertHero from "@/assets/experts/scene-05.png"
+import expertSkillResearch from "@/assets/experts/detail-skill-research.png"
+import expertSkillReview from "@/assets/experts/detail-skill-review.png"
+import expertSkillWriting from "@/assets/experts/detail-skill-writing.png"
 import {
   CMCC_EXPERTS,
   CMCC_TEAM_EXPERTS,
@@ -21,63 +30,100 @@ import { showToast } from "@/utils/toast"
 
 export { CMCC_EXPERTS, cmccExpertCenterHref, cmccExpertHref }
 
+const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; image: string }> = {
+  chat: {
+    eyebrow: "AI + 深度研究",
+    summary: "把复杂问题拆解为可靠的研究、判断与行动",
+    image: expertGeneral,
+  },
+  portal: {
+    eyebrow: "AI + 财经",
+    summary: "研究市场、公司与投资机会",
+    image: expertFinance,
+  },
+  workspace: {
+    eyebrow: "AI + 产业追踪",
+    summary: "追踪行业动态，快速识别趋势与信号",
+    image: expertIndustry,
+  },
+  "trading-agent": {
+    eyebrow: "AI + 交易决策",
+    summary: "多角色协作分析，形成交易计划与风险边界",
+    image: expertTrading,
+  },
+  "investment-masters-team": {
+    eyebrow: "AI + 投资研究",
+    summary: "汇集投资大师视角，输出可信的组合决策",
+    image: expertInvestment,
+  },
+}
+
+const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
+const INDUSTRY_EXPERTS = CMCC_EXPERTS.filter((expert) => expert.id !== "chat" && expert.id !== "workspace")
+const EXPERT_AVATARS = import.meta.glob("../../../../.opencode/experts/*/avatars/*.png", {
+  eager: true,
+  import: "default",
+  query: "?url",
+}) as Record<string, string>
+
 export function CmccExpertCenterRoute() {
   const navigate = useNavigate()
   const launch = useCmccExpertDraftLauncher()
   const [active, setActive] = createSignal<CmccExpert>()
-  const externalExperts = createMemo(() => CMCC_EXPERTS.filter((expert): expert is ExternalExpert => expert.kind === "external"))
+  const featured = CMCC_TEAM_EXPERTS[1] ?? CMCC_TEAM_EXPERTS[0]
 
   return (
-    <div class="min-h-0 flex-1 overflow-y-auto bg-v2-background-bg-deep">
-      <div class="mx-auto flex w-full max-w-[1180px] flex-col gap-6 px-6 py-6">
-        <div class="flex min-w-0 flex-wrap items-end justify-between gap-4">
-          <div class="flex min-w-0 flex-col gap-2">
-            <div class="flex items-center gap-2 text-[13px] leading-4 text-v2-text-text-muted">
-              <Icon name="mcp" class="size-4" />
-              <span>专家中心</span>
-            </div>
-            <h1 class="m-0 text-[26px] font-semibold leading-8 text-v2-text-text-base">召唤专家或专家团</h1>
-            <p class="m-0 max-w-[760px] text-[14px] leading-6 text-v2-text-text-muted">
-              选择一个专家团查看成员和示例问题，召唤后会进入新建对话，并在输入框左侧显示已召唤的专家团。
-            </p>
-          </div>
-          <div class="flex h-8 items-center rounded-[8px] bg-v2-background-bg-layer-01 p-1 text-[12px] leading-4 text-v2-text-text-muted">
-            <span class="rounded-[6px] bg-v2-background-bg-layer-03 px-3 py-1 text-v2-text-text-base">专家</span>
-            <span class="px-3 py-1">技能</span>
-            <span class="px-3 py-1">连接器</span>
-          </div>
-        </div>
+    <div class="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfcff] text-[#2a155a]">
+      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(239,226,255,0.58),transparent_31%),radial-gradient(circle_at_82%_78%,rgba(220,239,255,0.62),transparent_34%)]" />
+      <div class="relative mx-auto flex w-full max-w-[1320px] flex-col px-6 pb-10 pt-14 max-sm:px-4 max-sm:pt-8">
+        <header class="w-full">
+          <h1 class="m-0 bg-gradient-to-r from-[#8800ff] to-[#2c5dff] bg-clip-text text-[32px] font-medium leading-10 tracking-[-0.5px] text-transparent max-sm:text-[28px]">
+            产业洞察专家团
+          </h1>
+          <p class="m-0 mt-2 text-[16px] leading-6 text-[#3c4055] max-sm:text-[14px]">
+            让 AI 进入真实产业场景，完成研究、判断与行动
+          </p>
+        </header>
 
-        <section class="flex min-w-0 flex-col gap-3">
-          <div class="flex items-center justify-between">
-            <h2 class="m-0 text-[17px] font-semibold leading-6 text-v2-text-text-base">精选场景</h2>
-          </div>
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <For each={CMCC_EXPERTS}>
-              {(expert) => <ExpertCard expert={expert} onClick={() => setActive(expert)} />}
-            </For>
-          </div>
-        </section>
+        <Show when={featured}>
+          {(expert) => (
+            <button
+              type="button"
+              class="group relative mt-5 flex min-h-[180px] w-full overflow-hidden rounded-[16px] border border-[#d7def7] bg-[linear-gradient(142deg,#f7f5ff_0%,#edf2ff_100%)] p-0 text-left shadow-[0_8px_30px_rgba(67,66,116,0.06)] transition hover:-translate-y-0.5 hover:border-[#aebcf2] hover:shadow-[0_14px_34px_rgba(67,66,116,0.12)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff] max-sm:min-h-[160px]"
+              onClick={() => setActive(expert())}
+            >
+              <img
+                src={expertHero}
+                alt=""
+                class="pointer-events-none absolute inset-0 size-full object-cover opacity-90 transition duration-300 group-hover:scale-[1.015]"
+              />
+              <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#f6f4ff] via-[#f4f5ff]/78 to-transparent" />
+              <div class="relative z-10 flex min-h-[180px] w-full max-w-[720px] flex-col justify-center px-7 py-5 max-sm:min-h-[160px] max-sm:px-5 sm:max-w-[62%]">
+                <div class="text-[20px] font-medium leading-7 text-[#6b19ff]">{expert().name}</div>
+                <p class="m-0 mt-2 line-clamp-2 text-[13px] leading-5 text-[#49386e]/65">{expert().description}</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <For each={expert().tags.slice(0, 3)}>
+                    {(tag) => (
+                      <span class="rounded-full bg-[linear-gradient(90deg,#eceaff,#dedcff)] px-3 py-1 text-[11px] leading-4 text-[#5b4cff]">
+                        {tag}
+                      </span>
+                    )}
+                  </For>
+                </div>
+              </div>
+              <span class="absolute bottom-4 right-5 z-10 flex h-8 items-center gap-2 rounded-[12px] bg-[linear-gradient(90deg,#8265ff,#4e62ff)] px-4 text-[13px] text-white shadow-[0_6px_18px_rgba(82,80,255,0.22)] max-sm:hidden">
+                <Icon name="new-session" class="size-4" />
+                查看专家团
+              </span>
+            </button>
+          )}
+        </Show>
 
-        <section class="flex min-w-0 flex-col gap-3">
-          <div class="flex items-center gap-4">
-            <h2 class="m-0 text-[17px] font-semibold leading-6 text-v2-text-text-base">专家团</h2>
-            <span class="text-[12px] leading-4 text-v2-text-text-muted">{CMCC_TEAM_EXPERTS.length} 个本地专家团</span>
-          </div>
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <For each={CMCC_TEAM_EXPERTS}>
-              {(expert) => <ExpertCard expert={expert} wide onClick={() => setActive(expert)} />}
-            </For>
-          </div>
-        </section>
-
-        <section class="flex min-w-0 flex-col gap-3">
-          <div class="flex items-center gap-4">
-            <h2 class="m-0 text-[17px] font-semibold leading-6 text-v2-text-text-base">专家应用</h2>
-            <span class="text-[12px] leading-4 text-v2-text-text-muted">{externalExperts().length} 个外部专家入口</span>
-          </div>
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <For each={externalExperts()}>
+        <section class="mt-7 w-full">
+          <h2 class="m-0 text-[16px] font-medium leading-6 text-[#49386e]">AI + 产业洞察</h2>
+          <p class="m-0 mt-1 text-[14px] leading-5 text-[#49386e]/55">选择一个专家或专家团，进入专属工作台</p>
+          <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <For each={INDUSTRY_EXPERTS}>
               {(expert) => <ExpertCard expert={expert} onClick={() => setActive(expert)} />}
             </For>
           </div>
@@ -161,30 +207,33 @@ function TeamExpertView(props: { expert: TeamExpert }) {
   )
 }
 
-function ExpertCard(props: { expert: CmccExpert; wide?: boolean; onClick: () => void }) {
+function ExpertCard(props: { expert: CmccExpert; onClick: () => void }) {
+  const presentation = EXPERT_PRESENTATION[props.expert.id] ?? {
+    eyebrow: props.expert.name,
+    summary: props.expert.description,
+    image: expertGeneral,
+  }
+
   return (
     <button
       type="button"
-      class="min-w-0 rounded-[8px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-4 text-left shadow-[var(--v2-elevation-flat)] hover:border-v2-border-border-strong hover:bg-v2-background-bg-layer-02"
-      classList={{ "md:min-h-[132px]": props.wide }}
+      class="group relative h-[200px] min-w-0 overflow-hidden rounded-[16px] border border-[#e6e8f4] bg-[linear-gradient(169deg,#e4eaff_3%,#f5f6fb_48%)] p-0 text-left shadow-[0_4px_8px_rgba(26,13,82,0.12)] transition hover:-translate-y-1 hover:border-[#c8cff0] hover:shadow-[0_14px_28px_rgba(67,66,116,0.16)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff] xl:h-[220px]"
       onClick={props.onClick}
     >
-      <div class="flex min-w-0 items-start gap-3">
-        <ExpertMark expert={props.expert} />
-        <div class="min-w-0 flex-1">
-          <div class="flex min-w-0 items-center gap-2">
-            <h3 class="m-0 truncate text-[15px] font-semibold leading-5 text-v2-text-text-base">{props.expert.name}</h3>
-            <Show when={props.expert.kind === "team"}>
-              <span class="shrink-0 rounded-[4px] bg-v2-background-bg-layer-03 px-1.5 py-0.5 text-[11px] leading-3 text-v2-text-text-muted">
-                专家团
-              </span>
-            </Show>
-          </div>
-          <p class="mt-2 line-clamp-2 text-[12px] leading-5 text-v2-text-text-muted">{props.expert.description}</p>
+      <img
+        src={presentation.image}
+        alt=""
+        class="pointer-events-none absolute inset-0 size-full object-cover transition duration-300 group-hover:scale-[1.035]"
+      />
+      <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#eef1ff] via-[#eef1ff]/72 to-transparent" />
+      <div class="relative z-10 flex h-full max-w-[78%] flex-col px-4 py-4">
+        <h3 class="m-0 text-[17px] font-medium leading-6 text-[#2a155a]">{presentation.eyebrow}</h3>
+        <p class="m-0 mt-0.5 line-clamp-2 text-[11px] leading-4 text-[#2a155a]/52">{presentation.summary}</p>
+        <div class="mt-auto flex min-w-0 items-center">
+          <span class="max-w-full truncate rounded-full bg-[linear-gradient(90deg,#eceaff,#dedcff)] px-2.5 py-1 text-[11px] leading-4 text-[#5b4cff]">
+            {props.expert.name}
+          </span>
         </div>
-      </div>
-      <div class="mt-3">
-        <TagList tags={props.expert.tags} compact />
       </div>
     </button>
   )
@@ -196,27 +245,40 @@ function ExpertDetailDialog(props: {
   onOpenExternal: (expert: ExternalExpert) => void
   onSummon: (expert: TeamExpert, prompt?: string) => void
 }) {
+  const presentation = createMemo(
+    () =>
+      EXPERT_PRESENTATION[props.expert.id] ?? {
+        eyebrow: props.expert.name,
+        summary: props.expert.description,
+        image: expertGeneral,
+      },
+  )
+  const capabilities = createMemo(() =>
+    props.expert.tags.slice(0, 3).map((tag, index) => ({
+      title: tag,
+      description:
+        props.expert.kind === "team"
+          ? (props.expert.examples[index] ?? props.expert.description)
+          : props.expert.description,
+      image: EXPERT_SKILL_IMAGES[index] ?? expertSkillResearch,
+    })),
+  )
+
   return (
     <Portal>
-      <div class="fixed inset-0 z-[220] flex items-center justify-center bg-black/55 px-4 py-5" onClick={props.onClose}>
+      <div
+        class="fixed inset-0 z-[220] flex items-center justify-center bg-[#050112]/40 px-4 py-4 backdrop-blur-[1px]"
+        onClick={props.onClose}
+      >
         <section
-          class="flex max-h-[min(780px,calc(100dvh-32px))] w-full max-w-[560px] flex-col overflow-hidden rounded-[14px] border border-v2-border-border-base bg-v2-background-bg-layer-01 shadow-[0_24px_80px_rgba(0,0,0,0.32)]"
+          class="flex h-[600px] max-h-[calc(100dvh-32px)] w-full max-w-[800px] flex-col overflow-hidden rounded-[16px] bg-[#fff] text-[#1f2433] shadow-[0_28px_90px_rgba(24,14,57,0.28)]"
           onClick={(event) => event.stopPropagation()}
         >
-          <header class="flex shrink-0 items-start justify-between gap-4 px-5 py-5">
-            <div class="flex min-w-0 items-start gap-4">
-              <ExpertMark expert={props.expert} large />
-              <div class="min-w-0">
-                <h2 class="m-0 text-[20px] font-semibold leading-7 text-v2-text-text-base">{props.expert.name}</h2>
-                <div class="mt-1 text-[13px] leading-5 text-v2-text-text-muted">
-                  {props.expert.kind === "team" ? `${props.expert.members.length} 位成员` : "专家应用"}
-                </div>
-                <TagList tags={props.expert.tags} />
-              </div>
-            </div>
+          <header class="flex h-16 shrink-0 items-center justify-between border-b border-[#edf0f7] px-6">
+            <h2 class="m-0 truncate text-[16px] font-semibold leading-6 text-[#252839]">{presentation().eyebrow}</h2>
             <button
               type="button"
-              class="flex size-8 shrink-0 items-center justify-center rounded-[7px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
+              class="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-[#697085] transition hover:bg-[#f3f5fa] hover:text-[#252839]"
               onClick={props.onClose}
               aria-label="关闭专家详情"
             >
@@ -224,51 +286,72 @@ function ExpertDetailDialog(props: {
             </button>
           </header>
 
-          <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
-            <section class="flex flex-col gap-2">
-              <h3 class="m-0 text-[13px] font-semibold leading-5 text-v2-text-text-base">能力介绍</h3>
-              <p class="m-0 text-[14px] leading-6 text-v2-text-text-muted">{props.expert.description}</p>
+          <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-12 lg:px-[100px]">
+            <section class="relative h-[150px] overflow-hidden rounded-[16px] border border-[#e4e8f6] bg-[linear-gradient(145deg,#edf1ff_0%,#f7f8fd_100%)]">
+              <img src={presentation().image} alt="" class="absolute inset-0 size-full object-cover" />
+              <div class="absolute inset-0 bg-gradient-to-r from-[#eef2ff] via-[#eef2ff]/82 to-transparent" />
+              <div class="relative flex h-full max-w-[72%] flex-col px-6 py-5">
+                <h3 class="m-0 text-[18px] font-semibold leading-6 text-[#291759]">{presentation().eyebrow}</h3>
+                <p class="m-0 mt-1.5 line-clamp-2 text-[12px] leading-5 text-[#535a70]">{props.expert.description}</p>
+                <span class="mt-auto w-fit max-w-full truncate rounded-full bg-[linear-gradient(90deg,#eceaff,#dedcff)] px-3 py-1 text-[11px] leading-4 text-[#5b4cff]">
+                  {props.expert.name}
+                </span>
+              </div>
+            </section>
+
+            <section class="mt-5">
+              <h3 class="m-0 text-[16px] font-medium leading-6 text-[#252839]">专家团技能:</h3>
+              <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <For each={capabilities()}>
+                  {(capability, index) => (
+                    <button
+                      type="button"
+                      class="group flex min-h-20 min-w-0 items-center gap-2 rounded-[8px] border border-[#edf0f7] bg-[#f9fbfe] px-2.5 py-2 text-left transition hover:-translate-y-0.5 hover:border-[#cbd4f5] hover:bg-white hover:shadow-[0_8px_20px_rgba(69,65,116,0.09)]"
+                      onClick={() => {
+                        if (props.expert.kind === "team") {
+                          props.onSummon(props.expert, props.expert.examples[index()] ?? props.expert.defaultPrompt)
+                          return
+                        }
+                        props.onOpenExternal(props.expert)
+                      }}
+                    >
+                      <img src={capability.image} alt="" class="size-[50px] shrink-0 object-contain transition group-hover:scale-105" />
+                      <span class="min-w-0">
+                        <span class="block truncate text-[13px] font-medium leading-5 text-[#252839]">{capability.title}</span>
+                        <span class="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-[#7c8398]">{capability.description}</span>
+                      </span>
+                    </button>
+                  )}
+                </For>
+              </div>
             </section>
 
             <Show when={props.expert.kind === "team" ? props.expert : undefined}>
               {(item) => (
-                <>
-                  <section class="mt-5 flex flex-col gap-3">
-                    <h3 class="m-0 text-[13px] font-semibold leading-5 text-v2-text-text-base">团队成员</h3>
-                    <div class="flex flex-col divide-y divide-v2-border-border-base rounded-[8px] border border-v2-border-border-base">
-                      <For each={item().members.slice(0, 8)}>{(member) => <MemberRow member={member} />}</For>
-                    </div>
-                  </section>
-
-                  <section class="mt-5 flex flex-col gap-3">
-                    <h3 class="m-0 text-[13px] font-semibold leading-5 text-v2-text-text-base">试试这样问我</h3>
-                    <div class="flex flex-col gap-2">
-                      <For each={item().examples}>
-                        {(example) => (
-                          <button
-                            type="button"
-                            class="flex min-h-10 items-center justify-between gap-3 rounded-[8px] border border-v2-border-border-base px-3 py-2 text-left text-[13px] leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
-                            onClick={() => props.onSummon(item(), example)}
-                          >
-                            <span class="min-w-0 truncate">“{example}”</span>
-                            <Icon name="chevron-right" size="small" class="size-3.5 shrink-0 text-v2-icon-icon-muted" />
-                          </button>
-                        )}
-                      </For>
-                    </div>
-                  </section>
-                </>
+                <section class="mt-5">
+                  <h3 class="m-0 text-[16px] font-medium leading-6 text-[#252839]">专家协作:</h3>
+                  <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <For each={item().members.slice(0, 4)}>{(member) => <DialogMember member={member} />}</For>
+                  </div>
+                </section>
               )}
             </Show>
           </div>
 
-          <footer class="shrink-0 px-5 pb-5">
+          <footer class="flex h-[68px] shrink-0 items-center justify-end gap-3 border-t border-[#edf0f7] px-6 shadow-[0_-5px_16px_rgba(52,42,89,0.04)]">
+            <button
+              type="button"
+              class="h-9 rounded-[8px] border border-[#637cff] bg-white px-5 text-[13px] font-medium text-[#536dff] transition hover:bg-[#f5f7ff]"
+              onClick={props.onClose}
+            >
+              取消
+            </button>
             <Show
               when={props.expert.kind === "team" ? props.expert : undefined}
               fallback={
                 <button
                   type="button"
-                  class="flex h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-v2-text-text-base px-4 text-[14px] font-semibold leading-5 text-v2-background-bg-layer-01 hover:opacity-90"
+                  class="flex h-9 items-center justify-center rounded-[8px] bg-[linear-gradient(90deg,#536dff,#8758f5)] px-5 text-[13px] font-medium text-white shadow-[0_6px_14px_rgba(92,91,241,0.22)] transition hover:brightness-105"
                   onClick={() => props.onOpenExternal(props.expert as ExternalExpert)}
                 >
                   打开 {props.expert.name}
@@ -278,10 +361,10 @@ function ExpertDetailDialog(props: {
               {(item) => (
                 <button
                   type="button"
-                  class="flex h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-v2-text-text-base px-4 text-[14px] font-semibold leading-5 text-v2-background-bg-layer-01 hover:opacity-90"
+                  class="flex h-9 items-center justify-center rounded-[8px] bg-[linear-gradient(90deg,#536dff,#8758f5)] px-5 text-[13px] font-medium text-white shadow-[0_6px_14px_rgba(92,91,241,0.22)] transition hover:brightness-105"
                   onClick={() => props.onSummon(item())}
                 >
-                  召唤 {item().name}
+                  召唤产业专家团
                 </button>
               )}
             </Show>
@@ -334,7 +417,10 @@ function TagList(props: { tags: readonly string[]; compact?: boolean }) {
         {(tag) => (
           <span
             class="rounded-[5px] border border-v2-border-border-base bg-v2-background-bg-layer-02 text-v2-text-text-muted"
-            classList={{ "px-2 py-1 text-[11px] leading-3": props.compact, "px-2.5 py-1 text-[12px] leading-4": !props.compact }}
+            classList={{
+              "px-2 py-1 text-[11px] leading-3": props.compact,
+              "px-2.5 py-1 text-[12px] leading-4": !props.compact,
+            }}
           >
             {tag}
           </span>
@@ -345,12 +431,26 @@ function TagList(props: { tags: readonly string[]; compact?: boolean }) {
 }
 
 function MemberCard(props: { member: TeamMember }) {
+  const avatar = createMemo(() => memberAvatar(props.member))
+
   return (
     <div class="min-w-0 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-3">
       <div class="flex min-w-0 items-start justify-between gap-3">
-        <div class="min-w-0">
-          <div class="truncate text-[14px] font-medium leading-5 text-v2-text-text-base">{props.member.name}</div>
-          <div class="truncate text-[12px] leading-4 text-v2-text-text-muted">{props.member.profession}</div>
+        <div class="flex min-w-0 items-center gap-3">
+          <Show
+            when={avatar()}
+            fallback={
+              <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-v2-background-bg-layer-03 text-[13px] font-semibold text-v2-text-text-base">
+                {props.member.name.slice(0, 1)}
+              </div>
+            }
+          >
+            {(source) => <img src={source()} alt="" class="size-10 shrink-0 rounded-full object-cover" />}
+          </Show>
+          <div class="min-w-0">
+            <div class="truncate text-[14px] font-medium leading-5 text-v2-text-text-base">{props.member.name}</div>
+            <div class="truncate text-[12px] leading-4 text-v2-text-text-muted">{props.member.profession}</div>
+          </div>
         </div>
         <Show when={props.member.role === "lead"}>
           <span class="rounded-[4px] bg-v2-background-bg-layer-03 px-2 py-1 text-[11px] leading-3 text-v2-text-text-muted">
@@ -363,32 +463,31 @@ function MemberCard(props: { member: TeamMember }) {
   )
 }
 
-function MemberRow(props: { member: TeamMember }) {
+function DialogMember(props: { member: TeamMember }) {
+  const avatar = createMemo(() => memberAvatar(props.member))
+
   return (
-    <div class="flex min-w-0 items-center gap-3 px-3 py-2">
-      <div class="flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-v2-background-bg-layer-03 text-[12px] font-semibold text-v2-text-text-base">
-        {props.member.name.slice(0, 1)}
-      </div>
-      <div class="min-w-0 flex-1">
-        <div class="truncate text-[13px] font-medium leading-5 text-v2-text-text-base">{props.member.name}</div>
-        <div class="truncate text-[12px] leading-4 text-v2-text-text-muted">{props.member.profession}</div>
-      </div>
-      <Show when={props.member.role === "lead"}>
-        <span class="rounded-[4px] bg-v2-background-bg-layer-03 px-2 py-1 text-[11px] leading-3 text-v2-text-text-muted">
-          主理人
-        </span>
+    <div class="flex min-w-0 items-center gap-2 rounded-full border border-[#e5e7ef] bg-white p-1 pr-3">
+      <Show
+        when={avatar()}
+        fallback={
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,#8d77ff,#536dff)] text-[12px] font-semibold text-white shadow-[0_3px_8px_rgba(83,109,255,0.2)]">
+            {props.member.name.slice(0, 1)}
+          </div>
+        }
+      >
+        {(source) => <img src={source()} alt="" class="size-9 shrink-0 rounded-full object-cover" />}
       </Show>
+      <div class="min-w-0">
+        <div class="truncate text-[12px] font-medium leading-4 text-[#252839]">{props.member.profession}</div>
+        <div class="truncate text-[11px] leading-4 text-[#8b91a3]">{props.member.name}</div>
+      </div>
     </div>
   )
 }
 
-function ExpertMark(props: { expert: CmccExpert; large?: boolean }) {
-  return (
-    <div
-      class="flex shrink-0 items-center justify-center rounded-[12px] bg-v2-background-bg-layer-03 text-v2-text-text-base shadow-sm"
-      classList={{ "size-14 text-[18px] font-semibold": props.large, "size-10 text-[14px] font-semibold": !props.large }}
-    >
-      {props.expert.kind === "team" ? props.expert.name.slice(0, 2) : props.expert.name.slice(0, 1)}
-    </div>
-  )
+function memberAvatar(member: TeamMember) {
+  const [team, agent] = member.id.split("/")
+  if (!team || !agent) return
+  return EXPERT_AVATARS[`../../../../.opencode/experts/${team}/avatars/${agent}.png`]
 }

@@ -11,6 +11,7 @@ import ignore from "ignore"
 import { mkdir, rm } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "path"
+import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { scanKnowledgeGraph } from "@/knowledge/graph"
@@ -72,7 +73,6 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     })
 
     const list = Effect.fn("FileHttpApi.list")(function* (ctx: { query: { path: string } }) {
-      const directory = (yield* InstanceState.context).directory
       return yield* filesystem(
         Effect.gen(function* () {
           const fs = yield* FileSystem.Service
@@ -139,6 +139,72 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       if (!target) return yield* new HttpApiError.BadRequest({})
       return yield* filesystem(FileSystem.Service.use((fs) => fs.read({ path: target }))).pipe(
         Effect.map((file) => file.content),
+      )
+    })
+
+    const preview = Effect.fn("FileHttpApi.preview")(function* (ctx: {
+      query: { path: string }
+      request: HttpServerRequest.HttpServerRequest
+    }) {
+      const directory = (yield* InstanceState.context).directory
+      if (path.extname(ctx.query.path).toLowerCase() !== ".pdf") return yield* new HttpApiError.BadRequest({})
+
+      const absolute = path.resolve(directory, ctx.query.path)
+      if (!FSUtil.contains(directory, absolute)) return yield* new HttpApiError.BadRequest({})
+
+      const fs = yield* FSUtil.Service
+      const root = yield* fs.realPath(directory).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      const target = yield* fs.realPath(absolute).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      if (!FSUtil.contains(root, target)) return yield* new HttpApiError.BadRequest({})
+
+      const info = yield* fs.stat(target).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+      const size = Number(info.size)
+      if (info.type !== "File" || !Number.isSafeInteger(size)) return yield* new HttpApiError.BadRequest({})
+
+      const modified = Option.getOrUndefined(info.mtime)
+      const etag = `W/"${size.toString(16)}-${(modified?.getTime() ?? 0).toString(16)}"`
+      const requestedRange = parseRange(ctx.request.headers.range, size)
+      const ifRange = ctx.request.headers["if-range"]
+      const range = ifRange && ifRange !== etag && ifRange !== modified?.toUTCString() ? undefined : requestedRange
+      if (range === "unsatisfiable") {
+        return HttpServerResponse.empty({
+          status: 416,
+          headers: {
+            "Accept-Ranges": "bytes",
+            "Content-Range": `bytes */${size}`,
+            "X-Content-Type-Options": "nosniff",
+          },
+        })
+      }
+
+      const headers = {
+        "Accept-Ranges": "bytes",
+        "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length, Content-Range, ETag",
+        "Cache-Control": "private, no-cache",
+        "Content-Disposition": inlineDisposition(path.basename(ctx.query.path)),
+        ETag: etag,
+        ...(modified ? { "Last-Modified": modified.toUTCString() } : {}),
+        "X-Content-Type-Options": "nosniff",
+      }
+      if (!range) {
+        return HttpServerResponse.stream(fs.stream(target), {
+          contentType: "application/pdf",
+          contentLength: size,
+          headers,
+        })
+      }
+
+      return HttpServerResponse.stream(
+        fs.stream(target, { offset: range.start, bytesToRead: range.end - range.start + 1 }),
+        {
+          status: 206,
+          contentType: "application/pdf",
+          contentLength: range.end - range.start + 1,
+          headers: {
+            ...headers,
+            "Content-Range": `bytes ${range.start}-${range.end}/${size}`,
+          },
+        },
       )
     })
 
@@ -227,6 +293,7 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       .handle("list", list)
       .handle("content", content)
       .handle("download", download)
+      .handleRaw("preview", preview)
       .handle("archive", archive)
       .handle("createDirectory", createDirectory)
       .handle("upload", upload)
@@ -242,4 +309,34 @@ function downloadPath(directory: string, value: string) {
   const relative = path.relative(directory, absolute)
   if (!relative) return
   return RelativePath.make(relative)
+}
+
+function parseRange(
+  header: string | undefined,
+  size: number,
+): { start: number; end: number } | "unsatisfiable" | undefined {
+  if (!header) return undefined
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(header.trim())
+  if (!match || (!match[1] && !match[2])) return undefined
+
+  if (!match[1]) {
+    const suffix = Number(match[2])
+    if (!Number.isSafeInteger(suffix) || suffix <= 0 || size === 0) return "unsatisfiable" as const
+    return { start: Math.max(size - suffix, 0), end: size - 1 }
+  }
+
+  const start = Number(match[1])
+  const end = match[2] ? Number(match[2]) : size - 1
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= size)
+    return "unsatisfiable" as const
+  return { start, end: Math.min(end, size - 1) }
+}
+
+function inlineDisposition(name: string) {
+  const fallback = name.replaceAll(/[\x00-\x1f\x7f"\\]/g, "_").replaceAll(/[^ -~]/g, "_") || "document.pdf"
+  const encoded = encodeURIComponent(name).replace(
+    /[!'()*]/g,
+    (value) => `%${value.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
+  return `inline; filename="${fallback}"; filename*=UTF-8''${encoded}`
 }

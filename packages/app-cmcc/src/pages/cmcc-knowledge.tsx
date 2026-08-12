@@ -1,13 +1,5 @@
-import type {
-  FileContent,
-  FileNode,
-  Message,
-  OpencodeClient,
-  Part,
-  Session,
-  TextPart,
-} from "@opencode-ai/sdk/v2/client"
-import { Markdown } from "@opencode-ai/session-ui/markdown"
+import type { FileContent, FileNode, Message, OpencodeClient, Part, Session } from "@opencode-ai/sdk/v2/client"
+import { SessionTurn } from "@opencode-ai/session-ui/session-turn"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { batch, createEffect, createMemo, createSignal, For, on, onCleanup, Show, type JSX } from "solid-js"
@@ -36,10 +28,12 @@ import { DEFAULT_PROMPT, type ImageAttachmentPart, type Prompt, usePrompt } from
 import { useSDK } from "@/context/sdk"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
+import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { createPromptInputController } from "@/pages/session/composer"
 import { Identifier } from "@/utils/id"
 import { Persist, persisted } from "@/utils/persist"
+import { authTokenFromCredentials } from "@/utils/server"
 import { showToast } from "@/utils/toast"
 import { uuid } from "@/utils/uuid"
 import {
@@ -69,6 +63,7 @@ const markdownExtensions = /\.(md|markdown|mdx)$/i
 const attachmentBatchSize = 6
 const wikiBatchSize = 12
 const maxImportFiles = 1000
+const importRefreshInterval = 2500
 
 const SIDEBAR_DEFAULT_WIDTH = 260
 const SIDEBAR_MIN_WIDTH = 200
@@ -500,6 +495,7 @@ export function CmccKnowledgeNotebookRoute() {
   const layout = useLayout()
   const platform = usePlatform()
   const sdk = useSDK()
+  const serverSDK = useServerSDK()
   const sync = useSync()
   const serverSync = useServerSync()
   const local = useLocal()
@@ -539,6 +535,8 @@ export function CmccKnowledgeNotebookRoute() {
   })
   let inputElement: HTMLInputElement | undefined
   let loadedSession = ""
+  let importRefreshTimer: ReturnType<typeof setInterval> | undefined
+  let importRefreshRunning = false
   const client = createMemo(() => sdk().client)
   const activeSessionID = createMemo(() =>
     params.sessionID === "new" ? undefined : (params.sessionID ?? notebook()?.sessionID),
@@ -556,12 +554,48 @@ export function CmccKnowledgeNotebookRoute() {
     setSearchParams({ prompt: undefined }, { replace: true })
   })
   const sourceFiles = createMemo(() => (state.files ?? []).filter((item) => item.type === "file"))
+  const wikiPageCount = createMemo(
+    () =>
+      state.files.filter(
+        (file) =>
+          file.type === "file" &&
+          normalizeNotebookPath(file.path).startsWith("02_LLM_Wiki/") &&
+          markdownExtensions.test(file.path),
+      ).length,
+  )
+  const liveMessages = createMemo<ChatMessage[]>(() => {
+    const sessionID = activeSessionID()
+    if (!sessionID) return state.messages
+    const messages = sync().data.message[sessionID]
+    if (!messages) return state.messages
+    return messages.map((info) => ({ info, parts: sync().data.part[info.id] ?? [] }))
+  })
+  const answering = createMemo(() => {
+    const sessionID = activeSessionID()
+    if (!sessionID) return state.sending
+    const status = sync().data.session_status[sessionID]
+    return state.sending || (status !== undefined && status.type !== "idle")
+  })
   const graph = createMemo<KnowledgeGraph>(() => ({
     nodes: state.graph?.nodes ?? [],
     edges: state.graph?.edges ?? [],
   }))
   const rootChildren = createMemo(() => fileChildren(state.files ?? [], ""))
   const activePreview = createMemo(() => state.tabs.find((tab) => tab.path === state.activeTab))
+  const previewUrl = (file: string) => {
+    const context = sdk()
+    const connection = serverSDK().server.http
+    const url = new URL("/file/preview", context.url)
+    url.searchParams.set("directory", context.directory)
+    url.searchParams.set("path", file)
+    if (connection.password) {
+      url.searchParams.set(
+        "auth_token",
+        authTokenFromCredentials({ username: connection.username, password: connection.password }),
+      )
+    }
+    return url.toString()
+  }
 
   // --- panel resize state (persisted to localStorage) ---
   const [panelStore, setPanelStore] = createStore({
@@ -576,8 +610,7 @@ export function CmccKnowledgeNotebookRoute() {
   })
   persisted(Persist.global("knowledge-panels"), [panelStore, setPanelStore])
 
-  const graphMaxWidth = () =>
-    typeof window === "undefined" ? 600 : Math.floor(window.innerWidth * GRAPH_MAX_RATIO)
+  const graphMaxWidth = () => (typeof window === "undefined" ? 600 : Math.floor(window.innerWidth * GRAPH_MAX_RATIO))
 
   // left separator drag (sidebar ↔ content)
   const [leftDrag, setLeftDrag] = createStore({ active: false, startX: 0, startWidth: 0 })
@@ -664,6 +697,7 @@ export function CmccKnowledgeNotebookRoute() {
   }
 
   onCleanup(() => {
+    if (importRefreshTimer) clearInterval(importRefreshTimer)
     stopLeftDrag()
     stopRightDrag()
     stopSessionDrag()
@@ -925,7 +959,7 @@ export function CmccKnowledgeNotebookRoute() {
         parts: requestParts,
       })
       .then(async () => {
-        await Promise.all([loadMessages(sessionID), loadSessions()])
+        await Promise.all([sync().session.sync(sessionID, { force: true }), loadMessages(sessionID), loadSessions()])
         return true
       })
       .catch((error) => {
@@ -976,6 +1010,7 @@ export function CmccKnowledgeNotebookRoute() {
     if (!state.tabs.some((tab) => tab.path === file.path))
       setState("tabs", (tabs) => [...tabs, { path: file.path, name }])
     setState({ activeTab: file.path, graphSelection: file.path })
+    if (/\.pdf$/i.test(file.path)) return
     if (state.contents[file.path]) return
     const current = client()
     if (!current) return
@@ -1140,14 +1175,22 @@ export function CmccKnowledgeNotebookRoute() {
     stage: (sessionID: string, existing: Set<string>) => Promise<void>,
   ) => {
     setState({ importing: true, activeTab: "chat" })
-    const existing = new Set(rawSourcePaths(await listNotebookFiles(current)))
-    await current.session
-      .create({
-        directory: activeNotebook.directory,
-        title: `知识库导入 · ${activeNotebook.name} · ${formatImportTime(new Date())}`,
-        metadata: { cmccKnowledgeNotebookID: activeNotebook.id, cmccKnowledgeKind: "import" },
+    importRefreshRunning = false
+    importRefreshTimer = setInterval(() => {
+      if (importRefreshRunning) return
+      importRefreshRunning = true
+      void loadFiles().finally(() => {
+        importRefreshRunning = false
       })
-      .then(async (result) => {
+    }, importRefreshInterval)
+    await listNotebookFiles(current)
+      .then(async (files) => {
+        const existing = new Set(rawSourcePaths(files))
+        const result = await current.session.create({
+          directory: activeNotebook.directory,
+          title: `知识库导入 · ${activeNotebook.name} · ${formatImportTime(new Date())}`,
+          metadata: { cmccKnowledgeNotebookID: activeNotebook.id, cmccKnowledgeKind: "import" },
+        })
         const sessionID = result.data?.id
         if (!sessionID) throw new Error("创建导入任务未返回 ID")
         await stage(sessionID, existing)
@@ -1166,6 +1209,8 @@ export function CmccKnowledgeNotebookRoute() {
         })
       })
     await loadSessions()
+    if (importRefreshTimer) clearInterval(importRefreshTimer)
+    importRefreshTimer = undefined
     setState("importing", false)
   }
 
@@ -1315,241 +1360,251 @@ export function CmccKnowledgeNotebookRoute() {
 
           <main class="flex min-h-0 min-w-0 flex-1 overflow-hidden">
             <Show when={panelStore.sidebarOpened}>
-            <aside
-              class="flex min-h-0 min-w-0 shrink-0 flex-col border-r border-v2-border-border-base bg-transparent"
-              style={{ width: `${panelStore.sidebarWidth}px` }}
-            >
-              <PanelHeader
-                title="来源"
-                meta={`${sourceFiles().length} 个文件`}
-                collapsible
-                onCollapse={() => setPanelStore("sidebarOpened", false)}
-              />
-              <div class="flex shrink-0 flex-col items-center gap-2 border-b border-v2-border-border-base px-[5px] py-3">
-                <div
-                  class="relative flex h-[125px] w-[250px] shrink-0 flex-col items-center gap-1.5 overflow-hidden rounded-[8px] px-3 pb-2 pt-[54px] text-center data-[active]:ring-2 data-[active]:ring-[#0057ff]/25"
-                  data-active={state.dropActive ? "" : undefined}
-                  onDragOver={(event) => {
-                    event.preventDefault()
-                    setState("dropActive", true)
-                  }}
-                  onDragLeave={() => setState("dropActive", false)}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    setState("dropActive", false)
-                    void importFiles([...(event.dataTransfer?.files ?? [])])
-                  }}
-                >
-                  <img src={uploadDropzoneArtwork} alt="" class="pointer-events-none absolute inset-0 size-full object-fill" />
-                  <div class="relative text-[12px] leading-4 text-v2-text-text-muted">
-                    {state.importing ? "资料正在分阶段入库..." : "拖拽文件到这里"}
-                  </div>
-                  <div class="relative flex flex-wrap justify-center gap-1.5">
-                    <button
-                      type="button"
-                      class="h-7 rounded-[6px] bg-v2-text-text-base px-2.5 text-[11px] font-medium text-v2-background-bg-layer-01 disabled:opacity-50"
-                      disabled={state.importing}
-                      onClick={() => void chooseFiles()}
-                    >
-                      添加文件
-                    </button>
-                    <Show when={platform.platform === "desktop"}>
+              <aside
+                class="flex min-h-0 min-w-0 shrink-0 flex-col border-r border-v2-border-border-base bg-transparent"
+                style={{ width: `${panelStore.sidebarWidth}px` }}
+              >
+                <PanelHeader
+                  title="来源"
+                  meta={`${sourceFiles().length} 个文件`}
+                  collapsible
+                  onCollapse={() => setPanelStore("sidebarOpened", false)}
+                />
+                <div class="flex shrink-0 flex-col items-center gap-2 border-b border-v2-border-border-base px-[5px] py-3">
+                  <div
+                    class="relative flex h-[125px] w-full max-w-[250px] min-w-0 shrink-0 flex-col items-center gap-1.5 overflow-hidden rounded-[8px] px-3 pb-2 pt-[54px] text-center data-[active]:ring-2 data-[active]:ring-[#0057ff]/25"
+                    data-active={state.dropActive ? "" : undefined}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      setState("dropActive", true)
+                    }}
+                    onDragLeave={() => setState("dropActive", false)}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      setState("dropActive", false)
+                      void importFiles([...(event.dataTransfer?.files ?? [])])
+                    }}
+                  >
+                    <img
+                      src={uploadDropzoneArtwork}
+                      alt=""
+                      class="pointer-events-none absolute inset-0 size-full object-fill"
+                    />
+                    <div class="relative text-[12px] leading-4 text-v2-text-text-muted">
+                      {state.importing ? "资料正在分阶段入库..." : "拖拽文件到这里"}
+                    </div>
+                    <div class="relative flex flex-wrap justify-center gap-1.5">
                       <button
                         type="button"
-                        class="h-7 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-2.5 text-[11px] text-v2-text-text-muted hover:text-v2-text-text-base disabled:opacity-50"
+                        class="h-7 rounded-[6px] bg-v2-text-text-base px-2.5 text-[11px] font-medium text-v2-background-bg-layer-01 disabled:opacity-50"
                         disabled={state.importing}
-                        onClick={() => void importDirectory()}
+                        onClick={() => void chooseFiles()}
                       >
-                        导入目录
+                        添加文件
                       </button>
-                    </Show>
+                      <Show when={platform.platform === "desktop"}>
+                        <button
+                          type="button"
+                          class="h-7 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-2.5 text-[11px] text-v2-text-text-muted hover:text-v2-text-text-base disabled:opacity-50"
+                          disabled={state.importing}
+                          onClick={() => void importDirectory()}
+                        >
+                          导入目录
+                        </button>
+                      </Show>
+                    </div>
+                    <input
+                      ref={inputElement}
+                      class="hidden"
+                      type="file"
+                      multiple
+                      onChange={(event) => {
+                        void importFiles([...(event.currentTarget.files ?? [])])
+                        event.currentTarget.value = ""
+                      }}
+                    />
                   </div>
-                  <input
-                    ref={inputElement}
-                    class="hidden"
-                    type="file"
-                    multiple
-                    onChange={(event) => {
-                      void importFiles([...(event.currentTarget.files ?? [])])
-                      event.currentTarget.value = ""
-                    }}
-                  />
+                  <Show when={state.importPhase !== "idle"}>
+                    <ImportStatus
+                      phase={state.importPhase}
+                      completed={state.importCompleted}
+                      total={state.importTotal}
+                      message={state.importMessage}
+                    />
+                  </Show>
                 </div>
-                <Show when={state.importPhase !== "idle"}>
-                  <ImportStatus
-                    phase={state.importPhase}
-                    completed={state.importCompleted}
-                    total={state.importTotal}
-                    message={state.importMessage}
+                <div
+                  class="flex shrink-0 min-h-0 flex-col"
+                  style={
+                    !panelStore.historyOpened
+                      ? {}
+                      : !panelStore.directoryOpened
+                        ? { flex: "1 1 0%" }
+                        : { height: `${panelStore.sessionListHeight + 36}px` }
+                  }
+                >
+                  <div class="flex h-9 shrink-0 items-center justify-between px-3 text-[12px] font-semibold text-v2-text-text-muted">
+                    <button
+                      type="button"
+                      class="flex items-center gap-1.5 text-left hover:text-v2-text-text-base focus:outline-none"
+                      onClick={() => setPanelStore("historyOpened", !panelStore.historyOpened)}
+                    >
+                      <Icon
+                        name={panelStore.historyOpened ? "chevron-down" : "chevron-right"}
+                        class="size-3.5 transition-transform"
+                      />
+                      <span>对话历史 · {state.sessions.length}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="flex size-6 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base disabled:opacity-40"
+                      title="新建知识库对话"
+                      aria-label="新建知识库对话"
+                      disabled={state.sending || state.importing}
+                      onClick={newKnowledgeSession}
+                    >
+                      <Icon name="new-session" class="size-3.5" />
+                    </button>
+                  </div>
+                  <Show when={panelStore.historyOpened}>
+                    <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+                      <For
+                        each={state.sessions}
+                        fallback={
+                          <div class="px-2 py-2 text-[11px] text-v2-text-text-faint">暂无对话，发送问题后自动创建</div>
+                        }
+                      >
+                        {(session) => {
+                          const [hovered, setHovered] = createSignal(false)
+                          const [focused, setFocused] = createSignal(false)
+                          const deleteVisible = () => hovered() || focused()
+
+                          return (
+                            <div
+                              class="relative flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+                              data-selected={activeSessionID() === session.id ? "" : undefined}
+                              onMouseEnter={() => setHovered(true)}
+                              onMouseMove={() => setHovered(true)}
+                              onMouseLeave={() => setHovered(false)}
+                              onFocusIn={() => setFocused(true)}
+                              onFocusOut={(event) => {
+                                if (
+                                  event.relatedTarget instanceof Node &&
+                                  event.currentTarget.contains(event.relatedTarget)
+                                )
+                                  return
+                                setFocused(false)
+                              }}
+                            >
+                              <button
+                                type="button"
+                                class="flex h-full w-full min-w-0 touch-manipulation items-center gap-2 px-2 pr-9 text-left"
+                                aria-current={activeSessionID() === session.id ? "page" : undefined}
+                                onClick={() => openKnowledgeSession(session)}
+                              >
+                                <Icon
+                                  name={session.metadata?.cmccKnowledgeKind === "import" ? "task" : "brain"}
+                                  class="size-3.5 shrink-0"
+                                />
+                                <span class="min-w-0 flex-1 truncate">
+                                  {knowledgeSessionLabel(session, activeNotebook().name)}
+                                </span>
+                                <span class="shrink-0 text-[10px] text-v2-text-text-faint">
+                                  {knowledgeSessionTime(session)}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                class="absolute right-1 z-10 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed"
+                                style={{
+                                  visibility: deleteVisible() ? "visible" : "hidden",
+                                  opacity: deleteVisible() ? "1" : "0",
+                                  "pointer-events": deleteVisible() ? "auto" : "none",
+                                }}
+                                title="删除对话"
+                                aria-label={`删除对话 ${knowledgeSessionLabel(session, activeNotebook().name)}`}
+                                disabled={state.sending || state.importing || sessionRemoval.removing}
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onPointerUp={(event) => {
+                                  event.stopPropagation()
+                                  activateTreePointer(event, () => setSessionRemoval({ session, removing: false }))
+                                }}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  activateTreeClick(event, () => setSessionRemoval({ session, removing: false }))
+                                }}
+                              >
+                                <Icon name="trash" class="size-3.5" />
+                              </button>
+                            </div>
+                          )
+                        }}
+                      </For>
+                    </div>
+                  </Show>
+                </div>
+
+                <Show when={panelStore.historyOpened && panelStore.directoryOpened}>
+                  <div
+                    role="separator"
+                    aria-orientation="horizontal"
+                    class="relative z-10 h-2 w-full shrink-0 cursor-row-resize bg-transparent before:absolute before:inset-x-0 before:top-1/2 before:h-px before:-translate-y-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+                    onPointerDown={startSessionDrag}
                   />
                 </Show>
-              </div>
-              <div
-                class="flex shrink-0 min-h-0 flex-col"
-                style={
-                  !panelStore.historyOpened
-                    ? {}
-                    : !panelStore.directoryOpened
-                    ? { flex: "1 1 0%" }
-                    : { height: `${panelStore.sessionListHeight + 36}px` }
-                }
-              >
+
                 <div class="flex h-9 shrink-0 items-center justify-between px-3 text-[12px] font-semibold text-v2-text-text-muted">
                   <button
                     type="button"
                     class="flex items-center gap-1.5 text-left hover:text-v2-text-text-base focus:outline-none"
-                    onClick={() => setPanelStore("historyOpened", !panelStore.historyOpened)}
+                    onClick={() => setPanelStore("directoryOpened", !panelStore.directoryOpened)}
                   >
                     <Icon
-                      name={panelStore.historyOpened ? "chevron-down" : "chevron-right"}
+                      name={panelStore.directoryOpened ? "chevron-down" : "chevron-right"}
                       class="size-3.5 transition-transform"
                     />
-                    <span>对话历史 · {state.sessions.length}</span>
+                    <span>笔记本目录</span>
                   </button>
-                  <button
-                    type="button"
-                    class="flex size-6 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base disabled:opacity-40"
-                    title="新建知识库对话"
-                    aria-label="新建知识库对话"
-                    disabled={state.sending || state.importing}
-                    onClick={newKnowledgeSession}
-                  >
-                    <Icon name="new-session" class="size-3.5" />
-                  </button>
+                  <Show when={state.loading}>
+                    <span class="size-3 animate-spin rounded-full border border-current border-r-transparent" />
+                  </Show>
                 </div>
-                <Show when={panelStore.historyOpened}>
-                  <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-                    <For
-                      each={state.sessions}
-                      fallback={
-                        <div class="px-2 py-2 text-[11px] text-v2-text-text-faint">暂无对话，发送问题后自动创建</div>
-                      }
-                    >
-                      {(session) => {
-                        const [hovered, setHovered] = createSignal(false)
-                        const [focused, setFocused] = createSignal(false)
-                        const deleteVisible = () => hovered() || focused()
-
-                        return (
-                          <div
-                            class="relative flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
-                            data-selected={activeSessionID() === session.id ? "" : undefined}
-                            onMouseEnter={() => setHovered(true)}
-                            onMouseMove={() => setHovered(true)}
-                            onMouseLeave={() => setHovered(false)}
-                            onFocusIn={() => setFocused(true)}
-                            onFocusOut={(event) => {
-                              if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))
-                                return
-                              setFocused(false)
-                            }}
-                          >
-                            <button
-                              type="button"
-                              class="flex h-full w-full min-w-0 touch-manipulation items-center gap-2 px-2 pr-9 text-left"
-                              aria-current={activeSessionID() === session.id ? "page" : undefined}
-                              onClick={() => openKnowledgeSession(session)}
-                            >
-                              <Icon
-                                name={session.metadata?.cmccKnowledgeKind === "import" ? "task" : "brain"}
-                                class="size-3.5 shrink-0"
-                              />
-                              <span class="min-w-0 flex-1 truncate">
-                                {knowledgeSessionLabel(session, activeNotebook().name)}
-                              </span>
-                              <span class="shrink-0 text-[10px] text-v2-text-text-faint">
-                                {knowledgeSessionTime(session)}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              class="absolute right-1 z-10 flex size-6 shrink-0 touch-manipulation items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-red-500/10 hover:text-red-500 disabled:cursor-not-allowed"
-                              style={{
-                                visibility: deleteVisible() ? "visible" : "hidden",
-                                opacity: deleteVisible() ? "1" : "0",
-                                "pointer-events": deleteVisible() ? "auto" : "none",
-                              }}
-                              title="删除对话"
-                              aria-label={`删除对话 ${knowledgeSessionLabel(session, activeNotebook().name)}`}
-                              disabled={state.sending || state.importing || sessionRemoval.removing}
-                              onPointerDown={(event) => event.stopPropagation()}
-                              onPointerUp={(event) => {
-                                event.stopPropagation()
-                                activateTreePointer(event, () => setSessionRemoval({ session, removing: false }))
-                              }}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                activateTreeClick(event, () => setSessionRemoval({ session, removing: false }))
-                              }}
-                            >
-                              <Icon name="trash" class="size-3.5" />
-                            </button>
-                          </div>
-                        )
-                      }}
+                <Show when={panelStore.directoryOpened}>
+                  <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+                    <For each={rootChildren()} fallback={<EmptyFiles loading={state.loading} />}>
+                      {(file) => (
+                        <KnowledgeTreeNode
+                          file={file}
+                          files={state.files}
+                          level={0}
+                          active={state.activeTab}
+                          expanded={state.expanded}
+                          toggle={(path) =>
+                            setState("expanded", (items) =>
+                              items.includes(path) ? items.filter((item) => item !== path) : [...items, path],
+                            )
+                          }
+                          open={(item) => void openFile(item)}
+                          remove={(item) => setFileRemoval({ file: item, removing: false })}
+                          deleting={fileRemoval.removing || state.importing}
+                        />
+                      )}
                     </For>
                   </div>
                 </Show>
-              </div>
-
-              <Show when={panelStore.historyOpened && panelStore.directoryOpened}>
-                <div
-                  role="separator"
-                  aria-orientation="horizontal"
-                  class="relative z-10 h-2 w-full shrink-0 cursor-row-resize bg-transparent before:absolute before:inset-x-0 before:top-1/2 before:h-px before:-translate-y-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
-                  onPointerDown={startSessionDrag}
-                />
-              </Show>
-
-              <div class="flex h-9 shrink-0 items-center justify-between px-3 text-[12px] font-semibold text-v2-text-text-muted">
-                <button
-                  type="button"
-                  class="flex items-center gap-1.5 text-left hover:text-v2-text-text-base focus:outline-none"
-                  onClick={() => setPanelStore("directoryOpened", !panelStore.directoryOpened)}
-                >
-                  <Icon
-                    name={panelStore.directoryOpened ? "chevron-down" : "chevron-right"}
-                    class="size-3.5 transition-transform"
-                  />
-                  <span>笔记本目录</span>
-                </button>
-                <Show when={state.loading}>
-                  <span class="size-3 animate-spin rounded-full border border-current border-r-transparent" />
-                </Show>
-              </div>
-              <Show when={panelStore.directoryOpened}>
-                <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-                  <For each={rootChildren()} fallback={<EmptyFiles loading={state.loading} />}>
-                    {(file) => (
-                      <KnowledgeTreeNode
-                        file={file}
-                        files={state.files}
-                        level={0}
-                        active={state.activeTab}
-                        expanded={state.expanded}
-                        toggle={(path) =>
-                          setState("expanded", (items) =>
-                            items.includes(path) ? items.filter((item) => item !== path) : [...items, path],
-                          )
-                        }
-                        open={(item) => void openFile(item)}
-                        remove={(item) => setFileRemoval({ file: item, removing: false })}
-                        deleting={fileRemoval.removing || state.importing}
-                      />
-                    )}
-                  </For>
-                </div>
-              </Show>
-            </aside>
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
-              onPointerDown={startLeftDrag}
-            />
+              </aside>
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+                onPointerDown={startLeftDrag}
+              />
             </Show>
 
-            <section class="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent" style={{ "min-width": `${CONTENT_MIN_WIDTH}px` }}>
+            <section
+              class="flex min-h-0 min-w-0 flex-1 flex-col bg-transparent"
+              style={{ "min-width": `${CONTENT_MIN_WIDTH}px` }}
+            >
               <div class="flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b border-v2-border-border-base bg-transparent px-2 pt-1.5">
                 <WorkspaceTab
                   active={state.activeTab === "chat"}
@@ -1577,15 +1632,17 @@ export function CmccKnowledgeNotebookRoute() {
                     tab={activePreview()}
                     content={activePreview() ? state.contents[activePreview()!.path] : undefined}
                     loading={state.loadingPath === state.activeTab}
+                    pdfSrc={activePreview() ? previewUrl(activePreview()!.path) : undefined}
                     openPath={platform.openPath}
                   />
                 }
               >
                 <ChatWorkspace
                   notebook={activeNotebook()}
-                  messages={state.messages}
+                  sessionID={activeSessionID()}
+                  messages={liveMessages()}
                   optimisticPrompt={state.optimisticPrompt}
-                  sending={state.sending}
+                  sending={answering()}
                   importing={state.importing}
                   importMessage={state.importMessage}
                   send={(value) => void send(value)}
@@ -1601,35 +1658,46 @@ export function CmccKnowledgeNotebookRoute() {
             </section>
 
             <Show when={panelStore.graphOpened}>
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
-              onPointerDown={startRightDrag}
-            />
-            <aside
-              class="flex min-h-0 min-w-0 shrink-0 flex-col border-l border-v2-border-border-base bg-transparent"
-              style={{ width: `${panelStore.graphWidth}px` }}
-            >
-              <KnowledgeGraphPanel
-                graph={graph()}
-                mode={state.graphMode}
-                query={state.graphQuery}
-                selection={state.graphSelection}
-                setMode={(mode) => setState("graphMode", mode)}
-                setQuery={(query) => setState("graphQuery", query)}
-                select={(node) => {
-                  setState("graphSelection", node.path)
-                  void openFile({ path: node.path })
-                }}
-                clear={() => setState({ graphMode: "all", graphQuery: "", graphSelection: "" })}
-                onCollapse={() => setPanelStore("graphOpened", false)}
-                detailHeight={panelStore.graphDetailHeight}
-                onDetailDrag={startDetailDrag}
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+                onPointerDown={startRightDrag}
               />
-            </aside>
+              <aside
+                class="flex min-h-0 min-w-0 shrink-0 flex-col border-l border-v2-border-border-base bg-transparent"
+                style={{ width: `${panelStore.graphWidth}px` }}
+              >
+                <KnowledgeGraphPanel
+                  graph={graph()}
+                  mode={state.graphMode}
+                  query={state.graphQuery}
+                  selection={state.graphSelection}
+                  setMode={(mode) => setState("graphMode", mode)}
+                  setQuery={(query) => setState("graphQuery", query)}
+                  select={(node) => {
+                    setState("graphSelection", node.path)
+                    void openFile({ path: node.path })
+                  }}
+                  clear={() => setState({ graphMode: "all", graphQuery: "", graphSelection: "" })}
+                  onCollapse={() => setPanelStore("graphOpened", false)}
+                  detailHeight={panelStore.graphDetailHeight}
+                  onDetailDrag={startDetailDrag}
+                />
+              </aside>
             </Show>
           </main>
+          <Show when={state.importing}>
+            <ImportProgressDialog
+              notebook={activeNotebook().name}
+              phase={state.importPhase}
+              completed={state.importCompleted}
+              total={state.importTotal}
+              message={state.importMessage}
+              pages={wikiPageCount()}
+              relationships={graph().edges.length}
+            />
+          </Show>
           <Show when={fileRemoval.file} keyed>
             {(file) => (
               <Modal title="删除文档" close={() => !fileRemoval.removing && setFileRemoval("file", undefined)}>
@@ -1747,7 +1815,11 @@ function NotebookCard(props: {
         onClick={props.open}
       >
         <Show when={props.index % 2 === 0}>
-          <img src={notebookSpecCardArtwork} alt="" class="pointer-events-none absolute inset-0 size-full object-contain" />
+          <img
+            src={notebookSpecCardArtwork}
+            alt=""
+            class="pointer-events-none absolute inset-0 size-full object-contain"
+          />
         </Show>
         <Show when={props.index % 2 !== 0}>
           <img
@@ -1835,9 +1907,7 @@ function NotebookMenuItem(props: { icon: JSX.Element; label: string; action: () 
 }
 
 function FeatureStep(props: { artwork: string; label: string }) {
-  return (
-    <img src={props.artwork} alt={props.label} class="h-10 w-auto shrink-0 max-sm:h-9" />
-  )
+  return <img src={props.artwork} alt={props.label} class="h-10 w-auto shrink-0 max-sm:h-9" />
 }
 
 function Modal(props: { title: string; close: () => void; children: import("solid-js").JSX.Element; large?: boolean }) {
@@ -1892,7 +1962,7 @@ function PanelHeader(props: { title: string; meta: string; collapsible?: boolean
 }
 
 function ImportStatus(props: { phase: ImportPhase; completed: number; total: number; message: string }) {
-  const percent = () => (props.total > 0 ? Math.min(100, Math.round((props.completed / props.total) * 100)) : 0)
+  const percent = () => importPercent(props.phase, props.completed, props.total)
   const label = () =>
     ({
       idle: "等待导入",
@@ -1914,12 +1984,71 @@ function ImportStatus(props: { phase: ImportPhase; completed: number; total: num
         <div
           class="h-full rounded-full bg-v2-text-text-base transition-[width] duration-300"
           classList={{ "bg-red-500": props.phase === "failed" }}
-          style={{ width: `${props.phase === "validating" || props.phase === "completed" ? 100 : percent()}%` }}
+          style={{ width: `${percent()}%` }}
         />
       </div>
       <div class="mt-2 text-[10px] leading-4 text-v2-text-text-muted">{props.message}</div>
     </div>
   )
+}
+
+function ImportProgressDialog(props: {
+  notebook: string
+  phase: ImportPhase
+  completed: number
+  total: number
+  message: string
+  pages: number
+  relationships: number
+}) {
+  return (
+    <div
+      class="fixed inset-0 z-[230] flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="knowledge-import-title"
+    >
+      <section class="w-full max-w-[440px] rounded-[14px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.34)]">
+        <div class="flex items-start gap-3">
+          <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0057ff]/10 text-[#0057ff]">
+            <span class="size-5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <h2 id="knowledge-import-title" class="m-0 text-[16px] font-semibold leading-6 text-v2-text-text-base">
+              正在处理导入材料
+            </h2>
+            <p class="m-0 mt-1 truncate text-[12px] leading-5 text-v2-text-text-muted">{props.notebook}</p>
+          </div>
+        </div>
+        <div class="mt-5" aria-live="polite">
+          <ImportStatus phase={props.phase} completed={props.completed} total={props.total} message={props.message} />
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-2">
+          <div class="rounded-[8px] bg-v2-background-bg-layer-02 px-3 py-2.5">
+            <div class="text-[18px] font-semibold leading-6 text-v2-text-text-base">{props.pages}</div>
+            <div class="text-[10px] leading-4 text-v2-text-text-faint">已生成知识页</div>
+          </div>
+          <div class="rounded-[8px] bg-v2-background-bg-layer-02 px-3 py-2.5">
+            <div class="text-[18px] font-semibold leading-6 text-v2-text-text-base">{props.relationships}</div>
+            <div class="text-[10px] leading-4 text-v2-text-text-faint">已识别知识关系</div>
+          </div>
+        </div>
+        <p class="m-0 mt-4 text-center text-[11px] leading-5 text-v2-text-text-faint">
+          内容与右侧图谱会持续同步，处理完成后此窗口将自动关闭。
+        </p>
+      </section>
+    </div>
+  )
+}
+
+function importPercent(phase: ImportPhase, completed: number, total: number) {
+  const ratio = total > 0 ? Math.min(1, completed / total) : 0
+  if (phase === "collecting") return 5
+  if (phase === "staging") return Math.round(10 + ratio * 20)
+  if (phase === "organizing") return Math.round(30 + ratio * 55)
+  if (phase === "validating") return 92
+  if (phase === "completed") return 100
+  return 0
 }
 
 function EmptyFiles(props: { loading: boolean }) {
@@ -2092,6 +2221,7 @@ function WorkspaceTab(props: {
 
 function ChatWorkspace(props: {
   notebook: KnowledgeNotebook
+  sessionID?: string
   messages: ChatMessage[]
   optimisticPrompt: string
   sending: boolean
@@ -2100,24 +2230,18 @@ function ChatWorkspace(props: {
   send: (value: string) => void
   composer: JSX.Element
 }) {
-  const visibleMessages = createMemo(() =>
-    props.messages
-      .map((message) => ({
-        id: message.info.id,
-        role: message.info.role,
-        text: message.parts
-          .filter((part): part is TextPart => part.type === "text" && !part.ignored)
-          .map((part) => part.text)
-          .join("\n\n"),
-      }))
-      .filter((message) => message.text.trim()),
+  const settings = useSettings()
+  const messages = createMemo(() => props.messages.map((message) => message.info))
+  const userMessages = createMemo(() => messages().filter((message) => message.role === "user"))
+  const assistantWorking = createMemo(() =>
+    messages().some((message) => message.role === "assistant" && message.time.completed === undefined),
   )
 
   return (
     <div class="flex min-h-0 flex-1 flex-col">
       <div class="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         <Show
-          when={visibleMessages().length > 0 || props.optimisticPrompt}
+          when={userMessages().length > 0 || props.optimisticPrompt}
           fallback={
             <div class="mx-auto flex h-full max-w-[680px] flex-col items-center justify-center text-center">
               <div class="mb-4 flex size-12 items-center justify-center rounded-[14px] bg-v2-background-bg-layer-03 text-2xl">
@@ -2138,27 +2262,28 @@ function ChatWorkspace(props: {
             </div>
           }
         >
-          <div class="mx-auto flex w-full max-w-[760px] flex-col gap-5">
-            <For each={visibleMessages()}>
-              {(message) => (
-                <div class="flex gap-3" classList={{ "justify-end": message.role === "user" }}>
-                  <Show when={message.role === "assistant"}>
-                    <div class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-v2-background-bg-layer-03">
-                      <Icon name="brain" class="size-4" />
-                    </div>
-                  </Show>
-                  <div
-                    class="min-w-0 max-w-[88%] rounded-[10px] px-3.5 py-2.5 text-[13px] leading-6"
-                    classList={{
-                      "bg-v2-background-bg-layer-03 text-v2-text-text-base": message.role === "user",
-                      "text-v2-text-text-base": message.role === "assistant",
-                    }}
-                  >
-                    <Markdown text={message.text} cacheKey={message.id} />
-                  </div>
-                </div>
+          <div role="log" data-slot="session-turn-list" class="mx-auto flex w-full max-w-[800px] flex-col px-4">
+            <Show when={props.sessionID} keyed>
+              {(sessionID) => (
+                <For each={userMessages()}>
+                  {(message) => (
+                    <SessionTurn
+                      sessionID={sessionID}
+                      messageID={message.id}
+                      messages={messages()}
+                      showReasoningSummaries={settings.general.showReasoningSummaries()}
+                      shellToolDefaultOpen={settings.general.shellToolPartsExpanded()}
+                      editToolDefaultOpen={settings.general.editToolPartsExpanded()}
+                      classes={{
+                        root: "min-w-0 w-full relative",
+                        content: "flex flex-col justify-between !overflow-visible",
+                        container: "w-full",
+                      }}
+                    />
+                  )}
+                </For>
               )}
-            </For>
+            </Show>
             <Show when={props.optimisticPrompt}>
               <div class="flex justify-end">
                 <div class="max-w-[88%] rounded-[10px] bg-v2-background-bg-layer-03 px-3.5 py-2.5 text-[13px] leading-6 text-v2-text-text-base">
@@ -2166,7 +2291,7 @@ function ChatWorkspace(props: {
                 </div>
               </div>
             </Show>
-            <Show when={props.sending}>
+            <Show when={props.sending && !assistantWorking()}>
               <div class="flex items-center gap-3 text-[12px] text-v2-text-text-faint">
                 <div class="flex size-7 items-center justify-center rounded-[8px] bg-v2-background-bg-layer-03">
                   <span class="size-3 animate-spin rounded-full border border-current border-r-transparent" />
@@ -2210,6 +2335,7 @@ function DocumentPreview(props: {
   tab: PreviewTab | undefined
   content: FileContent | undefined
   loading: boolean
+  pdfSrc?: string
   openPath?: (path: string, app?: string) => Promise<void>
 }) {
   return (
@@ -2239,7 +2365,7 @@ function DocumentPreview(props: {
               </Show>
             </div>
             <Show
-              when={!props.loading && props.content}
+              when={!props.loading && (props.content || (/\.pdf$/i.test(tab().path) && props.pdfSrc))}
               fallback={
                 <div class="flex flex-1 items-center justify-center gap-2 text-[12px] text-v2-text-text-faint">
                   <span class="size-3 animate-spin rounded-full border border-current border-r-transparent" />
@@ -2247,18 +2373,17 @@ function DocumentPreview(props: {
                 </div>
               }
             >
-              {(content) => (
-                <div class="min-h-0 flex-1 overflow-hidden">
-                  <ArtifactPreview
-                    path={tab().path}
-                    content={content()}
-                    markdownCacheKey={`knowledge:${tab().path}`}
-                    htmlTitle="请使用系统打开"
-                    htmlDescription="知识库中的 HTML 文件不会在当前页面执行，可通过右上角“系统打开”查看。"
-                    unsupportedDescription="文件已保留在笔记本目录中，并可被 DeepInsight 与 llmwiki 使用。你可以通过右上角“系统打开”查看原始文件。"
-                  />
-                </div>
-              )}
+              <div class="min-h-0 flex-1 overflow-hidden">
+                <ArtifactPreview
+                  path={tab().path}
+                  content={props.content ?? emptyPdfContent}
+                  pdfSrc={props.pdfSrc}
+                  markdownCacheKey={`knowledge:${tab().path}`}
+                  htmlTitle="请使用系统打开"
+                  htmlDescription="知识库中的 HTML 文件不会在当前页面执行，可通过右上角“系统打开”查看。"
+                  unsupportedDescription="文件已保留在笔记本目录中，并可被 DeepInsight 与 llmwiki 使用。你可以通过右上角“系统打开”查看原始文件。"
+                />
+              </div>
             </Show>
           </>
         )}
@@ -2536,6 +2661,13 @@ function relativeKnowledgePath(root: string, target: string) {
 function absolutePath(directory: string, path: string) {
   const separator = directory.includes("\\") ? "\\" : "/"
   return `${directory.replace(/[\\/]+$/, "")}${separator}${path.replaceAll(/[\\/]/g, separator)}`
+}
+
+const emptyPdfContent: FileContent = {
+  type: "binary",
+  content: "",
+  encoding: "base64",
+  mimeType: "application/pdf",
 }
 
 function formatDate(value: number) {

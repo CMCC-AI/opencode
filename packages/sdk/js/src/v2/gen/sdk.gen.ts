@@ -72,6 +72,8 @@ import type {
   FileListResponses,
   FilePartInput,
   FilePartSource,
+  FilePreviewErrors,
+  FilePreviewResponses,
   FileReadErrors,
   FileReadResponses,
   FileRemoveErrors,
@@ -1969,6 +1971,38 @@ export class File extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<FileDownloadResponses, FileDownloadErrors, ThrowOnError>({
       url: "/file/download",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Preview PDF file
+   *
+   * Stream a PDF file inline with support for single byte range requests.
+   */
+  public preview<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      workspace?: string
+      path: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<FilePreviewResponses, FilePreviewErrors, ThrowOnError>({
+      url: "/file/preview",
       ...options,
       ...params,
     })

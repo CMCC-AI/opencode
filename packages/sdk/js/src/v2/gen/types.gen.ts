@@ -8128,6 +8128,43 @@ export type FileDownloadResponses = {
 
 export type FileDownloadResponse = FileDownloadResponses[keyof FileDownloadResponses]
 
+export type FilePreviewData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    workspace?: string
+    path: string
+  }
+  url: "/file/preview"
+}
+
+export type FilePreviewErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * <No Content>
+   */
+  416: unknown
+}
+
+export type FilePreviewError = FilePreviewErrors[keyof FilePreviewErrors]
+
+export type FilePreviewResponses = {
+  /**
+   * Success
+   */
+  200: Blob | File
+  /**
+   * Success
+   */
+  206: Blob | File
+}
+
+export type FilePreviewResponse = FilePreviewResponses[keyof FilePreviewResponses]
+
 export type FileArchiveData = {
   body?: {
     paths: Array<string>

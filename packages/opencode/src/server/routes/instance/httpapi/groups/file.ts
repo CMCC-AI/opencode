@@ -1,4 +1,3 @@
-import { FileSystem } from "@opencode-ai/core/filesystem"
 import { NonNegativeInt, RelativePath } from "@opencode-ai/core/schema"
 import { LSP } from "@/lsp/lsp"
 import { Schema } from "effect"
@@ -148,6 +147,7 @@ export const FilePaths = {
   list: "/file",
   content: "/file/content",
   download: "/file/download",
+  preview: "/file/preview",
   archive: "/file/archive",
   createDirectory: "/file/directory",
   upload: "/file/upload",
@@ -219,6 +219,23 @@ export const FileApi = HttpApi.make("file")
             identifier: "file.download",
             summary: "Download file",
             description: "Download a file from the current workspace without altering its contents.",
+          }),
+        ),
+        HttpApiEndpoint.get("preview", FilePaths.preview, {
+          query: FileQuery,
+          success: [
+            Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array({ contentType: "application/pdf" })),
+            Schema.Uint8Array.pipe(
+              HttpApiSchema.asUint8Array({ contentType: "application/pdf" }),
+              HttpApiSchema.status(206),
+            ),
+          ],
+          error: [HttpApiError.BadRequest, HttpApiSchema.Empty(416)],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "file.preview",
+            summary: "Preview PDF file",
+            description: "Stream a PDF file inline with support for single byte range requests.",
           }),
         ),
         HttpApiEndpoint.post("archive", FilePaths.archive, {

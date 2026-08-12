@@ -51,6 +51,7 @@ const openApiDriftRoutes = [
   { method: "get", path: FilePaths.findFile, query: FindFileQuery },
   { method: "get", path: FilePaths.findText, query: FindTextQuery },
   { method: "get", path: FilePaths.list, query: FileQuery },
+  { method: "get", path: FilePaths.preview, query: FileQuery },
   { method: "get", path: ExperimentalPaths.session, query: ExperimentalSessionListQuery },
   { method: "get", path: ExperimentalPaths.tool, query: ToolListQuery },
   { method: "get", path: InstancePaths.vcsDiff, query: VcsDiffQuery },

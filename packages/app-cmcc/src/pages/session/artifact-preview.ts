@@ -10,6 +10,16 @@ export type ArtifactPreviewKind =
   | "unsupported"
 
 const IMAGE_EXTENSIONS = new Set(["avif", "bmp", "gif", "jpeg", "jpg", "png", "svg", "webp"])
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  avif: "image/avif",
+  bmp: "image/bmp",
+  gif: "image/gif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  svg: "image/svg+xml",
+  webp: "image/webp",
+}
 const TEXT_EXTENSIONS = new Set([
   "css",
   "csv",
@@ -48,6 +58,11 @@ export function artifactPreviewKind(path: string): ArtifactPreviewKind {
   if (extension === "md" || extension === "markdown" || extension === "mdx") return "markdown"
   if (TEXT_EXTENSIONS.has(extension)) return "text"
   return "unsupported"
+}
+
+export function artifactImageMimeType(path: string, mimeType?: string) {
+  if (mimeType?.toLowerCase().startsWith("image/")) return mimeType
+  return IMAGE_MIME_TYPES[artifactExtension(path)] ?? "image/png"
 }
 
 export function resolveArtifactPath(candidate: string, paths: string[]) {
