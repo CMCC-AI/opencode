@@ -30,6 +30,14 @@ if [[ ! -d $release_dir/.opencode/experts ]]; then
   echo "Expert configuration is missing: $release_dir/.opencode/experts" >&2
   exit 1
 fi
+if [[ ! -x $release_dir/deepxiv-proxy ]]; then
+  echo "DeepXiv proxy binary is missing: $release_dir/deepxiv-proxy" >&2
+  exit 1
+fi
+if [[ ! -f $release_dir/deepxiv.env ]]; then
+  echo "DeepXiv proxy environment is missing: $release_dir/deepxiv.env" >&2
+  exit 1
+fi
 
 install -d -m 0755 "$install_root/releases" "$target" "$workspace_root"
 install -d -o "$service_user" -g "$service_user" -m 0750 \
@@ -38,12 +46,14 @@ install -d -o "$service_user" -g "$service_user" -m 0750 \
   "$data_root/state" \
   "$data_root/cache"
 install -o root -g root -m 0755 "$release_dir/opencode" "$target/opencode"
+install -o root -g root -m 0755 "$release_dir/deepxiv-proxy" "$target/deepxiv-proxy"
 install -d -o root -g root -m 0755 "$target/.opencode"
 cp -a "$release_dir/.opencode/." "$target/.opencode/"
 chown -R root:root "$target/.opencode"
 chmod -R a+rX "$target/.opencode"
 install -d -m 0755 /etc/opencode-cmcc
 install -o root -g root -m 0600 "$release_dir/opencode.env" /etc/opencode-cmcc/opencode.env
+install -o root -g root -m 0600 "$release_dir/deepxiv.env" /etc/opencode-cmcc/deepxiv.env
 ln -sfn "$target" "$install_root/current"
 chown "$service_user:$service_user" "$workspace_root"
 
@@ -83,10 +93,40 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 EOF
 
+cat >/etc/systemd/system/opencode-cmcc-deepxiv.service <<EOF
+[Unit]
+Description=OpenCode CMCC DeepXiv Proxy
+After=network-online.target opencode-cmcc.service
+Wants=network-online.target
+PartOf=opencode-cmcc.service
+
+[Service]
+Type=simple
+User=$service_user
+Group=$service_user
+WorkingDirectory=$workspace_root
+EnvironmentFile=/etc/opencode-cmcc/deepxiv.env
+ExecStart=$install_root/current/deepxiv-proxy
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+MemoryHigh=512M
+MemoryMax=768M
+StartLimitIntervalSec=60
+StartLimitBurst=5
+NoNewPrivileges=true
+PrivateTmp=true
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 systemctl daemon-reload
-systemctl enable --now opencode-cmcc.service
-systemctl restart opencode-cmcc.service
+systemctl enable --now opencode-cmcc.service opencode-cmcc-deepxiv.service
+systemctl restart opencode-cmcc.service opencode-cmcc-deepxiv.service
 systemctl is-active --quiet opencode-cmcc.service
+systemctl is-active --quiet opencode-cmcc-deepxiv.service
 
 current=$(readlink -f "$install_root/current")
 kept=1
@@ -108,4 +148,4 @@ for previous_stage in /tmp/opencode-cmcc-*; do
   rm -rf -- "$previous_stage"
 done
 
-echo "OpenCode CMCC $version is running on $bind_host:$port"
+echo "OpenCode CMCC $version is running on $bind_host:$port with the DeepXiv proxy"

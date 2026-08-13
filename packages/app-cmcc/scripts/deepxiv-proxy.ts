@@ -5,6 +5,17 @@ import { request as httpsRequest } from "node:https"
 const DEFAULT_TARGET = "http://81.70.174.140:3000/"
 const DEFAULT_HOST = "0.0.0.0"
 const DEFAULT_PORT = 3100
+const HOP_BY_HOP_HEADERS = [
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "proxy-connection",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+] as const
 
 export async function startDeepXivProxy(options?: {
   host?: string
@@ -30,6 +41,7 @@ export async function startDeepXivProxy(options?: {
 
   const server = createServer((incoming, outgoing) => {
     const source = new URL(incoming.url ?? "/", "http://deepxiv-proxy.local")
+    source.searchParams.delete("auth_token")
     const destination = new URL(`${source.pathname}${source.search}`, target)
     const forwardedHost = publicOrigin?.host ?? incoming.headers.host ?? `${host}:${port}`
     const forwardedProtocol = publicOrigin?.protocol.slice(0, -1) ?? "http"
@@ -37,19 +49,13 @@ export async function startDeepXivProxy(options?: {
     const requestUpstream = destination.protocol === "https:" ? httpsRequest : httpRequest
     const proxyRequest = requestUpstream(destination, {
       method: incoming.method,
-      headers: {
-        ...incoming.headers,
-        host: forwardedHost,
-        "x-forwarded-for": forwardedFor,
-        "x-forwarded-host": forwardedHost,
-        "x-forwarded-proto": forwardedProtocol,
-      },
+      headers: requestHeaders(incoming, { forwardedFor, forwardedHost, forwardedProtocol }),
     }, (proxyResponse) => {
       proxyResponse.on("error", (error) => failResponse(outgoing, error))
       outgoing.writeHead(
         proxyResponse.statusCode ?? 502,
         proxyResponse.statusMessage,
-        proxyResponse.headers,
+        responseHeaders(proxyResponse.headers, target, publicOrigin),
       )
       proxyResponse.pipe(outgoing)
       outgoing.on("close", () => {
@@ -90,8 +96,15 @@ function parsePort(value: string | number | undefined, allowZero = false) {
 
 function parseTarget(value: string) {
   const target = new URL(value)
-  if (target.protocol !== "http:" && target.protocol !== "https:") {
-    throw new Error("DEEPLIT_PROXY_TARGET must use http or https")
+  if (
+    (target.protocol !== "http:" && target.protocol !== "https:")
+    || target.username
+    || target.password
+    || (target.pathname !== "/" && target.pathname !== "")
+    || target.search
+    || target.hash
+  ) {
+    throw new Error("DEEPLIT_PROXY_TARGET must be an http or https origin")
   }
   return target
 }
@@ -129,6 +142,44 @@ function buildForwardedFor(incoming: IncomingMessage, trustForwardedHeaders: boo
   const forwarded = incoming.headers["x-forwarded-for"]
   const existing = Array.isArray(forwarded) ? forwarded.join(", ") : forwarded?.trim()
   return existing ? `${existing}, ${remoteAddress}` : remoteAddress
+}
+
+function requestHeaders(
+  incoming: IncomingMessage,
+  forwarded: { forwardedFor: string; forwardedHost: string; forwardedProtocol: string },
+) {
+  const headers = { ...incoming.headers }
+  const connection = incoming.headers.connection?.split(",").map((value) => value.trim().toLowerCase()) ?? []
+  HOP_BY_HOP_HEADERS.concat(connection).forEach((name) => delete headers[name])
+  delete headers.authorization
+  return {
+    ...headers,
+    host: forwarded.forwardedHost,
+    "x-forwarded-for": forwarded.forwardedFor,
+    "x-forwarded-host": forwarded.forwardedHost,
+    "x-forwarded-proto": forwarded.forwardedProtocol,
+  }
+}
+
+function responseHeaders(headers: IncomingMessage["headers"], target: URL, publicOrigin: URL | undefined) {
+  const result = { ...headers }
+  const connection = headers.connection?.split(",").map((value) => value.trim().toLowerCase()) ?? []
+  HOP_BY_HOP_HEADERS.concat(connection).forEach((name) => delete result[name])
+  if (!publicOrigin) return result
+  if (typeof result.location === "string") result.location = rewriteURL(result.location, target, publicOrigin)
+  if (typeof result.refresh === "string") {
+    result.refresh = result.refresh.replace(/^(\s*\d+\s*;\s*url=)(.+)$/i, (_value, prefix, url) =>
+      `${prefix}${rewriteURL(url, target, publicOrigin)}`,
+    )
+  }
+  return result
+}
+
+function rewriteURL(value: string, target: URL, publicOrigin: URL) {
+  if (!URL.canParse(value)) return value
+  const url = new URL(value)
+  if (url.origin !== target.origin) return value
+  return `${publicOrigin.origin}${url.pathname}${url.search}${url.hash}`
 }
 
 function failResponse(outgoing: ServerResponse, error: Error) {

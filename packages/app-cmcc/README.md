@@ -47,6 +47,17 @@ proxy, set `DEEPLIT_PROXY_PUBLIC_ORIGIN` to its browser-visible origin. Set
 exclusively through a trusted gateway so per-client rate limits use the
 gateway-provided address.
 
+The repository-level `deploy_to_server.sh` packages the proxy as a standalone
+executable, installs it as `opencode-cmcc-deepxiv.service`, sets the iframe URL
+at build time, and adds its validated public origin to the server CSP. Its
+production defaults can be overridden with `DEEPXIV_PROXY_PORT`,
+`DEEPLIT_PROXY_TARGET`, `DEEPLIT_PROXY_PUBLIC_ORIGIN`, and
+`DEEPLIT_PROXY_TRUST_FORWARD_HEADERS`. Use `OPENCODE_PUBLIC_SCHEME=https` only
+when a trusted gateway terminates TLS for both APP-CMCC and the proxy. The
+deployment script requires `VITE_DEEPXIV_URL`, when supplied, to match
+`DEEPLIT_PROXY_PUBLIC_ORIGIN` so the iframe URL, proxy headers, and CSP cannot
+drift apart.
+
 The page will reload if you make edits.<br>
 
 ### `npm run build`

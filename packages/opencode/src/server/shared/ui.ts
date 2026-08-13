@@ -23,11 +23,25 @@ const CMCC_EXPERT_FRAME_SOURCES = [
   "http://152.136.106.161:3001",
   "http://81.70.174.140:8083",
   "http://81.70.174.140:8888",
-].join(" ")
+]
 
-export const csp = (hash = "") =>
-  `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; frame-src 'self' ${CMCC_EXPERT_FRAME_SOURCES}; connect-src * data:`
+export const csp = (hash = "", deepXivOrigin = process.env.DEEPLIT_PROXY_PUBLIC_ORIGIN) => {
+  const deepXivFrameSource = parseFrameSource(deepXivOrigin)
+  const frameSources = [...CMCC_EXPERT_FRAME_SOURCES, ...(deepXivFrameSource ? [deepXivFrameSource] : [])].join(" ")
+  return `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; frame-src 'self' ${frameSources}; connect-src * data:`
+}
 export const DEFAULT_CSP = csp()
+
+function parseFrameSource(value: string | undefined) {
+  const configured = value?.trim()
+  if (!configured || !URL.canParse(configured)) return
+  const origin = new URL(configured)
+  if (origin.protocol !== "http:" && origin.protocol !== "https:") return
+  if (origin.username || origin.password || origin.search || origin.hash) return
+  if (origin.pathname !== "/" && origin.pathname !== "") return
+  if (origin.origin !== configured && origin.origin !== configured.replace(/\/$/, "")) return
+  return origin.origin
+}
 
 export function themePreloadHash(body: string) {
   return body.match(/<script\b(?![^>]*\bsrc\s*=)[^>]*\bid=(['"])oc-theme-preload-script\1[^>]*>([\s\S]*?)<\/script>/i)
