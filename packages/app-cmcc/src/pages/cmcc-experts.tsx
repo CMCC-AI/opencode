@@ -1,6 +1,6 @@
 import { Navigate, useNavigate, useParams } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
-import { createMemo, createSignal, For, Show } from "solid-js"
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { Portal } from "solid-js/web"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
@@ -12,6 +12,8 @@ import expertIndustry from "@/assets/experts/scene-06.png"
 import expertInvestment from "@/assets/experts/scene-17.png"
 import expertTrading from "@/assets/experts/scene-14.png"
 import expertHero from "@/assets/experts/scene-05.png"
+import bannerBg from "@/assets/experts/banner.png"
+import robotBtn from "@/assets/experts/robot-button.png"
 import expertSkillResearch from "@/assets/experts/detail-skill-research.png"
 import expertSkillReview from "@/assets/experts/detail-skill-review.png"
 import expertSkillWriting from "@/assets/experts/detail-skill-writing.png"
@@ -76,11 +78,63 @@ const EXPERT_AVATARS = import.meta.glob("../../../../.opencode/experts/*/avatars
   query: "?url",
 }) as Record<string, string>
 
+function FeaturedCarousel(props: { experts: TeamExpert[]; onOpen: (expert: TeamExpert) => void }) {
+  const [index, setIndex] = createSignal(0)
+  const total = () => props.experts.length
+  const current = createMemo(() => props.experts[index() % total()])
+
+  let timer: ReturnType<typeof setInterval>
+  onMount(() => {
+    timer = setInterval(() => setIndex((i) => (i + 1) % total()), 4000)
+  })
+  onCleanup(() => clearInterval(timer))
+
+  return (
+    <div class="relative mt-5 flex min-h-[240px] w-full overflow-hidden rounded-[16px] border border-[#d7def7] bg-white p-0 shadow-[0_8px_30px_rgba(67,66,116,0.06)] max-sm:min-h-[200px]">
+      <img
+        src={bannerBg}
+        alt=""
+        class="pointer-events-none absolute inset-0 size-full object-cover"
+      />
+      <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/95 via-white/80 to-white/30" />
+
+      <div class="relative z-10 flex w-full flex-col px-7 pt-12 pb-5 max-sm:px-5 max-sm:pt-8">
+        <div class="mb-5 flex gap-1.5">
+          <For each={props.experts}>
+            {(_, i) => (
+              <button
+                type="button"
+                class="h-2 w-2 rounded-full border-0 bg-[#c4b5fd] p-0 transition-all"
+                classList={{ "w-5 bg-[#7c3aed]": i() === index() % total() }}
+                onClick={() => setIndex(i())}
+              />
+            )}
+          </For>
+        </div>
+
+        <div class="flex flex-1 items-center gap-6">
+          <div class="min-w-0 flex-1">
+            <div class="text-[22px] font-semibold leading-8 text-[#7c3aed]">{current().name}</div>
+            <p class="m-0 mt-1.5 line-clamp-2 text-[13px] leading-5 text-[#6b7280]">{current().description}</p>
+          </div>
+
+          <button
+            type="button"
+            class="flex shrink-0 cursor-pointer flex-col items-center gap-1 border-0 bg-transparent p-0"
+            onClick={() => props.onOpen(current())}
+          >
+            <img src={robotBtn} alt="" class="h-28 w-auto object-contain transition hover:scale-105" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function CmccExpertCenterRoute() {
   const navigate = useNavigate()
   const launch = useCmccExpertDraftLauncher()
   const [active, setActive] = createSignal<CmccExpert>()
-  const featured = CMCC_TEAM_EXPERTS[1] ?? CMCC_TEAM_EXPERTS[0]
 
   return (
     <div class="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfcff] text-[#2a155a]">
@@ -95,39 +149,7 @@ export function CmccExpertCenterRoute() {
           </p>
         </header>
 
-        <Show when={featured}>
-          {(expert) => (
-            <button
-              type="button"
-              class="group relative mt-5 flex min-h-[180px] w-full overflow-hidden rounded-[16px] border border-[#d7def7] bg-[linear-gradient(142deg,#f7f5ff_0%,#edf2ff_100%)] p-0 text-left shadow-[0_8px_30px_rgba(67,66,116,0.06)] transition hover:-translate-y-0.5 hover:border-[#aebcf2] hover:shadow-[0_14px_34px_rgba(67,66,116,0.12)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff] max-sm:min-h-[160px]"
-              onClick={() => setActive(expert())}
-            >
-              <img
-                src={expertHero}
-                alt=""
-                class="pointer-events-none absolute inset-0 size-full object-cover opacity-90 transition duration-300 group-hover:scale-[1.015]"
-              />
-              <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#f6f4ff] via-[#f4f5ff]/78 to-transparent" />
-              <div class="relative z-10 flex min-h-[180px] w-full max-w-[720px] flex-col justify-center px-7 py-5 max-sm:min-h-[160px] max-sm:px-5 sm:max-w-[62%]">
-                <div class="text-[20px] font-medium leading-7 text-[#6b19ff]">{expert().name}</div>
-                <p class="m-0 mt-2 line-clamp-2 text-[13px] leading-5 text-[#49386e]/65">{expert().description}</p>
-                <div class="mt-4 flex flex-wrap gap-2">
-                  <For each={expert().tags.slice(0, 3)}>
-                    {(tag) => (
-                      <span class="rounded-full bg-[linear-gradient(90deg,#eceaff,#dedcff)] px-3 py-1 text-[11px] leading-4 text-[#5b4cff]">
-                        {tag}
-                      </span>
-                    )}
-                  </For>
-                </div>
-              </div>
-              <span class="absolute bottom-4 right-5 z-10 flex h-8 items-center gap-2 rounded-[12px] bg-[linear-gradient(90deg,#8265ff,#4e62ff)] px-4 text-[13px] text-white shadow-[0_6px_18px_rgba(82,80,255,0.22)] max-sm:hidden">
-                <Icon name="new-session" class="size-4" />
-                查看专家团
-              </span>
-            </button>
-          )}
-        </Show>
+        <FeaturedCarousel experts={CMCC_TEAM_EXPERTS} onOpen={(expert) => setActive(expert)} />
 
         <section class="mt-7 w-full">
           <h2 class="m-0 text-[16px] font-medium leading-6 text-[#49386e]">AI + 产业洞察</h2>
@@ -341,7 +363,7 @@ function ExpertDetailDialog(props: {
                 <section class="mt-5">
                   <h3 class="m-0 text-[16px] font-medium leading-6 text-[#252839]">专家协作:</h3>
                   <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <For each={item().members.slice(0, 4)}>{(member) => <DialogMember member={member} />}</For>
+                    <For each={item().members.filter((m) => m.id !== "deeptrading/dt-trader")}>{(member) => <DialogMember member={member} />}</For>
                   </div>
                 </section>
               )}
