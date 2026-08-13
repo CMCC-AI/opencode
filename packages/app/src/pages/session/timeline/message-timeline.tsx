@@ -464,7 +464,7 @@ export function MessageTimeline(props: {
     resizeItem(index, size)
   }
   virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) =>
-    item.end <= instance.getLogicalScrollOffset()
+    item.end <= (instance.scrollOffset ?? 0)
   const virtualItemByKey = createMemo(
     () => new Map(virtualizer.getVirtualItems().map((item) => [item.key, item] as const)),
   )

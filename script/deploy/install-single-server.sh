@@ -26,6 +26,10 @@ if ! id "$service_user" >/dev/null 2>&1; then
   echo "Service user does not exist: $service_user" >&2
   exit 1
 fi
+if [[ ! -d $release_dir/.opencode/experts ]]; then
+  echo "Expert configuration is missing: $release_dir/.opencode/experts" >&2
+  exit 1
+fi
 
 install -d -m 0755 "$install_root/releases" "$target" "$workspace_root"
 install -d -o "$service_user" -g "$service_user" -m 0750 \
@@ -34,6 +38,10 @@ install -d -o "$service_user" -g "$service_user" -m 0750 \
   "$data_root/state" \
   "$data_root/cache"
 install -o root -g root -m 0755 "$release_dir/opencode" "$target/opencode"
+install -d -o root -g root -m 0755 "$target/.opencode"
+cp -a "$release_dir/.opencode/." "$target/.opencode/"
+chown -R root:root "$target/.opencode"
+chmod -R a+rX "$target/.opencode"
 install -d -m 0755 /etc/opencode-cmcc
 install -o root -g root -m 0600 "$release_dir/opencode.env" /etc/opencode-cmcc/opencode.env
 ln -sfn "$target" "$install_root/current"
@@ -56,6 +64,8 @@ Environment=XDG_CONFIG_HOME=$data_root/config
 Environment=XDG_STATE_HOME=$data_root/state
 Environment=XDG_CACHE_HOME=$data_root/cache
 Environment=OPENCODE_DISABLE_AUTOUPDATE=true
+Environment=OPENCODE_BUNDLED_CONFIG_DIR=$install_root/current/.opencode
+Environment=OPENCODE_CONFIG_DIR=$install_root/current/.opencode
 EnvironmentFile=/etc/opencode-cmcc/opencode.env
 ExecStart=$install_root/current/opencode serve --hostname $bind_host --port $port
 Restart=always

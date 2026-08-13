@@ -3,14 +3,12 @@ import { Component, ComponentProps, createMemo, JSX, Show, ValidComponent } from
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { popularProviders } from "@/hooks/use-providers"
 import { Button } from "@opencode-ai/ui/button"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Tag } from "@opencode-ai/ui/tag"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { ModelTooltip } from "./model-tooltip"
 import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
 
@@ -18,6 +16,7 @@ const isFree = (provider: string, cost: { input: number } | undefined) =>
   provider === "opencode" && (!cost || cost.input === 0)
 
 type ModelState = ReturnType<typeof useLocal>["model"]
+const defaultModelIDs = ["glm-5.2", "qwen3.8-max", "qwen3.7-max", "qwen3.7-plus", "qwen3.6-plus"]
 
 const ModelList: Component<{
   provider?: string
@@ -29,12 +28,14 @@ const ModelList: Component<{
   const model = props.model ?? useLocal().model
   const language = useLanguage()
 
-  const models = createMemo(() =>
-    model
+  const models = createMemo(() => {
+    const visible = model
       .list()
       .filter((m) => model.visible({ modelID: m.id, providerID: m.provider.id }))
-      .filter((m) => (props.provider ? m.provider.id === props.provider : true)),
-  )
+      .filter((m) => (props.provider ? m.provider.id === props.provider : true))
+    const defaults = visible.filter((item) => defaultModelIDs.some((id) => item.id.toLowerCase().includes(id)))
+    return defaults.length ? defaults : visible
+  })
 
   return (
     <List
@@ -44,26 +45,8 @@ const ModelList: Component<{
       key={(x) => `${x.provider.id}:${x.id}`}
       items={models}
       current={model.current()}
-      filterKeys={["provider.name", "name", "id"]}
+      filterKeys={["name", "id"]}
       sortBy={(a, b) => a.name.localeCompare(b.name)}
-      groupBy={(x) => x.provider.name}
-      sortGroupsBy={(a, b) => {
-        const aProvider = a.items[0].provider.id
-        const bProvider = b.items[0].provider.id
-        if (popularProviders.includes(aProvider) && !popularProviders.includes(bProvider)) return -1
-        if (!popularProviders.includes(aProvider) && popularProviders.includes(bProvider)) return 1
-        return popularProviders.indexOf(aProvider) - popularProviders.indexOf(bProvider)
-      }}
-      itemWrapper={(item, node) => (
-        <Tooltip
-          class="w-full"
-          placement="right-start"
-          gutter={12}
-          value={<ModelTooltip model={item} latest={item.latest} free={isFree(item.provider.id, item.cost)} />}
-        >
-          {node}
-        </Tooltip>
-      )}
       onSelect={(x) => {
         model.set(x ? { modelID: x.id, providerID: x.provider.id } : undefined, {
           recent: true,

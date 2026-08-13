@@ -76,6 +76,9 @@ stage=$(mktemp -d "${TMPDIR:-/tmp}/opencode-cmcc.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 install -m 0755 "$root/packages/opencode/dist/$target/bin/opencode" "$stage/opencode"
 install -m 0755 "$root/script/deploy/install-single-server.sh" "$stage/install-single-server.sh"
+install -d -m 0755 "$stage/.opencode"
+cp -a "$root/.opencode/experts" "$stage/.opencode/experts"
+cp -a "$root/.opencode/skills" "$stage/.opencode/skills"
 printf '%s\n' "$version" >"$stage/VERSION"
 printf 'OPENCODE_SERVER_USERNAME=%q\nOPENCODE_SERVER_PASSWORD=%q\n' \
   "${OPENCODE_SERVER_USERNAME:-opencode}" \

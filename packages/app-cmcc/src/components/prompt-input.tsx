@@ -1586,6 +1586,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const designPlaceholder = () => {
     if (store.mode === "shell") return placeholder()
+    if (newSession()) return "请告诉我您要研究的问题？ @ 引用对话文件，/ 调用技能与指令"
     return language.t("prompt.placeholder.simple")
   }
 
@@ -1682,7 +1683,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               data-component={newSession() ? "session-new-composer" : "session-composer"}
               onSubmit={handleSubmit}
               classList={{
-                "group/prompt-input min-h-[96px] w-full rounded-xl bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]": true,
+                "group/prompt-input w-full rounded-[16px] border border-[#2c5dff] bg-v2-background-bg-base shadow-[0_4px_8px_rgba(50,6,249,0.15)]": true,
+                "min-h-[150px]": newSession(),
+                "min-h-[96px]": !newSession(),
                 "border-icon-info-active border-dashed": store.draggingType !== null,
                 [props.class ?? ""]: !!props.class,
               }}
@@ -1715,7 +1718,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 removeLabel={language.t("prompt.attachment.remove")}
               />
               <div
-                class="relative min-h-[52px]"
+                classList={{ "relative min-h-[52px]": true, "min-h-[96px]": newSession() }}
                 onMouseDown={(e) => {
                   const target = e.target
                   if (!(target instanceof HTMLElement)) return
@@ -1791,10 +1794,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         }}
                         onExperts={openExpertCenter}
                         onSkills={openSkillCommands}
-                        onPlugins={() => setPlainPrompt("请帮我推荐并使用适合当前任务的插件：")}
                         onKnowledge={newSession() ? openKnowledge : undefined}
                         onProfessionalDatabases={openProfessionalDatabases}
-                        onGoal={() => setPlainPrompt("请帮我制定一个目标，并拆解为可执行步骤：")}
                       />
                     </div>
                   </TooltipV2>
@@ -1821,7 +1822,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   </Show>
                   {props.toolbar}
                   <ComposerModelControl state={modelControlState()} />
-                  <Show when={!providersLoading() && store.mode !== "shell" && showVariantControl()}>
+                  <Show when={!newSession() && !providersLoading() && store.mode !== "shell" && showVariantControl()}>
                     <div
                       data-component="prompt-variant-control"
                       classList={{
@@ -2126,13 +2127,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                     })
                                   }}
                                 >
-                                  <Show when={props.controls.model.selection.current()?.provider?.id}>
-                                    <ProviderIcon
-                                      id={props.controls.model.selection.current()?.provider?.id ?? ""}
-                                      class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
-                                      style={{ "will-change": "opacity", transform: "translateZ(0)" }}
-                                    />
-                                  </Show>
                                   <span class="truncate">
                                     {props.controls.model.selection.current()?.name ??
                                       language.t("dialog.model.select.title")}
@@ -2160,13 +2154,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                                 }}
                                 onClose={restoreFocus}
                               >
-                                <Show when={props.controls.model.selection.current()?.provider?.id}>
-                                  <ProviderIcon
-                                    id={props.controls.model.selection.current()?.provider?.id ?? ""}
-                                    class="size-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity duration-150"
-                                    style={{ "will-change": "opacity", transform: "translateZ(0)" }}
-                                  />
-                                </Show>
                                 <span class="truncate">
                                   {props.controls.model.selection.current()?.name ??
                                     language.t("dialog.model.select.title")}
@@ -2176,7 +2163,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             </TooltipKeybind>
                           </Show>
                         </div>
-                        <Show when={showVariantControl()}>
+                        <Show when={!newSession() && showVariantControl()}>
                           <div
                             data-component="prompt-variant-control"
                             classList={{ "animate-in fade-in duration-300": providersShouldFadeIn() }}
