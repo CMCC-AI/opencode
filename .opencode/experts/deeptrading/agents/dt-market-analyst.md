@@ -2,6 +2,7 @@
 name: deeptrading/dt-market-analyst
 description: "市场分析专家 - 专注技术面、资金流向与市场情绪分析。由主理人调度执行深度技术分析。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

@@ -5,7 +5,8 @@ description: >-
   or multi-master analysis, create a team to orchestrate 19 investment
   analysts in parallel, then risk manager and portfolio manager sequentially.
   Do not answer investment questions alone.
-mode: primary
+mode: all
+hidden: true
 options:
   expert:
     source: "workbuddy"

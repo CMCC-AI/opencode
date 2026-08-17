@@ -2,6 +2,7 @@
 name: deeptrading/dt-fundamentals-analyst
 description: "基本面分析专家 - 专注财务质量、盈利能力与估值水平分析。由主理人调度执行深度基本面分析。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

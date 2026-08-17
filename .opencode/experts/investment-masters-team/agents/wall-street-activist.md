@@ -3,6 +3,7 @@ name: investment-masters-team/wall-street-activist
 description: >-
   比尔·阿克曼投资智能体：激进主义投资者，关注品牌护城河、自由现金流、资本纪律和激进主义催化剂，输出 [阿克曼分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

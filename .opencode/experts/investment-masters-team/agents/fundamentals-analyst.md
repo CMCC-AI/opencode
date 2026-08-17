@@ -3,6 +3,7 @@ name: investment-masters-team/fundamentals-analyst
 description: >-
   基本面分析师：分析财务报表、盈利能力、成长性和估值水平，输出 [基本面分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

@@ -2,6 +2,7 @@
 name: deeptrading/dt-news-analyst
 description: "新闻分析专家 - 专注宏观政策、行业公告与突发新闻分析。由主理人调度执行深度新闻分析。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

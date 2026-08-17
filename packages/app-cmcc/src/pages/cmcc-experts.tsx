@@ -10,7 +10,6 @@ import expertFinance from "@/assets/experts/scene-13.png"
 import expertGeneral from "@/assets/experts/scene-15.png"
 import expertIndustry from "@/assets/experts/scene-06.png"
 import expertInvestment from "@/assets/experts/scene-17.png"
-import expertTrading from "@/assets/experts/scene-14.png"
 import expertHero from "@/assets/experts/scene-05.png"
 import bannerBg from "@/assets/experts/banner.png"
 import robotBtn from "@/assets/experts/robot-button.png"
@@ -38,20 +37,10 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     summary: "把复杂问题拆解为可靠的研究、判断与行动",
     image: expertGeneral,
   },
-  portal: {
-    eyebrow: "AI + 财经",
-    summary: "研究市场、公司与投资机会",
-    image: expertFinance,
-  },
   workspace: {
     eyebrow: "AI + 产业追踪",
     summary: "追踪行业动态，快速识别趋势与信号",
     image: expertIndustry,
-  },
-  "trading-agent": {
-    eyebrow: "AI + 交易决策",
-    summary: "多角色协作分析，形成交易计划与风险边界",
-    image: expertTrading,
   },
   "investment-masters-team": {
     eyebrow: "AI + 投资研究",
@@ -59,7 +48,7 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     image: expertInvestment,
   },
   deeptrading: {
-    eyebrow: "AI + A股投研",
+    eyebrow: "AI + 财经",
     summary: "多智能体协作完成标的识别、四维分析与可视化报告",
     image: expertFinance,
   },
@@ -67,6 +56,11 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     eyebrow: "AI + 推荐",
     summary: "务实需求洞察、多平台比价、真实口碑分析，交付可点击的购买决策报告",
     image: expertHero,
+  },
+  deepinspect: {
+    eyebrow: "AI + 巡查",
+    summary: "多智能体协作完成现场风险识别、问题归并与结构化巡查报告交付",
+    image: expertIndustry,
   },
 }
 

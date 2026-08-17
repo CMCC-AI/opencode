@@ -3,6 +3,7 @@ name: investment-masters-team/dhandho-master
 description: >-
   莫尼什·帕布莱投资智能体：Dhandho 投资者，关注下行保护、自由现金流收益率和翻倍潜力，输出 [帕布莱分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

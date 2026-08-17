@@ -3,6 +3,7 @@ name: investment-masters-team/magellan-captain
 description: >-
   彼得·林奇投资智能体：以 GARP 视角寻找"十倍股"，关注 PEG 比率、收入增长、易懂商业模式，输出 [林奇分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

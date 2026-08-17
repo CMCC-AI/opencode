@@ -3,6 +3,7 @@ name: investment-masters-team/charlie-munger
 description: >-
   查理·芒格投资智能体：以理性思维评估企业质量，关注护城河强度、管理层质量、可预测性和估值，输出 [芒格分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

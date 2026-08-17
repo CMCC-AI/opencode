@@ -4,6 +4,7 @@ description: >-
   风险主管/裁判：评估三方风险辩论，输出最终的风险调整后 Buy/Sell/Hold 决策。
   在 Phase 4 辩论结束后由 orchestrator 调用。
 mode: subagent
+hidden: true
 color: "#9333EA"
 options:
   expert:

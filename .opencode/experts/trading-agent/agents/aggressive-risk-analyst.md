@@ -4,6 +4,7 @@ description: >-
   激进风险分析师：在风险辩论中倡导高回报机会，强调上行潜力，挑战保守观点。
   在 Phase 4 风险评估阶段由 orchestrator 并行调用（与保守/中性分析师同时）。
 mode: subagent
+hidden: true
 color: "#B45309"
 options:
   expert:

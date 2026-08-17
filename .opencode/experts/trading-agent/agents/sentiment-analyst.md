@@ -4,6 +4,7 @@ description: >-
   情绪分析师：分析资金流向、机构评级、市场热度和投资者情绪，输出 [情绪分析报告]。
   在 Phase 1 数据收集阶段由 orchestrator 并行调用。
 mode: subagent
+hidden: true
 color: "#7C3AED"
 options:
   expert:

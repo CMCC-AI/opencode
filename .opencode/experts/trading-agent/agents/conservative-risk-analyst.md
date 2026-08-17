@@ -4,6 +4,7 @@ description: >-
   保守风险分析师：在风险辩论中优先保护资产，强调潜在下行风险，挑战乐观假设。
   在 Phase 4 风险评估阶段由 orchestrator 并行调用（与激进/中性分析师同时）。
 mode: subagent
+hidden: true
 color: "#6B7280"
 options:
   expert:

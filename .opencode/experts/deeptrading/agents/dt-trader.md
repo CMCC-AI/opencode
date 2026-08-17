@@ -2,6 +2,7 @@
 name: deeptrading/dt-trader
 description: "仓位/止盈止损/风控执行方案专家 - 将投资结论转化为可执行交易方案。由主理人调度。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

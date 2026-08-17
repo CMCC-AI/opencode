@@ -3,6 +3,7 @@ name: investment-masters-team/rakesh-jhunjhunwala
 description: >-
   拉凯什·金君瓦拉投资智能体：印度"大牛"，关注成长性、管理层质量、财务实力和安全边际(>30%)，输出 [金君瓦拉分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

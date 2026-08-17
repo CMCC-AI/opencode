@@ -3,6 +3,7 @@ name: investment-masters-team/sentiment-analyst
 description: >-
   情绪分析师：分析内部人交易和新闻情绪，判断市场多空情绪，输出 [情绪分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

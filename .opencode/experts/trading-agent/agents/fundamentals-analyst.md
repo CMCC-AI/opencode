@@ -4,6 +4,7 @@ description: >-
   基本面分析师：分析财务报表、盈利能力、成长性和估值水平，输出 [基本面分析报告]。
   在 Phase 1 数据收集阶段由 orchestrator 并行调用。
 mode: subagent
+hidden: true
 color: "#059669"
 options:
   expert:

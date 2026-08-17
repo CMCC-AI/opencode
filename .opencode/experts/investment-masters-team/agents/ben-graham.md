@@ -3,6 +3,7 @@ name: investment-masters-team/ben-graham
 description: >-
   本杰明·格雷厄姆投资智能体：价值投资之父，关注安全边际、格雷厄姆数字、净净值、财务实力和盈利稳定性，输出 [格雷厄姆分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

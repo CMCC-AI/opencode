@@ -3,6 +3,7 @@ name: investment-masters-team/black-swan-prophet
 description: >-
   纳西姆·塔勒布投资智能体：反脆弱分析师，关注尾部风险、凸性、脆弱性检测和"切身利害"，输出 [塔勒布分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

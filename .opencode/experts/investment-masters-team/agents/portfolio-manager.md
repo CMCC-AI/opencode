@@ -3,6 +3,7 @@ name: investment-masters-team/portfolio-manager
 description: >-
   投资组合经理：综合所有分析师信号和风险约束，做出最终的 BUY/SELL/HOLD 决策和具体操作方案，输出 [最终投资决策]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

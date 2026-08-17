@@ -3,6 +3,7 @@ name: investment-masters-team/news-sentiment-analyst
 description: >-
   新闻情绪分析师：分析近期公司新闻和行业动态，评估新闻面正负情绪分布，输出 [新闻情绪信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

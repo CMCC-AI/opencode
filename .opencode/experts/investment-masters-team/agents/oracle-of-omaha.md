@@ -3,6 +3,7 @@ name: investment-masters-team/oracle-of-omaha
 description: >-
   沃伦·巴菲特投资智能体：以价值投资视角分析标的，关注护城河、管理层质量、财务健康和内在价值，输出 [巴菲特分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

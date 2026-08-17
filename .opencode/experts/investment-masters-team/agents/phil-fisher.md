@@ -3,6 +3,7 @@ name: investment-masters-team/phil-fisher
 description: >-
   菲利普·费雪投资智能体：成长股投资大师，关注长期增长潜力、管理层质量、研发创新和利润率一致性，输出 [费雪分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

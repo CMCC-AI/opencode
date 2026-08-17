@@ -3,6 +3,7 @@ name: investment-masters-team/dean-of-valuation
 description: >-
   阿斯沃斯·达摩达兰投资智能体：估值教父，以严谨的 FCFF DCF 模型、WACC 和相对估值进行估值分析，输出 [达摩达兰分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

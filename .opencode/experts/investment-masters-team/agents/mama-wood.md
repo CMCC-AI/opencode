@@ -3,6 +3,7 @@ name: investment-masters-team/mama-wood
 description: >-
   凯茜·伍德投资智能体：颠覆性创新投资者，关注指数级增长潜力、技术突破、大 TAM 和研发投入，输出 [伍德分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

@@ -1,10 +1,3 @@
-const deepTradingUrl = (() => {
-  const base = "http://81.70.174.140:8083/"
-  const token = import.meta.env.VITE_DEEPTRADING_API_KEY
-  if (!token) return base
-  return `${base}?token=${encodeURIComponent(token)}`
-})()
-
 export type ExternalExpert = {
   kind: "external"
   id: string
@@ -46,45 +39,11 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   },
   {
     kind: "external",
-    id: "portal",
-    name: "DeepTrading 财经分析",
-    description: "财经行情、投资研究和组合分析工作台。",
-    url: deepTradingUrl,
-    tags: ["财经分析", "行情", "投研"],
-  },
-  {
-    kind: "external",
     id: "workspace",
     name: "DeepTrack 行业资讯追踪",
     description: "行业资讯、热点事件和专题动态追踪。",
     url: "http://81.70.174.140:8888/",
     tags: ["行业资讯", "追踪", "日报"],
-  },
-  {
-    kind: "team",
-    id: "trading-agent",
-    name: "交易分析团队",
-    description:
-      "13 位专业角色按技术面、基本面、新闻面、情绪面、多空辩论、交易决策和风险评估协作，输出 BUY/SELL/HOLD 和操作方案。",
-    leadAgent: "trading-agent/trading-team-lead",
-    defaultPrompt: "帮我分析下茅台该不该买",
-    tags: ["交易策略", "风险管理", "市场分析"],
-    examples: ["帮我分析下茅台该不该买", "比较宁德时代和比亚迪未来一年的投资机会", "给我一份贵州茅台的交易计划和风险边界"],
-    members: [
-      { id: "trading-agent/trading-team-lead", name: "何执舟", profession: "首席策略官", role: "lead" },
-      { id: "trading-agent/market-analyst", name: "涂一线", profession: "技术分析师" },
-      { id: "trading-agent/fundamentals-analyst", name: "季本实", profession: "基本面分析师" },
-      { id: "trading-agent/news-analyst", name: "闻一新", profession: "新闻分析师" },
-      { id: "trading-agent/sentiment-analyst", name: "莫慌言", profession: "情绪分析师" },
-      { id: "trading-agent/bull-researcher", name: "牛正阳", profession: "多头研究员" },
-      { id: "trading-agent/bear-researcher", name: "熊正寒", profession: "空头研究员" },
-      { id: "trading-agent/research-manager", name: "蔡定锋", profession: "研究主管" },
-      { id: "trading-agent/trader", name: "程交远", profession: "交易员" },
-      { id: "trading-agent/aggressive-risk-analyst", name: "甘为先", profession: "激进风险分析师" },
-      { id: "trading-agent/conservative-risk-analyst", name: "沈行远", profession: "保守风险分析师" },
-      { id: "trading-agent/neutral-risk-analyst", name: "钟允平", profession: "中性风险分析师" },
-      { id: "trading-agent/risk-manager", name: "严控风", profession: "风险主管" },
-    ],
   },
   {
     kind: "team",
@@ -128,12 +87,12 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   {
     kind: "team",
     id: "deeptrading",
-    name: "DeepTrading A股投研专家团",
+    name: "DeepTrading 财经分析专家团",
     description:
-      "A股多智能体投研团队：标的识别、四维并行分析（市场/舆情/新闻/基本面）、投资决策、交易方案与七章可视化报告，一站式投研交付。",
+      "多智能体财经分析团队：标的识别、四维并行分析（市场/舆情/新闻/基本面）、投资决策、交易方案与七章可视化报告，一站式投研交付。",
     leadAgent: "deeptrading/deeptrading-team-lead",
     defaultPrompt: "研究一下贵州茅台最近怎么样",
-    tags: ["A股投研", "技术面分析", "基本面分析"],
+    tags: ["财经分析", "技术面分析", "基本面分析"],
     examples: [
       "研究一下贵州茅台最近怎么样",
       "分析 600519 在 2026-08-08 的交易决策",
@@ -172,6 +131,35 @@ export const CMCC_EXPERTS: CmccExpert[] = [
       { id: "shoppers-pro/product-discoverer", name: "搜旷标", profession: "商品发现师" },
       { id: "shoppers-pro/reputation-scout", name: "严不慌", profession: "口碑分析员" },
       { id: "shoppers-pro/card-editor", name: "甄措花", profession: "推荐编辑师" },
+    ],
+  },
+  {
+    kind: "team",
+    id: "deepinspect",
+    name: "DeepInspect",
+    description:
+      "基于AI技术深度识别现场安全风险，自动归并问题线索，生成结构化巡查报告与整改方案的专家协作团队。",
+    leadAgent: "deepinspect/deepinspect-team-lead",
+    defaultPrompt: "帮我分析巡查材料，识别现场风险并生成巡查报告",
+    tags: ["现场风险识别", "巡查报告生成", "整改方案制定"],
+    examples: [
+      "帮我分析巡查材料，识别现场风险并生成巡查报告",
+      "我有几张现场照片，帮我识别安全隐患",
+      "根据巡查发现的问题，生成整改方案",
+    ],
+    members: [
+      { id: "deepinspect/deepinspect-team-lead", name: "督巡安", profession: "巡查编排总监", role: "lead" },
+      { id: "deepinspect/intent-analyst", name: "明意图", profession: "意图分析专家" },
+      { id: "deepinspect/query-planner", name: "谋方略", profession: "巡查规划专家" },
+      { id: "deepinspect/risk-identifier", name: "辨见微", profession: "风险识别专家" },
+      { id: "deepinspect/material-researcher", name: "求甚睿", profession: "材料研究专家" },
+      { id: "deepinspect/web-researcher", name: "网博源", profession: "网络研究专家" },
+      { id: "deepinspect/problem-consolidator", name: "归一清", profession: "问题归并分析师" },
+      { id: "deepinspect/reflector", name: "审思谨", profession: "反思评估专家" },
+      { id: "deepinspect/outline-architect", name: "构宏图", profession: "大纲架构专家" },
+      { id: "deepinspect/report-writer", name: "述理明", profession: "报告撰写专家" },
+      { id: "deepinspect/evidence-reviewer", name: "证无遗", profession: "证据核验专家" },
+      { id: "deepinspect/viz-specialist", name: "绘图明", profession: "数据可视化专家" },
     ],
   },
 ]

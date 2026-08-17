@@ -3,6 +3,7 @@ name: investment-masters-team/valuation-analyst
 description: >-
   估值分析师：使用 DCF、可比倍数等多种方法计算内在价值，评估高估/低估程度，输出 [估值分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

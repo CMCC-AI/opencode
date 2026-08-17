@@ -3,6 +3,7 @@ name: investment-masters-team/risk-manager
 description: >-
   风险管理师：基于波动率和相关性分析，计算仓位限制和风险调整参数，输出 [风险评估报告]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

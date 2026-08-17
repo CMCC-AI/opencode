@@ -4,6 +4,7 @@ description: >-
   中性风险分析师：在风险辩论中提供平衡视角，同时挑战激进和保守两方，推荐温和策略。
   在 Phase 4 风险评估阶段由 orchestrator 并行调用（与激进/保守分析师同时）。
 mode: subagent
+hidden: true
 color: "#0284C7"
 options:
   expert:

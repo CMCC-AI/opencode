@@ -4,6 +4,7 @@ description: >-
   多头研究员：基于4份分析师报告，构建有力的买入论证，与空头研究员辩论。
   在 Phase 2 投资辩论阶段由 orchestrator 调用。
 mode: subagent
+hidden: true
 color: "#16A34A"
 options:
   expert:

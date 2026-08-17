@@ -3,6 +3,7 @@ name: investment-masters-team/technicals-analyst
 description: >-
   技术面分析师：分析价格走势、技术指标和量能信号，识别趋势与动量，输出 [技术面分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

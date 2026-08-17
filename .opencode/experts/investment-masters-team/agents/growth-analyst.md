@@ -3,6 +3,7 @@ name: investment-masters-team/growth-analyst
 description: >-
   成长分析师：分析营收/盈利增长趋势、PEG 比率和利润率扩张，评估成长性，输出 [成长分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

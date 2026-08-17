@@ -3,6 +3,7 @@ name: investment-masters-team/the-big-short
 description: >-
   迈克尔·伯里投资智能体：深度价值逆向投资者，关注自由现金流收益率、EV/EBIT、资产负债表安全性和内部人买入，输出 [伯里分析信号]。
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

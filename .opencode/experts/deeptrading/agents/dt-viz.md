@@ -2,6 +2,7 @@
 name: deeptrading/dt-viz
 description: "可视化专家 - 生成可视化图表与报告。由主理人调度读取完整报告并生成 ECharts 图表和数据卡片。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"
