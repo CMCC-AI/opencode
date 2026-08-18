@@ -41,6 +41,29 @@ describe("cmcc workspace paths", () => {
     expect(cmccIsWorkspaceDirectory("/Users/levent/projects/opencode", "/Users/levent")).toBe(false)
   })
 
+  test("matches Windows native separators from server responses", () => {
+    expect(
+      cmccIsWorkspaceDirectory(
+        "C:\\Users\\levent\\Documents\\DeepInsight\\2026-07-02\\conversation-162504",
+        "C:\\Users\\levent",
+      ),
+    ).toBe(true)
+    expect(cmccIsWorkspaceDirectory("C:\\Users\\levent\\Documents\\DeepInsight", "C:/Users/levent")).toBe(true)
+    expect(cmccWorkspaceLabel("C:\\Users\\levent\\Documents\\DeepInsight\\2026-07-02", "C:\\Users\\levent")).toBe(
+      "~/Documents/DeepInsight/2026-07-02",
+    )
+    expect(
+      cmccConversationDirectories("C:\\Users\\levent", [], [
+        { directory: "C:/Users/levent/Documents/DeepInsight/2026-07-08/conversation-160000" },
+        { directory: "C:\\Users\\levent\\Documents\\DeepInsight\\2026-07-08\\conversation-160000" },
+      ]),
+    ).toEqual([
+      "C:/Users/levent/Documents/DeepInsight/2026-07-08/conversation-160000",
+      "C:/Users/levent/.local/share/opencode",
+    ])
+    expect(cmccIsWorkspaceDirectory("C:\\Users\\levent\\projects\\opencode", "C:\\Users\\levent")).toBe(false)
+  })
+
   test("builds the global-project path used to discover persisted conversations", () => {
     expect(cmccWorkspaceSessionPath("/Users/levent")).toBe("Users/levent/Documents/DeepInsight")
     expect(cmccWorkspaceSessionPath("C:\\Users\\levent")).toBe("Users/levent/Documents/DeepInsight")

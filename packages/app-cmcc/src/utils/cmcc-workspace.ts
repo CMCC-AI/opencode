@@ -5,7 +5,7 @@ export const CMCC_CONVERSATION_WORKSPACES_EVENT = "opencode:cmcc-conversation-wo
 const CMCC_CONVERSATION_WORKSPACES_KEY = "opencode.cmcc.conversationWorkspaces.v1"
 
 function normalizeRoot(input: string | undefined) {
-  const root = input?.replace(/\/+$/, "")
+  const root = input?.replace(/\/+$/, "").replaceAll("\\", "/")
   if (!root) return
   return root
 }
@@ -62,17 +62,22 @@ export function cmccWorkspaceSessionPath(home: string | undefined) {
 
 export function cmccIsWorkspaceDirectory(directory: string | undefined, home: string | undefined) {
   if (!directory) return false
+  // Server responses carry platform-native separators on Windows while stored
+  // paths use forward slashes, so compare on a normalized form.
+  const normalized = directory.replaceAll("\\", "/")
   const root = cmccWorkspaceRoot(home)
   const legacy = cmccLegacyWorkspace(home)
   if (!home) {
     return (
-      directory.includes(`/${CMCC_WORKSPACE_RELATIVE}/`) ||
-      directory.endsWith(`/${CMCC_WORKSPACE_RELATIVE}`) ||
-      directory === CMCC_LEGACY_WORKSPACE_RELATIVE ||
-      directory.endsWith(`/${CMCC_LEGACY_WORKSPACE_RELATIVE}`)
+      normalized.includes(`/${CMCC_WORKSPACE_RELATIVE}/`) ||
+      normalized.endsWith(`/${CMCC_WORKSPACE_RELATIVE}`) ||
+      normalized === CMCC_LEGACY_WORKSPACE_RELATIVE ||
+      normalized.endsWith(`/${CMCC_LEGACY_WORKSPACE_RELATIVE}`)
     )
   }
-  return Boolean((root && (directory === root || directory.startsWith(`${root}/`))) || (legacy && directory === legacy))
+  return Boolean(
+    (root && (normalized === root || normalized.startsWith(`${root}/`))) || (legacy && normalized === legacy),
+  )
 }
 
 export function cmccWorkspaceLabel(directory: string | undefined, home: string | undefined) {
@@ -80,8 +85,9 @@ export function cmccWorkspaceLabel(directory: string | undefined, home: string |
   if (!home) return directory
   const root = normalizeRoot(home)
   if (!root) return directory
-  if (directory === root) return "~"
-  if (directory.startsWith(`${root}/`)) return `~/${directory.slice(root.length + 1)}`
+  const normalized = directory.replaceAll("\\", "/")
+  if (normalized === root) return "~"
+  if (normalized.startsWith(`${root}/`)) return `~/${normalized.slice(root.length + 1)}`
   return directory
 }
 
@@ -93,8 +99,10 @@ export function cmccConversationDirectories(
   const seen = new Set<string>()
   return [...remembered, ...sessions.map((session) => session.directory), cmccLegacyWorkspace(home)].filter(
     (directory): directory is string => {
-      if (!directory || seen.has(directory)) return false
-      seen.add(directory)
+      if (!directory) return false
+      const key = directory.replaceAll("\\", "/")
+      if (seen.has(key)) return false
+      seen.add(key)
       return cmccIsWorkspaceDirectory(directory, home)
     },
   )

@@ -169,7 +169,12 @@ function getForkedTitle(title: string): string {
 }
 
 function sessionPath(worktree: string, cwd: string) {
-  return path.relative(path.resolve(worktree), cwd).replaceAll("\\", "/")
+  const resolved = path.resolve(worktree)
+  // The global project uses "/" as its worktree. On Windows path.resolve("/")
+  // anchors to the server process's current drive, so directories on another
+  // drive would store absolute "C:/..." paths instead of root-relative ones.
+  if (path.parse(resolved).root === resolved) return cwd.replaceAll("\\", "/").replace(/^(?:[A-Za-z]:)?\//, "")
+  return path.relative(resolved, cwd).replaceAll("\\", "/")
 }
 
 const Summary = Schema.Struct({
