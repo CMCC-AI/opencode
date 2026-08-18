@@ -1683,9 +1683,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               data-component={newSession() ? "session-new-composer" : "session-composer"}
               onSubmit={handleSubmit}
               classList={{
-                "group/prompt-input w-full rounded-[16px] border border-[#2c5dff] bg-v2-background-bg-base shadow-[0_4px_8px_rgba(50,6,249,0.15)]": true,
-                "min-h-[150px]": newSession(),
-                "min-h-[96px]": !newSession(),
+                "group/prompt-input w-full bg-v2-background-bg-base": true,
+                "rounded-[24px] border-2 border-[#5b4fd7]/50 shadow-[0_4px_20px_rgba(91,79,215,0.12)] min-h-[140px]":
+                  newSession(),
+                "rounded-[16px] border border-[#2c5dff] shadow-[0_4px_8px_rgba(50,6,249,0.15)] min-h-[96px]":
+                  !newSession(),
                 "border-icon-info-active border-dashed": store.draggingType !== null,
                 [props.class ?? ""]: !!props.class,
               }}

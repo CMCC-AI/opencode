@@ -70,38 +70,30 @@ export default function NewSessionPage() {
   )
 
   return (
-    <div class="relative size-full overflow-hidden flex flex-col">
-      <div class="flex-1 min-h-0 flex flex-col gap-2 p-2">
-        <div class="@container relative flex flex-col min-h-0 h-full bg-background-stronger flex-1">
-          <div class="flex-1 min-h-0 overflow-hidden rounded-[10px]">
-            <NewSessionDesignView>
-              <div class={NEW_SESSION_CONTENT_WIDTH}>
-                <Show
-                  when={prompt.ready() || promptReady()}
-                  fallback={
-                    <div class="w-full min-h-32 md:min-h-40 rounded-md border border-border-weak-base bg-background-base/50 px-4 py-3 text-text-weak pointer-events-none">
-                      {language.t("prompt.loading")}
-                    </div>
-                  }
-                >
-                  <div class="flex flex-col gap-3">
-                    <PromptInput
-                      controls={inputController()}
-                      variant="new-session"
-                      ref={(el) => {
-                        inputRef = el
-                      }}
-                      onSubmit={() => comments.clear()}
-                      selectedExpertAgent={selectedExpertAgent()}
-                      onSelectedExpertAgentChange={selectExpertAgent}
-                    />
-                  </div>
-                </Show>
-              </div>
-            </NewSessionDesignView>
+    <div class="relative flex size-full min-h-0 flex-col overflow-hidden">
+      <NewSessionDesignView>
+        <Show
+          when={prompt.ready() || promptReady()}
+          fallback={
+            <div class="w-full min-h-32 md:min-h-40 rounded-md border border-border-weak-base bg-background-base/50 px-4 py-3 text-text-weak pointer-events-none">
+              {language.t("prompt.loading")}
+            </div>
+          }
+        >
+          <div class="flex flex-col gap-3">
+            <PromptInput
+              controls={inputController()}
+              variant="new-session"
+              ref={(el) => {
+                inputRef = el
+              }}
+              onSubmit={() => comments.clear()}
+              selectedExpertAgent={selectedExpertAgent()}
+              onSelectedExpertAgentChange={selectExpertAgent}
+            />
           </div>
-        </div>
-      </div>
+        </Show>
+      </NewSessionDesignView>
     </div>
   )
 }
