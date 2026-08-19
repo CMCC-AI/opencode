@@ -160,6 +160,7 @@ install -m 0755 "$root/packages/opencode/dist/$target/bin/opencode" "$stage/open
 install -m 0755 "$root/packages/opencode/dist/$target/bin/deepxiv-proxy" "$stage/deepxiv-proxy"
 install -m 0755 "$root/script/deploy/install-single-server.sh" "$stage/install-single-server.sh"
 install -d -m 0755 "$stage/.opencode"
+install -m 0644 "$root/script/deploy/opencode-cmcc.jsonc" "$stage/.opencode/opencode.jsonc"
 cp -a "$root/.opencode/experts" "$stage/.opencode/experts"
 cp -a "$root/.opencode/skills" "$stage/.opencode/skills"
 # Expert bundles keep their skills under experts/<team>/skills/, but the skill

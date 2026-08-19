@@ -4,6 +4,7 @@ interface ImportMetaEnv {
   readonly VITE_OPENCODE_CHANNEL?: "dev" | "beta" | "prod"
   readonly VITE_DEEPXIV_PROXY_PORT?: string
   readonly VITE_DEEPXIV_URL?: string
+  readonly VITE_DEEPLENS_URL?: string
 
   readonly VITE_SENTRY_DSN?: string
   readonly VITE_SENTRY_ENVIRONMENT?: string

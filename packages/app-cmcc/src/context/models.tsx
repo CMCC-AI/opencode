@@ -1,4 +1,4 @@
-import { type Accessor, createMemo, createResource } from "solid-js"
+import { type Accessor, createEffect, createMemo, createResource } from "solid-js"
 import { createStore } from "solid-js/store"
 import { DateTime } from "luxon"
 import { filter, firstBy, flat, groupBy, mapValues, pipe, uniqueBy, values } from "remeda"
@@ -14,9 +14,29 @@ type Store = {
   user: User[]
   recent: ModelKey[]
   variant?: Record<string, string | undefined>
+  cmccDefaultsVersion?: number
 }
 
 const RECENT_LIMIT = 5
+const CMCC_DEFAULTS_VERSION = 1
+const CMCC_BAILIAN_PROVIDERS = ["alibaba-cn", "alibaba"]
+export const CMCC_DEFAULT_MODEL_IDS = [
+  "qwen3.8-max",
+  "qwen3.7-plus",
+  "qwen3.7-flash",
+  "qwen3.6-plus",
+  "qwen3-coder-plus",
+  "qwen3-coder-flash",
+  "kimi-k2.6",
+  "kimi-k2.5",
+  "kimi-k2-thinking",
+  "deepseek-v4-pro",
+]
+const CMCC_DEFAULT_MODELS = new Set(
+  CMCC_BAILIAN_PROVIDERS.flatMap((providerID) =>
+    CMCC_DEFAULT_MODEL_IDS.map((modelID) => `${providerID}:${modelID}`),
+  ),
+)
 
 function modelKey(model: ModelKey) {
   return `${model.providerID}:${model.modelID}`
@@ -36,6 +56,18 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
         variant: {},
       }),
     )
+
+    createEffect(() => {
+      if (!ready()) return
+      if (store.cmccDefaultsVersion === CMCC_DEFAULTS_VERSION) return
+
+      // Earlier releases persisted hidden entries before the CMCC default list was expanded.
+      // Clear those entries once so the new defaults appear without overriding later user choices.
+      setStore("user", (items) =>
+        items.filter((item) => item.visibility !== "hide" || !CMCC_DEFAULT_MODELS.has(modelKey(item))),
+      )
+      setStore("cmccDefaultsVersion", CMCC_DEFAULTS_VERSION)
+    })
 
     const available = createMemo(() =>
       providers.connected().flatMap((p) =>
@@ -117,6 +149,7 @@ export const { use: useModels, provider: ModelsProvider } = createSimpleContext(
       const state = visibility().get(key)
       if (state === "hide") return false
       if (state === "show") return true
+      if (CMCC_DEFAULT_MODELS.has(key)) return true
       if (latestSet().has(key)) return true
       const date = release().get(key)
       if (!date?.isValid) return true

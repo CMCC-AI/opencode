@@ -30,6 +30,10 @@ if [[ ! -d $release_dir/.opencode/experts ]]; then
   echo "Expert configuration is missing: $release_dir/.opencode/experts" >&2
   exit 1
 fi
+if [[ ! -f $release_dir/.opencode/opencode.jsonc ]]; then
+  echo "CMCC model configuration is missing: $release_dir/.opencode/opencode.jsonc" >&2
+  exit 1
+fi
 if [[ ! -x $release_dir/deepxiv-proxy ]]; then
   echo "DeepXiv proxy binary is missing: $release_dir/deepxiv-proxy" >&2
   exit 1
@@ -125,6 +129,22 @@ EOF
 systemctl daemon-reload
 systemctl enable --now opencode-cmcc.service opencode-cmcc-deepxiv.service
 systemctl restart opencode-cmcc.service opencode-cmcc-deepxiv.service
+
+ready=0
+for _ in {1..15}; do
+  if curl --silent --output /dev/null --max-time 2 "http://127.0.0.1:$port/"; then
+    ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ $ready != 1 ]]; then
+  systemctl status opencode-cmcc.service opencode-cmcc-deepxiv.service --no-pager --lines=30 || true
+  journalctl -u opencode-cmcc.service -u opencode-cmcc-deepxiv.service --no-pager --lines=80 || true
+  echo "OpenCode CMCC failed its post-deployment health check on 127.0.0.1:$port" >&2
+  exit 1
+fi
+
 systemctl is-active --quiet opencode-cmcc.service
 systemctl is-active --quiet opencode-cmcc-deepxiv.service
 

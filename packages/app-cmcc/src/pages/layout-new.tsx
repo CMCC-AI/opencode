@@ -28,6 +28,7 @@ import {
 } from "@/utils/cmcc-workspace"
 import { cmccIsKnowledgeSession, cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
+import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import { displayName, sortedRootSessions } from "./layout/helpers"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
 
@@ -49,6 +50,7 @@ export default function NewLayout(props: ParentProps) {
   const layout = useLayout()
   const [persistentViews, setPersistentViews] = createStore({
     deepXivMounted: isDeepXivPath(location.pathname),
+    deepLensMounted: isDeepLensPath(location.pathname),
   })
   setNavigate(navigate)
 
@@ -57,6 +59,9 @@ export default function NewLayout(props: ParentProps) {
   // the same-site proxy restores its Cookie independently after a real reload.
   createEffect(() => {
     if (isDeepXivPath(location.pathname)) setPersistentViews("deepXivMounted", true)
+  })
+  createEffect(() => {
+    if (isDeepLensPath(location.pathname)) setPersistentViews("deepLensMounted", true)
   })
   createEffect(() => {
     if (!layout.ready()) return
@@ -132,6 +137,9 @@ export default function NewLayout(props: ParentProps) {
             <Suspense>{props.children}</Suspense>
             <Show when={persistentViews.deepXivMounted}>
               <CmccDeepXivFrame active={isDeepXivPath(location.pathname)} />
+            </Show>
+            <Show when={persistentViews.deepLensMounted}>
+              <CmccDeepLensFrame active={isDeepLensPath(location.pathname)} />
             </Show>
           </div>
         </section>
@@ -363,13 +371,6 @@ function CmccSidebar() {
     tabs.newDraft({ server: server.key, directory: dir })
   }
 
-  const openPendingProduct = (name: string) => {
-    showToast({
-      title: `${name} 待接入`,
-      description: "当前版本还没有配置对应的应用地址。",
-    })
-  }
-
   const openProject = (directory: string) => {
     server.projects.open(directory)
     layout.projects.open(directory)
@@ -534,7 +535,8 @@ function CmccSidebar() {
             <CmccSidebarAction
               icon="photo"
               label="DeepLens 拍照即懂"
-              onClick={() => openPendingProduct("DeepLens 拍照即懂")}
+              active={isDeepLensPath(location.pathname)}
+              onClick={() => navigate("/deeplens")}
             />
           </nav>
           <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">

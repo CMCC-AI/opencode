@@ -50,6 +50,7 @@ import { WslServersProvider } from "@/wsl/context"
 import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout"
 import NewLayout from "@/pages/layout-new"
 import { CmccDeepXivRoute } from "@/pages/cmcc-deepxiv"
+import { CmccDeepLensRoute } from "@/pages/cmcc-deeplens"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 import {
@@ -652,6 +653,8 @@ function Routes() {
         <Route path="/knowledge/:id" component={KnowledgeNotebookRoute} />
         <Route path="/deepxiv" component={CmccDeepXivRoute} />
         <Route path="/deepxiv/" component={CmccDeepXivRoute} />
+        <Route path="/deeplens" component={CmccDeepLensRoute} />
+        <Route path="/deeplens/" component={CmccDeepLensRoute} />
         <Route path="/plugins" component={CmccPluginHubRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
