@@ -9,7 +9,9 @@ import { useTabs } from "@/context/tabs"
 import expertFinance from "@/assets/experts/scene-13.png"
 import expertGeneral from "@/assets/experts/scene-15.png"
 import expertIndustry from "@/assets/experts/scene-06.png"
-import expertInvestment from "@/assets/experts/scene-17.png"
+import expertZhengqi from "@/assets/experts/scene-08.png"
+import expertMarketing from "@/assets/experts/scene-14.png"
+import expertResearch from "@/assets/experts/scene-17.png"
 import expertHero from "@/assets/experts/scene-05.png"
 import bannerBg from "@/assets/experts/banner.png"
 import robotBtn from "@/assets/experts/robot-button.png"
@@ -42,11 +44,6 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     summary: "追踪行业动态，快速识别趋势与信号",
     image: expertIndustry,
   },
-  "investment-masters-team": {
-    eyebrow: "AI + 投资研究",
-    summary: "汇集投资大师视角，输出可信的组合决策",
-    image: expertInvestment,
-  },
   deeptrading: {
     eyebrow: "AI + 财经",
     summary: "多智能体协作完成标的识别、四维分析与可视化报告",
@@ -61,6 +58,21 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     eyebrow: "AI + 巡查",
     summary: "多智能体协作完成现场风险识别、问题归并与结构化巡查报告交付",
     image: expertIndustry,
+  },
+  "zhengqi-visit-intel": {
+    eyebrow: "AI + 政企",
+    summary: "融合内部门户数据与公开情报，交付可溯源的谈参高拜决策报告",
+    image: expertZhengqi,
+  },
+  deepcampaign: {
+    eyebrow: "AI + 营销",
+    summary: "洞察人群，生成营销方案与报告",
+    image: expertMarketing,
+  },
+  "ai-scientist": {
+    eyebrow: "AI + 科研",
+    summary: "从论文理解到可信复现",
+    image: expertResearch,
   },
 }
 

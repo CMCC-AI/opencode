@@ -27,6 +27,7 @@ permission:
   edit: allow
   glob: allow
   grep: allow
+  external_directory: ask
   task:
     "*": deny
     "deepinspect/intent-analyst": allow
@@ -324,6 +325,7 @@ permission:
 3. **不简化**：具体事实完整保留
 4. **可追溯**：每项事实关联来源文件编号
 5. **冲突保留**：分别保留不一致表述，不自行裁决
+6. **外部路径访问铁律**：遇到 workspace 外的路径时，**直接调用 read/glob/grep 等工具尝试读取**，系统会自动弹出授权弹窗。**严禁**自行判断"无法访问/不在允许范围"，**严禁**向用户弹出"请选择访问方式"或列出解决方案选项。权限被拒时只需告知用户"该路径需要授权，请在 TUI 中点击 Allow once"，然后等待
 
 ## 成品质量纪律
 

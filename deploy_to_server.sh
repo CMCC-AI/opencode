@@ -162,6 +162,13 @@ install -m 0755 "$root/script/deploy/install-single-server.sh" "$stage/install-s
 install -d -m 0755 "$stage/.opencode"
 cp -a "$root/.opencode/experts" "$stage/.opencode/experts"
 cp -a "$root/.opencode/skills" "$stage/.opencode/skills"
+# Expert bundles keep their skills under experts/<team>/skills/, but the skill
+# scanner only matches {skill,skills}/**/SKILL.md from the config root, so
+# flatten expert skills into the bundled skills directory as well.
+for skill_dir in "$root"/.opencode/experts/*/skills/*/; do
+  [[ -f "${skill_dir}SKILL.md" ]] || continue
+  cp -a "${skill_dir%/}" "$stage/.opencode/skills/"
+done
 printf '%s\n' "$version" >"$stage/VERSION"
 printf 'OPENCODE_SERVER_USERNAME=%q\nOPENCODE_SERVER_PASSWORD=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' \
   "${OPENCODE_SERVER_USERNAME:-opencode}" \
