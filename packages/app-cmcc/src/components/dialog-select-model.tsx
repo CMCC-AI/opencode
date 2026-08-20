@@ -11,13 +11,12 @@ import { List } from "@opencode-ai/ui/list"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
-import { CMCC_DEFAULT_MODEL_IDS } from "@/context/models"
+import { modelSelectorItems } from "./model-selector"
 
 const isFree = (provider: string, cost: { input: number } | undefined) =>
   provider === "opencode" && (!cost || cost.input === 0)
 
 type ModelState = ReturnType<typeof useLocal>["model"]
-const defaultModelIDs = new Set(["glm-5.2", ...CMCC_DEFAULT_MODEL_IDS])
 
 const ModelList: Component<{
   provider?: string
@@ -29,14 +28,14 @@ const ModelList: Component<{
   const model = props.model ?? useLocal().model
   const language = useLanguage()
 
-  const models = createMemo(() => {
-    const visible = model
-      .list()
-      .filter((m) => model.visible({ modelID: m.id, providerID: m.provider.id }))
-      .filter((m) => (props.provider ? m.provider.id === props.provider : true))
-    const defaults = visible.filter((item) => defaultModelIDs.has(item.id.toLowerCase()))
-    return defaults.length ? defaults : visible
-  })
+  const models = createMemo(() =>
+    modelSelectorItems({
+      items: model.list(),
+      visible: (item) => model.visible(item),
+      current: model.current(),
+      provider: props.provider,
+    }),
+  )
 
   return (
     <List

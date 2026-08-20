@@ -7,7 +7,7 @@ import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { DragDropProvider, DragDropSensors, DragOverlay, SortableProvider, closestCenter } from "@thisbeyond/solid-dnd"
 import type { DragEvent } from "@thisbeyond/solid-dnd"
-import type { FileContent, FileNode, Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { FileContent, Part, SnapshotFileDiff, Todo, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 
@@ -37,6 +37,12 @@ import { useSessionLayout } from "@/pages/session/session-layout"
 import { DeepInsightMark } from "@/components/brand"
 import { showToast } from "@/utils/toast"
 import { artifactPreviewKind, artifactText, resolveArtifactPath } from "@/pages/session/artifact-preview"
+import { cmccArtifactDirectory } from "@/utils/cmcc-workspace"
+import {
+  cmccScanWorkspaceArtifactPaths,
+  cmccScopedArtifactPath,
+  cmccWorkspaceRelativePath,
+} from "@/utils/cmcc-artifact-paths"
 
 type RenderDiff = (SnapshotFileDiff & { file: string }) | VcsFileDiff
 type CmccPanelTab = "plan" | "artifacts" | "browser" | "review"
@@ -46,38 +52,6 @@ type CmccArtifact = {
   source: string
   status: "created" | "changed" | "deleted"
 }
-
-const WORKSPACE_ARTIFACT_LIMIT = 200
-const WORKSPACE_ARTIFACT_MAX_DEPTH = 8
-const WORKSPACE_ARTIFACT_DIRS = new Set([
-  "artifact",
-  "artifacts",
-  "deliverable",
-  "deliverables",
-  "output",
-  "outputs",
-  "report",
-  "reports",
-])
-const WORKSPACE_ARTIFACT_EXTENSIONS = new Set([
-  "csv",
-  "doc",
-  "docx",
-  "htm",
-  "html",
-  "jpeg",
-  "jpg",
-  "json",
-  "md",
-  "pdf",
-  "png",
-  "ppt",
-  "pptx",
-  "svg",
-  "txt",
-  "xls",
-  "xlsx",
-])
 
 const [retainedTodos, setRetainedTodos] = createStore({
   bySession: {} as Record<string, Todo[] | undefined>,
@@ -135,33 +109,6 @@ function downloadBlob(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
-function normalizeArtifactPath(value: string) {
-  return normalizePathSeparators(value).replace(/^\/+/, "")
-}
-
-function workspaceRelativePath(directory: string, value: string) {
-  const root = normalizePathSeparators(directory)
-  const path = normalizePathSeparators(value)
-  if (path === root) return ""
-  if (path.startsWith(`${root}/`)) return path.slice(root.length + 1)
-  return ""
-}
-
-function artifactNodePath(root: string, value: string) {
-  const path = normalizeArtifactPath(value)
-  if (!root || path === root || path.startsWith(`${root}/`)) return path
-  return `${root}/${path}`
-}
-
-function isWorkspaceArtifactFile(value: string) {
-  const ext = fileName(value).split(".").at(-1)?.toLowerCase()
-  return ext ? WORKSPACE_ARTIFACT_EXTENSIONS.has(ext) : false
-}
-
-function isWorkspaceArtifactDir(value: string) {
-  return WORKSPACE_ARTIFACT_DIRS.has(fileName(value).toLowerCase())
-}
-
 function markdownArtifactElement(target: EventTarget | null) {
   if (!(target instanceof Element)) return undefined
   const element = target.closest<HTMLElement>("a") ?? target.closest<HTMLElement>("code")
@@ -172,46 +119,6 @@ function markdownArtifactElement(target: EventTarget | null) {
 function markdownArtifactCandidate(element: HTMLElement) {
   if (element instanceof HTMLAnchorElement) return element.getAttribute("href") ?? element.textContent ?? ""
   return element.textContent ?? ""
-}
-
-async function scanWorkspaceArtifactPaths(list: (path: string) => Promise<FileNode[]>, roots: string[] = []) {
-  const paths = new Set<string>()
-  const queue: { path: string; depth: number }[] = []
-  for (const root of new Set(["", ...roots.map(normalizeArtifactPath).filter(Boolean)])) {
-    const nodes = await list(root)
-    for (const node of nodes) {
-      const current = artifactNodePath(root, node.path)
-      if (!current) continue
-
-      if (node.type === "file" && isWorkspaceArtifactFile(current)) {
-        paths.add(current)
-      }
-      if (node.type === "directory" && isWorkspaceArtifactDir(current)) {
-        queue.push({ path: current, depth: 1 })
-      }
-    }
-  }
-
-  while (queue.length > 0 && paths.size < WORKSPACE_ARTIFACT_LIMIT) {
-    const current = queue.shift()
-    if (!current) continue
-
-    const children = await list(current.path)
-    for (const child of children) {
-      const childPath = normalizeArtifactPath(child.path)
-      if (!childPath) continue
-
-      if (child.type === "file") {
-        paths.add(childPath)
-      }
-      if (child.type === "directory" && current.depth < WORKSPACE_ARTIFACT_MAX_DEPTH) {
-        queue.push({ path: childPath, depth: current.depth + 1 })
-      }
-      if (paths.size >= WORKSPACE_ARTIFACT_LIMIT) break
-    }
-  }
-
-  return [...paths].sort((a, b) => a.localeCompare(b))
 }
 
 export function SessionSidePanel(props: {
@@ -279,7 +186,30 @@ export function SessionSidePanel(props: {
     workspaceArtifactPaths: [] as string[],
   })
 
-  const diffs = createMemo(() => props.diffs().filter(renderDiff))
+  const sessionInfo = createMemo(() => {
+    const sessionID = params.id
+    if (!sessionID) return
+    return serverSync().session.get(sessionID)
+  })
+  const artifactRoot = createMemo(() => {
+    const directory = sdk().directory
+    const artifact = cmccArtifactDirectory(sessionInfo()?.metadata, directory)
+    if (!artifact) return
+    return cmccWorkspaceRelativePath(directory, artifact)
+  })
+  const scopedArtifactPath = (value: string) => {
+    if (params.id && !sessionInfo()) return
+    return cmccScopedArtifactPath(sdk().directory, artifactRoot(), value)
+  }
+  const diffs = createMemo(() =>
+    props
+      .diffs()
+      .filter(renderDiff)
+      .flatMap((diff) => {
+        const file = scopedArtifactPath(diff.file)
+        return file ? [{ ...diff, file }] : []
+      }),
+  )
   const diffFiles = createMemo(() => diffs().map((d) => d.file))
   const liveTodos = createMemo(() => {
     if (!params.id) return []
@@ -302,13 +232,15 @@ export function SessionSidePanel(props: {
     return sync().data.message[params.id] ?? []
   })
   const parts = createMemo(() => messages().flatMap((message) => sync().data.part[message.id] ?? []))
-  const artifactRoots = createMemo(() =>
-    messages().flatMap((message) => {
+  const artifactRoots = createMemo(() => {
+    const root = artifactRoot()
+    if (root) return [root]
+    return messages().flatMap((message) => {
       if (message.role !== "assistant") return []
-      const relative = workspaceRelativePath(sdk().directory, message.path.cwd)
+      const relative = cmccWorkspaceRelativePath(sdk().directory, message.path.cwd)
       return relative ? [relative] : []
-    }),
-  )
+    })
+  })
   const artifactRefreshKey = createMemo(() =>
     parts()
       .flatMap((part) => {
@@ -333,7 +265,9 @@ export function SessionSidePanel(props: {
 
     for (const part of parts()) {
       if (part.type === "patch") {
-        for (const path of part.files) {
+        for (const value of part.files) {
+          const path = scopedArtifactPath(value)
+          if (!path) continue
           items.set(path, {
             id: `${part.id}:${path}`,
             path,
@@ -343,7 +277,8 @@ export function SessionSidePanel(props: {
         }
       }
       if (part.type === "tool" && ["write", "edit", "apply_patch"].includes(part.tool)) {
-        const path = toolPath(part)
+        const value = toolPath(part)
+        const path = value ? scopedArtifactPath(value) : undefined
         if (!path) continue
         items.set(path, {
           id: `${part.id}:${path}`,
@@ -373,7 +308,7 @@ export function SessionSidePanel(props: {
     const sessionID = params.id
     const roots = artifactRoots()
     artifactRefreshKey()
-    if (!sessionID) {
+    if (!sessionID || !sessionInfo()) {
       setCmcc("workspaceArtifactPaths", [])
       return
     }
@@ -391,7 +326,7 @@ export function SessionSidePanel(props: {
           () => [],
         )
 
-    void scanWorkspaceArtifactPaths(list, roots).then((paths) => {
+    void cmccScanWorkspaceArtifactPaths(list, roots, artifactRoot() !== undefined).then((paths) => {
       if (cancelled) return
       if (sdk().directory !== directory || params.id !== sessionID) return
       setCmcc("workspaceArtifactPaths", paths)
@@ -433,9 +368,10 @@ export function SessionSidePanel(props: {
   )
 
   const nofiles = createMemo(() => {
-    const state = file.tree.state("")
+    const root = artifactRoot() ?? ""
+    const state = file.tree.state(root)
     if (!state?.loaded) return false
-    return file.tree.children("").length === 0
+    return file.tree.children(root).length === 0
   })
 
   const normalizeTab = (tab: string) => {
@@ -916,7 +852,7 @@ export function SessionSidePanel(props: {
                             }
                           >
                             <FileTree
-                              path=""
+                              path={artifactRoot() ?? ""}
                               class="pt-3"
                               allowed={diffFiles()}
                               kinds={kinds()}
@@ -933,7 +869,7 @@ export function SessionSidePanel(props: {
                         <Match when={nofiles()}>{empty(language.t("session.files.empty"))}</Match>
                         <Match when={true}>
                           <FileTree
-                            path=""
+                            path={artifactRoot() ?? ""}
                             class="pt-3"
                             modified={diffFiles()}
                             kinds={kinds()}

@@ -22,6 +22,8 @@ export type DraftTab = {
   draftID: string
   server: ServerConnection.Key
   directory: string
+  artifactDirectory?: string
+  expertID?: string
   worktree?: string
   agent?: string
 }

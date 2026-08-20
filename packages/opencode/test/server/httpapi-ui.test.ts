@@ -369,7 +369,7 @@ describe("HttpApi UI fallback", () => {
       expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval'")
       expect(csp).toContain(`'sha256-${createHash("sha256").update(script).digest("base64")}'`)
       expect(csp).toContain(
-        "frame-src 'self' http://152.136.106.161:3001 http://81.70.174.140:8083 http://81.70.174.140:8888",
+        "frame-src 'self' http://152.136.106.161:3001 http://81.70.174.140:8082 http://81.70.174.140:8888",
       )
       expect(csp).toContain("connect-src * data:")
     }),
@@ -378,7 +378,7 @@ describe("HttpApi UI fallback", () => {
   it.live("allows only a validated DeepXiv public origin in CSP", () =>
     Effect.sync(() => {
       expect(csp("", "https://papers.example.com:3100/")).toContain(
-        "frame-src 'self' http://152.136.106.161:3001 http://81.70.174.140:8083 http://81.70.174.140:8888 https://papers.example.com:3100",
+        "frame-src 'self' http://152.136.106.161:3001 http://81.70.174.140:8082 http://81.70.174.140:8888 https://papers.example.com:3100",
       )
       expect(csp("", "https://papers.example.com:3100/path")).not.toContain("https://papers.example.com:3100")
       expect(csp("", "javascript:alert(1)")).not.toContain("javascript:")

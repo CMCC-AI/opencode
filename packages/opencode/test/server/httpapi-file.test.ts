@@ -2,8 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { Context, Effect } from "effect"
 import path from "path"
 import { symlink } from "node:fs/promises"
+import { homedir } from "node:os"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
-import { FilePaths } from "../../src/server/routes/instance/httpapi/groups/file"
+import { FileApi, FilePaths } from "../../src/server/routes/instance/httpapi/groups/file"
+import { canCreateDirectory } from "../../src/server/routes/instance/httpapi/handlers/file"
+import { Authorization } from "../../src/server/routes/instance/httpapi/middleware/authorization"
+import { InstanceContextMiddleware } from "../../src/server/routes/instance/httpapi/middleware/instance-context"
+import { WorkspaceRoutingMiddleware } from "../../src/server/routes/instance/httpapi/middleware/workspace-routing"
 import { resetDatabase } from "../fixture/db"
 import { disposeAllInstances, tmpdir } from "../fixture/fixture"
 import { pollWithTimeout } from "../lib/effect"
@@ -32,6 +37,47 @@ afterEach(async () => {
 })
 
 describe("file HttpApi", () => {
+  test("creates only routed runtime descendants without instance middleware", async () => {
+    const endpoints = FileApi.groups.file.endpoints
+    const createMiddleware: ReadonlySet<unknown> = endpoints.createDirectory.middlewares
+    const listMiddleware: ReadonlySet<unknown> = endpoints.list.middlewares
+    expect(createMiddleware.has(InstanceContextMiddleware)).toBe(false)
+    expect(createMiddleware.has(WorkspaceRoutingMiddleware)).toBe(true)
+    expect(createMiddleware.has(Authorization)).toBe(true)
+    expect(listMiddleware.has(InstanceContextMiddleware)).toBe(true)
+
+    const runtime = path.join(process.cwd(), "runtime")
+    expect(canCreateDirectory({ directory: runtime, target: path.join(runtime, "runs", "run-1") })).toBe(true)
+    expect(canCreateDirectory({ directory: runtime, target: runtime })).toBe(false)
+    expect(canCreateDirectory({ directory: runtime, target: path.join(process.cwd(), "sibling") })).toBe(false)
+    expect(canCreateDirectory({ directory: runtime, target: path.join(runtime, "runs", "..", "..", "sibling") })).toBe(
+      false,
+    )
+    expect(
+      canCreateDirectory({ directory: path.parse(process.cwd()).root, target: path.join(process.cwd(), "runs") }),
+    ).toBe(false)
+    const legacyRoot = path.join(homedir(), "Documents", "DeepInsight")
+    expect(canCreateDirectory({ directory: process.cwd(), target: legacyRoot })).toBe(true)
+    expect(canCreateDirectory({ directory: process.cwd(), target: path.join(legacyRoot, "conversation") })).toBe(true)
+
+    const create = (target: string) =>
+      request(FilePaths.createDirectory, process.cwd(), undefined, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: target }),
+      })
+    const createWithEncodedDirectory = (target: string) =>
+      request(FilePaths.createDirectory, encodeURIComponent(process.cwd()), undefined, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: target }),
+      })
+    expect((await create(path.join(process.cwd(), "test", "server"))).status).toBe(200)
+    expect((await createWithEncodedDirectory(path.join(process.cwd(), "test", "server"))).status).toBe(200)
+    expect((await create(process.cwd())).status).toBe(400)
+    expect((await create(path.resolve(process.cwd(), ".."))).status).toBe(400)
+  })
+
   test("serves read endpoints", async () => {
     await using tmp = await tmpdir({ git: true })
     await Bun.write(path.join(tmp.path, "hello.txt"), "hello")

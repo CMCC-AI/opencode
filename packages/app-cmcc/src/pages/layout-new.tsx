@@ -21,8 +21,12 @@ import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
 import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
 import {
-  cmccCreateConversationWorkspace,
+  cmccArtifactDirectory,
+  cmccArtifactWorkspace,
+  cmccEnsureWorkspace,
   cmccIsWorkspaceDirectory,
+  cmccRememberConversationWorkspace,
+  cmccRuntimeWorkspace,
   cmccWorkspaceRoot,
   cmccWorkspaceSessionPath,
 } from "@/utils/cmcc-workspace"
@@ -160,6 +164,7 @@ function CmccTopControls() {
   const sync = useServerSync()
   const tabs = useTabs()
   const home = createMemo(() => sync().data.path.home)
+  const runtime = createMemo(() => cmccRuntimeWorkspace(home(), sync().data.path.directory))
   const activeSessionPath = createMemo(() => (location.pathname.includes("/session/") ? location.pathname : undefined))
   const [history, setHistory] = createStore({
     stack: [] as string[],
@@ -193,21 +198,25 @@ function CmccTopControls() {
     layout.sidebar.open()
   }
 
-  const openNewSession = async () => {
-    const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
-      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
+  const openNewSession = () => {
+    const directory = runtime()
+    const artifactDirectory = cmccArtifactWorkspace(directory)
+    if (!directory || !artifactDirectory || !tabs.ready()) return
+
+    tabs.newDraft({ server: server.key, directory, artifactDirectory })
+    cmccRememberConversationWorkspace(directory)
+    server.projects.touch(directory)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
     ).catch((error) => {
       showToast({
-        title: "无法创建对话目录",
+        title: "无法准备会话产物目录",
         description: error instanceof Error ? error.message : String(error),
         variant: "error",
       })
-      return undefined
     })
-    if (!dir || !tabs.ready()) return
-    server.projects.touch(dir)
-    void sync().project.loadSessions(dir, { limit: 64 })
-    tabs.newDraft({ server: server.key, directory: dir })
   }
 
   const switchSession = (direction: "back" | "forward") => {
@@ -261,6 +270,7 @@ function CmccSidebar() {
   const pickDirectory = useDirectoryPicker()
   const openSettings = useSettingsCommand()
   const home = createMemo(() => sync().data.path.home)
+  const runtime = createMemo(() => cmccRuntimeWorkspace(home(), sync().data.path.directory))
   const knowledgeNotebooks = createMemo(() => {
     location.pathname
     return cmccKnowledgeNotebooks()
@@ -276,7 +286,12 @@ function CmccSidebar() {
   const conversations = createMemo(() =>
     Object.values(sync().session.data.info)
       .filter((session): session is Session => !!session)
-      .filter((session) => cmccIsWorkspaceDirectory(session.directory, home()))
+      .filter((session) => {
+        const directory = runtime()
+        const stableRuntime = directory && cmccRuntimeWorkspace(undefined, session.directory) === directory
+        if (stableRuntime) return Boolean(cmccArtifactDirectory(session.metadata, directory))
+        return cmccIsWorkspaceDirectory(session.directory, home())
+      })
       .filter((session) => !session.parentID && !session.time.archived)
       .filter((session) => !cmccIsKnowledgeSession(knowledgeNotebooks(), session))
       .map((session) => ({ directory: session.directory, session }))
@@ -295,6 +310,13 @@ function CmccSidebar() {
       )
       .then((result) => result.data?.forEach((session) => sync().session.remember(session)))
       .catch(() => undefined)
+  })
+
+  createEffect(() => {
+    if (!sync().data.ready) return
+    const directory = runtime()
+    if (!directory) return
+    void sync().project.loadSessions(directory, { limit: SIDEBAR_SESSION_LIMIT })
   })
 
   createEffect(() => {
@@ -354,21 +376,25 @@ function CmccSidebar() {
 
   onCleanup(stopDrag)
 
-  const openNewSession = async () => {
-    const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
-      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
+  const openNewSession = () => {
+    const directory = runtime()
+    const artifactDirectory = cmccArtifactWorkspace(directory)
+    if (!directory || !artifactDirectory || !tabs.ready()) return
+
+    tabs.newDraft({ server: server.key, directory, artifactDirectory })
+    cmccRememberConversationWorkspace(directory)
+    server.projects.touch(directory)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
     ).catch((error) => {
       showToast({
-        title: "无法创建对话目录",
+        title: "无法准备会话产物目录",
         description: error instanceof Error ? error.message : String(error),
         variant: "error",
       })
-      return undefined
     })
-    if (!dir || !tabs.ready()) return
-    server.projects.touch(dir)
-    void sync().project.loadSessions(dir, { limit: 64 })
-    tabs.newDraft({ server: server.key, directory: dir })
   }
 
   const openProject = (directory: string) => {

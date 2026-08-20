@@ -21,7 +21,7 @@ export const UI_UPSTREAM = new URL("https://app.opencode.ai")
 
 const CMCC_EXPERT_FRAME_SOURCES = [
   "http://152.136.106.161:3001",
-  "http://81.70.174.140:8083",
+  "http://81.70.174.140:8082",
   "http://81.70.174.140:8888",
 ]
 

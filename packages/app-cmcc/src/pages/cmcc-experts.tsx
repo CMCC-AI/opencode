@@ -18,7 +18,12 @@ import robotBtn from "@/assets/experts/robot-button.png"
 import expertSkillResearch from "@/assets/experts/detail-skill-research.png"
 import expertSkillReview from "@/assets/experts/detail-skill-review.png"
 import expertSkillWriting from "@/assets/experts/detail-skill-writing.png"
-import { cmccCreateConversationWorkspace } from "@/utils/cmcc-workspace"
+import {
+  cmccArtifactWorkspace,
+  cmccEnsureWorkspace,
+  cmccRememberConversationWorkspace,
+  cmccRuntimeWorkspace,
+} from "@/utils/cmcc-workspace"
 import {
   CMCC_EXPERTS,
   CMCC_TEAM_EXPERTS,
@@ -419,42 +424,29 @@ function useCmccExpertDraftLauncher() {
   const sync = useServerSync()
   const tabs = useTabs()
   const home = createMemo(() => sync().data.path.home)
+  const runtime = createMemo(() => cmccRuntimeWorkspace(home(), sync().data.path.directory))
 
-  return async (expert: TeamExpert, prompt = expert.defaultPrompt) => {
-    const dir = await cmccCreateConversationWorkspace(home(), (directory) =>
-      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
+  return (expert: TeamExpert, prompt = expert.defaultPrompt) => {
+    const directory = runtime()
+    const artifactDirectory = cmccArtifactWorkspace(directory)
+    if (!directory || !artifactDirectory || !tabs.ready()) return
+
+    tabs.newDraft({ server: server.key, directory, artifactDirectory, expertID: expert.id }, prompt, {
+      agent: expert.leadAgent,
+    })
+    cmccRememberConversationWorkspace(directory)
+    server.projects.touch(directory)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
     ).catch((error) => {
       showToast({
-        title: "无法创建专家团对话",
+        title: "无法准备专家团产物目录",
         description: error instanceof Error ? error.message : String(error),
         variant: "error",
       })
-      return undefined
     })
-    if (!dir || !tabs.ready()) return
-
-    const agents = await serverSDK()
-      .client.app.agents({ directory: dir }, { throwOnError: true })
-      .catch((error) => {
-        showToast({
-          title: "无法读取专家配置",
-          description: error instanceof Error ? error.message : String(error),
-          variant: "error",
-        })
-        return undefined
-      })
-    if (!agents?.data?.some((item) => item.name === expert.leadAgent)) {
-      showToast({
-        title: "专家团配置未加载",
-        description: `后端还没有加载 ${expert.leadAgent}，请重启服务后再试。`,
-        variant: "error",
-      })
-      return
-    }
-
-    server.projects.touch(dir)
-    void sync().project.loadSessions(dir, { limit: 64 })
-    tabs.newDraft({ server: server.key, directory: dir }, prompt, { agent: expert.leadAgent })
   }
 }
 

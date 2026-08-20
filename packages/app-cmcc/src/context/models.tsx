@@ -5,6 +5,8 @@ import { filter, firstBy, flat, groupBy, mapValues, pipe, uniqueBy, values } fro
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { useProviders } from "@/hooks/use-providers"
 import { Persist, persisted } from "@/utils/persist"
+import { CMCC_BAILIAN_PROVIDERS, CMCC_DEFAULT_MODEL_IDS } from "./model-defaults"
+export { CMCC_DEFAULT_MODEL_IDS } from "./model-defaults"
 
 export type ModelKey = { providerID: string; modelID: string }
 
@@ -19,19 +21,6 @@ type Store = {
 
 const RECENT_LIMIT = 5
 const CMCC_DEFAULTS_VERSION = 1
-const CMCC_BAILIAN_PROVIDERS = ["alibaba-cn", "alibaba"]
-export const CMCC_DEFAULT_MODEL_IDS = [
-  "qwen3.8-max",
-  "qwen3.7-plus",
-  "qwen3.7-flash",
-  "qwen3.6-plus",
-  "qwen3-coder-plus",
-  "qwen3-coder-flash",
-  "kimi-k2.6",
-  "kimi-k2.5",
-  "kimi-k2-thinking",
-  "deepseek-v4-pro",
-]
 const CMCC_DEFAULT_MODELS = new Set(
   CMCC_BAILIAN_PROVIDERS.flatMap((providerID) =>
     CMCC_DEFAULT_MODEL_IDS.map((modelID) => `${providerID}:${modelID}`),

@@ -175,6 +175,8 @@ printf 'OPENCODE_SERVER_USERNAME=%q\nOPENCODE_SERVER_PASSWORD=%q\nDEEPLIT_PROXY_
   "${OPENCODE_SERVER_USERNAME:-opencode}" \
   "$password" \
   "$deeplit_public_origin" >"$stage/opencode.env"
+printf '%s:%s' "${OPENCODE_SERVER_USERNAME:-opencode}" "$password" | base64 | tr -d '\n' >"$stage/health-auth"
+chmod 600 "$stage/opencode.env" "$stage/health-auth"
 printf 'DEEPXIV_PROXY_HOST=%q\nDEEPXIV_PROXY_PORT=%q\nDEEPLIT_PROXY_TARGET=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\nDEEPLIT_PROXY_TRUST_FORWARD_HEADERS=%q\n' \
   "$deepxiv_bind_host" \
   "$deepxiv_port" \

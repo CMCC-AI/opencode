@@ -61,7 +61,12 @@ import {
   sessionHref,
 } from "./utils/session-route"
 import { isSessionNotFoundError } from "./utils/server-errors"
-import { cmccCreateConversationWorkspace, cmccIsWorkspaceDirectory } from "./utils/cmcc-workspace"
+import {
+  cmccArtifactWorkspace,
+  cmccEnsureWorkspace,
+  cmccRememberConversationWorkspace,
+  cmccRuntimeWorkspace,
+} from "./utils/cmcc-workspace"
 import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
@@ -85,6 +90,7 @@ const CmccKnowledgeHomeRoute = lazy(() =>
 const CmccKnowledgeNotebookRoute = lazy(() =>
   import("@/pages/cmcc-knowledge").then((module) => ({ default: module.CmccKnowledgeNotebookRoute })),
 )
+const cmccAgentWarmups = new Set<string>()
 
 const SessionRoute = () => {
   const settings = useSettings()
@@ -378,10 +384,39 @@ function NewAppLayout(props: ParentProps) {
   return (
     <SelectedServerProviders>
       <ServerScopedProviders>
+        <CmccRuntimePrewarm />
         <NewLayout>{props.children}</NewLayout>
       </ServerScopedProviders>
     </SelectedServerProviders>
   )
+}
+
+function CmccRuntimePrewarm() {
+  const serverSDK = useServerSDK()
+  const sync = useServerSync()
+
+  const prewarm = () => {
+    if (!sync().data.ready) return
+    const runtime = cmccRuntimeWorkspace(sync().data.path.home, sync().data.path.directory)
+    if (!runtime) return
+    const key = `${serverSDK().scope}\n${runtime}`
+    if (cmccAgentWarmups.has(key)) return
+    cmccAgentWarmups.add(key)
+    void serverSDK()
+      .client.app.agents({ directory: runtime }, { throwOnError: true })
+      .finally(() => cmccAgentWarmups.delete(key))
+      .catch(() => undefined)
+  }
+
+  createEffect(prewarm)
+  createEffect(() => {
+    const stop = serverSDK().event.listen((event) => {
+      if (event.details.type === "server.connected") prewarm()
+    })
+    onCleanup(stop)
+  })
+
+  return null
 }
 
 function TargetServerScopedProviders(props: ServerScopedShellProps) {
@@ -691,33 +726,37 @@ function CmccDefaultRoute() {
   const sync = useServerSync()
   const tabs = useTabs()
   const home = createMemo(() => sync().data.path.home)
+  const runtime = createMemo(() => cmccRuntimeWorkspace(home(), sync().data.path.directory))
   let started = false
 
   createEffect(() => {
-    if (!home() || started || !tabs.ready()) return
+    const directory = runtime()
+    if (!directory || started || !tabs.ready()) return
     started = true
-    const existing =
-      tabs.store.find(
-        (tab) => tab.type === "draft" && tab.server === server.key && cmccIsWorkspaceDirectory(tab.directory, home()),
-      ) ?? tabs.store.find((tab) => tab.type === "draft" && tab.server === server.key)
+    const existing = tabs.store.findLast(
+      (tab) => tab.type === "draft" && tab.server === server.key && tab.directory === directory,
+    )
     if (existing) {
       tabs.select(existing)
       return
     }
-    void cmccCreateConversationWorkspace(home(), (directory) =>
-      serverSDK().client.file.createDirectory({ path: directory }, { throwOnError: true }),
-    )
-      .then((dir) => {
-        if (!dir) return
-        tabs.newDraft({ server: server.key, directory: dir })
+    const artifactDirectory = cmccArtifactWorkspace(directory)
+    if (!artifactDirectory) return
+
+    tabs.newDraft({ server: server.key, directory, artifactDirectory })
+    cmccRememberConversationWorkspace(directory)
+    server.projects.touch(directory)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
+    ).catch((error) => {
+      showToast({
+        title: "无法准备会话产物目录",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
       })
-      .catch((error) => {
-        showToast({
-          title: "无法创建对话目录",
-          description: error instanceof Error ? error.message : String(error),
-          variant: "error",
-        })
-      })
+    })
   })
 
   return (

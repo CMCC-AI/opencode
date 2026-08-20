@@ -83,17 +83,38 @@ describe("DatabaseMigration", () => {
         expect(yield* db.get(sql`SELECT count(*) as count FROM migration`)).toEqual({ count: migrations.length })
         expect(
           yield* db.all(
-            sql`SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('event_aggregate_seq_idx', 'event_aggregate_type_seq_idx', 'session_input_session_pending_seq_idx', 'session_input_session_pending_delivery_seq_idx', 'session_input_session_admitted_seq_idx', 'session_input_session_promoted_seq_idx', 'session_message_session_idx', 'session_message_session_type_idx', 'session_message_session_seq_idx', 'session_message_session_type_seq_idx', 'session_message_session_time_created_id_idx') ORDER BY name`,
+            sql`SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('event_aggregate_seq_idx', 'event_aggregate_type_seq_idx', 'session_input_session_pending_seq_idx', 'session_input_session_pending_delivery_seq_idx', 'session_input_session_admitted_seq_idx', 'session_input_session_promoted_seq_idx', 'session_message_session_idx', 'session_message_session_type_idx', 'session_message_session_seq_idx', 'session_message_session_type_seq_idx', 'session_message_session_time_created_id_idx', 'session_project_directory_parent_updated_idx', 'session_directory_parent_updated_id_idx') ORDER BY name`,
           ),
         ).toEqual([
           { name: "event_aggregate_seq_idx" },
           { name: "event_aggregate_type_seq_idx" },
+          { name: "session_directory_parent_updated_id_idx" },
           { name: "session_input_session_admitted_seq_idx" },
           { name: "session_input_session_pending_delivery_seq_idx" },
           { name: "session_input_session_promoted_seq_idx" },
           { name: "session_message_session_seq_idx" },
           { name: "session_message_session_time_created_id_idx" },
           { name: "session_message_session_type_seq_idx" },
+          { name: "session_project_directory_parent_updated_idx" },
+        ])
+
+        expect(
+          yield* db.all<{ detail: string }>(
+            sql`EXPLAIN QUERY PLAN SELECT * FROM session WHERE project_id = 'global' AND directory = '/runtime' AND parent_id IS NULL ORDER BY time_updated DESC LIMIT 50`,
+          ),
+        ).toEqual([
+          expect.objectContaining({
+            detail: expect.stringContaining("USING INDEX session_project_directory_parent_updated_idx"),
+          }),
+        ])
+        expect(
+          yield* db.all<{ detail: string }>(
+            sql`EXPLAIN QUERY PLAN SELECT * FROM session WHERE directory = '/runtime' AND parent_id IS NULL AND time_archived IS NULL ORDER BY time_updated DESC, id DESC LIMIT 50`,
+          ),
+        ).toEqual([
+          expect.objectContaining({
+            detail: expect.stringContaining("USING INDEX session_directory_parent_updated_id_idx"),
+          }),
         ])
       }),
     )
