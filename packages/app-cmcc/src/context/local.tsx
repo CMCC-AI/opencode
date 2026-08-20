@@ -12,6 +12,7 @@ import { useSync } from "./sync"
 import { useServerSDK } from "./server-sdk"
 import { ScopedKey, type ServerScope } from "@/utils/server-scope"
 import { isCmccWhitelistedModel } from "./model-defaults"
+import { cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
 
 export type ModelKey = { providerID: string; modelID: string; variant?: string }
 
@@ -66,7 +67,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const models = useModels()
 
     const id = createMemo(() => params.id || undefined)
-    const list = createMemo(() => sync().data.agent.filter((item) => item.mode !== "subagent" && !item.hidden))
+    const list = createMemo(() =>
+      sync().data.agent.filter((item) => item.mode !== "subagent" && !item.hidden && !cmccTeamExpertByAgent(item.name)),
+    )
     const connected = createMemo(() => new Set(providers.connected().map((item) => item.id)))
 
     const [saved, setSaved] = persisted(
