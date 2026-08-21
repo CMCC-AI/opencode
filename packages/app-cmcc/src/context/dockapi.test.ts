@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { dockApiHistorySessions, isDockApiSessionDirectory, type DockApiSession } from "./dockapi"
+import { dockApiHistorySessions, isDockApiRuntimeDirectory, type DockApiSession } from "./dockapi"
 
 const binding = (id: string, directoryPath: string, query = "问题"): DockApiSession => ({
   id: `business-${id}`,
@@ -15,28 +15,26 @@ const binding = (id: string, directoryPath: string, query = "问题"): DockApiSe
 })
 
 describe("DockAPI history sessions", () => {
-  test("accepts only direct s-prefixed children of the current user directory", () => {
+  test("accepts only the current user stable runtime", () => {
     const root = "D:\\workspace\\u-2"
 
-    expect(isDockApiSessionDirectory(root, "D:\\workspace\\u-2\\s-one")).toBe(true)
-    expect(isDockApiSessionDirectory(root, "D:/workspace/u-2/s-two")).toBe(true)
-    expect(isDockApiSessionDirectory(root, root)).toBe(false)
-    expect(isDockApiSessionDirectory(root, "D:\\workspace\\u-2\\other")).toBe(false)
-    expect(isDockApiSessionDirectory(root, "D:\\workspace\\u-2\\s-one\\nested")).toBe(false)
-    expect(isDockApiSessionDirectory(root, "D:\\workspace\\u-3\\s-one")).toBe(false)
+    expect(isDockApiRuntimeDirectory(root, root)).toBe(true)
+    expect(isDockApiRuntimeDirectory(root, "D:/workspace/u-2")).toBe(true)
+    expect(isDockApiRuntimeDirectory(root, "D:\\workspace\\u-2\\s-one")).toBe(false)
+    expect(isDockApiRuntimeDirectory(root, "D:\\workspace\\u-2\\runs")).toBe(false)
+    expect(isDockApiRuntimeDirectory(root, "D:\\workspace\\u-3")).toBe(false)
   })
 
   test("keeps backend order and does not filter empty-query bindings", () => {
     const root = "D:\\workspace\\u-2"
     const result = dockApiHistorySessions(root, [
-      binding("draft", `${root}\\s-draft`, ""),
-      binding("active", `${root}\\s-active`, "研究问题"),
-      binding("legacy", root, "旧会话"),
-      binding("other", "D:\\workspace\\u-3\\s-other", "其他用户"),
+      binding("draft", root, ""),
+      binding("active", root, "研究问题"),
+      binding("legacy", `${root}\\s-legacy`, "旧目录会话"),
+      binding("other", "D:\\workspace\\u-3", "其他用户"),
     ])
 
     expect(result.map((session) => session.id)).toEqual(["session-draft", "session-active"])
     expect(result.map((session) => session.title)).toEqual(["新会话", "研究问题"])
-    expect(result.every((session) => session.directory.includes("\\s-"))).toBe(true)
   })
 })

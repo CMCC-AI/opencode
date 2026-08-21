@@ -42,10 +42,6 @@ export type DockApiSession = {
   updatedAt: string
 }
 
-type SessionPreparationResponse = {
-  preparationId: string
-}
-
 export function asOpenCodeSession(value: unknown): Session | undefined {
   if (!value || typeof value !== "object") return
   const session = value as Partial<Session>
@@ -58,17 +54,15 @@ export function asOpenCodeSession(value: unknown): Session | undefined {
 
 const normalizedDirectory = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "")
 
-export function isDockApiSessionDirectory(userDirectory: string, sessionDirectory: string) {
+export function isDockApiRuntimeDirectory(userDirectory: string, sessionDirectory: string) {
   const root = normalizedDirectory(userDirectory).toLowerCase()
   const candidate = normalizedDirectory(sessionDirectory).toLowerCase()
-  if (!candidate.startsWith(`${root}/`)) return false
-  const relative = candidate.slice(root.length + 1)
-  return relative.startsWith("s-") && !relative.includes("/")
+  return candidate === root
 }
 
 export function dockApiHistorySessions(userDirectory: string, bindings: DockApiSession[]): Session[] {
   return bindings
-    .filter((binding) => isDockApiSessionDirectory(userDirectory, binding.directoryPath))
+    .filter((binding) => isDockApiRuntimeDirectory(userDirectory, binding.directoryPath))
     .map((binding) => {
       const session = asOpenCodeSession(binding.openCodeSession)
       if (session) return { ...session, title: binding.title, directory: binding.directoryPath }
@@ -313,14 +307,14 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         findByOpenCodeId(sessionID: string) {
           return state.sessions.find((session) => session.openCodeSessionId === sessionID)
         },
-        async create(input: { query: string; title?: string; preparationId?: string }) {
+        async create(input: { query: string; title?: string; artifactDirectory: string }) {
           const session = await request<DockApiSession>("/api/dockapi/sessions", {
             method: "POST",
             body: JSON.stringify({
               agentType: import.meta.env.VITE_DOCKAPI_AGENT_TYPE?.trim() || "DeepInsight",
               query: input.query,
               title: input.title,
-              preparationId: input.preparationId,
+              artifactDirectory: input.artifactDirectory,
             }),
           })
           setState("sessions", (sessions) => [session, ...sessions.filter((item) => item.id !== session.id)])
@@ -340,19 +334,6 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           if (!session) throw new DockApiError("未找到业务会话绑定")
           await request<void>(`/api/dockapi/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" })
           setState("sessions", (sessions) => sessions.filter((item) => item.id !== session.id))
-        },
-      },
-      preparations: {
-        async create() {
-          const preparation = await request<SessionPreparationResponse>("/api/dockapi/sessions/preparations", {
-            method: "POST",
-          })
-          return preparation.preparationId
-        },
-        release(preparationId: string) {
-          return request<void>(`/api/dockapi/sessions/preparations/${encodeURIComponent(preparationId)}`, {
-            method: "DELETE",
-          })
         },
       },
     }

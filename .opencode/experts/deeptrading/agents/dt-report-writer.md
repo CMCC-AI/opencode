@@ -2,6 +2,7 @@
 name: deeptrading/dt-report-writer
 description: "报告撰写专家 - 整理各章节报告内容，形成完整研究报告。由主理人调度整合全部前置报告。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

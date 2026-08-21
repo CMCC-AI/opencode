@@ -1,4 +1,4 @@
-import { Show, createEffect, createResource, createSignal, onCleanup, untrack } from "solid-js"
+import { Show, createEffect, createResource, createSignal, untrack } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { NewSessionDesignView } from "@/components/session"
 import { PromptInput } from "@/components/prompt-input"
@@ -8,12 +8,9 @@ import { usePrompt } from "@/context/prompt"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useTabs } from "@/context/tabs"
-import { useDockApi } from "@/context/dockapi"
-import { useSDK } from "@/context/sdk"
 import { createPromptInputController } from "@/pages/session/composer"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
-import { NEW_SESSION_CONTENT_WIDTH } from "@/pages/session/new-session-layout"
 
 /**
  * The `/new-session` draft page. Unlike `session.tsx`, this only renders the prompt
@@ -26,8 +23,6 @@ export default function NewSessionPage() {
   const comments = useComments()
   const language = useLanguage()
   const tabs = useTabs()
-  const dockapi = useDockApi()
-  const sdk = useSDK()
   const route = useSessionKey()
   const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string; agent?: string }>()
   const draftAgent = () => {
@@ -36,34 +31,6 @@ export default function NewSessionPage() {
     return draft?.type === "draft" ? draft.agent : undefined
   }
   const [selectedExpertAgent, setSelectedExpertAgent] = createSignal(searchParams.agent ?? draftAgent())
-  let preparationPromise: Promise<string | undefined> | undefined
-  let preparationConsumed = false
-
-  const prepareSession = () => {
-    if (preparationPromise) return preparationPromise
-    if (!dockapi.workspace || dockapi.workspace.directoryPath !== sdk().directory) return Promise.resolve(undefined)
-    preparationPromise = dockapi.preparations.create().catch((error) => {
-      console.warn("会话预热失败，将在发送时同步创建", error)
-      return undefined
-    })
-    return preparationPromise
-  }
-
-  createEffect(() => {
-    if (!dockapi.workspace || dockapi.workspace.directoryPath !== sdk().directory) return
-    void prepareSession()
-  })
-
-  onCleanup(() => {
-    if (!preparationPromise || preparationConsumed) return
-    void preparationPromise.then((preparationId) => {
-      if (!preparationId || preparationConsumed) return
-      return dockapi.preparations.release(preparationId).catch((error) => {
-        console.warn("未使用的会话预热资源释放失败", error)
-      })
-    })
-  })
-
   const selectExpertAgent = (agent: string | undefined) => {
     setSelectedExpertAgent(agent)
     if (searchParams.draftId) tabs.updateDraft(searchParams.draftId, { agent })
@@ -101,42 +68,30 @@ export default function NewSessionPage() {
   )
 
   return (
-    <div class="relative size-full overflow-hidden flex flex-col">
-      <div class="flex-1 min-h-0 flex flex-col gap-2 p-2">
-        <div class="@container relative flex flex-col min-h-0 h-full bg-background-stronger flex-1">
-          <div class="flex-1 min-h-0 overflow-hidden rounded-[10px]">
-            <NewSessionDesignView>
-              <div class={NEW_SESSION_CONTENT_WIDTH}>
-                <Show
-                  when={prompt.ready() || promptReady()}
-                  fallback={
-                    <div class="w-full min-h-32 md:min-h-40 rounded-md border border-border-weak-base bg-background-base/50 px-4 py-3 text-text-weak pointer-events-none">
-                      {language.t("prompt.loading")}
-                    </div>
-                  }
-                >
-                  <div class="flex flex-col gap-3">
-                    <PromptInput
-                      controls={inputController()}
-                      variant="new-session"
-                      ref={(el) => {
-                        inputRef = el
-                      }}
-                      onSubmit={() => comments.clear()}
-                      sessionPreparation={prepareSession}
-                      onSessionPreparationConsumed={() => {
-                        preparationConsumed = true
-                      }}
-                      selectedExpertAgent={selectedExpertAgent()}
-                      onSelectedExpertAgentChange={selectExpertAgent}
-                    />
-                  </div>
-                </Show>
-              </div>
-            </NewSessionDesignView>
+    <div class="relative flex size-full min-h-0 flex-col overflow-hidden">
+      <NewSessionDesignView>
+        <Show
+          when={prompt.ready() || promptReady()}
+          fallback={
+            <div class="w-full min-h-32 md:min-h-40 rounded-md border border-border-weak-base bg-background-base/50 px-4 py-3 text-text-weak pointer-events-none">
+              {language.t("prompt.loading")}
+            </div>
+          }
+        >
+          <div class="flex flex-col gap-3">
+            <PromptInput
+              controls={inputController()}
+              variant="new-session"
+              ref={(el) => {
+                inputRef = el
+              }}
+              onSubmit={() => comments.clear()}
+              selectedExpertAgent={selectedExpertAgent()}
+              onSelectedExpertAgentChange={selectExpertAgent}
+            />
           </div>
-        </div>
-      </div>
+        </Show>
+      </NewSessionDesignView>
     </div>
   )
 }

@@ -2,6 +2,7 @@
 name: deeptrading/dt-intake
 description: "信息确认员 - 根据用户输入检索网络公开信息，匹配 A 股上市公司与股票代码，生成背景摘要。由主理人调度。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

@@ -3,7 +3,8 @@ name: trading-agent/trading-team-lead
 description: >-
   交易分析团队主理人（Lead Orchestrator）。当用户需要对 A股/港股/美股个股做系统性投资分析（涵盖技术面、基本面、新闻面、情绪面、多空辩论、风险评估）并给出 BUY/SELL/HOLD 建议时激活。
   触发词：帮我分析、该不该买、投资建议、买入卖出、交易决策、多空分析、技术面+基本面综合、风险评估、个股深度研究。
-mode: primary
+mode: all
+hidden: true
 color: "#0F172A"
 options:
   expert:

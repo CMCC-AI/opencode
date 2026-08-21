@@ -2,6 +2,7 @@
 name: deeptrading/dt-research-manager
 description: "投资决策经理 - 综合多方分析报告，进行投资决策辩论与研判。由主理人调度合成投资结论。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

@@ -5,6 +5,9 @@ let createPromptSubmit: typeof import("./submit").createPromptSubmit
 
 const createdClients: string[] = []
 const createdSessions: string[] = []
+const createdDirectories: string[] = []
+const createdSessionInputs: Array<{ agent?: string; metadata?: Record<string, unknown> }> = []
+const sentPrompts: Array<{ sessionID: string; system?: string }> = []
 const enabledAutoAccept: Array<{ sessionID: string; directory: string }> = []
 const optimistic: Array<{
   directory?: string
@@ -16,21 +19,25 @@ const optimistic: Array<{
   }
 }> = []
 const optimisticSeeded: boolean[] = []
-const storedSessions: Record<string, Array<{ id: string; title?: string; directory?: string }>> = {}
+const storedSessions: Record<
+  string,
+  Array<{ id: string; title?: string; directory?: string; metadata?: Record<string, unknown> }>
+> = {}
 const promoted: Array<{ directory: string; sessionID: string }> = []
 const sentShell: string[] = []
 const sentPromptAsync: string[] = []
 const syncedDirectories: string[] = []
 const promotedDrafts: Array<{ draftID: string; server: string; sessionId: string }> = []
 const dockSessionQueries: string[] = []
-const dockSessionPreparationIds: Array<string | undefined> = []
+const dockSessionArtifactDirectories: string[] = []
 
 let params: { id?: string } = {}
 let search: { draftId?: string } = {}
 let selected = "/repo/worktree-a"
 let variant: string | undefined
 let dockWorkspace: { directoryPath: string } | undefined
-let dockSessionDirectory = "/repo/main/s-business"
+let draftArtifact: string | undefined
+let prepareDirectory: (() => Promise<void>) | undefined
 
 const promptValue: Prompt = [{ type: "text", content: "ls", start: 0, end: 2 }]
 const prompt = {
@@ -55,12 +62,15 @@ const clientFor = (directory: string) => {
   createdClients.push(directory)
   return {
     session: {
-      create: async () => {
+      create: async (input?: { agent?: string; metadata?: Record<string, unknown> }) => {
         createdSessions.push(directory)
+        createdSessionInputs.push(input ?? {})
         return {
           data: {
             id: `session-${createdSessions.length}`,
             title: `New session ${createdSessions.length}`,
+            directory,
+            metadata: input?.metadata,
           },
         }
       },
@@ -69,8 +79,9 @@ const clientFor = (directory: string) => {
         return { data: undefined }
       },
       prompt: async () => ({ data: undefined }),
-      promptAsync: async () => {
+      promptAsync: async (input: { sessionID: string; system?: string }) => {
         sentPromptAsync.push(directory)
+        sentPrompts.push(input)
         return { data: undefined }
       },
       command: async () => ({ data: undefined }),
@@ -78,6 +89,13 @@ const clientFor = (directory: string) => {
     },
     worktree: {
       create: async () => ({ data: { directory: `${directory}/new` } }),
+    },
+    file: {
+      createDirectory: async (input: { path: string }) => {
+        createdDirectories.push(input.path)
+        await prepareDirectory?.()
+        return { data: undefined }
+      },
     },
   }
 }
@@ -118,17 +136,22 @@ beforeAll(async () => {
     useDockApi: () => ({
       workspace: dockWorkspace,
       sessions: {
-        async create(input: { query: string; preparationId?: string }) {
+        async create(input: { query: string; artifactDirectory: string }) {
           dockSessionQueries.push(input.query)
-          dockSessionPreparationIds.push(input.preparationId)
+          dockSessionArtifactDirectories.push(input.artifactDirectory)
           return {
             id: "business-1",
             agentType: "DeepInsight",
             query: input.query,
             title: input.query,
             openCodeSessionId: "dock-session-1",
-            directoryPath: dockSessionDirectory,
-            openCodeSession: { id: "dock-session-1", title: input.query, directory: dockSessionDirectory },
+            directoryPath: "/repo/main",
+            openCodeSession: {
+              id: "dock-session-1",
+              title: input.query,
+              directory: "/repo/main",
+              metadata: { cmccArtifactDirectory: input.artifactDirectory },
+            },
             openCodeStatus: { type: "idle" },
             createdAt: "2026-08-20T00:00:00",
             updatedAt: "2026-08-20T00:00:00",
@@ -170,7 +193,7 @@ beforeAll(async () => {
 
   mock.module("@/context/tabs", () => ({
     useTabs: () => ({
-      draft: () => ({ server: "project-server" }),
+      draft: () => ({ server: "project-server", artifactDirectory: draftArtifact }),
       promoteDraft: (draftID: string, session: { server: string; sessionId: string }) => {
         promotedDrafts.push({ draftID, ...session })
       },
@@ -248,11 +271,17 @@ beforeAll(async () => {
                 id: string
                 title?: string
                 directory?: string
+                metadata?: Record<string, unknown>
               }>
               return
             }
             if (Array.isArray(next)) {
-              storedSessions[directory] = next as Array<{ id: string; title?: string; directory?: string }>
+              storedSessions[directory] = next as Array<{
+                id: string
+                title?: string
+                directory?: string
+                metadata?: Record<string, unknown>
+              }>
             }
           },
         ]
@@ -279,6 +308,9 @@ beforeAll(async () => {
 beforeEach(() => {
   createdClients.length = 0
   createdSessions.length = 0
+  createdDirectories.length = 0
+  createdSessionInputs.length = 0
+  sentPrompts.length = 0
   enabledAutoAccept.length = 0
   optimistic.length = 0
   optimisticSeeded.length = 0
@@ -290,11 +322,12 @@ beforeEach(() => {
   sentPromptAsync.length = 0
   syncedDirectories.length = 0
   dockSessionQueries.length = 0
-  dockSessionPreparationIds.length = 0
+  dockSessionArtifactDirectories.length = 0
   selected = "/repo/worktree-a"
   variant = undefined
   dockWorkspace = undefined
-  dockSessionDirectory = "/repo/main/s-business"
+  draftArtifact = undefined
+  prepareDirectory = undefined
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
 })
 
@@ -452,13 +485,14 @@ describe("prompt submit worktree selection", () => {
 
     await submit.handleSubmit(event)
 
-    expect(storedSessions["/repo/worktree-a"]).toEqual([{ id: "session-1", title: "New session 1" }])
+    expect(storedSessions["/repo/worktree-a"]).toMatchObject([{ id: "session-1", title: "New session 1" }])
     expect(optimisticSeeded).toEqual([true])
   })
 
-  test("retargets a DockAPI session to its dedicated directory before sending", async () => {
+  test("creates a DockAPI binding in the user runtime with an isolated artifact directory", async () => {
     dockWorkspace = { directoryPath: "/repo/main" }
-    let preparationConsumed = false
+    search = { draftId: "draft-1" }
+    draftArtifact = "/repo/main/runs/session-a"
     const submit = createPromptSubmit({
       prompt,
       info: () => undefined,
@@ -475,24 +509,124 @@ describe("prompt submit worktree selection", () => {
       setMode: () => undefined,
       setPopover: () => undefined,
       onSubmit: () => undefined,
-      sessionPreparation: async () => "preparation-1",
-      onSessionPreparationConsumed: () => {
-        preparationConsumed = true
-      },
     })
 
     await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(dockSessionQueries).toEqual(["ls"])
-    expect(dockSessionPreparationIds).toEqual(["preparation-1"])
-    expect(preparationConsumed).toBe(true)
-    expect(createdClients).toEqual([dockSessionDirectory])
-    expect(sentPromptAsync).toEqual([dockSessionDirectory])
-    expect(promoted).toEqual([{ directory: dockSessionDirectory, sessionID: "dock-session-1" }])
-    expect(storedSessions[dockSessionDirectory]).toEqual([
-      { id: "dock-session-1", title: "ls", directory: dockSessionDirectory },
+    expect(dockSessionArtifactDirectories).toEqual([draftArtifact])
+    expect(createdClients).toEqual([])
+    expect(sentPromptAsync).toEqual(["/repo/main"])
+    expect(promoted).toEqual([{ directory: "/repo/main", sessionID: "dock-session-1" }])
+    expect(storedSessions["/repo/main"]).toEqual([
+      {
+        id: "dock-session-1",
+        title: "ls",
+        directory: "/repo/main",
+        metadata: { cmccArtifactDirectory: draftArtifact },
+      },
     ])
-    expect(optimistic[0]?.directory).toBe(dockSessionDirectory)
+    expect(optimistic[0]?.directory).toBe("/repo/main")
+    expect(sentPrompts[0]?.system).toContain(draftArtifact)
+  })
+
+  test("persists an isolated artifact directory and sends it on every prompt", async () => {
+    search = { draftId: "draft-1" }
+    draftArtifact = "/repo/main/runs/session-a"
+    const submit = createPromptSubmit({
+      prompt,
+      info: () => undefined,
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+    await Promise.resolve()
+
+    expect(createdDirectories).toEqual([draftArtifact])
+    expect(createdSessionInputs).toEqual([
+      {
+        agent: undefined,
+        metadata: { cmccArtifactDirectory: draftArtifact },
+      },
+    ])
+    expect(sentPrompts).toHaveLength(1)
+    expect(sentPrompts[0]?.system).toContain(draftArtifact)
+  })
+
+  test("ignores a duplicate submit while the artifact directory is preparing", async () => {
+    search = { draftId: "draft-1" }
+    draftArtifact = "/repo/main/runs/session-a"
+    const gate = Promise.withResolvers<void>()
+    prepareDirectory = () => gate.promise
+    const submit = createPromptSubmit({
+      prompt,
+      info: () => undefined,
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      onSubmit: () => undefined,
+    })
+    const event = { preventDefault: () => undefined } as unknown as Event
+
+    const first = submit.handleSubmit(event)
+    await Promise.resolve()
+    await submit.handleSubmit(event)
+    gate.resolve()
+    await first
+
+    expect(createdDirectories).toEqual([draftArtifact])
+    expect(createdSessions).toEqual(["/repo/main"])
+  })
+
+  test("restores the artifact constraint from session metadata on follow-up", async () => {
+    params = { id: "session-1" }
+    const artifactDirectory = "/repo/main/runs/session-a"
+    const submit = createPromptSubmit({
+      prompt,
+      info: () => ({ id: "session-1", metadata: { cmccArtifactDirectory: artifactDirectory } }),
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+    await Promise.resolve()
+
+    expect(createdDirectories).toEqual([])
+    expect(createdSessions).toEqual([])
+    expect(sentPrompts).toHaveLength(1)
+    expect(sentPrompts[0]?.system).toContain(artifactDirectory)
   })
 })

@@ -1,0 +1,200 @@
+{
+  "id": "zhengqi-visit-intel",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",
+  "teamInfo": {
+    "leadAgent": "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",
+    "memberAgents": [
+      "zhengqi-visit-intel/sensitive-check-officer",
+      "zhengqi-visit-intel/internal-intel-researcher",
+      "zhengqi-visit-intel/research-query-planner",
+      "zhengqi-visit-intel/public-web-researcher",
+      "zhengqi-visit-intel/intelligence-synthesizer",
+      "zhengqi-visit-intel/research-reflection-analyst",
+      "zhengqi-visit-intel/outline-architect",
+      "zhengqi-visit-intel/report-chief-writer",
+      "zhengqi-visit-intel/evidence-verify-officer",
+      "zhengqi-visit-intel/report-visual-designer"
+    ]
+  },
+  "displayName": {
+    "en": "Zhengqi Visit Intel",
+    "zh": "DeepEngage谈参高拜专家团"
+  },
+  "profession": {
+    "en": "Zhengqi Visit Intel",
+    "zh": "DeepEngage谈参高拜专家团"
+  },
+  "displayDescription": {
+    "en": "Blends internal CRM portal data with public intelligence into traceable executive visit decision reports: why visit now, what to discuss, and what consensus to pursue.",
+    "zh": "融合内部门户数据与公开情报，产出可溯源的政企拜访决策报告：为何拜访、谈什么、争取什么共识。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "07-SalesCommerce",
+  "defaultInitPrompt": {
+    "zh": "帮我生成某客户的谈参高拜报告，内部门户导出数据在这里：[文件路径]",
+    "en": "Generate an executive visit report for a customer, with internal portal export data at: [file path]"
+  },
+  "members": [
+    {
+      "id": "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",
+      "name": {
+        "en": "Tan Gaojian",
+        "zh": "谈高见"
+      },
+      "profession": {
+        "en": "Chief Visit Report Editor",
+        "zh": "谈参报告总编"
+      },
+      "avatar": "avatars/zhengqi-visit-intel-team-lead.png",
+      "role": "lead",
+      "originalId": "zhengqi-visit-intel-team-lead"
+    },
+    {
+      "id": "zhengqi-visit-intel/sensitive-check-officer",
+      "name": {
+        "en": "An Wuhuan",
+        "zh": "安无患"
+      },
+      "profession": {
+        "en": "Zhengqi Sensitive Input Safety Officer",
+        "zh": "政企安全检测专员"
+      },
+      "avatar": "avatars/sensitive-check-officer.png",
+      "role": "member",
+      "originalId": "sensitive-check-officer"
+    },
+    {
+      "id": "zhengqi-visit-intel/internal-intel-researcher",
+      "name": {
+        "en": "Wen Ruoyuan",
+        "zh": "闻若渊"
+      },
+      "profession": {
+        "en": "Internal Customer Intelligence Researcher",
+        "zh": "内部客户情报研究员"
+      },
+      "avatar": "avatars/internal-intel-researcher.png",
+      "role": "member",
+      "originalId": "internal-intel-researcher"
+    },
+    {
+      "id": "zhengqi-visit-intel/research-query-planner",
+      "name": {
+        "en": "Mou Dingce",
+        "zh": "牟定策"
+      },
+      "profession": {
+        "en": "Zhengqi Research Planner",
+        "zh": "政企研究规划师"
+      },
+      "avatar": "avatars/research-query-planner.png",
+      "role": "member",
+      "originalId": "research-query-planner"
+    },
+    {
+      "id": "zhengqi-visit-intel/public-web-researcher",
+      "name": {
+        "en": "Luo Guangwen",
+        "zh": "罗广闻"
+      },
+      "profession": {
+        "en": "Authoritative Public Information Researcher",
+        "zh": "权威公开信息研究员"
+      },
+      "avatar": "avatars/public-web-researcher.png",
+      "role": "member",
+      "originalId": "public-web-researcher"
+    },
+    {
+      "id": "zhengqi-visit-intel/intelligence-synthesizer",
+      "name": {
+        "en": "Zhen Ronghui",
+        "zh": "甄融汇"
+      },
+      "profession": {
+        "en": "Internal-External Intelligence Synthesizer",
+        "zh": "内外情报融合分析师"
+      },
+      "avatar": "avatars/intelligence-synthesizer.png",
+      "role": "member",
+      "originalId": "intelligence-synthesizer"
+    },
+    {
+      "id": "zhengqi-visit-intel/research-reflection-analyst",
+      "name": {
+        "en": "Shen Siming",
+        "zh": "慎思明"
+      },
+      "profession": {
+        "en": "Research Quality Reflection Analyst",
+        "zh": "研究质量反思专员"
+      },
+      "avatar": "avatars/research-reflection-analyst.png",
+      "role": "member",
+      "originalId": "research-reflection-analyst"
+    },
+    {
+      "id": "zhengqi-visit-intel/outline-architect",
+      "name": {
+        "en": "Ke Zhangfa",
+        "zh": "柯章法"
+      },
+      "profession": {
+        "en": "Visit Report Outline Architect",
+        "zh": "谈参报告大纲设计师"
+      },
+      "avatar": "avatars/outline-architect.png",
+      "role": "member",
+      "originalId": "outline-architect"
+    },
+    {
+      "id": "zhengqi-visit-intel/report-chief-writer",
+      "name": {
+        "en": "Bi Wencheng",
+        "zh": "毕文成"
+      },
+      "profession": {
+        "en": "Zhengqi Report Writer",
+        "zh": "政企报告撰写专家"
+      },
+      "avatar": "avatars/report-chief-writer.png",
+      "role": "member",
+      "originalId": "report-chief-writer"
+    },
+    {
+      "id": "zhengqi-visit-intel/evidence-verify-officer",
+      "name": {
+        "en": "Yan Kezheng",
+        "zh": "严可证"
+      },
+      "profession": {
+        "en": "Evidence Verification Officer",
+        "zh": "关键事实证据核验官"
+      },
+      "avatar": "avatars/evidence-verify-officer.png",
+      "role": "member",
+      "originalId": "evidence-verify-officer"
+    },
+    {
+      "id": "zhengqi-visit-intel/report-visual-designer",
+      "name": {
+        "en": "Lan Qitu",
+        "zh": "蓝启图"
+      },
+      "profession": {
+        "en": "Report Visual Designer",
+        "zh": "报告视觉设计师"
+      },
+      "avatar": "avatars/report-visual-designer.png",
+      "role": "member",
+      "originalId": "report-visual-designer"
+    }
+  ],
+  "original": {
+    "name": "zhengqi-visit-intel",
+    "version": "1.0.0",
+    "description": "Government-enterprise visit intelligence team producing evidence-based executive visit decision reports."
+  }
+}

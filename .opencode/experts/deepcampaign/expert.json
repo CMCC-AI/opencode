@@ -1,0 +1,49 @@
+{
+  "id": "deepcampaign",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "deepcampaign/deepcampaign-team-lead",
+  "teamInfo": {
+    "leadAgent": "deepcampaign/deepcampaign-team-lead",
+    "memberAgents": []
+  },
+  "displayName": {
+    "en": "DeepCampaign",
+    "zh": "DeepCampaign 营销方案专家团"
+  },
+  "profession": {
+    "en": "DeepCampaign",
+    "zh": "DeepCampaign 营销方案专家团"
+  },
+  "displayDescription": {
+    "en": "AI-powered marketing team that analyzes target audiences and generates marketing plans and reports.",
+    "zh": "洞察人群，生成营销方案与报告"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "11-Marketing",
+  "defaultInitPrompt": {
+    "zh": "帮我分析目标人群并生成营销方案",
+    "en": "Help me analyze the target audience and generate a marketing plan"
+  },
+  "members": [
+    {
+      "id": "deepcampaign/deepcampaign-team-lead",
+      "name": {
+        "en": "Marketing Director",
+        "zh": "营销总监"
+      },
+      "profession": {
+        "en": "Marketing Plan Director",
+        "zh": "营销方案总编"
+      },
+      "avatar": "avatars/deepcampaign-team-lead.png",
+      "role": "lead",
+      "originalId": "deepcampaign-team-lead"
+    }
+  ],
+  "original": {
+    "name": "deepcampaign",
+    "version": "1.0.0",
+    "description": "AI-powered marketing team for audience insight and marketing plan generation"
+  }
+}

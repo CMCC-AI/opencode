@@ -1,0 +1,215 @@
+{
+  "id": "deepinspect",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "deepinspect/deepinspect-team-lead",
+  "teamInfo": {
+    "leadAgent": "deepinspect/deepinspect-team-lead",
+    "memberAgents": [
+      "deepinspect/intent-analyst",
+      "deepinspect/query-planner",
+      "deepinspect/risk-identifier",
+      "deepinspect/material-researcher",
+      "deepinspect/web-researcher",
+      "deepinspect/problem-consolidator",
+      "deepinspect/reflector",
+      "deepinspect/outline-architect",
+      "deepinspect/report-writer",
+      "deepinspect/evidence-reviewer",
+      "deepinspect/viz-specialist"
+    ]
+  },
+  "displayName": {
+    "en": "DeepInspect",
+    "zh": "DeepInspect 巡查分析专家团"
+  },
+  "profession": {
+    "en": "DeepInspect",
+    "zh": "DeepInspect 巡查分析专家团"
+  },
+  "displayDescription": {
+    "en": "AI-powered team that identifies on-site risks, consolidates findings, and generates structured inspection and rectification reports.",
+    "zh": "基于AI技术深度识别现场安全风险，自动归并问题线索，生成结构化巡查报告与整改方案的专家协作团队"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "10-ProjectQuality",
+  "defaultInitPrompt": {
+    "zh": "帮我分析巡查材料，识别现场风险并生成巡查报告",
+    "en": "Help me analyze inspection materials, identify on-site risks and generate an inspection report"
+  },
+  "members": [
+    {
+      "id": "deepinspect/deepinspect-team-lead",
+      "name": {
+        "en": "Du Xun'an",
+        "zh": "督巡安"
+      },
+      "profession": {
+        "en": "Inspection Orchestration Director",
+        "zh": "巡查编排总监"
+      },
+      "avatar": "avatars/deepinspect-team-lead.png",
+      "role": "lead",
+      "originalId": "deepinspect-team-lead"
+    },
+    {
+      "id": "deepinspect/intent-analyst",
+      "name": {
+        "en": "Ming Yizhe",
+        "zh": "明意图"
+      },
+      "profession": {
+        "en": "Intent Analysis Expert",
+        "zh": "意图分析专家"
+      },
+      "avatar": "avatars/intent-analyst.png",
+      "role": "member",
+      "originalId": "intent-analyst"
+    },
+    {
+      "id": "deepinspect/query-planner",
+      "name": {
+        "en": "Mou Fanglue",
+        "zh": "谋方略"
+      },
+      "profession": {
+        "en": "Research Planning Expert",
+        "zh": "巡查规划专家"
+      },
+      "avatar": "avatars/query-planner.png",
+      "role": "member",
+      "originalId": "query-planner"
+    },
+    {
+      "id": "deepinspect/risk-identifier",
+      "name": {
+        "en": "Bian Jianwei",
+        "zh": "辨见微"
+      },
+      "profession": {
+        "en": "Risk Identification Expert",
+        "zh": "风险识别专家"
+      },
+      "avatar": "avatars/risk-identifier.png",
+      "role": "member",
+      "originalId": "risk-identifier"
+    },
+    {
+      "id": "deepinspect/material-researcher",
+      "name": {
+        "en": "Qiu Shenrui",
+        "zh": "求甚睿"
+      },
+      "profession": {
+        "en": "Material Research Expert",
+        "zh": "材料研究专家"
+      },
+      "avatar": "avatars/material-researcher.png",
+      "role": "member",
+      "originalId": "material-researcher"
+    },
+    {
+      "id": "deepinspect/web-researcher",
+      "name": {
+        "en": "Wang Boyuan",
+        "zh": "网博源"
+      },
+      "profession": {
+        "en": "Web Research Expert",
+        "zh": "网络研究专家"
+      },
+      "avatar": "avatars/web-researcher.png",
+      "role": "member",
+      "originalId": "web-researcher"
+    },
+    {
+      "id": "deepinspect/problem-consolidator",
+      "name": {
+        "en": "Gui Yiqing",
+        "zh": "归一清"
+      },
+      "profession": {
+        "en": "Problem Consolidation Analyst",
+        "zh": "问题归并分析师"
+      },
+      "avatar": "avatars/problem-consolidator.png",
+      "role": "member",
+      "originalId": "problem-consolidator"
+    },
+    {
+      "id": "deepinspect/reflector",
+      "name": {
+        "en": "Shen Sijin",
+        "zh": "审思谨"
+      },
+      "profession": {
+        "en": "Reflection Evaluation Expert",
+        "zh": "反思评估专家"
+      },
+      "avatar": "avatars/reflector.png",
+      "role": "member",
+      "originalId": "reflector"
+    },
+    {
+      "id": "deepinspect/outline-architect",
+      "name": {
+        "en": "Gou Hongtu",
+        "zh": "构宏图"
+      },
+      "profession": {
+        "en": "Outline Architecture Expert",
+        "zh": "大纲架构专家"
+      },
+      "avatar": "avatars/outline-architect.png",
+      "role": "member",
+      "originalId": "outline-architect"
+    },
+    {
+      "id": "deepinspect/report-writer",
+      "name": {
+        "en": "Shu Liming",
+        "zh": "述理明"
+      },
+      "profession": {
+        "en": "Report Writing Expert",
+        "zh": "报告撰写专家"
+      },
+      "avatar": "avatars/report-writer.png",
+      "role": "member",
+      "originalId": "report-writer"
+    },
+    {
+      "id": "deepinspect/evidence-reviewer",
+      "name": {
+        "en": "Zheng Wuyi",
+        "zh": "证无遗"
+      },
+      "profession": {
+        "en": "Evidence Verification Expert",
+        "zh": "证据核验专家"
+      },
+      "avatar": "avatars/evidence-reviewer.png",
+      "role": "member",
+      "originalId": "evidence-reviewer"
+    },
+    {
+      "id": "deepinspect/viz-specialist",
+      "name": {
+        "en": "Hui Tuming",
+        "zh": "绘图明"
+      },
+      "profession": {
+        "en": "Data Visualization Expert",
+        "zh": "数据可视化专家"
+      },
+      "avatar": "avatars/viz-specialist.png",
+      "role": "member",
+      "originalId": "viz-specialist"
+    }
+  ],
+  "original": {
+    "name": "deepinspect",
+    "version": "2.0.0",
+    "description": "AI-powered inspection team for on-site risk identification and rectification report generation"
+  }
+}

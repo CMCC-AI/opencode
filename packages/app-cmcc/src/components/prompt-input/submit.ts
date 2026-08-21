@@ -21,6 +21,12 @@ import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
 import { asOpenCodeSession, DockApiError, useDockApi } from "@/context/dockapi"
+import {
+  CMCC_ARTIFACT_DIRECTORY_METADATA,
+  cmccArtifactDirectory,
+  cmccArtifactSystemPrompt,
+  cmccEnsureWorkspace,
+} from "@/utils/cmcc-workspace"
 
 type PendingPrompt = {
   abort: AbortController
@@ -36,6 +42,7 @@ export type FollowupDraft = {
   context: (ContextItem & { key: string })[]
   agent: string
   model: { providerID: string; modelID: string }
+  system?: string
   variant?: string
 }
 
@@ -159,6 +166,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
       model: input.draft.model,
       messageID,
       parts: requestParts,
+      system: input.draft.system,
       variant: input.draft.variant,
     })
     return true
@@ -173,7 +181,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
 
 type PromptSubmitInput = {
   prompt: ReturnType<typeof usePrompt>
-  info: Accessor<{ id: string } | undefined>
+  info: Accessor<{ id: string; metadata?: Session["metadata"] } | undefined>
   imageAttachments: Accessor<ImageAttachmentPart[]>
   commentCount: Accessor<number>
   autoAccept: Accessor<boolean>
@@ -192,8 +200,6 @@ type PromptSubmitInput = {
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
   onSubmit?: () => void
-  sessionPreparation?: () => Promise<string | undefined>
-  onSessionPreparationConsumed?: () => void
   selectedAgent?: Accessor<string | undefined>
 }
 
@@ -212,6 +218,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const [search] = useSearchParams<{ draftId?: string }>()
   const tabs = useTabs()
   const pendingKey = (sessionID: string) => ScopedKey.from(sdk().scope, sessionID)
+  let creatingSession = false
 
   const errorMessage = (err: unknown) => {
     if (err && typeof err === "object" && "data" in err) {
@@ -315,12 +322,14 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
-    input.addToHistory(currentPrompt, mode)
-    input.resetHistoryNavigation()
-
     const projectDirectory = dockapi.workspace?.directoryPath ?? sdk().directory
     const isNewSession = !params.id
     const isDockApiRootSession = isNewSession && projectDirectory === dockapi.workspace?.directoryPath
+    if (isNewSession && creatingSession) return
+    if (isNewSession) creatingSession = true
+
+    input.addToHistory(currentPrompt, mode)
+    input.resetHistoryNavigation()
     const shouldAutoAccept = isNewSession && input.autoAccept()
     const worktreeSelection = input.newSessionWorktree?.() || "main"
 
@@ -341,6 +350,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           })
 
         if (!createdWorktree?.directory) {
+          creatingSession = false
           showToast({
             title: language.t("prompt.toast.worktreeCreateFailed.title"),
             description: language.t("common.requestFailed"),
@@ -366,23 +376,55 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       input.onNewSessionWorktreeReset?.()
     }
 
+    const draftID = search.draftId
+    const artifactDirectory = cmccArtifactDirectory(
+      isNewSession && draftID
+        ? { [CMCC_ARTIFACT_DIRECTORY_METADATA]: tabs.draft(draftID).artifactDirectory }
+        : input.info()?.metadata,
+      sessionDirectory,
+    )
+
+    if (isNewSession && artifactDirectory) {
+      const prepared = await cmccEnsureWorkspace(
+        artifactDirectory,
+        (directory) => client.file.createDirectory({ path: directory }, { throwOnError: true }),
+        sdk().scope,
+      ).catch((err) => {
+        showToast({
+          title: language.t("prompt.toast.sessionCreateFailed.title"),
+          description: errorMessage(err),
+        })
+        return undefined
+      })
+      if (!prepared) {
+        creatingSession = false
+        return
+      }
+    }
+
     let session = input.info()
     if (!session && isNewSession) {
       const created = await (async () => {
         try {
           if (isDockApiRootSession) {
             if (!text.trim()) throw new DockApiError("新会话需要输入文本问题")
-            const preparationId = await input.sessionPreparation?.()
-            const binding = await dockapi.sessions.create({ query: text, preparationId })
-            if (preparationId) input.onSessionPreparationConsumed?.()
+            if (!artifactDirectory) throw new DockApiError("新会话缺少产物目录")
+            const binding = await dockapi.sessions.create({ query: text, artifactDirectory })
             const openCodeSession = asOpenCodeSession(binding.openCodeSession)
             if (!openCodeSession) throw new DockApiError("业务会话未返回有效的 OpenCode session")
-            sessionDirectory = binding.directoryPath
-            client = sdk().createClient({ directory: sessionDirectory, throwOnError: true })
+            if (binding.directoryPath !== sessionDirectory) {
+              sessionDirectory = binding.directoryPath
+              client = sdk().createClient({ directory: sessionDirectory, throwOnError: true })
+            }
             serverSync().child(sessionDirectory)
             return { ...openCodeSession, title: binding.title, directory: binding.directoryPath }
           }
-          return (await client.session.create({ agent: selectedAgent })).data ?? undefined
+          return (
+            await client.session.create({
+              agent: selectedAgent,
+              metadata: artifactDirectory ? { [CMCC_ARTIFACT_DIRECTORY_METADATA]: artifactDirectory } : undefined,
+            })
+          ).data ?? undefined
         } catch (err) {
           showToast({
             title: language.t("prompt.toast.sessionCreateFailed.title"),
@@ -391,13 +433,13 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           return undefined
         }
       })()
+      creatingSession = false
       if (created) {
         seed(sessionDirectory, created)
         session = created
         if (shouldAutoAccept) permission.enableAutoAccept(session.id, sessionDirectory)
         local.session.promote(sessionDirectory, session.id)
         layout.handoff.setTabs(base64Encode(sessionDirectory), session.id)
-        const draftID = search.draftId
         if (draftID) tabs.promoteDraft(draftID, { server: tabs.draft(draftID).server, sessionId: session.id })
         else navigate(`/${base64Encode(sessionDirectory)}/session/${session.id}`)
         submission.retarget(prompt.capture({ dir: base64Encode(sessionDirectory), id: session.id }))
@@ -423,6 +465,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       context,
       agent,
       model,
+      system: artifactDirectory ? cmccArtifactSystemPrompt(sessionDirectory, artifactDirectory) : undefined,
       variant,
     }
 

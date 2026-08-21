@@ -250,18 +250,6 @@ export const FileApi = HttpApi.make("file")
             description: "Download selected workspace files as a ZIP archive.",
           }),
         ),
-        HttpApiEndpoint.post("createDirectory", FilePaths.createDirectory, {
-          query: WorkspaceRoutingQuery,
-          payload: CreateDirectoryPayload,
-          success: described(Schema.Void, "Created directory"),
-          error: HttpApiError.BadRequest,
-        }).annotateMerge(
-          OpenApi.annotations({
-            identifier: "file.createDirectory",
-            summary: "Create directory",
-            description: "Create a local directory recursively.",
-          }),
-        ),
         HttpApiEndpoint.post("upload", FilePaths.upload, {
           query: WorkspaceRoutingQuery,
           payload: UploadPayload,
@@ -315,7 +303,23 @@ export const FileApi = HttpApi.make("file")
           description: "Experimental HttpApi file routes.",
         }),
       )
+      // Creating the CMCC workspace only needs routing and authorization. Add it after
+      // instance middleware so a recursive mkdir does not bootstrap a project instance.
       .middleware(InstanceContextMiddleware)
+      .add(
+        HttpApiEndpoint.post("createDirectory", FilePaths.createDirectory, {
+          query: WorkspaceRoutingQuery,
+          payload: CreateDirectoryPayload,
+          success: described(Schema.Void, "Created directory"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "file.createDirectory",
+            summary: "Create directory",
+            description: "Create a local directory recursively.",
+          }),
+        ),
+      )
       .middleware(WorkspaceRoutingMiddleware)
       .middleware(Authorization),
   )

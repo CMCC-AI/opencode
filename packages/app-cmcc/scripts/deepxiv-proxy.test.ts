@@ -6,14 +6,19 @@ import { startDeepXivProxy } from "./deepxiv-proxy"
 test("forwards requests under the browser-facing host", async () => {
   const observed: Record<string, string | undefined> = {}
   const upstream = createServer((request, response) => {
+    observed.authorization = request.headers.authorization
     observed.host = request.headers.host
+    observed.proxyAuthorization = request.headers["proxy-authorization"]
     observed.forwardedFor = request.headers["x-forwarded-for"]
     observed.forwardedHost = request.headers["x-forwarded-host"] as string | undefined
     observed.forwardedProto = request.headers["x-forwarded-proto"] as string | undefined
     observed.url = request.url
     response.writeHead(200, {
       "content-type": "application/json",
-      "set-cookie": "deeplit_session=test; Path=/; HttpOnly; SameSite=Lax",
+      "set-cookie": [
+        "deeplit_session=test; Path=/; HttpOnly; SameSite=Lax",
+        "deeplit_theme=dark; Path=/; SameSite=Lax",
+      ],
     })
     response.end(JSON.stringify({ ok: true }))
   })
@@ -31,16 +36,58 @@ test("forwards requests under the browser-facing host", async () => {
     })
     const proxyAddress = proxy.address()
     if (!proxyAddress || typeof proxyAddress === "string") throw new Error("Missing proxy address")
-    const response = await read(`http://127.0.0.1:${proxyAddress.port}/api/auth/me?probe=1`)
+    const response = await read(`http://127.0.0.1:${proxyAddress.port}/api/auth/me?auth_token=secret&probe=1`, {
+      authorization: "Basic opencode-secret",
+      "proxy-authorization": "Basic gateway-secret",
+    })
     expect(JSON.parse(response.body)).toEqual({ ok: true })
+    expect(response.headers["set-cookie"]).toHaveLength(2)
     expect(response.headers["set-cookie"]?.join("; ")).toContain("deeplit_session=test")
+    expect(response.headers["set-cookie"]?.join("; ")).toContain("deeplit_theme=dark")
     expect(observed).toEqual({
+      authorization: undefined,
       host: `127.0.0.1:${proxyAddress.port}`,
+      proxyAuthorization: undefined,
       forwardedFor: "127.0.0.1",
       forwardedHost: `127.0.0.1:${proxyAddress.port}`,
       forwardedProto: "http",
       url: "/api/auth/me?probe=1",
     })
+  } finally {
+    proxy?.closeAllConnections()
+    if (proxy) await close(proxy)
+    await close(upstream)
+  }
+})
+
+test("rewrites upstream absolute redirects to the public origin", async () => {
+  let upstreamOrigin = ""
+  const upstream = createServer((_request, response) => {
+    response.writeHead(307, {
+      location: `${upstreamOrigin}/account?from=login`,
+      refresh: `0;url=${upstreamOrigin}/account?from=login`,
+    })
+    response.end()
+  })
+  await listen(upstream)
+  const upstreamAddress = upstream.address()
+  if (!upstreamAddress || typeof upstreamAddress === "string") throw new Error("Missing upstream address")
+  upstreamOrigin = `http://127.0.0.1:${upstreamAddress.port}`
+  let proxy: Awaited<ReturnType<typeof startDeepXivProxy>> | undefined
+
+  try {
+    proxy = await startDeepXivProxy({
+      host: "127.0.0.1",
+      port: 0,
+      publicOrigin: "https://papers.example.com",
+      target: upstreamOrigin,
+    })
+    const proxyAddress = proxy.address()
+    if (!proxyAddress || typeof proxyAddress === "string") throw new Error("Missing proxy address")
+    const response = await read(`http://127.0.0.1:${proxyAddress.port}/start`)
+    expect(response.status).toBe(307)
+    expect(response.headers.location).toBe("https://papers.example.com/account?from=login")
+    expect(response.headers.refresh).toBe("0;url=https://papers.example.com/account?from=login")
   } finally {
     proxy?.closeAllConnections()
     if (proxy) await close(proxy)
@@ -124,14 +171,15 @@ function close(server: ReturnType<typeof createServer>) {
   })
 }
 
-function read(url: string) {
-  return new Promise<{ body: string; headers: IncomingHttpHeaders }>((resolve, reject) => {
-    const request = get(url, (response) => {
+function read(url: string, headers?: Record<string, string>) {
+  return new Promise<{ body: string; headers: IncomingHttpHeaders; status: number }>((resolve, reject) => {
+    const request = get(url, { headers }, (response) => {
       const chunks: Buffer[] = []
       response.on("data", (chunk: Buffer) => chunks.push(chunk))
       response.on("end", () => resolve({
         body: Buffer.concat(chunks).toString("utf8"),
         headers: response.headers,
+        status: response.statusCode ?? 0,
       }))
     })
     request.on("error", reject)

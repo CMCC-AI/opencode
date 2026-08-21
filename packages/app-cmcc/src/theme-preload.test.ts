@@ -34,6 +34,13 @@ describe("theme preload", () => {
     expect(document.getElementById("oc-theme-preload")).toBeNull()
   })
 
+  test("defaults color scheme to light when unset", () => {
+    run()
+
+    expect(document.documentElement.dataset.colorScheme).toBe("light")
+    expect(localStorage.getItem("opencode-color-scheme")).toBe("light")
+  })
+
   test("keeps cached css for non-default themes", () => {
     localStorage.setItem("opencode-theme-id", "nightowl")
     localStorage.setItem("opencode-theme-css-light", "--background-base:#fff;")

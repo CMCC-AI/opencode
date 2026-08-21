@@ -2,6 +2,7 @@
 name: deeptrading/dt-sentiment-analyst
 description: "舆情分析专家 - 专注社媒热度、散户情绪与话题趋势分析。由主理人调度执行深度舆情分析。"
 mode: subagent
+hidden: true
 options:
   expert:
     source: "workbuddy"

@@ -2,13 +2,12 @@ import { createMemo, createSignal, For, Show, type Component } from "solid-js"
 import { Portal } from "solid-js/web"
 import { Icon } from "@opencode-ai/ui/icon"
 import academicIcon from "../assets/professional-databases/academic.png"
-import globalFinanceIcon from "../assets/professional-databases/global-finance.png"
+import bochaIcon from "../assets/professional-databases/bocha.svg"
+import byteSearchIcon from "../assets/professional-databases/byte-search.svg"
+import githubIcon from "../assets/professional-databases/github.svg"
 import ifindIcon from "../assets/professional-databases/ifind.png"
-import imfIcon from "../assets/professional-databases/imf.png"
-import legalIcon from "../assets/professional-databases/legal.png"
-import secIcon from "../assets/professional-databases/sec.png"
+import sogouIcon from "../assets/professional-databases/sogou.svg"
 import tianyanchaIcon from "../assets/professional-databases/tianyancha.png"
-import worldBankIcon from "../assets/professional-databases/world-bank.png"
 
 export type CmccProfessionalDatabase = {
   id: string
@@ -45,44 +44,36 @@ export const CMCC_PROFESSIONAL_DATABASES: CmccProfessionalDatabase[] = [
     icon: tianyanchaIcon,
   },
   {
-    id: "legal",
-    name: "华宇元典法律数据库",
-    description: "中国法律法规、案例数据",
-    detail: "检索法规、裁判文书、典型案例与司法观点，适合法律研究场景。",
-    prompt: "帮我检索近五年关于数据合规和个人信息保护的典型案例",
-    icon: legalIcon,
+    id: "github",
+    name: "Github 开源项目库",
+    description: "开源项目、代码仓库、Issue 与开发者社区数据",
+    detail: "检索开源仓库、代码、Issue 和项目活跃度，适合技术选型与开源项目调研。",
+    prompt: "帮我在 Github 查找近期活跃的大模型 Agent 框架，并对比项目热度和主要特性",
+    icon: githubIcon,
   },
   {
-    id: "world-bank",
-    name: "世界银行经济数据库",
-    description: "全球经济、社会与发展指标，包括 GDP、人口、通胀等",
-    detail: "覆盖全球发展指标和宏观数据，适合国家与区域经济对比分析。",
-    prompt: "帮我查询中国和美国近十年的 GDP、通胀率和人口数据，并生成对比表",
-    icon: worldBankIcon,
+    id: "bocha",
+    name: "博查搜索",
+    description: "聚合互联网网页、新闻与实时信息",
+    detail: "搜索公开网页、新闻和实时信息，适合事实核验、资讯追踪与综合调研。",
+    prompt: "帮我用博查搜索汇总今天人工智能领域的重要新闻，并标注信息来源",
+    icon: bochaIcon,
   },
   {
-    id: "global-finance",
-    name: "全球金融数据库",
-    description: "全球主要市场股票行情、财经资讯、历史数据",
-    detail: "覆盖全球主要市场行情、公司财务、指数表现与财经资讯。",
-    prompt: "帮我查询苹果公司过去一年的股价表现、主要财务指标和最新财经资讯",
-    icon: globalFinanceIcon,
+    id: "sogou",
+    name: "搜狗搜索",
+    description: "中文网页、资讯与内容搜索",
+    detail: "检索中文互联网网页与资讯内容，适合查找中文资料和热点信息。",
+    prompt: "帮我用搜狗搜索整理近期关于低空经济的政策和行业动态",
+    icon: sogouIcon,
   },
   {
-    id: "imf",
-    name: "IMF 国际货币基金组织数据库",
-    description: "全球宏观经济与金融数据，包括 GDP、通胀、利率等",
-    detail: "适合跨国家宏观指标对比、经济周期分析与政策数据查询。",
-    prompt: "帮我查询 2024 年主要经济体 GDP 增速、通胀和利率变化",
-    icon: imfIcon,
-  },
-  {
-    id: "sec",
-    name: "SEC",
-    description: "美国上市公司公告与监管文件",
-    detail: "查询 10-K、10-Q、8-K 等披露文件，提取风险、业务与财务信息。",
-    prompt: "帮我查询英伟达最近一年的 10-K 和 10-Q 报告摘要与关键风险",
-    icon: secIcon,
+    id: "byte-search",
+    name: "字节搜索",
+    description: "网页、新闻与多类型互联网内容搜索",
+    detail: "搜索网页、新闻及多类型公开内容，适合快速获取实时信息与多来源资料。",
+    prompt: "帮我用字节搜索汇总最近一周生成式 AI 产品的重要更新",
+    icon: byteSearchIcon,
   },
 ]
 
@@ -168,11 +159,7 @@ export const CmccProfessionalDatabasesDialog: Component<CmccProfessionalDatabase
       >
         <header class="flex h-16 shrink-0 items-center justify-between gap-4 px-6">
           <h2 class="text-[16px] font-medium leading-6 text-v2-text-text-base">专业数据库</h2>
-          <div class="flex min-w-0 items-center gap-4 text-[13px] leading-5 text-v2-text-text-muted">
-            <span class="hidden sm:inline">需要更多数据库？</span>
-            <button type="button" class="shrink-0 text-v2-text-text-accent hover:underline">
-              点此反馈
-            </button>
+          <div class="flex min-w-0 items-center">
             <button
               type="button"
               class="flex size-8 shrink-0 items-center justify-center rounded-[7px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"

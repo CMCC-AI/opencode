@@ -4,6 +4,7 @@ description: >-
   市场技术分析师：分析股票价格走势与技术指标，输出 [市场技术分析报告]。
   在 Phase 1 数据收集阶段由 orchestrator 并行调用。
 mode: subagent
+hidden: true
 color: "#2563EB"
 options:
   expert:

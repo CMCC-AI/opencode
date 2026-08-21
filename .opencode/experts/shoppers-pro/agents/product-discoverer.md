@@ -3,6 +3,7 @@ name: shoppers-pro/product-discoverer
 description: >-
   商品发现师。联网搜索真实在售候选，各平台比价，归一排序，返回结构化商品列表。
 mode: subagent
+hidden: true
 color: "#FAA307"
 options:
   expert:

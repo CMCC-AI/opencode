@@ -4,6 +4,7 @@ description: >-
   交易员：综合所有分析报告和投资计划，给出最终 FINAL TRANSACTION PROPOSAL (BUY/SELL/HOLD)。
   在 Phase 3 交易决策阶段由 orchestrator 调用。
 mode: subagent
+hidden: true
 color: "#EA580C"
 options:
   expert:

@@ -15,6 +15,7 @@ import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { scanKnowledgeGraph } from "@/knowledge/graph"
+import { WorkspaceRouteContext } from "../middleware/workspace-routing"
 
 const ARCHIVE_FILE_LIMIT = 200
 const ARCHIVE_BYTE_LIMIT = 100 * 1024 * 1024
@@ -238,10 +239,13 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     })
 
     const createDirectory = Effect.fn("FileHttpApi.createDirectory")(function* (ctx: { payload: { path: string } }) {
-      const root = path.resolve(homedir(), "Documents", "DeepInsight")
+      const route = yield* WorkspaceRouteContext
       const target = path.resolve(ctx.payload.path)
-      const relative = path.relative(root, target)
-      if (relative.startsWith("..") || path.isAbsolute(relative)) return yield* new HttpApiError.BadRequest({})
+      // Directory-scoped SDK clients encode this value in the POST header. The
+      // regular file handlers get decoding from InstanceContextMiddleware, but
+      // this lightweight endpoint deliberately skips that middleware.
+      if (!canCreateDirectory({ target, directory: decodeDirectory(route.directory) }))
+        return yield* new HttpApiError.BadRequest({})
       yield* Effect.tryPromise(() => mkdir(target, { recursive: true })).pipe(
         Effect.mapError(() => new HttpApiError.BadRequest({})),
       )
@@ -302,6 +306,25 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       .handle("status", status)
   }),
 ).pipe(Layer.provide(locationServiceMapLayer))
+
+export function canCreateDirectory(input: { target: string; directory: string }) {
+  const target = path.resolve(input.target)
+  const legacyRoot = path.resolve(homedir(), "Documents", "DeepInsight")
+  if (FSUtil.contains(legacyRoot, target)) return true
+
+  const serviceRoot = path.resolve(process.cwd())
+  const runtimeRoot = path.resolve(input.directory)
+  if (path.dirname(serviceRoot) === serviceRoot || !FSUtil.contains(serviceRoot, runtimeRoot)) return false
+  return target !== runtimeRoot && FSUtil.contains(runtimeRoot, target)
+}
+
+function decodeDirectory(input: string) {
+  try {
+    return decodeURIComponent(input)
+  } catch {
+    return input
+  }
+}
 
 function downloadPath(directory: string, value: string) {
   const absolute = path.resolve(directory, value)

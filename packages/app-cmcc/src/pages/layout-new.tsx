@@ -13,19 +13,29 @@ import { dockApiHistorySessions, useDockApi } from "@/context/dockapi"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
+import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useTabs } from "@/context/tabs"
 import { setNavigate } from "@/utils/notification-click"
 import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
 import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
+import {
+  cmccArtifactWorkspace,
+  cmccEnsureWorkspace,
+  cmccRememberConversationWorkspace,
+} from "@/utils/cmcc-workspace"
+import { cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
+import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
+import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
 
 const SIDEBAR_MIN_WIDTH = 280
 const SIDEBAR_MAX_WIDTH = 420
 const SIDEBAR_MAIN_MIN_WIDTH = 560
 const SIDEBAR_HIDE_THRESHOLD = 88
 const SIDEBAR_RESTORE_THRESHOLD = 140
+const SIDEBAR_SESSION_LIMIT = 64
 const CMCC_SIDEBAR_INITIALIZED_KEY = "opencode.cmcc.sidebar.initialized"
 
 function sessionUpdatedAt(session: Session) {
@@ -38,6 +48,7 @@ export default function NewLayout(props: ParentProps) {
   const layout = useLayout()
   const [persistentViews, setPersistentViews] = createStore({
     deepXivMounted: isDeepXivPath(location.pathname),
+    deepLensMounted: isDeepLensPath(location.pathname),
   })
   setNavigate(navigate)
 
@@ -46,6 +57,9 @@ export default function NewLayout(props: ParentProps) {
   // the same-site proxy restores its Cookie independently after a real reload.
   createEffect(() => {
     if (isDeepXivPath(location.pathname)) setPersistentViews("deepXivMounted", true)
+  })
+  createEffect(() => {
+    if (isDeepLensPath(location.pathname)) setPersistentViews("deepLensMounted", true)
   })
   createEffect(() => {
     if (!layout.ready()) return
@@ -85,13 +99,34 @@ export default function NewLayout(props: ParentProps) {
               <circle cx="166.187" cy="204.128" r="198.043" fill="#e689dd" />
             </g>
             <defs>
-              <filter id="cmcc-content-yellow-glow" x="502" y="-306" width="961" height="960" filterUnits="userSpaceOnUse">
+              <filter
+                id="cmcc-content-yellow-glow"
+                x="502"
+                y="-306"
+                width="961"
+                height="960"
+                filterUnits="userSpaceOnUse"
+              >
                 <feGaussianBlur stdDeviation="150" />
               </filter>
-              <filter id="cmcc-content-blue-glow" x="504.43" y="247.367" width="995.675" height="995.676" filterUnits="userSpaceOnUse">
+              <filter
+                id="cmcc-content-blue-glow"
+                x="504.43"
+                y="247.367"
+                width="995.675"
+                height="995.676"
+                filterUnits="userSpaceOnUse"
+              >
                 <feGaussianBlur stdDeviation="150" />
               </filter>
-              <filter id="cmcc-content-pink-glow" x="-411.856" y="-373.914" width="1156.09" height="1156.09" filterUnits="userSpaceOnUse">
+              <filter
+                id="cmcc-content-pink-glow"
+                x="-411.856"
+                y="-373.914"
+                width="1156.09"
+                height="1156.09"
+                filterUnits="userSpaceOnUse"
+              >
                 <feGaussianBlur stdDeviation="190" />
               </filter>
             </defs>
@@ -100,6 +135,9 @@ export default function NewLayout(props: ParentProps) {
             <Suspense>{props.children}</Suspense>
             <Show when={persistentViews.deepXivMounted}>
               <CmccDeepXivFrame active={isDeepXivPath(location.pathname)} />
+            </Show>
+            <Show when={persistentViews.deepLensMounted}>
+              <CmccDeepLensFrame active={isDeepLensPath(location.pathname)} />
             </Show>
           </div>
         </section>
@@ -116,6 +154,7 @@ function CmccTopControls() {
   const layout = useLayout()
   const location = useLocation()
   const server = useServer()
+  const serverSDK = useServerSDK()
   const dockapi = useDockApi()
   const tabs = useTabs()
   const activeSessionPath = createMemo(() => (location.pathname.includes("/session/") ? location.pathname : undefined))
@@ -151,10 +190,25 @@ function CmccTopControls() {
     layout.sidebar.open()
   }
 
-  const openNewSession = async () => {
+  const openNewSession = () => {
     const directory = dockapi.workspace?.directoryPath
-    if (!directory || !tabs.ready()) return
-    tabs.newDraft({ server: server.key, directory })
+    const artifactDirectory = cmccArtifactWorkspace(directory)
+    if (!directory || !artifactDirectory || !tabs.ready()) return
+
+    tabs.newDraft({ server: server.key, directory, artifactDirectory })
+    cmccRememberConversationWorkspace(directory)
+    server.projects.touch(directory)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
+    ).catch((error) => {
+      showToast({
+        title: "无法准备会话产物目录",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
+      })
+    })
   }
 
   const switchSession = (direction: "back" | "forward") => {
@@ -202,10 +256,15 @@ function CmccSidebar() {
   const navigate = useNavigate()
   const platform = usePlatform()
   const server = useServer()
+  const serverSDK = useServerSDK()
   const sync = useServerSync()
   const dockapi = useDockApi()
   const tabs = useTabs()
   const openSettings = useSettingsCommand()
+  const knowledgeNotebooks = createMemo(() => {
+    location.pathname
+    return cmccKnowledgeNotebooks()
+  })
   const [drag, setDrag] = createStore({
     active: false,
     startX: 0,
@@ -215,49 +274,20 @@ function CmccSidebar() {
   const conversations = createMemo(() => {
     const current = directory()
     if (!current) return [] as Session[]
-    return dockApiHistorySessions(current, dockapi.state.sessions).sort(
-      (a, b) => sessionUpdatedAt(b) - sessionUpdatedAt(a),
-    )
-  })
-
-  const preloadedHistoryDirectories = new Set<string>()
-  const preloadingHistoryDirectories = new Set<string>()
-
-  const preloadHistoryDirectories = async (sessions: Session[]) => {
-    const current = directory()
-    if (!current) return
-    const directories = [...new Set(sessions.map((session) => session.directory))].filter(
-      (item) => item !== current && !preloadedHistoryDirectories.has(item) && !preloadingHistoryDirectories.has(item),
-    )
-    if (directories.length === 0) return
-
-    let next = 0
-    const worker = async () => {
-      while (next < directories.length) {
-        const item = directories[next++]
-        preloadingHistoryDirectories.add(item)
-        try {
-          await sync().project.loadSessions(item)
-          preloadedHistoryDirectories.add(item)
-        } catch (error) {
-          console.warn("历史会话后台预加载失败", error)
-        } finally {
-          preloadingHistoryDirectories.delete(item)
-        }
-      }
-    }
-
-    await Promise.all(Array.from({ length: Math.min(3, directories.length) }, () => worker()))
-  }
-
-  createEffect(() => {
-    const current = directory()
-    if (!current) return
-    void sync().project.loadSessions(current)
+    return dockApiHistorySessions(current, dockapi.state.sessions)
+      .map((session) => {
+        const loaded = sync().session.data.info[session.id]
+        return loaded ? { ...loaded, title: session.title, directory: current } : session
+      })
+      .sort((a, b) => sessionUpdatedAt(b) - sessionUpdatedAt(a))
   })
 
   createEffect(() => {
-    void preloadHistoryDirectories(conversations())
+    const current = directory()
+    if (!sync().data.ready) return
+    if (!current) return
+    server.projects.touch(current)
+    void sync().project.loadSessions(current, { limit: SIDEBAR_SESSION_LIMIT })
   })
   const sidebarMaxWidth = createMemo(() => {
     if (typeof window === "undefined") return SIDEBAR_MAX_WIDTH
@@ -311,35 +341,47 @@ function CmccSidebar() {
 
   onCleanup(stopDrag)
 
-  const openNewSession = async () => {
+  const openNewSession = () => {
     const current = directory()
-    if (!current || !tabs.ready()) return
-    tabs.newDraft({ server: server.key, directory: current })
-  }
+    const artifactDirectory = cmccArtifactWorkspace(current)
+    if (!current || !artifactDirectory || !tabs.ready()) return
 
-  const openPendingProduct = (name: string) => {
-    showToast({
-      title: `${name} 待接入`,
-      description: "当前版本还没有配置对应的应用地址。",
+    tabs.newDraft({ server: server.key, directory: current, artifactDirectory })
+    cmccRememberConversationWorkspace(current)
+    server.projects.touch(current)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
+    ).catch((error) => {
+      showToast({
+        title: "无法准备会话产物目录",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
+      })
     })
   }
 
   const openSession = (session: Session) => {
+    sync().session.remember(session)
+    server.projects.touch(session.directory)
     const tab = tabs.addSessionTab({ server: server.key, sessionId: session.id })
     tabs.select(tab)
   }
 
   const activeSession = (session: Session) => {
-    return location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
+    const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
+    if (notebook) return location.pathname === `/knowledge/${notebook.id}/session/${session.id}`
+    return (
+      location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
+    )
   }
 
   const removeSession = (session: Session) => {
-    const [, setStore] = sync().child(session.directory, { bootstrap: false })
-    setStore("session", (list) => list.filter((item) => item.id !== session.id))
-    setStore("sessionTotal", (value) => Math.max(0, value - 1))
+    sync().session.set("info", session.id, undefined)
     sync().session.evict(session.id)
     notifySessionTabsRemoved({ server: server.key, directory: session.directory, sessionIDs: [session.id] })
-    if (activeSession(session) && tabs.ready()) tabs.newDraft({ server: server.key, directory: session.directory })
+    if (activeSession(session)) openNewSession()
   }
 
   const deleteSession = async (session: Session) => {
@@ -375,7 +417,7 @@ function CmccSidebar() {
         aria-label="CMCC conversations"
         aria-hidden={!visible()}
         inert={!visible()}
-        class="h-full shrink-0 overflow-hidden border-r border-v2-border-border-base bg-[linear-gradient(180deg,#d9e9ff_0%,#eae6ff_100%)]"
+        class="h-full shrink-0 overflow-hidden border-r border-v2-border-border-base bg-[linear-gradient(180deg,#e0e7ff_0%,#ede9fe_50%,#f5f3ff_100%)]"
         classList={{
           "transition-[width] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none":
             !drag.active,
@@ -384,7 +426,11 @@ function CmccSidebar() {
         style={{ width: `${width()}px` }}
       >
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
-          <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4 pt-12">
+          <div class="flex items-center gap-2.5 px-4 pb-3 pt-12">
+            <img src={jiutianSidebarLogo} alt="深度洞察" class="h-9 w-auto max-w-[96px] shrink-0 object-contain" />
+            <span class="text-[16px] font-semibold text-[#1a1a2e]">深度洞察</span>
+          </div>
+          <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4">
             <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
             <CmccSidebarAction
               icon="glasses"
@@ -421,7 +467,12 @@ function CmccSidebar() {
               active={isDeepXivPath(location.pathname)}
               onClick={() => navigate("/deepxiv")}
             />
-            <CmccSidebarAction icon="photo" label="DeepLens 拍照即懂" onClick={() => openPendingProduct("DeepLens 拍照即懂")} />
+            <CmccSidebarAction
+              icon="photo"
+              label="DeepLens 拍照即懂"
+              active={isDeepLensPath(location.pathname)}
+              onClick={() => navigate("/deeplens")}
+            />
           </nav>
           <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
             <CmccSidebarSection

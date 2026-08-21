@@ -173,6 +173,50 @@ describe("createChildStoreManager", () => {
     }
   })
 
+  test("keeps directory queries disabled until bootstrap is requested", () => {
+    const bootstraps: string[] = []
+    const offset = querySingles.length
+    let manager: ReturnType<typeof createChildStoreManager> | undefined
+
+    const dispose = createOwner((owner) => {
+      manager = createChildStoreManager({
+        owner,
+        scope: ServerScope.local,
+        persist,
+        isBooting: () => false,
+        isLoadingSessions: () => false,
+        onBootstrap(directory) {
+          bootstraps.push(directory)
+        },
+        onMcp() {},
+        onDispose() {},
+        translate: (key) => key,
+        queryOptions: queryOptionsApi,
+        global: { provider },
+      })
+    })
+
+    try {
+      if (!manager) throw new Error("manager required")
+      manager.child("/project", { bootstrap: false })
+
+      const queries = querySingles.slice(offset)
+      const core = queries.filter((query) =>
+        ["path", "lsp", "providers", "references"].includes(String(query().queryKey?.[1])),
+      )
+      expect(core).toHaveLength(4)
+      expect(core.every((query) => query().enabled === false)).toBe(true)
+      expect(bootstraps).toEqual([])
+
+      manager.child("/project")
+
+      expect(core.every((query) => query().enabled === true)).toBe(true)
+      expect(bootstraps).toEqual(["/project"])
+    } finally {
+      dispose()
+    }
+  })
+
   test("enables MCP only when requested for the directory", () => {
     let manager: ReturnType<typeof createChildStoreManager> | undefined
     const offset = querySingles.length

@@ -48,12 +48,9 @@ import { TabsProvider, useTabs, type DraftTab } from "@/context/tabs"
 import { SDKProvider, useSDK } from "@/context/sdk"
 import { WslServersProvider } from "@/wsl/context"
 import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout"
-import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
 import { CmccDeepXivRoute } from "@/pages/cmcc-deepxiv"
-import { CmccExpertCenterRoute, CmccExpertRoute } from "@/pages/cmcc-experts"
-import { CmccPluginHubRoute } from "@/pages/cmcc-plugin-hub"
-import { CmccKnowledgeHomeRoute, CmccKnowledgeNotebookRoute } from "@/pages/cmcc-knowledge"
+import { CmccDeepLensRoute } from "@/pages/cmcc-deeplens"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 import {
@@ -65,14 +62,36 @@ import {
 } from "./utils/session-route"
 import { isSessionNotFoundError } from "./utils/server-errors"
 import { useDockApi } from "./context/dockapi"
+import {
+  cmccArtifactWorkspace,
+  cmccEnsureWorkspace,
+  cmccRememberConversationWorkspace,
+  cmccRuntimeWorkspace,
+} from "./utils/cmcc-workspace"
 import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
 
-import Session from "@/pages/session"
-import { LegacyHome } from "@/pages/home"
-
+const LegacyLayout = lazy(() => import("@/pages/layout"))
+const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
+const LegacyHome = lazy(() => import("@/pages/home").then((module) => ({ default: module.LegacyHome })))
+const CmccExpertCenterRoute = lazy(() =>
+  import("@/pages/cmcc-experts").then((module) => ({ default: module.CmccExpertCenterRoute })),
+)
+const CmccExpertRoute = lazy(() =>
+  import("@/pages/cmcc-experts").then((module) => ({ default: module.CmccExpertRoute })),
+)
+const CmccPluginHubRoute = lazy(() =>
+  import("@/pages/cmcc-plugin-hub").then((module) => ({ default: module.CmccPluginHubRoute })),
+)
+const CmccKnowledgeHomeRoute = lazy(() =>
+  import("@/pages/cmcc-knowledge").then((module) => ({ default: module.CmccKnowledgeHomeRoute })),
+)
+const CmccKnowledgeNotebookRoute = lazy(() =>
+  import("@/pages/cmcc-knowledge").then((module) => ({ default: module.CmccKnowledgeNotebookRoute })),
+)
+const cmccAgentWarmups = new Set<string>()
 
 const SessionRoute = () => {
   const settings = useSettings()
@@ -374,10 +393,40 @@ function NewAppLayout(props: ParentProps) {
   return (
     <SelectedServerProviders>
       <ServerScopedProviders>
+        <CmccRuntimePrewarm />
         <NewLayout>{props.children}</NewLayout>
       </ServerScopedProviders>
     </SelectedServerProviders>
   )
+}
+
+function CmccRuntimePrewarm() {
+  const serverSDK = useServerSDK()
+  const sync = useServerSync()
+  const dockapi = useDockApi()
+
+  const prewarm = () => {
+    if (!sync().data.ready) return
+    const runtime = dockapi.workspace?.directoryPath
+    if (!runtime) return
+    const key = `${serverSDK().scope}\n${runtime}`
+    if (cmccAgentWarmups.has(key)) return
+    cmccAgentWarmups.add(key)
+    void serverSDK()
+      .client.app.agents({ directory: runtime }, { throwOnError: true })
+      .finally(() => cmccAgentWarmups.delete(key))
+      .catch(() => undefined)
+  }
+
+  createEffect(prewarm)
+  createEffect(() => {
+    const stop = serverSDK().event.listen((event) => {
+      if (event.details.type === "server.connected") prewarm()
+    })
+    onCleanup(stop)
+  })
+
+  return null
 }
 
 function TargetServerScopedProviders(props: ServerScopedShellProps) {
@@ -649,6 +698,8 @@ function Routes() {
         <Route path="/knowledge/:id" component={KnowledgeNotebookRoute} />
         <Route path="/deepxiv" component={CmccDeepXivRoute} />
         <Route path="/deepxiv/" component={CmccDeepXivRoute} />
+        <Route path="/deeplens" component={CmccDeepLensRoute} />
+        <Route path="/deeplens/" component={CmccDeepLensRoute} />
         <Route path="/plugins" component={CmccPluginHubRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
@@ -662,7 +713,7 @@ function KnowledgeNotebookRoute() {
   const params = useParams<{ id: string; sessionID?: string }>()
   const notebook = createMemo(() => cmccKnowledgeNotebooks().find((item) => item.id === params.id))
   const directory = () => notebook()!.directory
-  const sessionID = () => (params.sessionID === "new" ? undefined : params.sessionID ?? notebook()?.sessionID)
+  const sessionID = () => (params.sessionID === "new" ? undefined : (params.sessionID ?? notebook()?.sessionID))
 
   return (
     <Show when={notebook()} fallback={<Navigate href="/knowledge" />}>
@@ -681,6 +732,7 @@ function KnowledgeNotebookRoute() {
 
 function CmccDefaultRoute() {
   const server = useServer()
+  const serverSDK = useServerSDK()
   const dockapi = useDockApi()
   const tabs = useTabs()
   let started = false
@@ -689,7 +741,29 @@ function CmccDefaultRoute() {
     const directory = dockapi.workspace?.directoryPath
     if (!directory || started || !tabs.ready()) return
     started = true
-    tabs.newDraft({ server: server.key, directory })
+    const existing = tabs.store.findLast(
+      (tab) => tab.type === "draft" && tab.server === server.key && tab.directory === directory,
+    )
+    if (existing) {
+      tabs.select(existing)
+      return
+    }
+    const artifactDirectory = cmccArtifactWorkspace(directory)
+    if (!artifactDirectory) return
+    tabs.newDraft({ server: server.key, directory, artifactDirectory })
+    cmccRememberConversationWorkspace(directory)
+    server.projects.touch(directory)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
+    ).catch((error) => {
+      showToast({
+        title: "无法准备会话产物目录",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
+      })
+    })
   })
 
   return (

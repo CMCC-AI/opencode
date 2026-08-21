@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { gunzipSync, inflateSync } from "node:zlib"
+import { compressBody } from "../../src/server/routes/instance/httpapi/middleware/compression"
 import { Server } from "../../src/server/server"
 import { resetDatabase } from "../fixture/db"
 import { disposeAllInstances, tmpdir } from "../fixture/fixture"
@@ -11,6 +12,10 @@ afterEach(async () => {
 
 function app() {
   return Server.Default().app
+}
+
+function vary(response: Response) {
+  return (response.headers.get("vary") ?? "").split(",").map((token) => token.trim().toLowerCase())
 }
 
 // /config echoes the config back. Padding the config pushes the response body
@@ -29,6 +34,17 @@ function fatConfig() {
 }
 
 describe("HttpApi compression", () => {
+  test("caches compressed bytes by response body and encoding", () => {
+    const body = new TextEncoder().encode("compressible".repeat(200))
+    const gzip = compressBody(body, "gzip")
+    const deflate = compressBody(body, "deflate")
+
+    expect(compressBody(body, "gzip")).toBe(gzip)
+    expect(compressBody(body, "deflate")).toBe(deflate)
+    expect(gunzipSync(Buffer.from(gzip))).toEqual(Buffer.from(body))
+    expect(inflateSync(Buffer.from(deflate))).toEqual(Buffer.from(body))
+  })
+
   describe("encodes responses", () => {
     test("gzips JSON when Accept-Encoding includes gzip and body exceeds threshold", async () => {
       await using tmp = await tmpdir({ config: fatConfig() })
@@ -37,6 +53,7 @@ describe("HttpApi compression", () => {
       })
       expect(response.status).toBe(200)
       expect(response.headers.get("content-encoding")).toBe("gzip")
+      expect(vary(response)).toContain("accept-encoding")
       const compressed = new Uint8Array(await response.arrayBuffer())
       const decompressed = gunzipSync(compressed)
       const json = JSON.parse(new TextDecoder().decode(decompressed))
@@ -84,6 +101,7 @@ describe("HttpApi compression", () => {
         headers: { "x-opencode-directory": tmp.path },
       })
       expect(response.headers.get("content-encoding")).toBeNull()
+      expect(vary(response)).toContain("accept-encoding")
     })
 
     test("when Accept-Encoding only allows unsupported encodings", async () => {
@@ -92,6 +110,7 @@ describe("HttpApi compression", () => {
         headers: { "x-opencode-directory": tmp.path, "accept-encoding": "br" },
       })
       expect(response.headers.get("content-encoding")).toBeNull()
+      expect(vary(response)).toContain("accept-encoding")
     })
 
     test("when the response body is below the 1024-byte threshold", async () => {
@@ -127,6 +146,7 @@ describe("HttpApi compression", () => {
       try {
         expect(response.status).toBe(200)
         expect(response.headers.get("content-encoding")).toBeNull()
+        expect(vary(response)).not.toContain("accept-encoding")
       } finally {
         controller.abort()
         await response.body?.cancel().catch(() => {})
@@ -142,6 +162,7 @@ describe("HttpApi compression", () => {
       try {
         expect(response.status).toBe(200)
         expect(response.headers.get("content-encoding")).toBeNull()
+        expect(vary(response)).not.toContain("accept-encoding")
       } finally {
         controller.abort()
         await response.body?.cancel().catch(() => {})

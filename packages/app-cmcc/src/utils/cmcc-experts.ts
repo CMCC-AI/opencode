@@ -1,10 +1,3 @@
-const deepTradingUrl = (() => {
-  const base = "http://81.70.174.140:8083/"
-  const token = import.meta.env.VITE_DEEPTRADING_API_KEY
-  if (!token) return base
-  return `${base}?token=${encodeURIComponent(token)}`
-})()
-
 export type ExternalExpert = {
   kind: "external"
   id: string
@@ -46,14 +39,6 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   },
   {
     kind: "external",
-    id: "portal",
-    name: "DeepTrading 财经分析",
-    description: "财经行情、投资研究和组合分析工作台。",
-    url: deepTradingUrl,
-    tags: ["财经分析", "行情", "投研"],
-  },
-  {
-    kind: "external",
     id: "workspace",
     name: "DeepTrack 行业资讯追踪",
     description: "行业资讯、热点事件和专题动态追踪。",
@@ -62,78 +47,13 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   },
   {
     kind: "team",
-    id: "trading-agent",
-    name: "交易分析团队",
-    description:
-      "13 位专业角色按技术面、基本面、新闻面、情绪面、多空辩论、交易决策和风险评估协作，输出 BUY/SELL/HOLD 和操作方案。",
-    leadAgent: "trading-agent/trading-team-lead",
-    defaultPrompt: "帮我分析下茅台该不该买",
-    tags: ["交易策略", "风险管理", "市场分析"],
-    examples: ["帮我分析下茅台该不该买", "比较宁德时代和比亚迪未来一年的投资机会", "给我一份贵州茅台的交易计划和风险边界"],
-    members: [
-      { id: "trading-agent/trading-team-lead", name: "何执舟", profession: "首席策略官", role: "lead" },
-      { id: "trading-agent/market-analyst", name: "涂一线", profession: "技术分析师" },
-      { id: "trading-agent/fundamentals-analyst", name: "季本实", profession: "基本面分析师" },
-      { id: "trading-agent/news-analyst", name: "闻一新", profession: "新闻分析师" },
-      { id: "trading-agent/sentiment-analyst", name: "莫慌言", profession: "情绪分析师" },
-      { id: "trading-agent/bull-researcher", name: "牛正阳", profession: "多头研究员" },
-      { id: "trading-agent/bear-researcher", name: "熊正寒", profession: "空头研究员" },
-      { id: "trading-agent/research-manager", name: "蔡定锋", profession: "研究主管" },
-      { id: "trading-agent/trader", name: "程交远", profession: "交易员" },
-      { id: "trading-agent/aggressive-risk-analyst", name: "甘为先", profession: "激进风险分析师" },
-      { id: "trading-agent/conservative-risk-analyst", name: "沈行远", profession: "保守风险分析师" },
-      { id: "trading-agent/neutral-risk-analyst", name: "钟允平", profession: "中性风险分析师" },
-      { id: "trading-agent/risk-manager", name: "严控风", profession: "风险主管" },
-    ],
-  },
-  {
-    kind: "team",
-    id: "investment-masters-team",
-    name: "投资大师专家团",
-    description:
-      "13 位传奇投资哲学家和 6 位专业分析师并行给出信号，再由风险管理师和投资组合经理形成多视角投资决策。",
-    leadAgent: "investment-masters-team/hedge-fund-lead",
-    defaultPrompt: "帮我从多位投资大师的视角分析下腾讯的基本面和估值",
-    tags: ["价值投资", "估值", "组合决策"],
-    examples: [
-      "帮我从多位投资大师的视角分析下腾讯的基本面和估值",
-      "用巴菲特、芒格和彼得林奇的视角分析苹果是否值得长期持有",
-      "帮我对比阿里和美团的商业质量、估值和风险",
-    ],
-    members: [
-      { id: "investment-masters-team/hedge-fund-lead", name: "贺知衡", profession: "基金经理", role: "lead" },
-      { id: "investment-masters-team/oracle-of-omaha", name: "奥马哈先知", profession: "价值投资大师" },
-      { id: "investment-masters-team/charlie-munger", name: "查理·芒格", profession: "理性思维大师" },
-      { id: "investment-masters-team/magellan-captain", name: "麦哲伦舵手", profession: "GARP成长投资大师" },
-      { id: "investment-masters-team/the-big-short", name: "大空头", profession: "深度价值逆向投资大师" },
-      { id: "investment-masters-team/black-swan-prophet", name: "黑天鹅之父", profession: "反脆弱分析大师" },
-      { id: "investment-masters-team/mama-wood", name: "木头姐", profession: "颠覆性创新投资大师" },
-      { id: "investment-masters-team/ben-graham", name: "本杰明·格雷厄姆", profession: "价值投资之父" },
-      { id: "investment-masters-team/wall-street-activist", name: "华尔街斗牛士", profession: "激进主义投资大师" },
-      { id: "investment-masters-team/macro-king", name: "宏观之王", profession: "宏观投资大师" },
-      { id: "investment-masters-team/dhandho-master", name: "Dhandho掌门", profession: "Dhandho投资大师" },
-      { id: "investment-masters-team/phil-fisher", name: "费雪", profession: "成长品质投资大师" },
-      { id: "investment-masters-team/dean-of-valuation", name: "估值教父", profession: "估值专家" },
-      { id: "investment-masters-team/rakesh-jhunjhunwala", name: "金君瓦拉", profession: "新兴市场成长投资大师" },
-      { id: "investment-masters-team/fundamentals-analyst", name: "基本面分析师", profession: "基本面分析" },
-      { id: "investment-masters-team/technicals-analyst", name: "技术面分析师", profession: "技术面分析" },
-      { id: "investment-masters-team/valuation-analyst", name: "估值分析师", profession: "估值分析" },
-      { id: "investment-masters-team/sentiment-analyst", name: "情绪分析师", profession: "市场情绪" },
-      { id: "investment-masters-team/growth-analyst", name: "成长分析师", profession: "成长分析" },
-      { id: "investment-masters-team/news-sentiment-analyst", name: "新闻情绪分析师", profession: "新闻情绪" },
-      { id: "investment-masters-team/risk-manager", name: "风险管理师", profession: "风险约束" },
-      { id: "investment-masters-team/portfolio-manager", name: "投资组合经理", profession: "最终决策" },
-    ],
-  },
-  {
-    kind: "team",
     id: "deeptrading",
-    name: "DeepTrading A股投研专家团",
+    name: "DeepTrading 财经分析专家团",
     description:
-      "A股多智能体投研团队：标的识别、四维并行分析（市场/舆情/新闻/基本面）、投资决策、交易方案与七章可视化报告，一站式投研交付。",
+      "多智能体财经分析团队：标的识别、四维并行分析（市场/舆情/新闻/基本面）、投资决策、交易方案与七章可视化报告，一站式投研交付。",
     leadAgent: "deeptrading/deeptrading-team-lead",
     defaultPrompt: "研究一下贵州茅台最近怎么样",
-    tags: ["A股投研", "技术面分析", "基本面分析"],
+    tags: ["财经分析", "技术面分析", "基本面分析"],
     examples: [
       "研究一下贵州茅台最近怎么样",
       "分析 600519 在 2026-08-08 的交易决策",
@@ -155,7 +75,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   {
     kind: "team",
     id: "shoppers-pro",
-    name: "Shoppers Pro",
+    name: "Shoppers Pro 购买决策专家团",
     description:
       "全品类AI购买决策专家团。务实需求洞察 + 各平台比价 + 真实口碑分析 + 推荐指数，给你可点击的购买决策报告。",
     leadAgent: "shoppers-pro/shoppers-pro-team-lead",
@@ -174,6 +94,97 @@ export const CMCC_EXPERTS: CmccExpert[] = [
       { id: "shoppers-pro/card-editor", name: "甄措花", profession: "推荐编辑师" },
     ],
   },
+  {
+    kind: "team",
+    id: "deepinspect",
+    name: "DeepInspect 巡查分析专家团",
+    description:
+      "基于AI技术深度识别现场安全风险，自动归并问题线索，生成结构化巡查报告与整改方案的专家协作团队。",
+    leadAgent: "deepinspect/deepinspect-team-lead",
+    defaultPrompt: "帮我分析巡查材料，识别现场风险并生成巡查报告",
+    tags: ["现场风险识别", "巡查报告生成", "整改方案制定"],
+    examples: [
+      "帮我分析巡查材料，识别现场风险并生成巡查报告",
+      "我有几张现场照片，帮我识别安全隐患",
+      "根据巡查发现的问题，生成整改方案",
+    ],
+    members: [
+      { id: "deepinspect/deepinspect-team-lead", name: "督巡安", profession: "巡查编排总监", role: "lead" },
+      { id: "deepinspect/intent-analyst", name: "明意图", profession: "意图分析专家" },
+      { id: "deepinspect/query-planner", name: "谋方略", profession: "巡查规划专家" },
+      { id: "deepinspect/risk-identifier", name: "辨见微", profession: "风险识别专家" },
+      { id: "deepinspect/material-researcher", name: "求甚睿", profession: "材料研究专家" },
+      { id: "deepinspect/web-researcher", name: "网博源", profession: "网络研究专家" },
+      { id: "deepinspect/problem-consolidator", name: "归一清", profession: "问题归并分析师" },
+      { id: "deepinspect/reflector", name: "审思谨", profession: "反思评估专家" },
+      { id: "deepinspect/outline-architect", name: "构宏图", profession: "大纲架构专家" },
+      { id: "deepinspect/report-writer", name: "述理明", profession: "报告撰写专家" },
+      { id: "deepinspect/evidence-reviewer", name: "证无遗", profession: "证据核验专家" },
+      { id: "deepinspect/viz-specialist", name: "绘图明", profession: "数据可视化专家" },
+    ],
+  },
+  {
+    kind: "team",
+    id: "zhengqi-visit-intel",
+    name: "DeepEngage谈参高拜专家团",
+    description:
+      "融合内部门户数据与公开情报，产出可溯源的政企拜访决策报告：为何拜访、谈什么、争取什么共识。",
+    leadAgent: "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",
+    defaultPrompt: "帮我生成某客户的谈参高拜报告，内部门户导出数据在这里：[文件路径]",
+    tags: ["政企客户洞察", "高价值拜访准备", "商情研究与报告"],
+    examples: [
+      "帮我生成某客户的谈参高拜报告，内部门户导出数据在这里：[文件路径]",
+      "拜访前快速研判：这家客户最近发生了什么，值得跟进的合作机会有哪些？",
+      "核验这份报告里的企业基本信息和领导层人物，给我可溯源的修订建议。",
+    ],
+    members: [
+      { id: "zhengqi-visit-intel/zhengqi-visit-intel-team-lead", name: "谈高见", profession: "谈参报告总编", role: "lead" },
+      { id: "zhengqi-visit-intel/sensitive-check-officer", name: "安无患", profession: "政企安全检测专员" },
+      { id: "zhengqi-visit-intel/internal-intel-researcher", name: "闻若渊", profession: "内部客户情报研究员" },
+      { id: "zhengqi-visit-intel/research-query-planner", name: "牟定策", profession: "政企研究规划师" },
+      { id: "zhengqi-visit-intel/public-web-researcher", name: "罗广闻", profession: "权威公开信息研究员" },
+      { id: "zhengqi-visit-intel/intelligence-synthesizer", name: "甄融汇", profession: "内外情报融合分析师" },
+      { id: "zhengqi-visit-intel/research-reflection-analyst", name: "慎思明", profession: "研究质量反思专员" },
+      { id: "zhengqi-visit-intel/outline-architect", name: "柯章法", profession: "谈参报告大纲设计师" },
+      { id: "zhengqi-visit-intel/report-chief-writer", name: "毕文成", profession: "政企报告撰写专家" },
+      { id: "zhengqi-visit-intel/evidence-verify-officer", name: "严可证", profession: "关键事实证据核验官" },
+      { id: "zhengqi-visit-intel/report-visual-designer", name: "蓝启图", profession: "报告视觉设计师" },
+    ],
+  },
+  {
+    kind: "team",
+    id: "deepcampaign",
+    name: "DeepCampaign 营销方案专家团",
+    description: "洞察人群，生成营销方案与报告",
+    leadAgent: "deepcampaign/deepcampaign-team-lead",
+    defaultPrompt: "帮我分析目标人群并生成营销方案",
+    tags: ["人群洞察", "营销方案", "报告生成"],
+    examples: [
+      "帮我分析目标人群并生成营销方案",
+      "为新产品制定一份完整的营销推广计划",
+      "分析竞品营销策略并给出优化建议",
+    ],
+    members: [
+      { id: "deepcampaign/deepcampaign-team-lead", name: "营销总监", profession: "营销方案总编", role: "lead" },
+    ],
+  },
+  {
+    kind: "team",
+    id: "ai-scientist",
+    name: "AI Scientist 科研分析专家团",
+    description: "从论文理解到可信复现",
+    leadAgent: "ai-scientist/ai-scientist-team-lead",
+    defaultPrompt: "帮我解读这篇论文并给出复现方案",
+    tags: ["论文解读", "实验复现", "科研分析"],
+    examples: [
+      "帮我解读这篇论文并给出复现方案",
+      "分析这篇论文的核心贡献和方法论",
+      "帮我梳理这个研究方向的发展脉络",
+    ],
+    members: [
+      { id: "ai-scientist/ai-scientist-team-lead", name: "科研总监", profession: "科研分析总编", role: "lead" },
+    ],
+  },
 ]
 
 export const CMCC_TEAM_EXPERTS = CMCC_EXPERTS.filter((expert): expert is TeamExpert => expert.kind === "team")
@@ -189,4 +200,39 @@ export function cmccExpertCenterHref() {
 export function cmccTeamExpertByAgent(agent: string | undefined) {
   if (!agent) return
   return CMCC_TEAM_EXPERTS.find((expert) => expert.leadAgent === agent)
+}
+
+export const EXPERT_AVATARS = import.meta.glob("../../../../.opencode/experts/*/avatars/*.png", {
+  eager: true,
+  import: "default",
+  query: "?url",
+}) as Record<string, string>
+
+// 96px 缩略图，由 packages/app-cmcc/scripts/generate-avatar-thumbs.ps1 生成；小尺寸场景优先使用
+export const EXPERT_AVATAR_THUMBS = import.meta.glob("../../../../.opencode/experts/*/avatars/thumb/*.png", {
+  eager: true,
+  import: "default",
+  query: "?url",
+}) as Record<string, string>
+
+function expertAvatarUrl(team: string, agent: string) {
+  return (
+    EXPERT_AVATAR_THUMBS[`../../../../.opencode/experts/${team}/avatars/thumb/${agent}.png`] ??
+    EXPERT_AVATARS[`../../../../.opencode/experts/${team}/avatars/${agent}.png`]
+  )
+}
+
+export function cmccMemberAvatarUrl(member: TeamMember) {
+  const [team, agent] = member.id.split("/")
+  if (!team || !agent) return
+  return expertAvatarUrl(team, agent)
+}
+
+export function cmccTeamAvatarUrl(expert: TeamExpert) {
+  return expertAvatarUrl(expert.id, "team") ?? expertAvatarUrl(expert.id, expert.leadAgent.split("/")[1] ?? "")
+}
+
+export function cmccExpertChineseName(expert: TeamExpert) {
+  const index = expert.name.search(/[\u4e00-\u9fff]/)
+  return index === -1 ? expert.name : expert.name.slice(index)
 }

@@ -1,0 +1,49 @@
+{
+  "id": "ai-scientist",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "ai-scientist/ai-scientist-team-lead",
+  "teamInfo": {
+    "leadAgent": "ai-scientist/ai-scientist-team-lead",
+    "memberAgents": []
+  },
+  "displayName": {
+    "en": "AI Scientist",
+    "zh": "AI Scientist 科研分析专家团"
+  },
+  "profession": {
+    "en": "AI Scientist",
+    "zh": "AI Scientist 科研分析专家团"
+  },
+  "displayDescription": {
+    "en": "AI-powered research team that helps understand papers and enables reproducible experiments.",
+    "zh": "从论文理解到可信复现"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "12-Research",
+  "defaultInitPrompt": {
+    "zh": "帮我解读这篇论文并给出复现方案",
+    "en": "Help me understand this paper and provide a reproduction plan"
+  },
+  "members": [
+    {
+      "id": "ai-scientist/ai-scientist-team-lead",
+      "name": {
+        "en": "Research Director",
+        "zh": "科研总监"
+      },
+      "profession": {
+        "en": "Research Analysis Director",
+        "zh": "科研分析总编"
+      },
+      "avatar": "avatars/ai-scientist-team-lead.png",
+      "role": "lead",
+      "originalId": "ai-scientist-team-lead"
+    }
+  ],
+  "original": {
+    "name": "ai-scientist",
+    "version": "1.0.0",
+    "description": "AI-powered research team for paper understanding and reproducible experiments"
+  }
+}

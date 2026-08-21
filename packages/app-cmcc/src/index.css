@@ -8,6 +8,7 @@
   src: url("/assets/JetBrainsMonoNerdFontMono-Regular.woff2") format("woff2");
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 [data-cmcc-artifact-path] {
@@ -53,6 +54,7 @@
   src: url("/assets/Inter.ttf") format("truetype");
   font-weight: 100 900;
   font-style: normal;
+  font-display: swap;
 }
 
 @media (display-mode: standalone) {

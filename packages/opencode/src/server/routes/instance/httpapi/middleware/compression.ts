@@ -15,6 +15,19 @@ const THRESHOLD_BYTES = 1024
 
 type Encoding = "gzip" | "deflate"
 
+const compressedBodyCache = new WeakMap<Uint8Array, Partial<Record<Encoding, Uint8Array>>>()
+
+export function compressBody(body: Uint8Array, encoding: Encoding) {
+  const cached = compressedBodyCache.get(body)?.[encoding]
+  if (cached) return cached
+
+  const compressed = encoding === "gzip" ? gzipSync(body) : deflateSync(body)
+  const encodings = compressedBodyCache.get(body) ?? {}
+  encodings[encoding] = compressed
+  compressedBodyCache.set(body, encodings)
+  return compressed
+}
+
 function pickEncoding(acceptEncoding: string | undefined): Encoding | undefined {
   if (!acceptEncoding) return undefined
   const lower = acceptEncoding.toLowerCase()
@@ -26,6 +39,15 @@ function pickEncoding(acceptEncoding: string | undefined): Encoding | undefined 
 function pathOf(url: string): string {
   const queryIndex = url.indexOf("?")
   return queryIndex === -1 ? url : url.slice(0, queryIndex)
+}
+
+function varyAcceptEncoding(response: HttpServerResponse.HttpServerResponse) {
+  const vary = response.headers["vary"]
+  if (!vary) return HttpServerResponse.setHeader(response, "vary", "Accept-Encoding")
+
+  const tokens = vary.split(",").map((token) => token.trim().toLowerCase())
+  if (tokens.includes("accept-encoding") || tokens.includes("*")) return response
+  return HttpServerResponse.setHeader(response, "vary", `${vary}, Accept-Encoding`)
 }
 
 export const compressionLayer = HttpRouter.middleware<{ handles: unknown }>()((effect) =>
@@ -51,14 +73,21 @@ export const compressionLayer = HttpRouter.middleware<{ handles: unknown }>()((e
     const contentType = body.contentType
     if (!COMPRESSIBLE_CONTENT_TYPE_REGEX.test(contentType)) return response
 
+    const varyingResponse = varyAcceptEncoding(response)
     const encoding = pickEncoding(request.headers["accept-encoding"])
-    if (!encoding) return response
+    if (!encoding) return varyingResponse
 
-    const compressed = encoding === "gzip" ? gzipSync(body.body) : deflateSync(body.body)
+    const compressed = compressBody(body.body, encoding)
     return HttpServerResponse.setHeader(
-      HttpServerResponse.setBody(response, HttpBody.uint8Array(compressed, contentType)),
+      HttpServerResponse.setBody(varyingResponse, HttpBody.uint8Array(compressed, contentType)),
       "content-encoding",
       encoding,
     )
   }),
 ).layer
+
+export function isStreamingRequest(method: string, url: string) {
+  const path = pathOf(url)
+  if (STREAMING_PATHS.has(path)) return true
+  return method === "POST" && STREAMING_POST_REGEX.test(path)
+}

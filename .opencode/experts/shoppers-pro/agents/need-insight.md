@@ -3,6 +3,7 @@ name: shoppers-pro/need-insight
 description: >-
   需求洞察师。把模糊购买需求翻译为结构化Need Brief，输出务实需求洞察与决策优先级。
 mode: subagent
+hidden: true
 color: "#F48C06"
 options:
   expert:

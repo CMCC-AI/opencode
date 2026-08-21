@@ -18,6 +18,7 @@ import { migrateLegacySessionStateKeys, ServerScope, SessionStateKey } from "@/u
 import { createSessionKeyReader, ensureSessionKey, pruneSessionKeys } from "./layout-helpers"
 import { requireServerKey } from "@/utils/session-route"
 import { type DraftTab, useTabs } from "./tabs"
+import { cmccIsWorkspaceDirectory } from "@/utils/cmcc-workspace"
 
 export { createSessionKeyReader, ensureSessionKey, pruneSessionKeys }
 
@@ -579,9 +580,10 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         sessionTimer = window.setTimeout(() => {
           sessionTimer = undefined
           void Promise.all(
-            server.projects.list().map((project) => {
-              return serverSync().project.loadSessions(project.worktree)
-            }),
+            server.projects
+              .list()
+              .filter((project) => !cmccIsWorkspaceDirectory(project.worktree, serverSync().data.path.home))
+              .map((project) => serverSync().project.loadSessions(project.worktree)),
           )
         }, 0)
       })

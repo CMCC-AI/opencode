@@ -3,6 +3,7 @@ name: shoppers-pro/reputation-scout
 description: >-
   口碑分析员。联网采集真实口碑证据，抽取共性槽点/好评/长期反馈，数据诚实分层标注来源。
 mode: subagent
+hidden: true
 color: "#F48C06"
 options:
   expert:

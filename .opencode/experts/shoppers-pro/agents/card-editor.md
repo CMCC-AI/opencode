@@ -3,6 +3,7 @@ name: shoppers-pro/card-editor
 description: >-
   推荐编辑师。把口碑融入卡片文案，撰写针对当前用户的推荐卡片和500字购买决策报告。
 mode: subagent
+hidden: true
 color: "#E85D04"
 options:
   expert:

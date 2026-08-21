@@ -4,6 +4,7 @@ description: >-
   研究主管/投资组合经理：裁判多空辩论，输出明确的 Buy/Sell/Hold 投资计划。
   在 Phase 2 辩论结束后由 orchestrator 调用。
 mode: subagent
+hidden: true
 color: "#0891B2"
 options:
   expert:

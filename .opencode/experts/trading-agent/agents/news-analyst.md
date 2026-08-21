@@ -4,6 +4,7 @@ description: >-
   新闻分析师：分析公司新闻、行业动态和宏观经济趋势，输出 [新闻分析报告]。
   在 Phase 1 数据收集阶段由 orchestrator 并行调用。
 mode: subagent
+hidden: true
 color: "#D97706"
 options:
   expert:
