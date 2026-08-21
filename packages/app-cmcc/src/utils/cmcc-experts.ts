@@ -208,8 +208,18 @@ export const EXPERT_AVATARS = import.meta.glob("../../../../.opencode/experts/*/
   query: "?url",
 }) as Record<string, string>
 
+// 96px 缩略图，由 packages/app-cmcc/scripts/generate-avatar-thumbs.ps1 生成；小尺寸场景优先使用
+export const EXPERT_AVATAR_THUMBS = import.meta.glob("../../../../.opencode/experts/*/avatars/thumb/*.png", {
+  eager: true,
+  import: "default",
+  query: "?url",
+}) as Record<string, string>
+
 function expertAvatarUrl(team: string, agent: string) {
-  return EXPERT_AVATARS[`../../../../.opencode/experts/${team}/avatars/${agent}.png`]
+  return (
+    EXPERT_AVATAR_THUMBS[`../../../../.opencode/experts/${team}/avatars/thumb/${agent}.png`] ??
+    EXPERT_AVATARS[`../../../../.opencode/experts/${team}/avatars/${agent}.png`]
+  )
 }
 
 export function cmccMemberAvatarUrl(member: TeamMember) {
