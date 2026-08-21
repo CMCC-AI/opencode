@@ -30,6 +30,15 @@ import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
+import {
+  formatImportDuration,
+  knowledgeImportHeartbeat,
+  knowledgeImportExecution,
+  knowledgeImportLiveActivity,
+  knowledgeImportPermissions,
+  type KnowledgeImportExecution,
+  validateImportPrompt,
+} from "@/pages/cmcc-knowledge-import"
 import { createPromptInputController } from "@/pages/session/composer"
 import { Identifier } from "@/utils/id"
 import { Persist, persisted } from "@/utils/persist"
@@ -515,6 +524,8 @@ export function CmccKnowledgeNotebookRoute() {
     importTotal: 0,
     importCompleted: 0,
     importMessage: "",
+    importSessionID: "",
+    importModelName: "",
     dropActive: false,
     sessions: [] as Session[],
     messages: [] as ChatMessage[],
@@ -580,6 +591,13 @@ export function CmccKnowledgeNotebookRoute() {
     nodes: state.graph?.nodes ?? [],
     edges: state.graph?.edges ?? [],
   }))
+  const importActivity = createMemo(() => {
+    const sessionID = state.importSessionID
+    if (!sessionID) return undefined
+    return knowledgeImportLiveActivity(
+      (sync().data.message[sessionID] ?? []).flatMap((message) => sync().data.part[message.id] ?? []),
+    )
+  })
   const rootChildren = createMemo(() => fileChildren(state.files ?? [], ""))
   const activePreview = createMemo(() => state.tabs.find((tab) => tab.path === state.activeTab))
   const previewUrl = (file: string) => {
@@ -1134,6 +1152,7 @@ export function CmccKnowledgeNotebookRoute() {
     activeNotebook: KnowledgeNotebook,
     sessionID: string,
     paths: string[],
+    execution: KnowledgeImportExecution,
   ) => {
     if (paths.length === 0) throw new Error("原始资料区没有发现新文件，未启动 llm-wiki")
     const batches = chunk(paths, wikiBatchSize)
@@ -1147,11 +1166,17 @@ export function CmccKnowledgeNotebookRoute() {
             paths.length,
             `正在整理第 ${index + 1}/${batches.length} 批（${batch.length} 个文件）`,
           )
-          await current.session.prompt({
-            sessionID,
-            system: knowledgeSystemPrompt(activeNotebook),
-            parts: [{ type: "text", text: batchImportPrompt(activeNotebook, batch, index + 1, batches.length) }],
-          })
+          await current.session.prompt(
+            {
+              sessionID,
+              system: knowledgeSystemPrompt(activeNotebook),
+              agent: execution.agent,
+              model: execution.model,
+              variant: execution.variant,
+              parts: [{ type: "text", text: batchImportPrompt(activeNotebook, batch, index + 1, batches.length) }],
+            },
+            { throwOnError: true },
+          )
           importProgress(
             "organizing",
             Math.min((index + 1) * wikiBatchSize, paths.length),
@@ -1162,19 +1187,37 @@ export function CmccKnowledgeNotebookRoute() {
       Promise.resolve(),
     )
     importProgress("validating", paths.length, paths.length, "正在重建索引、校验双链与操作日志")
-    await current.session.prompt({
-      sessionID,
-      system: knowledgeSystemPrompt(activeNotebook),
-      parts: [{ type: "text", text: validateImportPrompt(paths.length) }],
-    })
+    await current.session.prompt(
+      {
+        sessionID,
+        system: knowledgeSystemPrompt(activeNotebook),
+        agent: execution.agent,
+        model: execution.model,
+        variant: execution.variant,
+        parts: [{ type: "text", text: validateImportPrompt(paths.length) }],
+      },
+      { throwOnError: true },
+    )
   }
 
   const runImport = async (
     activeNotebook: KnowledgeNotebook,
     current: OpencodeClient,
-    stage: (sessionID: string, existing: Set<string>) => Promise<void>,
+    stage: (sessionID: string, existing: Set<string>, execution: KnowledgeImportExecution) => Promise<void>,
+    sourceDirectories: string[] = [],
   ) => {
-    setState({ importing: true, activeTab: "chat" })
+    const selectedModel = local.model.current()
+    const execution = knowledgeImportExecution({
+      agent: local.agent.current(),
+      model: selectedModel,
+      variant: local.model.variant.current(),
+    })
+    if (!execution) {
+      importProgress("failed", 0, 0, "没有可用的模型或 Agent，请重新选择后再导入")
+      showToast({ title: "请选择模型和 Agent 后再导入", variant: "error" })
+      return
+    }
+    setState({ importing: true, activeTab: "chat", importModelName: selectedModel?.name ?? execution.model.modelID })
     importRefreshRunning = false
     importRefreshTimer = setInterval(() => {
       if (importRefreshRunning) return
@@ -1189,13 +1232,21 @@ export function CmccKnowledgeNotebookRoute() {
         const result = await current.session.create({
           directory: activeNotebook.directory,
           title: `知识库导入 · ${activeNotebook.name} · ${formatImportTime(new Date())}`,
+          agent: execution.agent,
+          model: {
+            providerID: execution.model.providerID,
+            id: execution.model.modelID,
+            variant: execution.variant,
+          },
           metadata: { cmccKnowledgeNotebookID: activeNotebook.id, cmccKnowledgeKind: "import" },
+          permission: knowledgeImportPermissions(sourceDirectories),
         })
         const sessionID = result.data?.id
         if (!sessionID) throw new Error("创建导入任务未返回 ID")
-        await stage(sessionID, existing)
+        setState("importSessionID", sessionID)
+        await stage(sessionID, existing, execution)
         const staged = rawSourcePaths(await listNotebookFiles(current)).filter((path) => !existing.has(path))
-        await organizeSources(current, activeNotebook, sessionID, staged)
+        await organizeSources(current, activeNotebook, sessionID, staged, execution)
         await loadFiles()
         importProgress("completed", staged.length, staged.length, `入库完成：${staged.length} 个文件已整理并通过校验`)
         showToast({ title: `知识库入库完成：${staged.length} 个文件`, variant: "success" })
@@ -1276,15 +1327,26 @@ export function CmccKnowledgeNotebookRoute() {
     const paths = (Array.isArray(selected) ? selected : selected ? [selected] : []).filter(Boolean)
     if (paths.length === 0) return
     importProgress("collecting", 0, paths.length, `已选择 ${paths.length} 个目录，准备复制全部原始文件`)
-    await runImport(activeNotebook, current, async (sessionID) => {
-      importProgress("staging", 0, paths.length, "正在完整复制目录；此阶段不会调用 llm-wiki")
-      await current.session.prompt({
-        sessionID,
-        system: stagingSystemPrompt(activeNotebook),
-        parts: [{ type: "text", text: stageDirectoriesPrompt(activeNotebook, paths) }],
-      })
-      importProgress("staging", paths.length, paths.length, "目录复制完成，正在核对原始文件清单")
-    })
+    await runImport(
+      activeNotebook,
+      current,
+      async (sessionID, _existing, execution) => {
+        importProgress("staging", 0, paths.length, "正在完整复制目录；此阶段不会调用 llm-wiki")
+        await current.session.prompt(
+          {
+            sessionID,
+            system: stagingSystemPrompt(activeNotebook),
+            agent: execution.agent,
+            model: execution.model,
+            variant: execution.variant,
+            parts: [{ type: "text", text: stageDirectoriesPrompt(activeNotebook, paths) }],
+          },
+          { throwOnError: true },
+        )
+        importProgress("staging", paths.length, paths.length, "目录复制完成，正在核对原始文件清单")
+      },
+      paths,
+    )
   }
 
   return (
@@ -1696,6 +1758,8 @@ export function CmccKnowledgeNotebookRoute() {
               message={state.importMessage}
               pages={wikiPageCount()}
               relationships={graph().edges.length}
+              activity={importActivity()}
+              model={state.importModelName}
             />
           </Show>
           <Show when={fileRemoval.file} keyed>
@@ -2000,7 +2064,28 @@ function ImportProgressDialog(props: {
   message: string
   pages: number
   relationships: number
+  activity?: ReturnType<typeof knowledgeImportLiveActivity>
+  model: string
 }) {
+  const startedAt = Date.now()
+  const [now, setNow] = createSignal(startedAt)
+  const [lastEventAt, setLastEventAt] = createSignal(startedAt)
+  let activitySignature = ""
+  const timer = setInterval(() => setNow(Date.now()), 1000)
+  onCleanup(() => clearInterval(timer))
+  createEffect(() => {
+    const signature = [props.activity?.label, props.activity?.detail, props.activity?.updatedAt].join(":")
+    if (!activitySignature) {
+      activitySignature = signature
+      return
+    }
+    if (signature === activitySignature) return
+    activitySignature = signature
+    setLastEventAt(Date.now())
+  })
+  const elapsedSeconds = () => Math.max(0, Math.floor((now() - startedAt) / 1000))
+  const secondsSinceActivity = () => Math.max(0, Math.floor((now() - lastEventAt()) / 1000))
+
   return (
     <div
       class="fixed inset-0 z-[230] flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-[2px]"
@@ -2018,10 +2103,36 @@ function ImportProgressDialog(props: {
               正在处理导入材料
             </h2>
             <p class="m-0 mt-1 truncate text-[12px] leading-5 text-v2-text-text-muted">{props.notebook}</p>
+            <p class="m-0 mt-0.5 truncate text-[10px] leading-4 text-v2-text-text-faint">
+              本次使用模型：{props.model}
+            </p>
+            <div class="mt-2 flex items-center gap-2 text-[11px] leading-4 text-[#0057ff]">
+              <span class="relative flex size-2">
+                <span class="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-35" />
+                <span class="relative inline-flex size-2 rounded-full bg-current" />
+              </span>
+              <span class="font-medium">任务处理中 · 已运行 {formatImportDuration(elapsedSeconds())}</span>
+            </div>
           </div>
         </div>
         <div class="mt-5" aria-live="polite">
           <ImportStatus phase={props.phase} completed={props.completed} total={props.total} message={props.message} />
+        </div>
+        <div class="mt-3 rounded-[8px] border border-[#0057ff]/15 bg-[#0057ff]/[0.04] px-3 py-2.5">
+          <div class="flex items-center gap-1.5 text-[12px] font-medium leading-5 text-v2-text-text-base">
+            <span>{props.activity?.label ?? props.message ?? "正在等待当前步骤返回"}</span>
+            <span class="flex gap-0.5" aria-hidden="true">
+              <span class="animate-pulse">.</span>
+              <span class="animate-pulse [animation-delay:180ms]">.</span>
+              <span class="animate-pulse [animation-delay:360ms]">.</span>
+            </span>
+          </div>
+          <Show when={props.activity?.detail}>
+            {(detail) => <div class="mt-0.5 truncate text-[10px] leading-4 text-v2-text-text-muted">{detail()}</div>}
+          </Show>
+          <div class="mt-0.5 text-[10px] leading-4 text-v2-text-text-muted">
+            {knowledgeImportHeartbeat(secondsSinceActivity())}；以上内容来自当前导入会话的实时执行事件
+          </div>
         </div>
         <div class="mt-4 grid grid-cols-2 gap-2">
           <div class="rounded-[8px] bg-v2-background-bg-layer-02 px-3 py-2.5">
@@ -2712,10 +2823,6 @@ function stageDirectoriesPrompt(notebook: KnowledgeNotebook, paths: string[]) {
 
 function batchImportPrompt(notebook: KnowledgeNotebook, paths: string[], batch: number, totalBatches: number) {
   return `使用 llm-wiki skill 的 Ingest 模式处理第 ${batch}/${totalBatches} 批已经落盘的原始资料。只处理以下路径：\n${paths.map((path) => `- ${path}`).join("\n")}\n\n笔记本目录：${notebook.directory}\n\n要求：在 02_LLM_Wiki 创建或更新原子知识页；每页包含 tags、aliases、type、source、created，文末包含“## 语义连接”和有效 [[双链]]。本批结束时更新 index.md 和 log.md，并汇报处理成功、跳过和失败数量。不要重新复制原始文件，不要处理清单之外的文件。`
-}
-
-function validateImportPrompt(count: number) {
-  return `使用 llm-wiki skill 对刚完成的 ${count} 个原始文件执行最终校验：重建 index.md 的全量覆盖，检查 02_LLM_Wiki 中 YAML 必填字段、重复 aliases、失效 [[双链]]、缺失“## 语义连接”的页面，并修复可确定的问题；最后向 log.md 追加 validation 记录。不要重新执行原始文件导入。`
 }
 
 function chunk<T>(items: T[], size: number) {
