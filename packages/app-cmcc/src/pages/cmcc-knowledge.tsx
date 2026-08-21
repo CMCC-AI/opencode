@@ -1207,6 +1207,15 @@ export function CmccKnowledgeNotebookRoute() {
     sourceDirectories: string[] = [],
   ) => {
     const selectedModel = local.model.current()
+    if (!selectedModel?.capabilities.toolcall) {
+      importProgress("failed", 0, 0, "当前模型不支持文件工具，无法用于知识库导入")
+      showToast({
+        title: "请选择支持工具调用的模型",
+        description: "知识库导入需要读取和写入文件；请使用 DeepSeek V4 Pro、Qwen 或其他支持工具调用的模型。",
+        variant: "error",
+      })
+      return
+    }
     const execution = knowledgeImportExecution({
       agent: local.agent.current(),
       model: selectedModel,
@@ -1217,7 +1226,11 @@ export function CmccKnowledgeNotebookRoute() {
       showToast({ title: "请选择模型和 Agent 后再导入", variant: "error" })
       return
     }
-    setState({ importing: true, activeTab: "chat", importModelName: selectedModel?.name ?? execution.model.modelID })
+    setState({
+      importing: true,
+      activeTab: "chat",
+      importModelName: `${selectedModel.provider.name} / ${selectedModel.name}`,
+    })
     importRefreshRunning = false
     importRefreshTimer = setInterval(() => {
       if (importRefreshRunning) return
