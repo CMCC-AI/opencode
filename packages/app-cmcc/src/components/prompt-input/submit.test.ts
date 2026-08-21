@@ -16,16 +16,20 @@ const optimistic: Array<{
   }
 }> = []
 const optimisticSeeded: boolean[] = []
-const storedSessions: Record<string, Array<{ id: string; title?: string }>> = {}
+const storedSessions: Record<string, Array<{ id: string; title?: string; directory?: string }>> = {}
 const promoted: Array<{ directory: string; sessionID: string }> = []
 const sentShell: string[] = []
+const sentPromptAsync: string[] = []
 const syncedDirectories: string[] = []
 const promotedDrafts: Array<{ draftID: string; server: string; sessionId: string }> = []
+const dockSessionQueries: string[] = []
 
 let params: { id?: string } = {}
 let search: { draftId?: string } = {}
 let selected = "/repo/worktree-a"
 let variant: string | undefined
+let dockWorkspace: { directoryPath: string } | undefined
+let dockSessionDirectory = "/repo/main/s-business"
 
 const promptValue: Prompt = [{ type: "text", content: "ls", start: 0, end: 2 }]
 const prompt = {
@@ -64,7 +68,10 @@ const clientFor = (directory: string) => {
         return { data: undefined }
       },
       prompt: async () => ({ data: undefined }),
-      promptAsync: async () => ({ data: undefined }),
+      promptAsync: async () => {
+        sentPromptAsync.push(directory)
+        return { data: undefined }
+      },
       command: async () => ({ data: undefined }),
       abort: async () => ({ data: undefined }),
     },
@@ -98,6 +105,35 @@ beforeAll(async () => {
 
   mock.module("@opencode-ai/core/util/encode", () => ({
     base64Encode: (value: string) => value,
+    base64Decode: (value: string) => value,
+    checksum: () => "checksum",
+    sampledChecksum: () => "checksum",
+    hash: async () => "hash",
+  }))
+
+  mock.module("@/context/dockapi", () => ({
+    DockApiError: class DockApiError extends Error {},
+    asOpenCodeSession: (value: unknown) => value,
+    useDockApi: () => ({
+      workspace: dockWorkspace,
+      sessions: {
+        async create(input: { query: string }) {
+          dockSessionQueries.push(input.query)
+          return {
+            id: "business-1",
+            agentType: "DeepInsight",
+            query: input.query,
+            title: input.query,
+            openCodeSessionId: "dock-session-1",
+            directoryPath: dockSessionDirectory,
+            openCodeSession: { id: "dock-session-1", title: input.query, directory: dockSessionDirectory },
+            openCodeStatus: { type: "idle" },
+            createdAt: "2026-08-20T00:00:00",
+            updatedAt: "2026-08-20T00:00:00",
+          }
+        },
+      },
+    }),
   }))
 
   mock.module("@/context/local", () => ({
@@ -126,6 +162,7 @@ beforeAll(async () => {
   }))
 
   mock.module("@/context/server", () => ({
+    ServerConnection: { Key: { make: (value: string) => value } },
     useServer: () => ({ key: "server-key" }),
   }))
 
@@ -190,6 +227,7 @@ beforeAll(async () => {
   }))
 
   mock.module("@/context/server-sync", () => ({
+    createServerSyncContext: () => ({}),
     useServerSync: () => () => ({
       session: {
         remember: () => undefined,
@@ -204,11 +242,15 @@ beforeAll(async () => {
             if (args[0] !== "session") return
             const next = args[1]
             if (typeof next === "function") {
-              storedSessions[directory] = next(storedSessions[directory]) as Array<{ id: string; title?: string }>
+              storedSessions[directory] = next(storedSessions[directory]) as Array<{
+                id: string
+                title?: string
+                directory?: string
+              }>
               return
             }
             if (Array.isArray(next)) {
-              storedSessions[directory] = next as Array<{ id: string; title?: string }>
+              storedSessions[directory] = next as Array<{ id: string; title?: string; directory?: string }>
             }
           },
         ]
@@ -243,9 +285,13 @@ beforeEach(() => {
   params = {}
   search = {}
   sentShell.length = 0
+  sentPromptAsync.length = 0
   syncedDirectories.length = 0
+  dockSessionQueries.length = 0
   selected = "/repo/worktree-a"
   variant = undefined
+  dockWorkspace = undefined
+  dockSessionDirectory = "/repo/main/s-business"
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
 })
 
@@ -405,5 +451,38 @@ describe("prompt submit worktree selection", () => {
 
     expect(storedSessions["/repo/worktree-a"]).toEqual([{ id: "session-1", title: "New session 1" }])
     expect(optimisticSeeded).toEqual([true])
+  })
+
+  test("retargets a DockAPI session to its dedicated directory before sending", async () => {
+    dockWorkspace = { directoryPath: "/repo/main" }
+    const submit = createPromptSubmit({
+      prompt,
+      info: () => undefined,
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(dockSessionQueries).toEqual(["ls"])
+    expect(createdClients).toEqual([dockSessionDirectory])
+    expect(sentPromptAsync).toEqual([dockSessionDirectory])
+    expect(promoted).toEqual([{ directory: dockSessionDirectory, sessionID: "dock-session-1" }])
+    expect(storedSessions[dockSessionDirectory]).toEqual([
+      { id: "dock-session-1", title: "ls", directory: dockSessionDirectory },
+    ])
+    expect(optimistic[0]?.directory).toBe(dockSessionDirectory)
   })
 })

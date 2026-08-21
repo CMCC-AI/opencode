@@ -66,6 +66,10 @@ import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { DeepTradingSessionView } from "@/pages/session/deeptrading/deeptrading-session-view"
+import { DeepTradingResultsPanel } from "@/pages/session/deeptrading/deeptrading-results-panel"
+import { isDeepTradingRootSession } from "@/pages/session/deeptrading/page-selection"
+import { DeepTradingWorkbenchProvider } from "@/pages/session/deeptrading/workbench-context"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
@@ -271,6 +275,8 @@ export default function Page() {
   }
 
   const info = createMemo(() => (params.id ? sync().session.get(params.id) : undefined))
+  const deepTrading = createMemo(() => isDeepTradingRootSession(info()))
+  const contentPanelWidth = createMemo(() => (deepTrading() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
   const canReview = createMemo(() => !!sync().project)
@@ -396,9 +402,11 @@ export default function Page() {
   })
   const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
   const wantsReview = createMemo(() =>
-    isDesktop()
-      ? desktopFileTreeOpen() || (desktopReviewOpen() && activeTab() === "review")
-      : store.mobileTab === "changes",
+    deepTrading()
+      ? false
+      : isDesktop()
+        ? desktopFileTreeOpen() || (desktopReviewOpen() && activeTab() === "review")
+        : store.mobileTab === "changes",
   )
   const vcsMode = createMemo<VcsMode | undefined>(() => {
     if (store.changes === "git" || store.changes === "branch") return store.changes
@@ -1756,7 +1764,7 @@ export default function Page() {
           classes={{ button: compact ? "w-full !py-2" : "w-full" }}
           onClick={() => setStore("mobileTab", "session")}
         >
-          {language.t("session.tab.session")}
+          {deepTrading() ? "分析内容" : language.t("session.tab.session")}
         </Tabs.Trigger>
         <Tabs.Trigger
           value="changes"
@@ -1767,9 +1775,11 @@ export default function Page() {
           classes={{ button: compact ? "w-full !py-2" : "w-full" }}
           onClick={() => setStore("mobileTab", "changes")}
         >
-          {hasReview()
-            ? language.t("session.review.filesChanged", { count: reviewCount() })
-            : language.t("session.review.change.other")}
+          {deepTrading()
+            ? "分析结果"
+            : hasReview()
+              ? language.t("session.review.filesChanged", { count: reviewCount() })
+              : language.t("session.review.change.other")}
         </Tabs.Trigger>
       </Tabs.List>
     </Tabs>
@@ -1779,172 +1789,213 @@ export default function Page() {
   )
 
   return (
-    <div class="relative size-full overflow-hidden flex flex-col">
-      {sessionSync() ?? ""}
-      <SessionHeader />
-      <Show when={cmccLayout()}>
-        <button
-          type="button"
-          class="absolute right-3 top-2 z-50 flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-icon-icon-muted transition-[background-color,color] duration-150 hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-border-border-active data-[pressed]:bg-v2-overlay-simple-overlay-hover data-[pressed]:text-v2-icon-icon-base disabled:pointer-events-none disabled:opacity-35"
-          data-pressed={view().reviewPanel.opened() ? "" : undefined}
-          title={view().reviewPanel.opened() ? "隐藏右栏" : "展开右栏"}
-          aria-label={view().reviewPanel.opened() ? "隐藏右栏" : "展开右栏"}
-          aria-pressed={view().reviewPanel.opened()}
-          disabled={!params.id}
-          onClick={toggleCmccRightPanel}
-        >
-          <Icon name={view().reviewPanel.opened() ? "layout-right-full" : "layout-right"} class="size-4" />
-        </button>
-      </Show>
-      <div
-        class="flex-1 min-h-0 flex flex-col md:flex-row"
-        classList={{
-          "gap-2 p-2": settings.general.newLayoutDesigns() && !cmccLayout(),
-        }}
-      >
-        <Show when={!isDesktop() && !!params.id && !settings.general.newLayoutDesigns()}>{mobileTabs()}</Show>
-
+    <DeepTradingWorkbenchProvider sessionID={() => params.id} active={deepTrading}>
+      <div class="relative size-full overflow-hidden flex flex-col">
+        {sessionSync() ?? ""}
+        <SessionHeader />
+        <Show when={cmccLayout() && !deepTrading()}>
+          <button
+            type="button"
+            class="absolute right-3 top-2 z-50 flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-icon-icon-muted transition-[background-color,color] duration-150 hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-border-border-active data-[pressed]:bg-v2-overlay-simple-overlay-hover data-[pressed]:text-v2-icon-icon-base disabled:pointer-events-none disabled:opacity-35"
+            data-pressed={view().reviewPanel.opened() ? "" : undefined}
+            title={view().reviewPanel.opened() ? "隐藏右栏" : "展开右栏"}
+            aria-label={view().reviewPanel.opened() ? "隐藏右栏" : "展开右栏"}
+            aria-pressed={view().reviewPanel.opened()}
+            disabled={!params.id}
+            onClick={toggleCmccRightPanel}
+          >
+            <Icon name={view().reviewPanel.opened() ? "layout-right-full" : "layout-right"} class="size-4" />
+          </button>
+        </Show>
         <div
+          class="flex-1 min-h-0 flex flex-col md:flex-row"
           classList={{
-            "@container relative shrink-0 flex flex-col min-h-0 h-full transition-[width]": true,
-            "flex-1": cmccLayout(),
-            "flex-1 md:flex-none": !cmccLayout(),
-            "duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
-              !size.active() && !ui.reviewSnap && !ui.rightSizing,
-          }}
-          style={{
-            width: sessionPanelWidth(),
+            "gap-2 p-2": settings.general.newLayoutDesigns() && !cmccLayout(),
           }}
         >
+          <Show when={!isDesktop() && !!params.id && !settings.general.newLayoutDesigns()}>{mobileTabs()}</Show>
+
           <div
             classList={{
-              "flex-1 min-h-0 flex flex-col": true,
-              "bg-v2-background-bg-base": settings.general.newLayoutDesigns(),
-              "bg-background-stronger": !settings.general.newLayoutDesigns(),
-              "rounded-[10px] overflow-hidden": settings.general.newLayoutDesigns() && !cmccLayout(),
-              "shadow-[var(--v2-elevation-raised)]":
-                settings.general.newLayoutDesigns() && !!params.id && !cmccLayout(),
-              "border-r border-v2-border-border-base": cmccLayout(),
+              "@container relative shrink-0 flex flex-col min-h-0 h-full transition-[width]": true,
+              "flex-1": cmccLayout(),
+              "flex-1 md:flex-none": !cmccLayout(),
+              "duration-[240ms] ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] motion-reduce:transition-none":
+                !size.active() && !ui.reviewSnap && !ui.rightSizing,
+            }}
+            style={{
+              width: contentPanelWidth(),
             }}
           >
-            <Show when={!isDesktop() && !!params.id && settings.general.newLayoutDesigns() && !mobileTabsBottom()}>
-              {mobileTabs(true)}
-            </Show>
-            <div class="flex-1 min-h-0 overflow-hidden">
-              <Switch>
-                <Match when={params.id && mobileChanges()}>
-                  <div class="relative h-full overflow-hidden">
-                    {reviewContent({
-                      diffStyle: "unified",
-                      classes: {
-                        root: "pb-8 [&_[data-slot=session-review-list]]:pb-0",
-                        header: "px-4 !h-16 !pb-4",
-                        container: "px-4",
-                      },
-                      loadingClass: "px-4 py-4 text-text-weak",
-                      emptyClass: "h-full pb-64 -mt-4 flex flex-col items-center justify-center text-center gap-6",
-                    })}
-                  </div>
-                </Match>
-                <Match when={params.id}>
-                  <Show when={messagesReady() ? params.id : undefined} keyed>
-                    {(_id) => (
-                      <MessageTimeline
-                        actions={actions}
-                        scroll={ui.scroll}
-                        onResumeScroll={resumeScroll}
-                        setScrollRef={setScrollRef}
-                        onScheduleScrollState={scheduleScrollState}
-                        onAutoScrollHandleScroll={autoScroll.handleScroll}
-                        onMarkScrollGesture={markScrollGesture}
-                        hasScrollGesture={hasScrollGesture}
-                        onUserScroll={markUserScroll}
-                        onHistoryScroll={onHistoryScroll}
-                        onAutoScrollInteraction={autoScroll.handleInteraction}
-                        shouldAnchorBottom={() =>
-                          !location.hash && !store.messageId && !ui.pendingMessage && !autoScroll.userScrolled()
-                        }
-                        centered={centered()}
-                        setContentRef={(el) => {
-                          content = el
-                          autoScroll.contentRef(el)
+            <div
+              classList={{
+                "flex-1 min-h-0 flex flex-col": true,
+                "bg-v2-background-bg-base": settings.general.newLayoutDesigns(),
+                "bg-background-stronger": !settings.general.newLayoutDesigns(),
+                "rounded-[10px] overflow-hidden": settings.general.newLayoutDesigns() && !cmccLayout(),
+                "shadow-[var(--v2-elevation-raised)]":
+                  settings.general.newLayoutDesigns() && !!params.id && !cmccLayout(),
+                "border-r border-v2-border-border-base": cmccLayout() && !deepTrading(),
+              }}
+            >
+              <Show when={!isDesktop() && !!params.id && settings.general.newLayoutDesigns() && !mobileTabsBottom()}>
+                {mobileTabs(true)}
+              </Show>
+              <div class="flex-1 min-h-0 overflow-hidden">
+                <Switch>
+                  <Match when={params.id && mobileChanges()}>
+                    <Show
+                      when={deepTrading()}
+                      fallback={
+                        <div class="relative h-full overflow-hidden">
+                          {reviewContent({
+                            diffStyle: "unified",
+                            classes: {
+                              root: "pb-8 [&_[data-slot=session-review-list]]:pb-0",
+                              header: "px-4 !h-16 !pb-4",
+                              container: "px-4",
+                            },
+                            loadingClass: "px-4 py-4 text-text-weak",
+                            emptyClass:
+                              "h-full pb-64 -mt-4 flex flex-col items-center justify-center text-center gap-6",
+                          })}
+                        </div>
+                      }
+                    >
+                      <DeepTradingResultsPanel />
+                    </Show>
+                  </Match>
+                  <Match when={params.id}>
+                    <Show when={messagesReady() ? params.id : undefined} keyed>
+                      {(_id) => (
+                        <Show
+                          when={deepTrading()}
+                          fallback={
+                            <MessageTimeline
+                              actions={actions}
+                              scroll={ui.scroll}
+                              onResumeScroll={resumeScroll}
+                              setScrollRef={setScrollRef}
+                              onScheduleScrollState={scheduleScrollState}
+                              onAutoScrollHandleScroll={autoScroll.handleScroll}
+                              onMarkScrollGesture={markScrollGesture}
+                              hasScrollGesture={hasScrollGesture}
+                              onUserScroll={markUserScroll}
+                              onHistoryScroll={onHistoryScroll}
+                              onAutoScrollInteraction={autoScroll.handleInteraction}
+                              shouldAnchorBottom={() =>
+                                !location.hash && !store.messageId && !ui.pendingMessage && !autoScroll.userScrolled()
+                              }
+                              centered={centered()}
+                              setContentRef={(el) => {
+                                content = el
+                                autoScroll.contentRef(el)
 
-                          const root = scroller
-                          if (root) scheduleScrollState(root)
-                        }}
-                        userMessages={visibleUserMessages()}
-                        setHistoryAnchor={(handlers) => {
-                          captureHistoryAnchor = handlers.capture
-                          restoreHistoryAnchor = handlers.restore
-                        }}
-                        anchor={anchor}
-                        setRevealMessage={(fn) => {
-                          revealMessage = fn
-                        }}
-                        setScrollToEnd={(fn) => {
-                          scrollToEnd = fn
-                        }}
-                      />
-                    )}
-                  </Show>
-                </Match>
-                <Match when={true}>
-                  <NewSessionView worktree={newSessionWorktree()} />
-                </Match>
-              </Switch>
+                                const root = scroller
+                                if (root) scheduleScrollState(root)
+                              }}
+                              userMessages={visibleUserMessages()}
+                              setHistoryAnchor={(handlers) => {
+                                captureHistoryAnchor = handlers.capture
+                                restoreHistoryAnchor = handlers.restore
+                              }}
+                              anchor={anchor}
+                              setRevealMessage={(fn) => {
+                                revealMessage = fn
+                              }}
+                              setScrollToEnd={(fn) => {
+                                scrollToEnd = fn
+                              }}
+                            />
+                          }
+                        >
+                          <Show
+                            when={isDesktop()}
+                            fallback={<DeepTradingSessionView />}
+                          >
+                            <div class="flex size-full min-h-0 overflow-hidden bg-[#f7f8fb]">
+                              <section class="flex h-full w-[55%] shrink-0 min-w-0 flex-col overflow-hidden">
+                                <div class="min-h-0 flex-1 overflow-hidden">
+                                  <DeepTradingSessionView />
+                                </div>
+                                {composerRegion()}
+                              </section>
+                              <aside
+                                aria-label="DeepTrading 分析结果"
+                                class="h-full w-[45%] shrink-0 min-w-0 overflow-hidden border-l border-[#dfe3ea] bg-[#f7f8fb]"
+                              >
+                                <DeepTradingResultsPanel />
+                              </aside>
+                            </div>
+                          </Show>
+                        </Show>
+                      )}
+                    </Show>
+                  </Match>
+                  <Match when={true}>
+                    <NewSessionView worktree={newSessionWorktree()} />
+                  </Match>
+                </Switch>
+              </div>
+
+              <Show
+                when={(params.id || !newSessionDesign()) && !mobileChanges() && (!deepTrading() || !isDesktop())}
+              >
+                {(_) => composerRegion()}
+              </Show>
+              <Show when={!!params.id && mobileTabsBottom()}>{mobileTabs(true, true)}</Show>
             </div>
 
-            <Show when={(params.id || !newSessionDesign()) && !mobileChanges()}>{(_) => composerRegion()}</Show>
-            <Show when={!!params.id && mobileTabsBottom()}>{mobileTabs(true, true)}</Show>
+            <Show when={desktopReviewOpen() && !cmccLayout() && !deepTrading()}>
+              <div onPointerDown={() => size.start()}>
+                <ResizeHandle
+                  classList={{
+                    "-right-1": settings.general.newLayoutDesigns(),
+                  }}
+                  direction="horizontal"
+                  size={layout.session.width()}
+                  min={450}
+                  max={typeof window === "undefined" ? 1000 : window.innerWidth * 0.45}
+                  onResize={(width) => {
+                    size.touch()
+                    layout.session.resize(width)
+                  }}
+                />
+              </div>
+            </Show>
           </div>
 
-          <Show when={desktopReviewOpen() && !cmccLayout()}>
-            <div onPointerDown={() => size.start()}>
-              <ResizeHandle
-                classList={{
-                  "-right-1": settings.general.newLayoutDesigns(),
-                }}
-                direction="horizontal"
-                size={layout.session.width()}
-                min={450}
-                max={typeof window === "undefined" ? 1000 : window.innerWidth * 0.45}
-                onResize={(width) => {
-                  size.touch()
-                  layout.session.resize(width)
-                }}
-              />
-            </div>
+          <Show when={cmccLayout() && !deepTrading()}>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+              onPointerDown={startRightSizing}
+            />
+          </Show>
+
+          <Show when={!deepTrading()}>
+            <SessionSidePanel
+              canReview={canReview}
+              diffs={reviewDiffs}
+              diffsReady={reviewReady}
+              empty={reviewEmptyText}
+              hasReview={hasReview}
+              reviewCount={reviewCount}
+              reviewPanel={reviewPanel}
+              activeDiff={tree.activeDiff}
+              focusReviewDiff={focusReviewDiff}
+              reviewSnap={ui.reviewSnap}
+              size={size}
+              open={cmccLayout() ? cmccRightOpen : undefined}
+              width={cmccLayout() ? cmccRightWidth : undefined}
+              plain={cmccLayout()}
+            />
           </Show>
         </div>
 
-        <Show when={cmccLayout()}>
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
-            onPointerDown={startRightSizing}
-          />
-        </Show>
-
-        <SessionSidePanel
-          canReview={canReview}
-          diffs={reviewDiffs}
-          diffsReady={reviewReady}
-          empty={reviewEmptyText}
-          hasReview={hasReview}
-          reviewCount={reviewCount}
-          reviewPanel={reviewPanel}
-          activeDiff={tree.activeDiff}
-          focusReviewDiff={focusReviewDiff}
-          reviewSnap={ui.reviewSnap}
-          size={size}
-          open={cmccLayout() ? cmccRightOpen : undefined}
-          width={cmccLayout() ? cmccRightWidth : undefined}
-          plain={cmccLayout()}
-        />
+        <TerminalPanel />
       </div>
-
-      <TerminalPanel />
-    </div>
+    </DeepTradingWorkbenchProvider>
   )
 }

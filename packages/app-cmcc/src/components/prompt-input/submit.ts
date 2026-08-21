@@ -373,6 +373,9 @@ export function createPromptSubmit(input: PromptSubmitInput) {
             const binding = await dockapi.sessions.create({ query: text })
             const openCodeSession = asOpenCodeSession(binding.openCodeSession)
             if (!openCodeSession) throw new DockApiError("业务会话未返回有效的 OpenCode session")
+            sessionDirectory = binding.directoryPath
+            client = sdk().createClient({ directory: sessionDirectory, throwOnError: true })
+            serverSync().child(sessionDirectory)
             return { ...openCodeSession, title: binding.title, directory: binding.directoryPath }
           }
           return (await client.session.create({ agent: selectedAgent })).data ?? undefined

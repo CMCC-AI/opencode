@@ -9,7 +9,7 @@ import { DebugBar } from "@/components/debug-bar"
 import { HelpButton } from "@/components/help-button"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { useSettingsCommand } from "@/components/settings-dialog"
-import { useDockApi } from "@/context/dockapi"
+import { dockApiHistorySessions, useDockApi } from "@/context/dockapi"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
@@ -19,7 +19,6 @@ import { setNavigate } from "@/utils/notification-click"
 import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
 import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
-import { sortedRootSessions } from "./layout/helpers"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 
 const SIDEBAR_MIN_WIDTH = 280
@@ -216,7 +215,7 @@ function CmccSidebar() {
   const conversations = createMemo(() => {
     const current = directory()
     if (!current) return [] as Session[]
-    return sortedRootSessions(sync().child(current, { bootstrap: false })[0], Date.now()).sort(
+    return dockApiHistorySessions(current, dockapi.state.sessions).sort(
       (a, b) => sessionUpdatedAt(b) - sessionUpdatedAt(a),
     )
   })

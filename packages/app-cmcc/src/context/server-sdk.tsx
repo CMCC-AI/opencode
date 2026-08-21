@@ -11,6 +11,7 @@ import { createRefCountMap } from "@/utils/refcount"
 import { useGlobal } from "./global"
 import { ServerScope } from "@/utils/server-scope"
 import { useDockApi } from "./dockapi"
+import { pathKey } from "@/utils/path-key"
 
 const isAbortError = (error: unknown) =>
   error !== null && typeof error === "object" && "name" in error && error.name === "AbortError"
@@ -80,8 +81,8 @@ export function resumeStreamAfterPageShow(event: PageTransitionEvent, start: () 
 function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerScope) {
   const platform = usePlatform()
   const dockapi = useDockApi()
-  const directory = dockapi.workspace?.directoryPath
-  if (!directory) throw new Error("DockAPI workspace is unavailable")
+  const defaultDirectory = dockapi.workspace?.directoryPath
+  if (!defaultDirectory) throw new Error("DockAPI workspace is unavailable")
   const abort = new AbortController()
 
   const eventFetch = (() => {
@@ -140,123 +141,164 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     timer = setTimeout(flush, Math.max(0, FLUSH_FRAME_MS - elapsed))
   }
 
-  let streamErrorLogged = false
   const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-  let attempt: AbortController | undefined
-  let run: Promise<void> | undefined
-  let started = false
-  let generation = 0
   const HEARTBEAT_TIMEOUT_MS = 15_000
-  let lastEventAt = Date.now()
-  let heartbeat: ReturnType<typeof setTimeout> | undefined
-  const resetHeartbeat = () => {
-    lastEventAt = Date.now()
-    if (heartbeat) clearTimeout(heartbeat)
-    heartbeat = setTimeout(() => {
-      attempt?.abort()
-    }, HEARTBEAT_TIMEOUT_MS)
-  }
-  const clearHeartbeat = () => {
-    if (!heartbeat) return
-    clearTimeout(heartbeat)
-    heartbeat = undefined
-  }
+  const createDirectoryStream = (directory: string) => {
+    let streamErrorLogged = false
+    let attempt: AbortController | undefined
+    let run: Promise<void> | undefined
+    let started = false
+    let generation = 0
+    let lastEventAt = Date.now()
+    let heartbeat: ReturnType<typeof setTimeout> | undefined
 
-  const start = () => {
-    if (started) return run
-    started = true
-    const active = ++generation
-    const previous = run
-    const current = (async () => {
-      if (previous) await previous
-      // oxlint-disable-next-line no-unmodified-loop-condition -- `started` is set to false by stop() which also aborts; both flags are checked to allow graceful exit
-      while (!abort.signal.aborted && started && generation === active) {
-        attempt = new AbortController()
-        lastEventAt = Date.now()
-        const onAbort = () => {
-          attempt?.abort()
-        }
-        abort.signal.addEventListener("abort", onAbort)
-        try {
-          const events = await eventSdk.event.subscribe(
-            { directory },
-            {
-              signal: attempt.signal,
-              onSseError: (error) => {
-                if (isStreamClosed(error, attempt?.signal)) return
-                if (streamErrorLogged) return
-                streamErrorLogged = true
-                console.error("[directory-sdk] event stream error", {
-                  url: server.http.url,
-                  directory,
-                  fetch: eventFetch ? "platform" : "webview",
-                  error,
-                })
+    const clearHeartbeat = () => {
+      if (!heartbeat) return
+      clearTimeout(heartbeat)
+      heartbeat = undefined
+    }
+    const resetHeartbeat = () => {
+      lastEventAt = Date.now()
+      clearHeartbeat()
+      heartbeat = setTimeout(() => attempt?.abort(), HEARTBEAT_TIMEOUT_MS)
+    }
+    const start = () => {
+      if (started) return run
+      started = true
+      const active = ++generation
+      const previous = run
+      const current = (async () => {
+        if (previous) await previous
+        // oxlint-disable-next-line no-unmodified-loop-condition -- stop() changes both flags and aborts the active request
+        while (!abort.signal.aborted && started && generation === active) {
+          attempt = new AbortController()
+          lastEventAt = Date.now()
+          const onAbort = () => attempt?.abort()
+          abort.signal.addEventListener("abort", onAbort)
+          try {
+            const events = await eventSdk.event.subscribe(
+              { directory },
+              {
+                signal: attempt.signal,
+                onSseError: (error) => {
+                  if (isStreamClosed(error, attempt?.signal) || streamErrorLogged) return
+                  streamErrorLogged = true
+                  console.error("[directory-sdk] event stream error", {
+                    url: server.http.url,
+                    directory,
+                    fetch: eventFetch ? "platform" : "webview",
+                    error,
+                  })
+                },
               },
-            },
-          )
-          let yielded = Date.now()
-          resetHeartbeat()
-          for await (const payload of events.stream) {
+            )
+            let yielded = Date.now()
             resetHeartbeat()
-            streamErrorLogged = false
-            const type = payload.type as string
-            if (type !== "server.connected" && type !== "server.heartbeat") {
-              if (enqueueServerEvent(queue, { directory, payload: payload as Event })) schedule()
+            for await (const payload of events.stream) {
+              resetHeartbeat()
+              streamErrorLogged = false
+              const type = payload.type as string
+              if (type !== "server.connected" && type !== "server.heartbeat") {
+                if (enqueueServerEvent(queue, { directory, payload: payload as Event })) schedule()
+              }
+
+              if (Date.now() - yielded < STREAM_YIELD_MS) continue
+              yielded = Date.now()
+              await wait(0)
             }
+          } catch (error) {
+            if (!isStreamClosed(error, attempt?.signal) && !streamErrorLogged) {
+              streamErrorLogged = true
+              console.error("[directory-sdk] event stream failed", {
+                url: server.http.url,
+                directory,
+                fetch: eventFetch ? "platform" : "webview",
+                error,
+              })
+            }
+          } finally {
+            abort.signal.removeEventListener("abort", onAbort)
+            attempt = undefined
+            clearHeartbeat()
+          }
 
-            if (Date.now() - yielded < STREAM_YIELD_MS) continue
-            yielded = Date.now()
-            await wait(0)
-          }
-        } catch (error) {
-          if (!isStreamClosed(error, attempt?.signal) && !streamErrorLogged) {
-            streamErrorLogged = true
-            console.error("[directory-sdk] event stream failed", {
-              url: server.http.url,
-              directory,
-              fetch: eventFetch ? "platform" : "webview",
-              error,
-            })
-          }
-        } finally {
-          abort.signal.removeEventListener("abort", onAbort)
-          attempt = undefined
-          clearHeartbeat()
+          if (abort.signal.aborted || !started || generation !== active) return
+          await wait(RECONNECT_DELAY_MS)
         }
+      })().finally(() => {
+        if (run !== current) return
+        run = undefined
+        flush()
+      })
+      run = current
+      return run
+    }
+    const stop = () => {
+      started = false
+      generation++
+      attempt?.abort()
+      clearHeartbeat()
+    }
+    const reconnectIfStale = () => {
+      if (!started || Date.now() - lastEventAt < HEARTBEAT_TIMEOUT_MS) return
+      attempt?.abort()
+    }
 
-        if (abort.signal.aborted || !started || generation !== active) return
-        await wait(RECONNECT_DELAY_MS)
-      }
-    })().finally(() => {
-      if (run !== current) return
-      run = undefined
-      flush()
-    })
-    run = current
-    return run
+    return { start, stop, reconnectIfStale }
   }
 
-  const stop = () => {
-    started = false
-    generation++
-    attempt?.abort()
-    clearHeartbeat()
+  const streams = new Map<string, { references: number; stream: ReturnType<typeof createDirectoryStream> }>()
+  let pagePaused = false
+  const retain = (directory: string) => {
+    const key = pathKey(directory)
+    let entry = streams.get(key)
+    if (!entry) {
+      entry = { references: 0, stream: createDirectoryStream(key) }
+      streams.set(key, entry)
+    }
+    entry.references++
+    if (!pagePaused) void entry.stream.start()
+
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      const current = streams.get(key)
+      if (!current) return
+      current.references--
+      if (current.references > 0) return
+      current.stream.stop()
+      streams.delete(key)
+    }
+  }
+
+  let defaultRelease: VoidFunction | undefined
+  const start = () => {
+    if (!defaultRelease) defaultRelease = retain(defaultDirectory)
   }
 
   onMount(() => {
-    makeEventListener(window, "pagehide", stop)
-    makeEventListener(window, "pageshow", (event) => resumeStreamAfterPageShow(event, start))
+    makeEventListener(window, "pagehide", () => {
+      pagePaused = true
+      streams.forEach((entry) => entry.stream.stop())
+    })
+    makeEventListener(window, "pageshow", (event) =>
+      resumeStreamAfterPageShow(event, () => {
+        pagePaused = false
+        streams.forEach((entry) => void entry.stream.start())
+      }),
+    )
     makeEventListener(document, "visibilitychange", () => {
       if (document.visibilityState !== "visible") return
-      if (!started) return
-      if (Date.now() - lastEventAt < HEARTBEAT_TIMEOUT_MS) return
-      attempt?.abort()
+      streams.forEach((entry) => entry.stream.reconnectIfStale())
     })
   })
 
   onCleanup(() => {
-    stop()
+    pagePaused = true
+    defaultRelease?.()
+    streams.forEach((entry) => entry.stream.stop())
+    streams.clear()
     abort.abort()
     flush()
   })
@@ -276,6 +318,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
       on: emitter.on.bind(emitter),
       listen: emitter.listen.bind(emitter),
       start,
+      retain,
     },
     createClient(opts: Omit<Parameters<typeof createSdkForServer>[0], "server" | "fetch">) {
       return createSdkForServer({
@@ -325,6 +368,7 @@ function createDirSdkContext(directory: string, serverSDK: ServerSDKBase) {
     directory,
     throwOnError: true,
   })
+  const releaseStream = serverSDK.event.retain(directory)
 
   const emitter = createGlobalEmitter<SDKEventMap>()
 
@@ -332,6 +376,7 @@ function createDirSdkContext(directory: string, serverSDK: ServerSDKBase) {
     emitter.emit(event.type, event)
   })
   onCleanup(unsub)
+  onCleanup(releaseStream)
 
   return {
     scope: serverSDK.scope,

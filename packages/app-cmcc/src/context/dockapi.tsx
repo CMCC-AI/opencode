@@ -4,6 +4,7 @@ import { createStore } from "solid-js/store"
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { usePlatform } from "./platform"
 import { Persist, removePersisted } from "@/utils/persist"
+import { showToast } from "@/utils/toast"
 
 const ACCESS_TOKEN_KEY = "dockapi.accessToken"
 const REFRESH_TOKEN_KEY = "dockapi.refreshToken"
@@ -49,6 +50,39 @@ export function asOpenCodeSession(value: unknown): Session | undefined {
   if (typeof session.title !== "string") return
   if (!session.time || typeof session.time.created !== "number" || typeof session.time.updated !== "number") return
   return session as Session
+}
+
+const normalizedDirectory = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "")
+
+export function isDockApiSessionDirectory(userDirectory: string, sessionDirectory: string) {
+  const root = normalizedDirectory(userDirectory).toLowerCase()
+  const candidate = normalizedDirectory(sessionDirectory).toLowerCase()
+  if (!candidate.startsWith(`${root}/`)) return false
+  const relative = candidate.slice(root.length + 1)
+  return relative.startsWith("s-") && !relative.includes("/")
+}
+
+export function dockApiHistorySessions(userDirectory: string, bindings: DockApiSession[]): Session[] {
+  return bindings
+    .filter((binding) => isDockApiSessionDirectory(userDirectory, binding.directoryPath))
+    .map((binding) => {
+      const session = asOpenCodeSession(binding.openCodeSession)
+      if (session) return { ...session, title: binding.title, directory: binding.directoryPath }
+      const created = Date.parse(binding.createdAt)
+      const updated = Date.parse(binding.updatedAt)
+      return {
+        id: binding.openCodeSessionId,
+        slug: binding.id,
+        projectID: binding.directoryPath,
+        directory: binding.directoryPath,
+        title: binding.title,
+        version: "v2",
+        time: {
+          created: Number.isFinite(created) ? created : 0,
+          updated: Number.isFinite(updated) ? updated : Number.isFinite(created) ? created : 0,
+        },
+      } as Session
+    })
 }
 
 type AuthResponse = {
@@ -191,6 +225,20 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       return sessions
     }
 
+    const loadSessionsSafely = async () => {
+      try {
+        return await loadSessions()
+      } catch (error) {
+        console.error("业务历史加载失败", error)
+        showToast({
+          variant: "error",
+          title: "历史会话加载失败",
+          description: error instanceof Error ? error.message : String(error),
+        })
+        return state.sessions
+      }
+    }
+
     const restore = async () => {
       if (!state.accessToken && !state.refreshToken) {
         setState("status", "unauthenticated")
@@ -199,10 +247,19 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       try {
         const profile = await request<UserProfileResponse>("/api/user/profile")
         setState({ user: profile.user, workspace: profile.workspace })
-        await loadSessions()
         setState("status", "authenticated")
-      } catch {
-        clear()
+        await loadSessionsSafely()
+      } catch (error) {
+        if (error instanceof DockApiError && error.status === 401) {
+          clear()
+          return
+        }
+        setState("status", "unauthenticated")
+        showToast({
+          variant: "error",
+          title: "登录状态恢复失败",
+          description: error instanceof Error ? error.message : String(error),
+        })
       }
     }
 
@@ -232,8 +289,8 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
             body: JSON.stringify(input),
           }).then(readResponse<AuthResponse>)
           saveTokens(auth)
-          await loadSessions()
           setState("status", "authenticated")
+          await loadSessionsSafely()
         },
         register(input: { name: string; phone: string; password: string }) {
           return fetch(`${dockApiBaseUrl()}/api/auth/register`, {

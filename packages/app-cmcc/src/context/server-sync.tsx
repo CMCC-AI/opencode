@@ -214,6 +214,17 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
   })
 
   const session = createServerSession(serverSDK.client)
+  const eventStreamReleases = new Map<string, VoidFunction>()
+  const retainEventStream = (directory: string) => {
+    const key = directoryKey(directory)
+    if (!key || eventStreamReleases.has(key)) return
+    eventStreamReleases.set(key, serverSDK.event.retain(key))
+  }
+  const releaseEventStream = (directory: string) => {
+    const key = directoryKey(directory)
+    eventStreamReleases.get(key)?.()
+    eventStreamReleases.delete(key)
+  }
 
   const children = createChildStoreManager({
     owner,
@@ -222,6 +233,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     isBooting: (directory) => booting.has(directory),
     isLoadingSessions: (directory) => sessionLoads.has(directory),
     onBootstrap: (directory) => {
+      retainEventStream(directory)
       void bootstrapInstance(directory)
     },
     onMcp: (directory, setStore) => {
@@ -243,6 +255,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       sessionMeta.delete(key)
       sdkCache.delete(key)
       clearProviderRev(serverSDK.scope, key)
+      releaseEventStream(key)
     },
     translate: language.t,
     queryOptions: queryOptionsApi,
@@ -282,30 +295,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
         ...queryOptionsApi.sessions(key),
         queryFn: () => {
           if (dockApiDirectory === directory) {
-            return dockapi.sessions.list().then(async (bindings) => {
-              const settled = await Promise.allSettled(
-                bindings
-                  .filter((binding) => binding.directoryPath === directory)
-                  .map(async (binding) => {
-                    const response = await sdkFor(directory).session.get({ sessionID: binding.openCodeSessionId })
-                    if (!response.data) throw new Error(`Session not found: ${binding.openCodeSessionId}`)
-                    return { ...response.data, title: binding.title, directory: binding.directoryPath } satisfies Session
-                  }),
-              )
-              const failed = settled.filter((result) => result.status === "rejected")
-              if (failed.length > 0) {
-                showToast({
-                  variant: "default",
-                  title: "部分历史会话加载失败",
-                  description: `${failed.length} 条业务会话没有取得对应的 OpenCode 会话详情`,
-                })
-              }
-              return {
-                data: settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])),
-                limit: bindings.length,
-                limited: false,
-              }
-            })
+            return Promise.resolve({ data: [] as Session[], limit: 0, limited: false })
           }
           return loadRootSessionsWithFallback({
             directory,
@@ -463,6 +453,8 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     for (const directory of Object.keys(children.children)) {
       children.disposeDirectory(directoryKey(directory))
     }
+    eventStreamReleases.forEach((release) => release())
+    eventStreamReleases.clear()
   })
 
   onMount(() => {
