@@ -126,7 +126,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   {
     kind: "team",
     id: "zhengqi-visit-intel",
-    name: "政企谈参高拜专家团",
+    name: "DeepEngage谈参高拜专家团",
     description:
       "融合内部门户数据与公开情报，产出可溯源的政企拜访决策报告：为何拜访、谈什么、争取什么共识。",
     leadAgent: "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",
@@ -200,4 +200,29 @@ export function cmccExpertCenterHref() {
 export function cmccTeamExpertByAgent(agent: string | undefined) {
   if (!agent) return
   return CMCC_TEAM_EXPERTS.find((expert) => expert.leadAgent === agent)
+}
+
+export const EXPERT_AVATARS = import.meta.glob("../../../../.opencode/experts/*/avatars/*.png", {
+  eager: true,
+  import: "default",
+  query: "?url",
+}) as Record<string, string>
+
+function expertAvatarUrl(team: string, agent: string) {
+  return EXPERT_AVATARS[`../../../../.opencode/experts/${team}/avatars/${agent}.png`]
+}
+
+export function cmccMemberAvatarUrl(member: TeamMember) {
+  const [team, agent] = member.id.split("/")
+  if (!team || !agent) return
+  return expertAvatarUrl(team, agent)
+}
+
+export function cmccTeamAvatarUrl(expert: TeamExpert) {
+  return expertAvatarUrl(expert.id, "team") ?? expertAvatarUrl(expert.id, expert.leadAgent.split("/")[1] ?? "")
+}
+
+export function cmccExpertChineseName(expert: TeamExpert) {
+  const index = expert.name.search(/[\u4e00-\u9fff]/)
+  return index === -1 ? expert.name : expert.name.slice(index)
 }

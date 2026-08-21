@@ -74,7 +74,7 @@ import {
   CmccPromptActionMenu,
   type CmccProfessionalDatabase,
 } from "@/components/cmcc-professional-databases"
-import { cmccExpertCenterHref, cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
+import { cmccExpertCenterHref, cmccExpertChineseName, cmccTeamAvatarUrl, cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
 import { CmccKnowledgePicker } from "@/components/cmcc-knowledge-picker"
 import { cmccKnowledgeNotebooks, type KnowledgeNotebook } from "@/utils/cmcc-knowledge"
 import { useNavigate } from "@solidjs/router"
@@ -1806,7 +1806,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       <button
                         type="button"
                         data-action="prompt-selected-expert"
-                        class="flex h-7 min-w-0 max-w-[210px] items-center gap-1.5 rounded-[7px] bg-v2-background-bg-layer-03 px-2 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                        class="flex h-7 min-w-0 max-w-[210px] items-center gap-1.5 rounded-[7px] bg-v2-background-bg-layer-03 pr-1.5 pl-1 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
                         style={buttons()}
                         onClick={() => {
                           props.onSelectedExpertAgentChange?.(undefined)
@@ -1814,8 +1814,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         }}
                         aria-label={`移除${expert().name}`}
                       >
+                        <Show
+                          when={cmccTeamAvatarUrl(expert())}
+                          fallback={
+                            <div class="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,#8d77ff,#536dff)] text-[10px] font-semibold leading-none text-white">
+                              {cmccExpertChineseName(expert()).slice(0, 1)}
+                            </div>
+                          }
+                        >
+                          {(source) => <img src={source()} alt="" class="size-[18px] shrink-0 rounded-full object-cover" />}
+                        </Show>
+                        <span class="min-w-0 truncate">{cmccExpertChineseName(expert())}</span>
                         <Icon name="close" class="size-3.5 shrink-0 text-v2-icon-icon-muted" />
-                        <span class="min-w-0 truncate">{expert().name}</span>
                       </button>
                     )}
                   </Show>

@@ -29,6 +29,7 @@ import {
   CMCC_TEAM_EXPERTS,
   cmccExpertCenterHref,
   cmccExpertHref,
+  cmccMemberAvatarUrl,
   type CmccExpert,
   type ExternalExpert,
   type TeamExpert,
@@ -82,12 +83,15 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
 }
 
 const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
-const INDUSTRY_EXPERTS = CMCC_EXPERTS.filter((expert) => expert.id !== "chat" && expert.id !== "workspace")
-const EXPERT_AVATARS = import.meta.glob("../../../../.opencode/experts/*/avatars/*.png", {
-  eager: true,
-  import: "default",
-  query: "?url",
-}) as Record<string, string>
+// 3 列网格的固定排序：财经/政企/科研 + 推荐/营销/巡查
+const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "ai-scientist", "shoppers-pro", "deepcampaign", "deepinspect"]
+const INDUSTRY_EXPERTS = [
+  ...INDUSTRY_ORDER.flatMap((id) => {
+    const expert = CMCC_EXPERTS.find((item) => item.id === id)
+    return expert ? [expert] : []
+  }),
+  ...CMCC_EXPERTS.filter((expert) => expert.id !== "chat" && expert.id !== "workspace" && !INDUSTRY_ORDER.includes(expert.id)),
+]
 
 function FeaturedCarousel(props: { experts: TeamExpert[]; onOpen: (expert: TeamExpert) => void }) {
   const [index, setIndex] = createSignal(0)
@@ -101,7 +105,7 @@ function FeaturedCarousel(props: { experts: TeamExpert[]; onOpen: (expert: TeamE
   onCleanup(() => clearInterval(timer))
 
   return (
-    <div class="relative mt-5 flex min-h-[240px] w-full overflow-hidden rounded-[16px] border border-[#d7def7] bg-white p-0 shadow-[0_8px_30px_rgba(67,66,116,0.06)] max-sm:min-h-[200px]">
+    <div class="relative mt-5 flex min-h-[240px] w-full overflow-hidden rounded-[16px] border border-[#d7def7] bg-[#fff] p-0 shadow-[0_8px_30px_rgba(67,66,116,0.06)] max-sm:min-h-[200px]">
       <img
         src={bannerBg}
         alt=""
@@ -207,7 +211,7 @@ function ExternalExpertFrame(props: { expert: ExternalExpert }) {
     <div class="flex size-full min-h-0 min-w-0 flex-col bg-v2-background-bg-base">
       <iframe
         title={props.expert.name}
-        class="min-h-0 flex-1 border-0 bg-white"
+        class="min-h-0 flex-1 border-0 bg-[#fff]"
         src={props.expert.url}
         sandbox="allow-forms allow-popups allow-same-origin allow-scripts"
       />
@@ -349,7 +353,7 @@ function ExpertDetailDialog(props: {
                   {(capability, index) => (
                     <button
                       type="button"
-                      class="group flex min-h-20 min-w-0 items-center gap-2 rounded-[8px] border border-[#edf0f7] bg-[#f9fbfe] px-2.5 py-2 text-left transition hover:-translate-y-0.5 hover:border-[#cbd4f5] hover:bg-white hover:shadow-[0_8px_20px_rgba(69,65,116,0.09)]"
+                      class="group flex min-h-20 min-w-0 items-center gap-2 rounded-[8px] border border-[#edf0f7] bg-[#f9fbfe] px-2.5 py-2 text-left transition hover:-translate-y-0.5 hover:border-[#cbd4f5] hover:bg-[#fff] hover:shadow-[0_8px_20px_rgba(69,65,116,0.09)]"
                       onClick={() => {
                         if (props.expert.kind === "team") {
                           props.onSummon(props.expert, props.expert.examples[index()] ?? props.expert.defaultPrompt)
@@ -384,7 +388,7 @@ function ExpertDetailDialog(props: {
           <footer class="flex h-[68px] shrink-0 items-center justify-end gap-3 border-t border-[#edf0f7] px-6 shadow-[0_-5px_16px_rgba(52,42,89,0.04)]">
             <button
               type="button"
-              class="h-9 rounded-[8px] border border-[#637cff] bg-white px-5 text-[13px] font-medium text-[#536dff] transition hover:bg-[#f5f7ff]"
+              class="h-9 rounded-[8px] border border-[#637cff] bg-[#fff] px-5 text-[13px] font-medium text-[#536dff] transition hover:bg-[#f5f7ff]"
               onClick={props.onClose}
             >
               取消
@@ -394,7 +398,7 @@ function ExpertDetailDialog(props: {
               fallback={
                 <button
                   type="button"
-                  class="flex h-9 items-center justify-center rounded-[8px] bg-[linear-gradient(90deg,#536dff,#8758f5)] px-5 text-[13px] font-medium text-white shadow-[0_6px_14px_rgba(92,91,241,0.22)] transition hover:brightness-105"
+                  class="flex h-9 items-center justify-center rounded-[8px] bg-[linear-gradient(90deg,#536dff,#8758f5)] px-5 text-[13px] font-medium text-[#fff] shadow-[0_6px_14px_rgba(92,91,241,0.22)] transition hover:brightness-105"
                   onClick={() => props.onOpenExternal(props.expert as ExternalExpert)}
                 >
                   打开 {props.expert.name}
@@ -404,7 +408,7 @@ function ExpertDetailDialog(props: {
               {(item) => (
                 <button
                   type="button"
-                  class="flex h-9 items-center justify-center rounded-[8px] bg-[linear-gradient(90deg,#536dff,#8758f5)] px-5 text-[13px] font-medium text-white shadow-[0_6px_14px_rgba(92,91,241,0.22)] transition hover:brightness-105"
+                  class="flex h-9 items-center justify-center rounded-[8px] bg-[linear-gradient(90deg,#8758f5,#3b6dff)] px-5 text-[13px] font-medium text-[#fff] shadow-[0_6px_14px_rgba(120,95,245,0.25)] transition hover:brightness-105"
                   onClick={() => props.onSummon(item())}
                 >
                   召唤产业专家团
@@ -471,7 +475,7 @@ function TagList(props: { tags: readonly string[]; compact?: boolean }) {
 }
 
 function MemberCard(props: { member: TeamMember }) {
-  const avatar = createMemo(() => memberAvatar(props.member))
+  const avatar = createMemo(() => cmccMemberAvatarUrl(props.member))
 
   return (
     <div class="min-w-0 rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-3">
@@ -504,14 +508,14 @@ function MemberCard(props: { member: TeamMember }) {
 }
 
 function DialogMember(props: { member: TeamMember }) {
-  const avatar = createMemo(() => memberAvatar(props.member))
+  const avatar = createMemo(() => cmccMemberAvatarUrl(props.member))
 
   return (
-    <div class="flex min-w-0 items-center gap-2 rounded-full border border-[#e5e7ef] bg-white p-1 pr-3">
+    <div class="flex min-w-0 items-center gap-2 rounded-full border border-[#e5e7ef] bg-[#fff] p-1 pr-3">
       <Show
         when={avatar()}
         fallback={
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,#8d77ff,#536dff)] text-[12px] font-semibold text-white shadow-[0_3px_8px_rgba(83,109,255,0.2)]">
+          <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,#8d77ff,#536dff)] text-[12px] font-semibold text-[#fff] shadow-[0_3px_8px_rgba(83,109,255,0.2)]">
             {props.member.name.slice(0, 1)}
           </div>
         }
@@ -524,10 +528,4 @@ function DialogMember(props: { member: TeamMember }) {
       </div>
     </div>
   )
-}
-
-function memberAvatar(member: TeamMember) {
-  const [team, agent] = member.id.split("/")
-  if (!team || !agent) return
-  return EXPERT_AVATARS[`../../../../.opencode/experts/${team}/avatars/${agent}.png`]
 }
