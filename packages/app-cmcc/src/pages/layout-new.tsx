@@ -220,10 +220,44 @@ function CmccSidebar() {
     )
   })
 
+  const preloadedHistoryDirectories = new Set<string>()
+  const preloadingHistoryDirectories = new Set<string>()
+
+  const preloadHistoryDirectories = async (sessions: Session[]) => {
+    const current = directory()
+    if (!current) return
+    const directories = [...new Set(sessions.map((session) => session.directory))].filter(
+      (item) => item !== current && !preloadedHistoryDirectories.has(item) && !preloadingHistoryDirectories.has(item),
+    )
+    if (directories.length === 0) return
+
+    let next = 0
+    const worker = async () => {
+      while (next < directories.length) {
+        const item = directories[next++]
+        preloadingHistoryDirectories.add(item)
+        try {
+          await sync().project.loadSessions(item)
+          preloadedHistoryDirectories.add(item)
+        } catch (error) {
+          console.warn("历史会话后台预加载失败", error)
+        } finally {
+          preloadingHistoryDirectories.delete(item)
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(3, directories.length) }, () => worker()))
+  }
+
   createEffect(() => {
     const current = directory()
     if (!current) return
     void sync().project.loadSessions(current)
+  })
+
+  createEffect(() => {
+    void preloadHistoryDirectories(conversations())
   })
   const sidebarMaxWidth = createMemo(() => {
     if (typeof window === "undefined") return SIDEBAR_MAX_WIDTH

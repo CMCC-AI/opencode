@@ -23,6 +23,7 @@ const sentPromptAsync: string[] = []
 const syncedDirectories: string[] = []
 const promotedDrafts: Array<{ draftID: string; server: string; sessionId: string }> = []
 const dockSessionQueries: string[] = []
+const dockSessionPreparationIds: Array<string | undefined> = []
 
 let params: { id?: string } = {}
 let search: { draftId?: string } = {}
@@ -117,8 +118,9 @@ beforeAll(async () => {
     useDockApi: () => ({
       workspace: dockWorkspace,
       sessions: {
-        async create(input: { query: string }) {
+        async create(input: { query: string; preparationId?: string }) {
           dockSessionQueries.push(input.query)
+          dockSessionPreparationIds.push(input.preparationId)
           return {
             id: "business-1",
             agentType: "DeepInsight",
@@ -288,6 +290,7 @@ beforeEach(() => {
   sentPromptAsync.length = 0
   syncedDirectories.length = 0
   dockSessionQueries.length = 0
+  dockSessionPreparationIds.length = 0
   selected = "/repo/worktree-a"
   variant = undefined
   dockWorkspace = undefined
@@ -455,6 +458,7 @@ describe("prompt submit worktree selection", () => {
 
   test("retargets a DockAPI session to its dedicated directory before sending", async () => {
     dockWorkspace = { directoryPath: "/repo/main" }
+    let preparationConsumed = false
     const submit = createPromptSubmit({
       prompt,
       info: () => undefined,
@@ -471,12 +475,18 @@ describe("prompt submit worktree selection", () => {
       setMode: () => undefined,
       setPopover: () => undefined,
       onSubmit: () => undefined,
+      sessionPreparation: async () => "preparation-1",
+      onSessionPreparationConsumed: () => {
+        preparationConsumed = true
+      },
     })
 
     await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(dockSessionQueries).toEqual(["ls"])
+    expect(dockSessionPreparationIds).toEqual(["preparation-1"])
+    expect(preparationConsumed).toBe(true)
     expect(createdClients).toEqual([dockSessionDirectory])
     expect(sentPromptAsync).toEqual([dockSessionDirectory])
     expect(promoted).toEqual([{ directory: dockSessionDirectory, sessionID: "dock-session-1" }])

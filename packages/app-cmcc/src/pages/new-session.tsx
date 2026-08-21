@@ -1,4 +1,4 @@
-import { Show, createEffect, createResource, createSignal, untrack } from "solid-js"
+import { Show, createEffect, createResource, createSignal, onCleanup, untrack } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { NewSessionDesignView } from "@/components/session"
 import { PromptInput } from "@/components/prompt-input"
@@ -8,6 +8,8 @@ import { usePrompt } from "@/context/prompt"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useTabs } from "@/context/tabs"
+import { useDockApi } from "@/context/dockapi"
+import { useSDK } from "@/context/sdk"
 import { createPromptInputController } from "@/pages/session/composer"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
@@ -24,6 +26,8 @@ export default function NewSessionPage() {
   const comments = useComments()
   const language = useLanguage()
   const tabs = useTabs()
+  const dockapi = useDockApi()
+  const sdk = useSDK()
   const route = useSessionKey()
   const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string; agent?: string }>()
   const draftAgent = () => {
@@ -32,6 +36,33 @@ export default function NewSessionPage() {
     return draft?.type === "draft" ? draft.agent : undefined
   }
   const [selectedExpertAgent, setSelectedExpertAgent] = createSignal(searchParams.agent ?? draftAgent())
+  let preparationPromise: Promise<string | undefined> | undefined
+  let preparationConsumed = false
+
+  const prepareSession = () => {
+    if (preparationPromise) return preparationPromise
+    if (!dockapi.workspace || dockapi.workspace.directoryPath !== sdk().directory) return Promise.resolve(undefined)
+    preparationPromise = dockapi.preparations.create().catch((error) => {
+      console.warn("会话预热失败，将在发送时同步创建", error)
+      return undefined
+    })
+    return preparationPromise
+  }
+
+  createEffect(() => {
+    if (!dockapi.workspace || dockapi.workspace.directoryPath !== sdk().directory) return
+    void prepareSession()
+  })
+
+  onCleanup(() => {
+    if (!preparationPromise || preparationConsumed) return
+    void preparationPromise.then((preparationId) => {
+      if (!preparationId || preparationConsumed) return
+      return dockapi.preparations.release(preparationId).catch((error) => {
+        console.warn("未使用的会话预热资源释放失败", error)
+      })
+    })
+  })
 
   const selectExpertAgent = (agent: string | undefined) => {
     setSelectedExpertAgent(agent)
@@ -92,6 +123,10 @@ export default function NewSessionPage() {
                         inputRef = el
                       }}
                       onSubmit={() => comments.clear()}
+                      sessionPreparation={prepareSession}
+                      onSessionPreparationConsumed={() => {
+                        preparationConsumed = true
+                      }}
                       selectedExpertAgent={selectedExpertAgent()}
                       onSelectedExpertAgentChange={selectExpertAgent}
                     />

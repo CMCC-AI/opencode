@@ -192,6 +192,8 @@ type PromptSubmitInput = {
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
   onSubmit?: () => void
+  sessionPreparation?: () => Promise<string | undefined>
+  onSessionPreparationConsumed?: () => void
   selectedAgent?: Accessor<string | undefined>
 }
 
@@ -370,7 +372,9 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         try {
           if (isDockApiRootSession) {
             if (!text.trim()) throw new DockApiError("新会话需要输入文本问题")
-            const binding = await dockapi.sessions.create({ query: text })
+            const preparationId = await input.sessionPreparation?.()
+            const binding = await dockapi.sessions.create({ query: text, preparationId })
+            if (preparationId) input.onSessionPreparationConsumed?.()
             const openCodeSession = asOpenCodeSession(binding.openCodeSession)
             if (!openCodeSession) throw new DockApiError("业务会话未返回有效的 OpenCode session")
             sessionDirectory = binding.directoryPath

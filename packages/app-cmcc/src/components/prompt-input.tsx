@@ -175,6 +175,8 @@ export interface PromptInputProps {
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
   onSubmit?: () => void
+  sessionPreparation?: () => Promise<string | undefined>
+  onSessionPreparationConsumed?: () => void
   toolbar?: JSX.Element
   selectedExpertAgent?: string
   onSelectedExpertAgentChange?: (agent: string | undefined) => void
@@ -1406,6 +1408,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       onQueue: props.onQueue,
       onAbort: props.onAbort,
       onSubmit: props.onSubmit,
+      sessionPreparation: props.sessionPreparation,
+      onSessionPreparationConsumed: props.onSessionPreparationConsumed,
       selectedAgent: () => props.selectedExpertAgent,
     })
 
