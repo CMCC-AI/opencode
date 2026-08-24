@@ -6,11 +6,13 @@ import echartsRuntimeUrl from "../../../../node_modules/echarts/dist/echarts.min
 import { ArtifactPreview } from "@/components/artifact-preview"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
+import { useServerSDK } from "@/context/server-sdk"
 import { artifactText } from "@/pages/session/artifact-preview"
+import { authTokenFromCredentials } from "@/utils/server"
 import { showToast } from "@/utils/toast"
 import type { SessionArtifact } from "../agent-workbench/model"
 import { DEEPTRADING_LEAD_AGENT, deepTradingAvatar } from "./config"
-import { prepareDeepTradingHtmlReport } from "./html-report"
+import { deepTradingHtmlReportPreviewUrl } from "./html-report"
 import { useDeepTradingWorkbench } from "./workbench-context"
 
 export function DeepTradingFilesTab() {
@@ -191,45 +193,44 @@ export function DeepTradingTextReportTab() {
 
 export function DeepTradingVisualReportTab() {
   const context = useDeepTradingWorkbench()
-  const file = useFile()
+  const sdk = useSDK()
+  const serverSDK = useServerSDK()
   const path = createMemo(() => context.workbench().visualReportPath)
-  const state = createMemo(() => (path() ? file.get(path()!) : undefined))
-
-  createEffect(() => {
+  const previewUrl = createMemo(() => {
     const value = path()
-    if (value) void file.load(value)
+    if (!value) return
+    const sdkContext = sdk()
+    const connection = serverSDK().server.http
+    return deepTradingHtmlReportPreviewUrl({
+      serverUrl: sdkContext.url,
+      directory: sdkContext.directory,
+      path: value,
+      runtimeUrl: echartsRuntimeUrl,
+      pageOrigin: window.location.origin,
+      authToken: connection.password
+        ? authTokenFromCredentials({ username: connection.username, password: connection.password })
+        : undefined,
+    })
   })
 
   return (
-    <ReportFileShell
-      path={path()}
-      state={state()}
-      emptyTitle="可视化报告尚未生成"
-      emptyDescription="等待 40-report.html 写入完成。"
-    >
-      {(content) => {
-        const prepared = createMemo(() =>
-          prepareDeepTradingHtmlReport(artifactText(content.content, content.encoding), echartsRuntimeUrl),
-        )
-        return (
-          <Show
-            when={prepared().document}
-            fallback={<ReportEmpty title="可视化报告加载失败" description={prepared().error ?? "HTML 报告无效"} />}
-            keyed
-          >
-            {(document) => (
-              <iframe
-                title={prepared().title}
-                class="block size-full min-h-[400px] border-0 bg-white"
-                srcdoc={document}
-                sandbox="allow-popups allow-scripts"
-                referrerpolicy="no-referrer"
-              />
-            )}
-          </Show>
-        )
-      }}
-    </ReportFileShell>
+    <div class="h-full min-h-0 overflow-hidden bg-[#f7f8fb]">
+      <Show
+        when={previewUrl()}
+        fallback={<ReportEmpty title="可视化报告尚未生成" description="等待 40-report.html 写入完成。" />}
+        keyed
+      >
+        {(url) => (
+          <iframe
+            title="DeepTrading 可视化报告"
+            class="block size-full min-h-[400px] border-0 bg-white"
+            src={url}
+            sandbox="allow-scripts"
+            referrerpolicy="origin"
+          />
+        )}
+      </Show>
+    </div>
   )
 }
 

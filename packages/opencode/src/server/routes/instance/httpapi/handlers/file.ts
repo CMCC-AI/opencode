@@ -13,6 +13,7 @@ import { homedir } from "node:os"
 import path from "path"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
+import { DomUtils, parseDocument } from "htmlparser2"
 import { InstanceHttpApi } from "../api"
 import { scanKnowledgeGraph } from "@/knowledge/graph"
 import { WorkspaceRouteContext } from "../middleware/workspace-routing"
@@ -144,11 +145,12 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     })
 
     const preview = Effect.fn("FileHttpApi.preview")(function* (ctx: {
-      query: { path: string }
+      query: { path: string; runtime?: string }
       request: HttpServerRequest.HttpServerRequest
     }) {
       const directory = (yield* InstanceState.context).directory
-      if (path.extname(ctx.query.path).toLowerCase() !== ".pdf") return yield* new HttpApiError.BadRequest({})
+      const extension = path.extname(ctx.query.path).toLowerCase()
+      if (extension !== ".pdf" && extension !== ".html") return yield* new HttpApiError.BadRequest({})
 
       const absolute = path.resolve(directory, ctx.query.path)
       if (!FSUtil.contains(directory, absolute)) return yield* new HttpApiError.BadRequest({})
@@ -161,6 +163,23 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       const info = yield* fs.stat(target).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
       const size = Number(info.size)
       if (info.type !== "File" || !Number.isSafeInteger(size)) return yield* new HttpApiError.BadRequest({})
+
+      if (extension === ".html") {
+        const runtime = htmlPreviewRuntime(ctx.query.runtime, ctx.request.url, ctx.request.headers.referer)
+        if (!runtime) return yield* new HttpApiError.BadRequest({})
+        const content = yield* fs.readFileString(target).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
+        if (!content.trim()) return yield* new HttpApiError.BadRequest({})
+        return HttpServerResponse.text(prepareHtmlPreview(content, runtime.href), {
+          contentType: "text/html; charset=utf-8",
+          headers: {
+            "Cache-Control": "private, no-cache",
+            "Content-Disposition": inlineDisposition(path.basename(ctx.query.path)),
+            "Content-Security-Policy": htmlPreviewCsp(runtime),
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+          },
+        })
+      }
 
       const modified = Option.getOrUndefined(info.mtime)
       const etag = `W/"${size.toString(16)}-${(modified?.getTime() ?? 0).toString(16)}"`
@@ -332,6 +351,61 @@ function downloadPath(directory: string, value: string) {
   const relative = path.relative(directory, absolute)
   if (!relative) return
   return RelativePath.make(relative)
+}
+
+function htmlPreviewRuntime(input: string | undefined, request: string, referer: string | undefined) {
+  if (!input || !URL.canParse(input)) return
+  const runtime = new URL(input)
+  if (runtime.protocol !== "http:" && runtime.protocol !== "https:") return
+  if (runtime.username || runtime.password || runtime.hash) return
+  const pathname = runtime.pathname.toLowerCase()
+  if (!pathname.includes("echarts") || !pathname.endsWith(".js")) return
+
+  const requestOrigin = new URL(request, "http://localhost").origin
+  const refererOrigin = referer && URL.canParse(referer) ? new URL(referer).origin : undefined
+  if (runtime.origin !== requestOrigin && runtime.origin !== refererOrigin) return
+  return runtime
+}
+
+function prepareHtmlPreview(content: string, runtime: string) {
+  const document = parseDocument(content)
+  const scripts = DomUtils.getElementsByTagName("script", document.children).filter((script) =>
+    script.attribs.src?.toLowerCase().includes("echarts"),
+  )
+  const primary = scripts[0]
+  if (primary) {
+    primary.attribs.src = runtime
+    primary.attribs["data-deeptrading-echarts"] = "local"
+    delete primary.attribs.integrity
+    delete primary.attribs.crossorigin
+    delete primary.attribs.referrerpolicy
+    scripts.slice(1).forEach((script) => DomUtils.removeElement(script))
+  } else {
+    const runtimeDocument = parseDocument("<script></script>")
+    const runtimeScript = DomUtils.getElementsByTagName("script", runtimeDocument.children)[0]
+    runtimeScript.attribs.src = runtime
+    runtimeScript.attribs["data-deeptrading-echarts"] = "local"
+    const head = DomUtils.getElementsByTagName("head", document.children)[0]
+    DomUtils.prependChild(head ?? document, runtimeScript)
+  }
+  return DomUtils.getOuterHTML(document)
+}
+
+function htmlPreviewCsp(runtime: URL) {
+  return [
+    "default-src 'none'",
+    `script-src 'unsafe-inline' ${runtime.origin}${runtime.pathname}`,
+    "script-src-attr 'none'",
+    "style-src 'unsafe-inline'",
+    "img-src data:",
+    "font-src data:",
+    "connect-src 'none'",
+    "media-src 'none'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-src 'none'",
+  ].join("; ")
 }
 
 function parseRange(

@@ -24,6 +24,7 @@ const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const plugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
 const targetFlag = process.argv.find((arg) => arg.startsWith("--target="))?.slice("--target=".length)
+const compileExecutablePath = process.env.OPENCODE_BUN_EXECUTABLE_PATH
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
@@ -172,7 +173,7 @@ for (const item of targets) {
   const bunfsRoot = item.os === "win32" ? "B:/~BUN/root/" : "/$bunfs/root/"
   const workerRelativePath = path.relative(dir, parserWorker).replaceAll("\\", "/")
 
-  await Bun.build({
+  const result = await Bun.build({
     conditions: ["bun", "node"],
     tsconfig: "./tsconfig.json",
     plugins: [plugin],
@@ -182,6 +183,7 @@ for (const item of targets) {
     sourcemap: sourcemapsFlag ? "linked" : "none",
     splitting: true,
     compile: {
+      ...(compileExecutablePath ? { executablePath: compileExecutablePath } : {}),
       autoloadBunfig: false,
       autoloadDotenv: false,
       autoloadTsconfig: true,
@@ -204,6 +206,10 @@ for (const item of targets) {
       ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },
   })
+  if (!result.success) {
+    result.logs.forEach((log) => console.error(log))
+    process.exit(1)
+  }
 
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {

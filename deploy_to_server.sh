@@ -4,9 +4,11 @@ set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 remote=${DEPLOY_HOST:-ubuntu@81.70.49.200}
 port=${OPENCODE_PORT:-4096}
-bind_host=${OPENCODE_BIND_HOST:-0.0.0.0}
+bind_host=${OPENCODE_BIND_HOST:-127.0.0.1}
 public_host=${OPENCODE_PUBLIC_HOST:-${remote#*@}}
 public_scheme=${OPENCODE_PUBLIC_SCHEME:-http}
+public_port=${OPENCODE_PUBLIC_PORT:-3002}
+server_auth_enabled=${OPENCODE_SERVER_AUTH_ENABLED:-false}
 service_user=${OPENCODE_SERVICE_USER:-${remote%@*}}
 keep_releases=${OPENCODE_KEEP_RELEASES:-3}
 install_root=${OPENCODE_INSTALL_ROOT:-/opt/opencode-cmcc}
@@ -35,6 +37,14 @@ if [[ ! $version =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 if [[ $public_scheme != http && $public_scheme != https ]]; then
   echo "OPENCODE_PUBLIC_SCHEME must be http or https" >&2
+  exit 1
+fi
+if [[ $server_auth_enabled != true && $server_auth_enabled != false ]]; then
+  echo "OPENCODE_SERVER_AUTH_ENABLED must be true or false" >&2
+  exit 1
+fi
+if [[ ! $public_port =~ ^[1-9][0-9]*$ ]] || ((10#$public_port > 65535)); then
+  echo "OPENCODE_PUBLIC_PORT must be an integer between 1 and 65535" >&2
   exit 1
 fi
 if [[ ! $port =~ ^[1-9][0-9]*$ ]] || ((10#$port > 65535)); then
@@ -86,16 +96,19 @@ fi
 mkdir -p "$deploy_dir"
 chmod 700 "$deploy_dir"
 
-if [[ -n ${OPENCODE_SERVER_PASSWORD:-} ]]; then
-  password=$OPENCODE_SERVER_PASSWORD
-  printf '%s\n' "$password" >"$password_file"
-  chmod 600 "$password_file"
-elif [[ -f $password_file ]]; then
-  password=$(<"$password_file")
-else
-  password=$(openssl rand -hex 24)
-  printf '%s\n' "$password" >"$password_file"
-  chmod 600 "$password_file"
+password=""
+if [[ $server_auth_enabled == true ]]; then
+  if [[ -n ${OPENCODE_SERVER_PASSWORD:-} ]]; then
+    password=$OPENCODE_SERVER_PASSWORD
+    printf '%s\n' "$password" >"$password_file"
+    chmod 600 "$password_file"
+  elif [[ -f $password_file ]]; then
+    password=$(<"$password_file")
+  else
+    password=$(openssl rand -hex 24)
+    printf '%s\n' "$password" >"$password_file"
+    chmod 600 "$password_file"
+  fi
 fi
 
 echo "Detecting remote architecture: $remote"
@@ -118,18 +131,82 @@ case "$remote_arch" in
     ;;
 esac
 
+prepare_compile_runtime() {
+  if [[ -n ${OPENCODE_BUN_EXECUTABLE_PATH:-} ]]; then
+    if [[ ! -f $OPENCODE_BUN_EXECUTABLE_PATH ]]; then
+      echo "OPENCODE_BUN_EXECUTABLE_PATH does not exist: $OPENCODE_BUN_EXECUTABLE_PATH" >&2
+      exit 1
+    fi
+    compile_runtime_path=$OPENCODE_BUN_EXECUTABLE_PATH
+  else
+    local bun_version
+    local runtime_dir
+    local runtime_archive
+    local runtime_cache_root
+    local runtime_extract_dir
+    local runtime_url
+    bun_version=$(bun --version)
+    runtime_cache_root=${OPENCODE_BUN_CACHE_DIR:-}
+    if [[ -z $runtime_cache_root ]]; then
+      if command -v cygpath >/dev/null 2>&1 && [[ -n ${LOCALAPPDATA:-} ]]; then
+        runtime_cache_root="$(cygpath -u "$LOCALAPPDATA")/opencode-cmcc/bun-runtime"
+      else
+        runtime_cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/opencode-cmcc/bun-runtime"
+      fi
+    fi
+    runtime_dir="$runtime_cache_root/$bun_version/$proxy_target"
+    compile_runtime_path="$runtime_dir/bun"
+
+    if [[ ! -s $compile_runtime_path ]]; then
+      runtime_archive="$runtime_dir/$proxy_target-$bun_version.tgz.part"
+      runtime_extract_dir="$runtime_dir/extract.$$"
+      runtime_url="https://registry.npmjs.org/@oven/$proxy_target/-/$proxy_target-$bun_version.tgz"
+      mkdir -p "$runtime_extract_dir"
+      echo "Downloading Bun compile runtime: $proxy_target v$bun_version"
+      curl --fail --location \
+        --connect-timeout 15 \
+        --retry 3 \
+        --retry-delay 2 \
+        --retry-all-errors \
+        --output "$runtime_archive" \
+        "$runtime_url"
+      tar -xzf "$runtime_archive" \
+        --strip-components=2 \
+        -C "$runtime_extract_dir" \
+        package/bin/bun
+      if [[ ! -s $runtime_extract_dir/bun ]]; then
+        echo "Downloaded Bun compile runtime is empty: $runtime_url" >&2
+        exit 1
+      fi
+      mv -f "$runtime_extract_dir/bun" "$compile_runtime_path"
+      chmod 0755 "$compile_runtime_path"
+      rm -rf "$runtime_extract_dir"
+      rm -f "$runtime_archive"
+    else
+      echo "Using cached Bun compile runtime: $compile_runtime_path"
+    fi
+  fi
+
+  if command -v cygpath >/dev/null 2>&1; then
+    compile_runtime_path=$(cygpath -m "$compile_runtime_path")
+  fi
+}
+
 if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
+  prepare_compile_runtime
   echo "Building APP-CMCC and OpenCode for $target"
   (
     cd "$root/packages/opencode"
     OPENCODE_VERSION="$version" \
       OPENCODE_CHANNEL=cmcc \
+      OPENCODE_BUN_EXECUTABLE_PATH="$compile_runtime_path" \
       OPENCODE_WEB_APP_DIR="$root/packages/app-cmcc" \
       VITE_DEEPXIV_URL="$deepxiv_url" \
       bun run script/build.ts --target="$target"
   )
   echo "Building DeepXiv proxy for $proxy_target"
   bun build --compile \
+    --compile-executable-path="$compile_runtime_path" \
     --no-compile-autoload-dotenv \
     --no-compile-autoload-bunfig \
     --no-compile-autoload-tsconfig \
@@ -140,11 +217,11 @@ if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
   printf '%s\n' "$deepxiv_url" >"$root/packages/opencode/dist/$target/DEEPXIV_URL"
 fi
 
-if [[ ! -x $root/packages/opencode/dist/$target/bin/opencode ]]; then
+if [[ ! -s $root/packages/opencode/dist/$target/bin/opencode ]]; then
   echo "Missing build output: packages/opencode/dist/$target/bin/opencode" >&2
   exit 1
 fi
-if [[ ! -x $root/packages/opencode/dist/$target/bin/deepxiv-proxy ]]; then
+if [[ ! -s $root/packages/opencode/dist/$target/bin/deepxiv-proxy ]]; then
   echo "Missing build output: packages/opencode/dist/$target/bin/deepxiv-proxy" >&2
   exit 1
 fi
@@ -171,10 +248,14 @@ for skill_dir in "$root"/.opencode/experts/*/skills/*/; do
   cp -a "${skill_dir%/}" "$stage/.opencode/skills/"
 done
 printf '%s\n' "$version" >"$stage/VERSION"
-printf 'OPENCODE_SERVER_USERNAME=%q\nOPENCODE_SERVER_PASSWORD=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' \
-  "${OPENCODE_SERVER_USERNAME:-opencode}" \
-  "$password" \
-  "$deeplit_public_origin" >"$stage/opencode.env"
+if [[ $server_auth_enabled == true ]]; then
+  printf 'OPENCODE_SERVER_USERNAME=%q\nOPENCODE_SERVER_PASSWORD=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' \
+    "${OPENCODE_SERVER_USERNAME:-opencode}" \
+    "$password" \
+    "$deeplit_public_origin" >"$stage/opencode.env"
+else
+  printf 'DEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' "$deeplit_public_origin" >"$stage/opencode.env"
+fi
 printf '%s:%s' "${OPENCODE_SERVER_USERNAME:-opencode}" "$password" | base64 | tr -d '\n' >"$stage/health-auth"
 chmod 600 "$stage/opencode.env" "$stage/health-auth"
 printf 'DEEPXIV_PROXY_HOST=%q\nDEEPXIV_PROXY_PORT=%q\nDEEPLIT_PROXY_TARGET=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\nDEEPLIT_PROXY_TRUST_FORWARD_HEADERS=%q\n' \
@@ -209,6 +290,10 @@ if [[ ${DEPLOY_BUILD_ONLY:-0} == 1 ]]; then
 fi
 
 remote_stage="/tmp/opencode-cmcc-$version"
+if [[ $upload_mode == delta ]] && ! command -v rsync >/dev/null 2>&1; then
+  echo "Local rsync is unavailable; falling back to compressed bundle upload"
+  upload_mode=bundle
+fi
 if [[ $upload_mode == delta ]]; then
   if ! ssh "$remote" "command -v rsync >/dev/null 2>&1 && test -x '$install_root/current/opencode'"; then
     echo "Remote rsync or current binary is unavailable; falling back to compressed bundle upload"
@@ -256,7 +341,7 @@ else
   create_bundle
   echo "Uploading one compressed offline bundle"
   ssh "$remote" "rm -rf -- '$remote_stage' && mkdir -p '$remote_stage'"
-  if ssh "$remote" command -v rsync >/dev/null 2>&1; then
+  if command -v rsync >/dev/null 2>&1 && ssh "$remote" command -v rsync >/dev/null 2>&1; then
     rsync --partial --progress "$bundle" "$remote:$remote_stage/release.tar.gz"
   else
     scp "$bundle" "$remote:$remote_stage/release.tar.gz"
@@ -269,15 +354,17 @@ fi
 
 echo
 echo "Deployment complete."
-auth_token=$(printf '%s:%s' "${OPENCODE_SERVER_USERNAME:-opencode}" "$password" | base64 | tr -d '\n')
-if [[ $bind_host == 127.0.0.1 || $bind_host == localhost ]]; then
-  echo "Open an SSH tunnel in another terminal:"
-  echo "  ssh -N -L $port:127.0.0.1:$port $remote"
-  echo "Then visit once: http://127.0.0.1:$port/?auth_token=$auth_token"
-else
-  echo "APP-CMCC URL: $public_scheme://$public_host:$port/?auth_token=$auth_token"
-  echo "DeepXiv proxy URL: $deepxiv_url"
-  echo "Ensure TCP ports $port and $deepxiv_port are allowed by the server firewall and cloud security group."
+public_origin="$public_scheme://$public_host"
+if [[ ($public_scheme == http && $public_port != 80) || ($public_scheme == https && $public_port != 443) ]]; then
+  public_origin="$public_origin:$public_port"
 fi
-echo "Username: ${OPENCODE_SERVER_USERNAME:-opencode}"
-echo "Password: $password"
+if [[ $server_auth_enabled == true ]]; then
+  auth_token=$(printf '%s:%s' "${OPENCODE_SERVER_USERNAME:-opencode}" "$password" | base64 | tr -d '\n')
+  echo "APP-CMCC URL: $public_origin/?auth_token=$auth_token"
+  echo "Username: ${OPENCODE_SERVER_USERNAME:-opencode}"
+  echo "Password: $password"
+else
+  echo "APP-CMCC URL: $public_origin/"
+fi
+echo "DeepXiv proxy URL: $deepxiv_url"
+echo "Ensure TCP ports $public_port and $deepxiv_port are allowed by the server firewall and cloud security group."

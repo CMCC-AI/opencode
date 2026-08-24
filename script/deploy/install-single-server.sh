@@ -115,7 +115,7 @@ service_user=${2:-ubuntu}
 install_root=${OPENCODE_INSTALL_ROOT:-/opt/opencode-cmcc}
 data_root=${OPENCODE_DATA_ROOT:-/var/lib/opencode-cmcc}
 workspace_root=${OPENCODE_WORKSPACE_ROOT:-/srv/opencode/workspaces}
-bind_host=${OPENCODE_BIND_HOST:-0.0.0.0}
+bind_host=${OPENCODE_BIND_HOST:-127.0.0.1}
 port=${OPENCODE_PORT:-4096}
 keep_releases=${OPENCODE_KEEP_RELEASES:-3}
 version=$(<"$release_dir/VERSION")
@@ -139,7 +139,11 @@ if [[ ! -f $release_dir/.opencode/opencode.jsonc ]]; then
   echo "CMCC model configuration is missing: $release_dir/.opencode/opencode.jsonc" >&2
   exit 1
 fi
-if [[ ! -x $release_dir/deepxiv-proxy ]]; then
+if [[ ! -s $release_dir/opencode ]]; then
+  echo "OpenCode binary is missing: $release_dir/opencode" >&2
+  exit 1
+fi
+if [[ ! -s $release_dir/deepxiv-proxy ]]; then
   echo "DeepXiv proxy binary is missing: $release_dir/deepxiv-proxy" >&2
   exit 1
 fi

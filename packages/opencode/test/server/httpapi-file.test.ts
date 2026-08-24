@@ -160,6 +160,69 @@ describe("file HttpApi", () => {
     expect((await request(FilePaths.preview, tmp.path, { path: "linked.pdf" })).status).toBe(400)
   })
 
+  test("serves isolated HTML previews with the local ECharts runtime", async () => {
+    await using tmp = await tmpdir({ git: true })
+    await using outside = await tmpdir({ git: true })
+    const report = `<!DOCTYPE html><html><head>
+      <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js" integrity="stale"></script>
+      </head><body><div id="chart"></div><script>window.chartReady = typeof echarts !== "undefined"</script></body></html>`
+    await Bun.write(path.join(tmp.path, "report.html"), report)
+    await Bun.write(path.join(outside.path, "outside.html"), report)
+    const runtime = "http://app.local:3000/assets/echarts.min-TestHash.js"
+
+    const response = await request(
+      FilePaths.preview,
+      tmp.path,
+      { path: "report.html", runtime },
+      { headers: { Referer: "http://app.local:3000/session/report" } },
+    )
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-type")).toBe("text/html; charset=utf-8")
+    expect(response.headers.get("content-security-policy")).toContain(`script-src 'unsafe-inline' ${runtime}`)
+    expect(response.headers.get("content-security-policy")).toContain("connect-src 'none'")
+    const html = await response.text()
+    expect(html).not.toContain("cdn.jsdelivr.net")
+    expect(html).not.toContain('integrity="stale"')
+    expect(html).toContain(`src="${runtime}"`)
+    expect(html).toContain('data-deeptrading-echarts="local"')
+    expect(html).toContain("window.chartReady")
+
+    await Bun.write(
+      path.join(tmp.path, "report-without-runtime.html"),
+      '<!DOCTYPE html><html><head></head><body><div id="chart"></div></body></html>',
+    )
+    const injected = await request(
+      FilePaths.preview,
+      tmp.path,
+      { path: "report-without-runtime.html", runtime },
+      { headers: { Referer: "http://app.local:3000/session/report" } },
+    )
+    expect(injected.status).toBe(200)
+    expect(await injected.text()).toContain(`src="${runtime}" data-deeptrading-echarts="local"`)
+
+    expect((await request(FilePaths.preview, tmp.path, { path: "report.html" })).status).toBe(400)
+    expect(
+      (
+        await request(
+          FilePaths.preview,
+          tmp.path,
+          { path: "report.html", runtime: "https://example.com/echarts.min.js" },
+          { headers: { Referer: "http://app.local:3000/session/report" } },
+        )
+      ).status,
+    ).toBe(400)
+    expect(
+      (
+        await request(
+          FilePaths.preview,
+          tmp.path,
+          { path: "../outside.html", runtime },
+          { headers: { Referer: "http://app.local:3000/session/report" } },
+        )
+      ).status,
+    ).toBe(400)
+  })
+
   test("serves search endpoints", async () => {
     await using tmp = await tmpdir({ git: true })
     await Bun.write(path.join(tmp.path, "hello.txt"), "needle")

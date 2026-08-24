@@ -16,6 +16,12 @@ export const FileQuery = Schema.Struct({
   path: Schema.String,
 })
 
+export const FilePreviewQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  path: Schema.String,
+  runtime: Schema.optional(Schema.String),
+})
+
 export const FindTextQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   pattern: Schema.String,
@@ -222,20 +228,22 @@ export const FileApi = HttpApi.make("file")
           }),
         ),
         HttpApiEndpoint.get("preview", FilePaths.preview, {
-          query: FileQuery,
+          query: FilePreviewQuery,
           success: [
             Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array({ contentType: "application/pdf" })),
             Schema.Uint8Array.pipe(
               HttpApiSchema.asUint8Array({ contentType: "application/pdf" }),
               HttpApiSchema.status(206),
             ),
+            Schema.String.pipe(HttpApiSchema.asText({ contentType: "text/html; charset=utf-8" })),
           ],
           error: [HttpApiError.BadRequest, HttpApiSchema.Empty(416)],
         }).annotateMerge(
           OpenApi.annotations({
             identifier: "file.preview",
-            summary: "Preview PDF file",
-            description: "Stream a PDF file inline with support for single byte range requests.",
+            summary: "Preview PDF or HTML file",
+            description:
+              "Stream a PDF file with byte range support or render an isolated HTML report from the current workspace.",
           }),
         ),
         HttpApiEndpoint.post("archive", FilePaths.archive, {
