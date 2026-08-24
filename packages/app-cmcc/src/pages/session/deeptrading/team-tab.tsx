@@ -75,7 +75,7 @@ export function DeepTradingTeamTab() {
         </For>
       </section>
 
-      <div class="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto_minmax(0,1fr)] overflow-hidden rounded-[8px] border border-[#dfe4ed] bg-white">
+      <div class="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_auto_minmax(0,1fr)] overflow-hidden rounded-[8px] border border-[#dfe4ed] bg-white">
         <section aria-label="DeepTrading DAG" class="min-h-0 overflow-hidden bg-[#f9fbff] px-3 py-1">
           <div ref={dagContainer} class="relative mx-auto h-full w-full max-w-[860px]">
             <DagConnections getContainer={() => dagContainer} getNode={(agentId) => dagNodes.get(agentId)} nodes={nodes()} />

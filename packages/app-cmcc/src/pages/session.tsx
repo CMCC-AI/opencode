@@ -69,6 +69,7 @@ import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { DeepTradingSessionView } from "@/pages/session/deeptrading/deeptrading-session-view"
 import { DeepTradingResultsPanel } from "@/pages/session/deeptrading/deeptrading-results-panel"
 import { isDeepTradingRootSession } from "@/pages/session/deeptrading/page-selection"
+import { DeepTradingSplitLayout } from "@/pages/session/deeptrading/split-layout"
 import { DeepTradingWorkbenchProvider } from "@/pages/session/deeptrading/workbench-context"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
@@ -1909,24 +1910,18 @@ export default function Page() {
                             />
                           }
                         >
-                          <Show
-                            when={isDesktop()}
-                            fallback={<DeepTradingSessionView />}
-                          >
-                            <div class="flex size-full min-h-0 overflow-hidden bg-[#f7f8fb]">
-                              <section class="flex h-full w-[55%] shrink-0 min-w-0 flex-col overflow-hidden">
-                                <div class="min-h-0 flex-1 overflow-hidden">
-                                  <DeepTradingSessionView />
-                                </div>
-                                {composerRegion()}
-                              </section>
-                              <aside
-                                aria-label="DeepTrading 分析结果"
-                                class="h-full w-[45%] shrink-0 min-w-0 overflow-hidden border-l border-[#dfe3ea] bg-[#f7f8fb]"
-                              >
-                                <DeepTradingResultsPanel />
-                              </aside>
-                            </div>
+                          <Show when={isDesktop()} fallback={<DeepTradingSessionView />}>
+                            <DeepTradingSplitLayout
+                              left={
+                                <>
+                                  <div class="min-h-0 flex-1 overflow-hidden">
+                                    <DeepTradingSessionView />
+                                  </div>
+                                  {composerRegion()}
+                                </>
+                              }
+                              right={<DeepTradingResultsPanel />}
+                            />
                           </Show>
                         </Show>
                       )}
