@@ -18,7 +18,6 @@ deeplit_public_origin=${DEEPLIT_PROXY_PUBLIC_ORIGIN:-$public_scheme://$public_ho
 deeplit_trust_forwarded_headers=${DEEPLIT_PROXY_TRUST_FORWARD_HEADERS:-false}
 requested_deepxiv_url=${VITE_DEEPXIV_URL:-}
 deploy_dir="$root/.deploy"
-password_file="$deploy_dir/opencode-server-password"
 version=${OPENCODE_VERSION:-0.0.0-cmcc-$(date +%Y%m%d%H%M%S)}
 
 if [[ ! $keep_releases =~ ^[1-9][0-9]*$ ]]; then
@@ -122,18 +121,6 @@ prepare_models_snapshot() {
   exit 1
 }
 
-if [[ -n ${OPENCODE_SERVER_PASSWORD:-} ]]; then
-  password=$OPENCODE_SERVER_PASSWORD
-  printf '%s\n' "$password" >"$password_file"
-  chmod 600 "$password_file"
-elif [[ -f $password_file ]]; then
-  password=$(<"$password_file")
-else
-  password=$(openssl rand -hex 24)
-  printf '%s\n' "$password" >"$password_file"
-  chmod 600 "$password_file"
-fi
-
 echo "Detecting remote architecture: $remote"
 remote_arch=${DEPLOY_ARCH:-}
 if [[ -z $remote_arch ]]; then
@@ -209,12 +196,8 @@ for skill_dir in "$root"/.opencode/experts/*/skills/*/; do
   cp -a "${skill_dir%/}" "$stage/.opencode/skills/"
 done
 printf '%s\n' "$version" >"$stage/VERSION"
-printf 'OPENCODE_SERVER_USERNAME=%q\nOPENCODE_SERVER_PASSWORD=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' \
-  "${OPENCODE_SERVER_USERNAME:-opencode}" \
-  "$password" \
-  "$deeplit_public_origin" >"$stage/opencode.env"
-printf '%s:%s' "${OPENCODE_SERVER_USERNAME:-opencode}" "$password" | base64 | tr -d '\n' >"$stage/health-auth"
-chmod 600 "$stage/opencode.env" "$stage/health-auth"
+printf 'DEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' "$deeplit_public_origin" >"$stage/opencode.env"
+chmod 600 "$stage/opencode.env"
 printf 'DEEPXIV_PROXY_HOST=%q\nDEEPXIV_PROXY_PORT=%q\nDEEPLIT_PROXY_TARGET=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\nDEEPLIT_PROXY_TRUST_FORWARD_HEADERS=%q\n' \
   "$deepxiv_bind_host" \
   "$deepxiv_port" \
@@ -307,15 +290,12 @@ fi
 
 echo
 echo "Deployment complete."
-auth_token=$(printf '%s:%s' "${OPENCODE_SERVER_USERNAME:-opencode}" "$password" | base64 | tr -d '\n')
 if [[ $bind_host == 127.0.0.1 || $bind_host == localhost ]]; then
   echo "Open an SSH tunnel in another terminal:"
   echo "  ssh -N -L $port:127.0.0.1:$port $remote"
-  echo "Then visit once: http://127.0.0.1:$port/?auth_token=$auth_token"
+  echo "Then visit: http://127.0.0.1:$port/"
 else
-  echo "APP-CMCC URL: $public_scheme://$public_host:$port/?auth_token=$auth_token"
+  echo "APP-CMCC URL: $public_scheme://$public_host:$port/"
   echo "DeepXiv proxy URL: $deepxiv_url"
   echo "Ensure TCP ports $port and $deepxiv_port are allowed by the server firewall and cloud security group."
 fi
-echo "Username: ${OPENCODE_SERVER_USERNAME:-opencode}"
-echo "Password: $password"

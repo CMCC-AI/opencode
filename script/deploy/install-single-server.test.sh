@@ -64,7 +64,6 @@ assert_contains "$logrotate" "maxsize 20M"
 assert_contains "$logrotate" "copytruncate"
 assert_contains "$logrotate" "su opencode-test opencode-test"
 
-health_auth=b3BlbmNvZGU6dGVzdC1wYXNzd29yZA==
 curl_calls=0
 sleep_calls=0
 curl_args=()
@@ -84,8 +83,9 @@ wait_for_health
 [[ $curl_calls == 2 ]] || fail "health check did not retry exactly once"
 [[ $sleep_calls == 1 ]] || fail "health check did not wait between retries"
 has_curl_argument --fail || fail "health check does not reject HTTP errors"
-has_curl_argument --header || fail "health check does not send service credentials"
-has_curl_argument "Authorization: Basic $health_auth" || fail "health check sent unexpected credentials"
+if has_curl_argument --header; then
+  fail "health check still sends Basic Auth credentials"
+fi
 has_curl_argument "http://127.0.0.1:14096/global/health" || fail "health check uses the wrong endpoint"
 
 curl_calls=0
@@ -105,8 +105,11 @@ deployer_source=$(<"$deployer")
 assert_contains "$installer_source" "systemctl enable opencode-cmcc.service opencode-cmcc-deepxiv.service"
 assert_contains "$installer_source" "systemctl restart opencode-cmcc.service opencode-cmcc-deepxiv.service"
 assert_not_contains "$installer_source" "systemctl enable --now"
-assert_contains "$installer_source" 'health_auth=$(<"$release_dir/health-auth")'
-assert_contains "$deployer_source" '>"$stage/health-auth"'
+assert_not_contains "$installer_source" "health-auth"
+assert_not_contains "$deployer_source" "health-auth"
+assert_not_contains "$deployer_source" "OPENCODE_SERVER_PASSWORD"
+assert_not_contains "$deployer_source" "OPENCODE_SERVER_USERNAME"
+assert_not_contains "$deployer_source" "auth_token="
 assert_contains "$deployer_source" 'MODELS_DEV_API_JSON="$models_snapshot"'
 assert_not_contains "$deployer_source" "NODE_TLS_REJECT_UNAUTHORIZED=0"
 assert_not_contains "$deployer_source" "--insecure"

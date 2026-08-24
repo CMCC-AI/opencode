@@ -91,7 +91,7 @@ wait_for_health() {
   local attempt
   for ((attempt = 0; attempt < 15; attempt++)); do
     if curl --disable --fail --silent --output /dev/null --max-time 2 --noproxy '*' \
-      --header "Authorization: Basic $health_auth" "http://127.0.0.1:$port/global/health"; then
+      "http://127.0.0.1:$port/global/health"; then
       return 0
     fi
     if ((attempt < 14)); then
@@ -147,20 +147,10 @@ if [[ ! -f $release_dir/opencode.env ]]; then
   echo "OpenCode environment is missing: $release_dir/opencode.env" >&2
   exit 1
 fi
-if [[ ! -f $release_dir/health-auth ]]; then
-  echo "OpenCode health credentials are missing: $release_dir/health-auth" >&2
-  exit 1
-fi
 if [[ ! -f $release_dir/deepxiv.env ]]; then
   echo "DeepXiv proxy environment is missing: $release_dir/deepxiv.env" >&2
   exit 1
 fi
-health_auth=$(<"$release_dir/health-auth")
-if [[ ! $health_auth =~ ^[A-Za-z0-9+/]+={0,2}$ ]]; then
-  echo "OpenCode health credentials are invalid" >&2
-  exit 1
-fi
-
 install -d -m 0755 "$install_root/releases" "$target" "$workspace_root"
 install -d -o "$service_user" -g "$service_user" -m 0750 \
   "$data_root/data" \
