@@ -34,7 +34,7 @@ import { cmccIsKnowledgeSession, cmccKnowledgeNotebookForSession, cmccKnowledgeN
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import { displayName, sortedRootSessions } from "./layout/helpers"
-import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
+import jiutianLogo from "@/assets/home-v6/jiutian-logo.png"
 
 const SIDEBAR_MIN_WIDTH = 280
 const SIDEBAR_MAX_WIDTH = 420
@@ -518,7 +518,7 @@ function CmccSidebar() {
       >
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
           <div class="flex items-center gap-2.5 px-4 pb-3 pt-12">
-            <img src={jiutianSidebarLogo} alt="深度洞察" class="h-9 w-auto max-w-[96px] shrink-0 object-contain" />
+            <img src={jiutianLogo} alt="九天智能" class="h-9 w-9 shrink-0 rounded-lg object-contain" />
             <span class="text-[16px] font-semibold text-[#1a1a2e]">深度洞察</span>
           </div>
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4">

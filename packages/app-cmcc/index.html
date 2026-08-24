@@ -16,6 +16,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta property="og:image" content="/social-share.png" />
     <meta property="twitter:image" content="/social-share.png" />
+    <!-- 首页指向落地页，须在任何模块脚本加载前重定向，主应用首页在 /app；用显式 index.html 避开 SPA fallback -->
+    <script>
+      if (location.pathname === "/") location.replace("/landing/index.html")
+    </script>
     <script id="oc-theme-preload-script" src="/oc-theme-preload.js"></script>
   </head>
   <body class="antialiased overscroll-none text-12-regular overflow-hidden bg-v2-background-bg-deep">
