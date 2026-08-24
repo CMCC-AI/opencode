@@ -787,22 +787,14 @@ export function CmccKnowledgeNotebookRoute() {
     setNotebook(next)
   }
 
-  const loadMessages = async (sessionID: string) => {
-    const current = client()
-    if (!current) return
-    await current.session
-      .messages({ sessionID, limit: 100 })
-      .then((result) => {
-        if (activeSessionID() !== sessionID) return
-        setState("messages", result.data ?? [])
-      })
-      .catch((error) =>
-        showToast({
-          title: "读取知识库对话失败",
-          description: error instanceof Error ? error.message : String(error),
-          variant: "error",
-        }),
-      )
+  const syncMessages = async (sessionID: string) => {
+    await sync().session.sync(sessionID, { force: true, messageLimit: 100 })
+    await sync().session.prefetch(sessionID, 100)
+    while (sync().session.history.more(sessionID)) {
+      const count = sync().data.message[sessionID]?.length ?? 0
+      await sync().session.history.loadMore(sessionID)
+      if ((sync().data.message[sessionID]?.length ?? 0) <= count) return
+    }
   }
 
   const loadSessions = async () => {
@@ -886,8 +878,13 @@ export function CmccKnowledgeNotebookRoute() {
     loadedSession = sessionID
     serverSync().session.pin(sessionID)
     onCleanup(() => serverSync().session.unpin(sessionID))
-    void sync().session.sync(sessionID, { force: true, messageLimit: 100 })
-    void loadMessages(sessionID)
+    void syncMessages(sessionID).catch((error) =>
+      showToast({
+        title: "读取知识库对话失败",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
+      }),
+    )
   })
 
   createEffect(() => {
@@ -992,11 +989,7 @@ export function CmccKnowledgeNotebookRoute() {
         parts: requestParts,
       })
       .then(async () => {
-        await Promise.all([
-          sync().session.sync(sessionID, { force: true, messageLimit: 100 }),
-          loadMessages(sessionID),
-          loadSessions(),
-        ])
+        await Promise.all([syncMessages(sessionID), loadSessions()])
         return true
       })
       .catch((error) => {
@@ -1107,8 +1100,7 @@ export function CmccKnowledgeNotebookRoute() {
     if (!activeNotebook) return
     if (activeSessionID() === session.id) {
       setState({ activeTab: "chat", messages: [], optimisticPrompt: "" })
-      void sync().session.sync(session.id, { force: true, messageLimit: 100 })
-      void loadMessages(session.id)
+      void syncMessages(session.id)
       return
     }
     saveNotebook({ ...cmccRememberKnowledgeSession(activeNotebook, session.id), lastOpenedAt: Date.now() })
@@ -1583,10 +1575,16 @@ export function CmccKnowledgeNotebookRoute() {
                             <div
                               class="relative flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
                               data-selected={activeSessionID() === session.id ? "" : undefined}
-                              onMouseEnter={() => setHovered(true)}
+                              onMouseEnter={() => {
+                                setHovered(true)
+                                void sync().session.prefetch(session.id, 100)
+                              }}
                               onMouseMove={() => setHovered(true)}
                               onMouseLeave={() => setHovered(false)}
-                              onFocusIn={() => setFocused(true)}
+                              onFocusIn={() => {
+                                setFocused(true)
+                                void sync().session.prefetch(session.id, 100)
+                              }}
                               onFocusOut={(event) => {
                                 if (
                                   event.relatedTarget instanceof Node &&
