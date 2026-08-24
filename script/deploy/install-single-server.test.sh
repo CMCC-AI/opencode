@@ -107,5 +107,8 @@ assert_contains "$installer_source" "systemctl restart opencode-cmcc.service ope
 assert_not_contains "$installer_source" "systemctl enable --now"
 assert_contains "$installer_source" 'health_auth=$(<"$release_dir/health-auth")'
 assert_contains "$deployer_source" '>"$stage/health-auth"'
+assert_contains "$deployer_source" 'MODELS_DEV_API_JSON="$models_snapshot"'
+assert_not_contains "$deployer_source" "NODE_TLS_REJECT_UNAUTHORIZED=0"
+assert_not_contains "$deployer_source" "--insecure"
 
 echo "install-single-server tests passed"

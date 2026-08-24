@@ -86,6 +86,42 @@ fi
 mkdir -p "$deploy_dir"
 chmod 700 "$deploy_dir"
 
+validate_models_snapshot() {
+  bun -e '
+    const value = await Bun.file(process.argv[1]).json()
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length === 0) process.exit(1)
+  ' "$1"
+}
+
+prepare_models_snapshot() {
+  if [[ -n ${MODELS_DEV_API_JSON:-} ]]; then
+    if [[ ! -f $MODELS_DEV_API_JSON ]] || ! validate_models_snapshot "$MODELS_DEV_API_JSON"; then
+      echo "MODELS_DEV_API_JSON must point to a valid models.dev API snapshot" >&2
+      exit 1
+    fi
+    models_snapshot=$MODELS_DEV_API_JSON
+    return
+  fi
+
+  models_snapshot="$deploy_dir/models-dev-api.json"
+  local download
+  download=$(mktemp "$deploy_dir/models-dev-api.XXXXXX")
+  if curl -L --fail --silent --show-error --max-time 30 https://models.dev/api.json -o "$download" && \
+    validate_models_snapshot "$download"; then
+    mv "$download" "$models_snapshot"
+    chmod 600 "$models_snapshot"
+    return
+  fi
+
+  rm -f -- "$download"
+  if [[ -f $models_snapshot ]] && validate_models_snapshot "$models_snapshot"; then
+    echo "Warning: models.dev is unavailable; using the last verified local snapshot" >&2
+    return
+  fi
+  echo "Unable to download a valid models.dev snapshot and no verified cache is available" >&2
+  exit 1
+}
+
 if [[ -n ${OPENCODE_SERVER_PASSWORD:-} ]]; then
   password=$OPENCODE_SERVER_PASSWORD
   printf '%s\n' "$password" >"$password_file"
@@ -119,12 +155,14 @@ case "$remote_arch" in
 esac
 
 if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
+  prepare_models_snapshot
   echo "Building APP-CMCC and OpenCode for $target"
   (
     cd "$root/packages/opencode"
     OPENCODE_VERSION="$version" \
       OPENCODE_CHANNEL=cmcc \
       OPENCODE_WEB_APP_DIR="$root/packages/app-cmcc" \
+      MODELS_DEV_API_JSON="$models_snapshot" \
       VITE_DEEPXIV_URL="$deepxiv_url" \
       bun run script/build.ts --target="$target"
   )
