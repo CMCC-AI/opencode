@@ -28,6 +28,7 @@ const sentShell: string[] = []
 const sentPromptAsync: string[] = []
 const syncedDirectories: string[] = []
 const promotedDrafts: Array<{ draftID: string; server: string; sessionId: string }> = []
+const dockSessionAgentTypes: string[] = []
 const dockSessionQueries: string[] = []
 const dockSessionArtifactDirectories: string[] = []
 
@@ -37,6 +38,7 @@ let selected = "/repo/worktree-a"
 let variant: string | undefined
 let dockWorkspace: { directoryPath: string } | undefined
 let draftArtifact: string | undefined
+let draftExpertID: string | undefined
 let prepareDirectory: (() => Promise<void>) | undefined
 
 const promptValue: Prompt = [{ type: "text", content: "ls", start: 0, end: 2 }]
@@ -135,13 +137,15 @@ beforeAll(async () => {
     asOpenCodeSession: (value: unknown) => value,
     useDockApi: () => ({
       workspace: dockWorkspace,
+      agentType: "deepinsight",
       sessions: {
-        async create(input: { query: string; artifactDirectory: string }) {
+        async create(input: { agentType: string; query: string; artifactDirectory: string }) {
+          dockSessionAgentTypes.push(input.agentType)
           dockSessionQueries.push(input.query)
           dockSessionArtifactDirectories.push(input.artifactDirectory)
           return {
             id: "business-1",
-            agentType: "DeepInsight",
+            agentType: input.agentType,
             query: input.query,
             title: input.query,
             openCodeSessionId: "dock-session-1",
@@ -193,7 +197,7 @@ beforeAll(async () => {
 
   mock.module("@/context/tabs", () => ({
     useTabs: () => ({
-      draft: () => ({ server: "project-server", artifactDirectory: draftArtifact }),
+      draft: () => ({ server: "project-server", artifactDirectory: draftArtifact, expertID: draftExpertID }),
       promoteDraft: (draftID: string, session: { server: string; sessionId: string }) => {
         promotedDrafts.push({ draftID, ...session })
       },
@@ -321,12 +325,14 @@ beforeEach(() => {
   sentShell.length = 0
   sentPromptAsync.length = 0
   syncedDirectories.length = 0
+  dockSessionAgentTypes.length = 0
   dockSessionQueries.length = 0
   dockSessionArtifactDirectories.length = 0
   selected = "/repo/worktree-a"
   variant = undefined
   dockWorkspace = undefined
   draftArtifact = undefined
+  draftExpertID = undefined
   prepareDirectory = undefined
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
 })
@@ -493,6 +499,7 @@ describe("prompt submit worktree selection", () => {
     dockWorkspace = { directoryPath: "/repo/main" }
     search = { draftId: "draft-1" }
     draftArtifact = "/repo/main/runs/session-a"
+    draftExpertID = "deeptrading"
     const submit = createPromptSubmit({
       prompt,
       info: () => undefined,
@@ -509,11 +516,13 @@ describe("prompt submit worktree selection", () => {
       setMode: () => undefined,
       setPopover: () => undefined,
       onSubmit: () => undefined,
+      selectedAgent: () => "deeptrading/deeptrading-team-lead",
     })
 
     await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
+    expect(dockSessionAgentTypes).toEqual(["deeptrading"])
     expect(dockSessionQueries).toEqual(["ls"])
     expect(dockSessionArtifactDirectories).toEqual([draftArtifact])
     expect(createdClients).toEqual([])

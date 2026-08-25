@@ -3,7 +3,7 @@ import { dockApiHistorySessions, isDockApiRuntimeDirectory, type DockApiSession 
 
 const binding = (id: string, directoryPath: string, query = "问题"): DockApiSession => ({
   id: `business-${id}`,
-  agentType: "DeepInsight",
+  agentType: "deepinsight",
   query,
   title: query || "新会话",
   openCodeSessionId: `session-${id}`,

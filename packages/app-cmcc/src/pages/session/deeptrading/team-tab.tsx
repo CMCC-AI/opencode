@@ -23,28 +23,24 @@ export function DeepTradingTeamTab() {
         label: "思考时间",
         value: formatElapsed(context.workbench().stats.elapsedMs),
         icon: "brain" as const,
-        tone: "blue",
       },
       {
         key: "tokens",
         label: "消耗 token",
         value: tokenCount === undefined ? "--" : formatNumber(tokenCount),
         icon: "code-lines" as const,
-        tone: "green",
       },
       {
         key: "sources",
         label: "深度分析",
         value: `${formatNumber(context.workbench().stats.uniqueSearchUrlCount)} 个来源`,
         icon: "magnifying-glass" as const,
-        tone: "amber",
       },
       {
         key: "experts",
         label: "专家团",
         value: `${context.workbench().stats.expertCount} 位`,
         icon: "fork" as const,
-        tone: "red",
       },
     ]
   })
@@ -54,14 +50,8 @@ export function DeepTradingTeamTab() {
       <section aria-label="DeepTrading 统计" class="grid grid-cols-4 gap-1.5">
         <For each={stats()}>
           {(stat) => (
-            <div
-              data-tone={stat.tone}
-              class="flex min-h-[64px] min-w-0 items-center gap-1.5 rounded-[7px] border border-[#dce5f5] bg-[#f4f7fd] p-2 data-[tone=green]:border-[#d5eadd] data-[tone=amber]:border-[#ebdfbf] data-[tone=red]:border-[#efd8d8]"
-            >
-              <span
-                data-tone={stat.tone}
-                class="flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-[#dfe8fb] text-[#4969b4] data-[tone=green]:bg-[#dcefe4] data-[tone=green]:text-[#27815a] data-[tone=amber]:bg-[#f1e6c8] data-[tone=amber]:text-[#956d1f] data-[tone=red]:bg-[#f2dddd] data-[tone=red]:text-[#b04d4d]"
-              >
+            <div class="flex min-h-[64px] min-w-0 items-center gap-1.5 rounded-[7px] border border-[#dce5f5] bg-[#f4f7fd] p-2">
+              <span class="flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-[#dfe8fb] text-[#4969b4]">
                 <Icon name={stat.icon} class="size-3.5" />
               </span>
               <span class="min-w-0">

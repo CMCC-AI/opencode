@@ -409,7 +409,8 @@ export function createPromptSubmit(input: PromptSubmitInput) {
           if (isDockApiRootSession) {
             if (!text.trim()) throw new DockApiError("新会话需要输入文本问题")
             if (!artifactDirectory) throw new DockApiError("新会话缺少产物目录")
-            const binding = await dockapi.sessions.create({ query: text, artifactDirectory })
+            const agentType = (draftID ? tabs.draft(draftID).expertID : undefined) ?? dockapi.agentType
+            const binding = await dockapi.sessions.create({ agentType, query: text, artifactDirectory })
             const openCodeSession = asOpenCodeSession(binding.openCodeSession)
             if (!openCodeSession) throw new DockApiError("业务会话未返回有效的 OpenCode session")
             if (binding.directoryPath !== sessionDirectory) {

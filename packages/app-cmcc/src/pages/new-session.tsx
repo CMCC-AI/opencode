@@ -33,7 +33,9 @@ export default function NewSessionPage() {
   const [selectedExpertAgent, setSelectedExpertAgent] = createSignal(searchParams.agent ?? draftAgent())
   const selectExpertAgent = (agent: string | undefined) => {
     setSelectedExpertAgent(agent)
-    if (searchParams.draftId) tabs.updateDraft(searchParams.draftId, { agent })
+    if (searchParams.draftId) {
+      tabs.updateDraft(searchParams.draftId, agent ? { agent } : { agent, expertID: undefined })
+    }
   }
 
   useComposerCommands()

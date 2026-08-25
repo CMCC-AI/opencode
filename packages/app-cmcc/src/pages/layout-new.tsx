@@ -417,7 +417,7 @@ function CmccSidebar() {
         aria-label="CMCC conversations"
         aria-hidden={!visible()}
         inert={!visible()}
-        class="h-full shrink-0 overflow-hidden border-r border-v2-border-border-base bg-[linear-gradient(180deg,#e0e7ff_0%,#ede9fe_50%,#f5f3ff_100%)]"
+        class="h-full shrink-0 overflow-hidden border-r border-[#c7d2fe] bg-[linear-gradient(180deg,#e0e7ff_0%,#ede9fe_50%,#f5f3ff_100%)] shadow-[4px_0_16px_rgba(49,46,129,0.08)]"
         classList={{
           "transition-[width] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none":
             !drag.active,
@@ -426,11 +426,11 @@ function CmccSidebar() {
         style={{ width: `${width()}px` }}
       >
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
-          <div class="flex items-center gap-2.5 px-4 pb-3 pt-12">
-            <img src={jiutianSidebarLogo} alt="深度洞察" class="h-9 w-auto max-w-[96px] shrink-0 object-contain" />
+          <div class="flex items-center gap-2.5 px-4 pb-4 pt-12">
+            <img src={jiutianSidebarLogo} alt="深度洞察" class="h-10 w-auto max-w-[92px] shrink-0 object-contain" />
             <span class="text-[16px] font-semibold text-[#1a1a2e]">深度洞察</span>
           </div>
-          <nav class="flex shrink-0 flex-col gap-1 px-3 pb-4">
+          <nav class="flex shrink-0 flex-col gap-1 px-3 pb-3">
             <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
             <CmccSidebarAction
               icon="glasses"
@@ -474,21 +474,22 @@ function CmccSidebar() {
               onClick={() => navigate("/deeplens")}
             />
           </nav>
-          <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+          <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#c7d2fe] [&::-webkit-scrollbar]:w-1">
             <CmccSidebarSection
-              label="对话"
+              label="历史任务"
               actionLabel="新对话"
               action={() => void openNewSession()}
               actionIcon="new-session"
             />
             <For
               each={conversations()}
-              fallback={<div class="px-1 py-3 text-14-regular text-v2-text-text-faint">暂无对话</div>}
+              fallback={<div class="px-2 py-5 text-center text-[13px] text-[#9294ad]">暂无历史任务</div>}
             >
               {(session) => (
                 <CmccSessionRow
                   session={session}
                   active={activeSession(session)}
+                  agentType={dockapi.sessions.findByOpenCodeId(session.id)?.agentType}
                   timeLabel={timeLabel(session)}
                   openSession={openSession}
                   deleteSession={deleteSession}
@@ -496,15 +497,15 @@ function CmccSidebar() {
               )}
             </For>
           </div>
-          <div class="shrink-0 border-t border-v2-border-border-base p-3">
-            <div class="mb-2 flex h-9 min-w-0 items-center gap-2 px-2 text-14-medium text-v2-text-text-base">
+          <div class="shrink-0 border-t border-[rgba(99,102,241,0.10)] px-3 py-3.5">
+            <div class="mb-2 flex h-9 min-w-0 items-center gap-2 rounded-[8px] px-2 text-14-medium text-[#4a4a6a] hover:bg-[rgba(99,102,241,0.06)]">
               <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-12-medium text-blue-700">
                 {dockapi.user?.name.slice(0, 1) || "用"}
               </span>
               <span class="min-w-0 flex-1 truncate">{dockapi.user?.name}</span>
               <button
                 type="button"
-                class="shrink-0 text-12-regular text-v2-text-text-muted hover:text-v2-text-text-strong"
+                class="shrink-0 text-12-regular text-[#7c7fbd] hover:text-[#4f46e5]"
                 onClick={() => void dockapi.auth.logout()}
               >
                 退出
@@ -512,7 +513,7 @@ function CmccSidebar() {
             </div>
             <button
               type="button"
-              class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+              class="flex h-9 w-full min-w-0 items-center gap-2.5 rounded-[8px] px-3 text-left text-14-medium text-[#4a4a6a] hover:bg-[rgba(99,102,241,0.08)] hover:text-[#4f46e5]"
               onClick={openSettings}
             >
               <Icon name="settings-gear" class="size-4 shrink-0" />
@@ -520,7 +521,7 @@ function CmccSidebar() {
             </button>
             <button
               type="button"
-              class="mt-1 flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base"
+              class="mt-1 flex h-9 w-full min-w-0 items-center gap-2.5 rounded-[8px] px-3 text-left text-14-medium text-[#4a4a6a] hover:bg-[rgba(99,102,241,0.08)] hover:text-[#4f46e5]"
               onClick={() => platform.openLink("https://opencode.ai/desktop-feedback")}
             >
               <Icon name="help" class="size-4 shrink-0" />
@@ -532,7 +533,7 @@ function CmccSidebar() {
       <div
         role="separator"
         aria-orientation="vertical"
-        class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-v2-border-border-base hover:before:bg-v2-border-border-strong"
+        class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-transparent hover:before:bg-[#a5b4fc]"
         onPointerDown={startDrag}
       />
     </>
@@ -571,7 +572,7 @@ function CmccSidebarAction(props: {
   return (
     <button
       type="button"
-      class="flex h-8 w-full min-w-0 items-center gap-2 rounded-[6px] px-2 text-left text-14-medium text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base disabled:opacity-50 data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+      class="flex h-9 w-full min-w-0 items-center gap-2.5 rounded-[8px] px-3 text-left text-14-medium text-[#4a4a6a] transition-colors duration-150 hover:bg-[rgba(99,102,241,0.08)] hover:text-[#4f46e5] disabled:opacity-50 data-[selected]:bg-[rgba(99,102,241,0.12)] data-[selected]:font-medium data-[selected]:text-[#4f46e5]"
       onClick={props.onClick}
       disabled={!props.onClick}
       data-selected={props.active ? "" : undefined}
@@ -589,12 +590,12 @@ function CmccSidebarSection(props: {
   action?: () => void
 }) {
   return (
-    <div class="mb-2 mt-4 flex h-6 items-center gap-2 px-1 text-14-medium text-v2-text-text-faint first:mt-0">
+    <div class="mb-1.5 mt-4 flex h-7 items-center gap-2 px-1 text-[12px] font-medium text-[#7c7fbd] first:mt-0">
       <span class="min-w-0 flex-1 truncate">{props.label}</span>
       <Show when={props.action && props.actionIcon && props.actionLabel}>
         <button
           type="button"
-          class="flex size-6 shrink-0 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
+          class="flex size-6 shrink-0 items-center justify-center rounded-[6px] text-[#8b8ec4] hover:bg-[rgba(99,102,241,0.10)] hover:text-[#4f46e5]"
           title={props.actionLabel}
           aria-label={props.actionLabel}
           onClick={() => props.action?.()}
@@ -609,6 +610,7 @@ function CmccSidebarSection(props: {
 function CmccSessionRow(props: {
   session: Session
   active: boolean
+  agentType?: string
   timeLabel: string
   openSession: (session: Session) => void
   deleteSession: (session: Session) => void
@@ -627,23 +629,37 @@ function CmccSessionRow(props: {
 
   const row = (
     <div
-      class="group/session relative flex h-9 w-full min-w-0 items-center rounded-[6px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+      class="group/session relative mb-0.5 flex min-h-12 w-full min-w-0 items-center rounded-[6px] text-[#4a4a6a] transition-colors duration-150 hover:bg-[rgba(99,102,241,0.06)] data-[selected]:bg-[rgba(99,102,241,0.10)] data-[selected]:text-[#4f46e5]"
       data-selected={props.active ? "" : undefined}
     >
       <button
         type="button"
-        class="flex h-full w-full min-w-0 items-center gap-2 rounded-[6px] px-2 pr-9 text-left text-14-medium"
+        class="flex min-h-12 w-full min-w-0 items-center rounded-[6px] px-2.5 py-1.5 pr-9 text-left"
         onClick={() => props.openSession(props.session)}
       >
-        <span class="min-w-0 flex-1 truncate">{sessionTitle(props.session.title) ?? "未命名对话"}</span>
-        <span class="shrink-0 text-v2-text-text-faint">{props.timeLabel}</span>
+        <span class="min-w-0 flex-1">
+          <span class="flex min-w-0 items-center gap-1.5">
+            <span class="min-w-0 flex-1 truncate text-[13px] font-medium">
+              {sessionTitle(props.session.title) ?? "未命名对话"}
+            </span>
+            <Show when={props.agentType?.trim()}>
+              <span
+                class="max-w-[104px] shrink-0 truncate rounded-full bg-[rgba(96,165,250,0.14)] px-1.5 py-0.5 text-[11px] font-normal leading-[1.4] text-[#2563eb]"
+                title={props.agentType}
+              >
+                {props.agentType}
+              </span>
+            </Show>
+          </span>
+          <span class="mt-0.5 block text-[11px] font-normal leading-none text-[#8b8daf]">{props.timeLabel}</span>
+        </span>
       </button>
       <div class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100">
         <DropdownMenu>
           <DropdownMenu.Trigger
             as="button"
             type="button"
-            class="flex size-6 shrink-0 items-center justify-center rounded-[5px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base data-[expanded]:bg-v2-overlay-simple-overlay-hover data-[expanded]:text-v2-icon-icon-base"
+            class="flex size-6 shrink-0 items-center justify-center rounded-[5px] text-[#9294b5] hover:bg-[rgba(99,102,241,0.12)] hover:text-[#4f46e5] data-[expanded]:bg-[rgba(99,102,241,0.12)] data-[expanded]:text-[#4f46e5]"
             title="更多"
             aria-label="更多"
           >

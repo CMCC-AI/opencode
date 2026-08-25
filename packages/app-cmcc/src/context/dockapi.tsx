@@ -277,7 +277,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         return state.workspace
       },
       get agentType() {
-        return import.meta.env.VITE_DOCKAPI_AGENT_TYPE?.trim() || "DeepInsight"
+        return (import.meta.env.VITE_DOCKAPI_AGENT_TYPE?.trim() || "deepinsight").toLowerCase()
       },
       auth: {
         async login(input: { phone: string; password: string }) {
@@ -307,11 +307,11 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         findByOpenCodeId(sessionID: string) {
           return state.sessions.find((session) => session.openCodeSessionId === sessionID)
         },
-        async create(input: { query: string; title?: string; artifactDirectory: string }) {
+        async create(input: { agentType: string; query: string; title?: string; artifactDirectory: string }) {
           const session = await request<DockApiSession>("/api/dockapi/sessions", {
             method: "POST",
             body: JSON.stringify({
-              agentType: import.meta.env.VITE_DOCKAPI_AGENT_TYPE?.trim() || "DeepInsight",
+              agentType: input.agentType,
               query: input.query,
               title: input.title,
               artifactDirectory: input.artifactDirectory,
