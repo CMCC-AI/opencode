@@ -8,7 +8,6 @@ bind_host=${OPENCODE_BIND_HOST:-127.0.0.1}
 public_host=${OPENCODE_PUBLIC_HOST:-${remote#*@}}
 public_scheme=${OPENCODE_PUBLIC_SCHEME:-http}
 public_port=${OPENCODE_PUBLIC_PORT:-3002}
-server_auth_enabled=${OPENCODE_SERVER_AUTH_ENABLED:-false}
 service_user=${OPENCODE_SERVICE_USER:-${remote%@*}}
 keep_releases=${OPENCODE_KEEP_RELEASES:-3}
 install_root=${OPENCODE_INSTALL_ROOT:-/opt/opencode-cmcc}
@@ -20,7 +19,6 @@ deeplit_public_origin=${DEEPLIT_PROXY_PUBLIC_ORIGIN:-$public_scheme://$public_ho
 deeplit_trust_forwarded_headers=${DEEPLIT_PROXY_TRUST_FORWARD_HEADERS:-false}
 requested_deepxiv_url=${VITE_DEEPXIV_URL:-}
 deploy_dir="$root/.deploy"
-password_file="$deploy_dir/opencode-server-password"
 version=${OPENCODE_VERSION:-0.0.0-cmcc-$(date +%Y%m%d%H%M%S)}
 
 if [[ ! $keep_releases =~ ^[1-9][0-9]*$ ]]; then
@@ -37,10 +35,6 @@ if [[ ! $version =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 if [[ $public_scheme != http && $public_scheme != https ]]; then
   echo "OPENCODE_PUBLIC_SCHEME must be http or https" >&2
-  exit 1
-fi
-if [[ $server_auth_enabled != true && $server_auth_enabled != false ]]; then
-  echo "OPENCODE_SERVER_AUTH_ENABLED must be true or false" >&2
   exit 1
 fi
 if [[ ! $public_port =~ ^[1-9][0-9]*$ ]] || ((10#$public_port > 65535)); then
@@ -96,20 +90,41 @@ fi
 mkdir -p "$deploy_dir"
 chmod 700 "$deploy_dir"
 
-password=""
-if [[ $server_auth_enabled == true ]]; then
-  if [[ -n ${OPENCODE_SERVER_PASSWORD:-} ]]; then
-    password=$OPENCODE_SERVER_PASSWORD
-    printf '%s\n' "$password" >"$password_file"
-    chmod 600 "$password_file"
-  elif [[ -f $password_file ]]; then
-    password=$(<"$password_file")
-  else
-    password=$(openssl rand -hex 24)
-    printf '%s\n' "$password" >"$password_file"
-    chmod 600 "$password_file"
+validate_models_snapshot() {
+  bun -e '
+    const value = await Bun.file(process.argv[1]).json()
+    if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length === 0) process.exit(1)
+  ' "$1"
+}
+
+prepare_models_snapshot() {
+  if [[ -n ${MODELS_DEV_API_JSON:-} ]]; then
+    if [[ ! -f $MODELS_DEV_API_JSON ]] || ! validate_models_snapshot "$MODELS_DEV_API_JSON"; then
+      echo "MODELS_DEV_API_JSON must point to a valid models.dev API snapshot" >&2
+      exit 1
+    fi
+    models_snapshot=$MODELS_DEV_API_JSON
+    return
   fi
-fi
+
+  models_snapshot="$deploy_dir/models-dev-api.json"
+  local download
+  download=$(mktemp "$deploy_dir/models-dev-api.XXXXXX")
+  if curl -L --fail --silent --show-error --max-time 30 https://models.dev/api.json -o "$download" && \
+    validate_models_snapshot "$download"; then
+    mv "$download" "$models_snapshot"
+    chmod 600 "$models_snapshot"
+    return
+  fi
+
+  rm -f -- "$download"
+  if [[ -f $models_snapshot ]] && validate_models_snapshot "$models_snapshot"; then
+    echo "Warning: models.dev is unavailable; using the last verified local snapshot" >&2
+    return
+  fi
+  echo "Unable to download a valid models.dev snapshot and no verified cache is available" >&2
+  exit 1
+}
 
 echo "Detecting remote architecture: $remote"
 remote_arch=${DEPLOY_ARCH:-}
@@ -194,6 +209,7 @@ prepare_compile_runtime() {
 
 if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
   prepare_compile_runtime
+  prepare_models_snapshot
   echo "Building APP-CMCC and OpenCode for $target"
   (
     cd "$root/packages/opencode"
@@ -201,6 +217,7 @@ if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
       OPENCODE_CHANNEL=cmcc \
       OPENCODE_BUN_EXECUTABLE_PATH="$compile_runtime_path" \
       OPENCODE_WEB_APP_DIR="$root/packages/app-cmcc" \
+      MODELS_DEV_API_JSON="$models_snapshot" \
       VITE_DEEPXIV_URL="$deepxiv_url" \
       bun run script/build.ts --target="$target"
   )
@@ -248,16 +265,8 @@ for skill_dir in "$root"/.opencode/experts/*/skills/*/; do
   cp -a "${skill_dir%/}" "$stage/.opencode/skills/"
 done
 printf '%s\n' "$version" >"$stage/VERSION"
-if [[ $server_auth_enabled == true ]]; then
-  printf 'OPENCODE_SERVER_USERNAME=%q\nOPENCODE_SERVER_PASSWORD=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' \
-    "${OPENCODE_SERVER_USERNAME:-opencode}" \
-    "$password" \
-    "$deeplit_public_origin" >"$stage/opencode.env"
-else
-  printf 'DEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' "$deeplit_public_origin" >"$stage/opencode.env"
-fi
-printf '%s:%s' "${OPENCODE_SERVER_USERNAME:-opencode}" "$password" | base64 | tr -d '\n' >"$stage/health-auth"
-chmod 600 "$stage/opencode.env" "$stage/health-auth"
+printf 'DEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' "$deeplit_public_origin" >"$stage/opencode.env"
+chmod 600 "$stage/opencode.env"
 printf 'DEEPXIV_PROXY_HOST=%q\nDEEPXIV_PROXY_PORT=%q\nDEEPLIT_PROXY_TARGET=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\nDEEPLIT_PROXY_TRUST_FORWARD_HEADERS=%q\n' \
   "$deepxiv_bind_host" \
   "$deepxiv_port" \
@@ -358,13 +367,6 @@ public_origin="$public_scheme://$public_host"
 if [[ ($public_scheme == http && $public_port != 80) || ($public_scheme == https && $public_port != 443) ]]; then
   public_origin="$public_origin:$public_port"
 fi
-if [[ $server_auth_enabled == true ]]; then
-  auth_token=$(printf '%s:%s' "${OPENCODE_SERVER_USERNAME:-opencode}" "$password" | base64 | tr -d '\n')
-  echo "APP-CMCC URL: $public_origin/?auth_token=$auth_token"
-  echo "Username: ${OPENCODE_SERVER_USERNAME:-opencode}"
-  echo "Password: $password"
-else
-  echo "APP-CMCC URL: $public_origin/"
-fi
+echo "APP-CMCC URL: $public_origin/"
 echo "DeepXiv proxy URL: $deepxiv_url"
 echo "Ensure TCP ports $public_port and $deepxiv_port are allowed by the server firewall and cloud security group."

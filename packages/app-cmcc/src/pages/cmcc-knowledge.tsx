@@ -39,6 +39,7 @@ import {
   type KnowledgeImportExecution,
   validateImportPrompt,
 } from "@/pages/cmcc-knowledge-import"
+import { hasUserPrompt, isKnowledgeChatSession } from "@/pages/cmcc-knowledge-chat"
 import { createPromptInputController } from "@/pages/session/composer"
 import { Identifier } from "@/utils/id"
 import { Persist, persisted } from "@/utils/persist"
@@ -786,22 +787,14 @@ export function CmccKnowledgeNotebookRoute() {
     setNotebook(next)
   }
 
-  const loadMessages = async (sessionID: string) => {
-    const current = client()
-    if (!current) return
-    await current.session
-      .messages({ sessionID, limit: 100 })
-      .then((result) => {
-        if (activeSessionID() !== sessionID) return
-        setState("messages", result.data ?? [])
-      })
-      .catch((error) =>
-        showToast({
-          title: "读取知识库对话失败",
-          description: error instanceof Error ? error.message : String(error),
-          variant: "error",
-        }),
-      )
+  const syncMessages = async (sessionID: string) => {
+    await sync().session.sync(sessionID, { force: true, messageLimit: 100 })
+    await sync().session.prefetch(sessionID, 100)
+    while (sync().session.history.more(sessionID)) {
+      const count = sync().data.message[sessionID]?.length ?? 0
+      await sync().session.history.loadMore(sessionID)
+      if ((sync().data.message[sessionID]?.length ?? 0) <= count) return
+    }
   }
 
   const loadSessions = async () => {
@@ -815,9 +808,15 @@ export function CmccKnowledgeNotebookRoute() {
           .filter((session) => !session.parentID && session.time.archived === undefined)
           .toSorted((a, b) => sessionUpdatedAt(b) - sessionUpdatedAt(a))
         setState("sessions", sessions)
-        if (params.sessionID === "new" || sessions.some((session) => session.id === activeSessionID())) return
-        const latest = sessions[0]
-        if (!latest) return
+        if (params.sessionID === "new") return
+        if (params.sessionID && sessions.some((session) => session.id === params.sessionID)) return
+        const active = sessions.find((session) => session.id === activeSessionID())
+        if (active && isKnowledgeChatSession(active)) return
+        const latest = sessions.find(isKnowledgeChatSession)
+        if (!latest) {
+          navigate(`/knowledge/${activeNotebook.id}/session/new`, { replace: true })
+          return
+        }
         saveNotebook({ ...cmccRememberKnowledgeSession(activeNotebook, latest.id), lastOpenedAt: Date.now() })
         navigate(`/knowledge/${activeNotebook.id}/session/${latest.id}`, { replace: true })
       })
@@ -879,8 +878,13 @@ export function CmccKnowledgeNotebookRoute() {
     loadedSession = sessionID
     serverSync().session.pin(sessionID)
     onCleanup(() => serverSync().session.unpin(sessionID))
-    void sync().session.sync(sessionID)
-    void loadMessages(sessionID)
+    void syncMessages(sessionID).catch((error) =>
+      showToast({
+        title: "读取知识库对话失败",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
+      }),
+    )
   })
 
   createEffect(() => {
@@ -896,7 +900,15 @@ export function CmccKnowledgeNotebookRoute() {
     const current = client()
     if (!activeNotebook || !current) return
     const existing = activeSessionID()
-    if (existing) return existing
+    if (existing) {
+      const session =
+        state.sessions.find((item) => item.id === existing) ??
+        (await current.session
+          .get({ sessionID: existing })
+          .then((result) => result.data)
+          .catch(() => undefined))
+      if (session && isKnowledgeChatSession(session)) return existing
+    }
 
     return current.session
       .create({
@@ -977,7 +989,7 @@ export function CmccKnowledgeNotebookRoute() {
         parts: requestParts,
       })
       .then(async () => {
-        await Promise.all([sync().session.sync(sessionID, { force: true }), loadMessages(sessionID), loadSessions()])
+        await Promise.all([syncMessages(sessionID), loadSessions()])
         return true
       })
       .catch((error) => {
@@ -1085,7 +1097,12 @@ export function CmccKnowledgeNotebookRoute() {
 
   const openKnowledgeSession = (session: Session) => {
     const activeNotebook = notebook()
-    if (!activeNotebook || activeSessionID() === session.id) return
+    if (!activeNotebook) return
+    if (activeSessionID() === session.id) {
+      setState({ activeTab: "chat", messages: [], optimisticPrompt: "" })
+      void syncMessages(session.id)
+      return
+    }
     saveNotebook({ ...cmccRememberKnowledgeSession(activeNotebook, session.id), lastOpenedAt: Date.now() })
     setState({ activeTab: "chat", messages: [], optimisticPrompt: "" })
     navigate(`/knowledge/${activeNotebook.id}/session/${session.id}`)
@@ -1558,10 +1575,16 @@ export function CmccKnowledgeNotebookRoute() {
                             <div
                               class="relative flex h-8 w-full min-w-0 items-center rounded-[6px] text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
                               data-selected={activeSessionID() === session.id ? "" : undefined}
-                              onMouseEnter={() => setHovered(true)}
+                              onMouseEnter={() => {
+                                setHovered(true)
+                                void sync().session.prefetch(session.id, 100)
+                              }}
                               onMouseMove={() => setHovered(true)}
                               onMouseLeave={() => setHovered(false)}
-                              onFocusIn={() => setFocused(true)}
+                              onFocusIn={() => {
+                                setFocused(true)
+                                void sync().session.prefetch(session.id, 100)
+                              }}
                               onFocusOut={(event) => {
                                 if (
                                   event.relatedTarget instanceof Node &&
@@ -2357,6 +2380,9 @@ function ChatWorkspace(props: {
   const settings = useSettings()
   const messages = createMemo(() => props.messages.map((message) => message.info))
   const userMessages = createMemo(() => messages().filter((message) => message.role === "user"))
+  const optimisticPromptVisible = createMemo(
+    () => !!props.optimisticPrompt && !hasUserPrompt(props.messages, props.optimisticPrompt),
+  )
   const assistantWorking = createMemo(() =>
     messages().some((message) => message.role === "assistant" && message.time.completed === undefined),
   )
@@ -2365,7 +2391,7 @@ function ChatWorkspace(props: {
     <div class="flex min-h-0 flex-1 flex-col">
       <div class="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         <Show
-          when={userMessages().length > 0 || props.optimisticPrompt}
+          when={userMessages().length > 0 || optimisticPromptVisible()}
           fallback={
             <div class="mx-auto flex h-full max-w-[680px] flex-col items-center justify-center text-center">
               <div class="mb-4 flex size-12 items-center justify-center rounded-[14px] bg-v2-background-bg-layer-03 text-2xl">
@@ -2408,7 +2434,7 @@ function ChatWorkspace(props: {
                 </For>
               )}
             </Show>
-            <Show when={props.optimisticPrompt}>
+            <Show when={optimisticPromptVisible()}>
               <div class="flex justify-end">
                 <div class="max-w-[88%] rounded-[10px] bg-v2-background-bg-layer-03 px-3.5 py-2.5 text-[13px] leading-6 text-v2-text-text-base">
                   {props.optimisticPrompt}

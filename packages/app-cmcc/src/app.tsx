@@ -248,7 +248,7 @@ function DraftRoute() {
       <Show
         when={tabs.store.find((tab): tab is DraftTab => tab.type === "draft" && tab.draftID === search.draftId)}
         keyed
-        fallback={<Navigate href="/" />}
+        fallback={<Navigate href="/app" />}
       >
         {(draft) => <ResolvedDraftRoute draft={draft} />}
       </Show>
@@ -683,14 +683,14 @@ function Routes() {
   return (
     <>
       <Route component={LegacyServerLayout}>
-        <Show when={!settings.general.newLayoutDesigns()}>{<Route path="/" component={LegacyHome} />}</Show>
+        <Show when={!settings.general.newLayoutDesigns()}>{<Route path="/app" component={LegacyHome} />}</Show>
         <Route path="/:dir" component={DirectoryLayout}>
           <Route path="/" component={() => <Navigate href="session" />} />
           <Route path="/session/:id?" component={SessionRoute} />
         </Route>
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
-        <Route path="/" component={CmccDefaultRoute} />
+        <Route path="/app" component={CmccDefaultRoute} />
         <Route path="/expert" component={CmccExpertCenterRoute} />
         <Route path="/expert/:id" component={CmccExpertRoute} />
         <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />
