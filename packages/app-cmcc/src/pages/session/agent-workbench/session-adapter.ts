@@ -157,6 +157,8 @@ export function buildNestedAgentSessions(input: {
         parentSessionId: input.parentSessionId!,
         agentId: session.agent,
         title: session.title,
+        startedAt: session.time.created,
+        completedAt: transcript ? sessionCompletedAt(transcript) : undefined,
         status: input.loadErrors?.[session.id]
           ? ("failed" as const)
           : transcript

@@ -187,6 +187,8 @@ describe("agent workbench session adapter", () => {
         agentId: "helper/searcher",
         title: selected.title,
         status: "completed",
+        startedAt: 10,
+        completedAt: 30,
       },
     ])
     expect(buildNestedAgentSessions({ sessions: [selected], transcripts: new Map() })).toEqual([])

@@ -7,6 +7,14 @@ type InvalidSearchOutput = {
   partId: string
 }
 
+export type SearchUrlEvent = {
+  completedAt: number
+  sessionId: string
+  messageId: string
+  partId: string
+  urls: string[]
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value)
 }
@@ -24,6 +32,15 @@ export function collectUniqueSearchUrls(
   onInvalid?: (input: InvalidSearchOutput) => void,
 ) {
   const urls = new Set<string>()
+  collectSearchUrlEvents(transcripts, onInvalid).forEach((event) => event.urls.forEach((url) => urls.add(url)))
+  return urls
+}
+
+export function collectSearchUrlEvents(
+  transcripts: readonly SessionTranscript[],
+  onInvalid?: (input: InvalidSearchOutput) => void,
+) {
+  const events: SearchUrlEvent[] = []
   for (const transcript of transcripts) {
     for (const message of transcript.messages) {
       for (const part of transcript.parts[message.id] ?? []) {
@@ -34,11 +51,23 @@ export function collectUniqueSearchUrls(
           onInvalid?.({ sessionId: transcript.session.id, messageId: message.id, partId: part.id })
           continue
         }
-        parsed.forEach((url) => urls.add(url))
+        events.push({
+          completedAt: part.state.time.end,
+          sessionId: transcript.session.id,
+          messageId: message.id,
+          partId: part.id,
+          urls: [...new Set(parsed)],
+        })
       }
     }
   }
-  return urls
+  return events.sort(
+    (left, right) =>
+      left.completedAt - right.completedAt ||
+      left.sessionId.localeCompare(right.sessionId) ||
+      left.messageId.localeCompare(right.messageId) ||
+      left.partId.localeCompare(right.partId),
+  )
 }
 
 function parseSearchOutput(output: string) {

@@ -1,8 +1,10 @@
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { createEffect, createMemo, on, onCleanup, type Accessor } from "solid-js"
 import { createStore } from "solid-js/store"
+import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
+import { artifactText } from "@/pages/session/artifact-preview"
 import { artifactByRole, discoverSessionArtifacts } from "../agent-workbench/artifacts"
 import type { AgentWorkbench, SessionTranscript } from "../agent-workbench/model"
 import {
@@ -14,8 +16,19 @@ import {
   extractUserQuery,
   resolveAgentSessions,
 } from "../agent-workbench/session-adapter"
-import { calculateElapsedMs, collectUniqueSearchUrls, sumSessionTokens } from "../agent-workbench/statistics"
+import { calculateElapsedMs, collectSearchUrlEvents, sumSessionTokens } from "../agent-workbench/statistics"
 import { DEEPTRADING_ARTIFACT_ROLES, DEEPTRADING_MEMBERS } from "./config"
+import {
+  DEEPTRADING_REPLAY_DURATION_MS,
+  advanceDeepTradingReplay,
+  compileDeepTradingReplay,
+  createDeepTradingReplayFrame,
+  deepTradingReplayStage,
+  replayNestedAgentSessions,
+  type DeepTradingReplayFrame,
+  type DeepTradingReplayStage,
+  type DeepTradingReplayTimeline,
+} from "./replay"
 
 const MESSAGE_PAGE_SIZE = 200
 const DEEPTRADING_MEMBER_IDS = new Set(DEEPTRADING_MEMBERS.map((member) => member.id))
@@ -24,6 +37,7 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
   name: "DeepTradingWorkbench",
   gate: false,
   init: (props: { sessionID: Accessor<string | undefined>; active: Accessor<boolean> }) => {
+    const file = useFile()
     const sdk = useSDK()
     const sync = useSync()
     const pending = new Map<string, Promise<void>>()
@@ -39,7 +53,39 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
       nestedLoading: {} as Record<string, boolean | undefined>,
       nestedLoadErrors: {} as Record<string, string | undefined>,
     })
+    const [replayState, setReplayState] = createStore({
+      preparing: false,
+      playing: false,
+      progress: 0,
+      stage: "idle" as DeepTradingReplayStage,
+      frame: undefined as DeepTradingReplayFrame | undefined,
+    })
     let generation = 0
+    let replayRunId = 0
+    let replayTimer: number | undefined
+    let replayStartedAt = 0
+    let replayTimeline: DeepTradingReplayTimeline | undefined
+    let replayNextCueIndex = 0
+
+    const clearReplayTimer = () => {
+      if (replayTimer === undefined) return
+      window.clearInterval(replayTimer)
+      replayTimer = undefined
+    }
+
+    const stopReplay = (completed = false) => {
+      replayRunId += 1
+      clearReplayTimer()
+      replayTimeline = undefined
+      replayNextCueIndex = 0
+      setReplayState({
+        preparing: false,
+        playing: false,
+        progress: completed ? 1 : 0,
+        stage: "idle",
+        frame: undefined,
+      })
+    }
 
     const rootSession = createMemo(() => {
       const id = props.active() ? props.sessionID() : undefined
@@ -127,6 +173,7 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
       on(
         () => ({ active: props.active(), directory: sdk().directory, sessionId: props.sessionID() }),
         (input) => {
+          stopReplay()
           const current = ++generation
           setState("selectedAgentId", "overview")
           setState("error", undefined)
@@ -233,6 +280,14 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
         return item ? [item] : []
       })
     })
+    const searchUrlEvents = createMemo(() =>
+      collectSearchUrlEvents(selectedChildTranscripts(), (input) => {
+        const key = `${input.sessionId}/${input.messageId}/${input.partId}`
+        if (invalidSearchOutputs.has(key)) return
+        invalidSearchOutputs.add(key)
+        console.warn(`DeepTrading websearch output is invalid: ${key}`)
+      }),
+    )
     const nodeResult = createMemo(() => {
       const transcripts = childTranscripts()
       const nodes = buildAgentNodes({
@@ -294,12 +349,7 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
       const selected = selectedChildTranscripts()
       return {
         tokenCount: sumSessionTokens([root.session, ...selected.map((item) => item.session)]),
-        uniqueSearchUrlCount: collectUniqueSearchUrls(selected, (input) => {
-          const key = `${input.sessionId}/${input.messageId}/${input.partId}`
-          if (invalidSearchOutputs.has(key)) return
-          invalidSearchOutputs.add(key)
-          console.warn(`DeepTrading websearch output is invalid: ${key}`)
-        }).size,
+        uniqueSearchUrlCount: new Set(searchUrlEvents().flatMap((event) => event.urls)).size,
       }
     })
 
@@ -314,7 +364,7 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
       })
     })
 
-    const workbench = createMemo<AgentWorkbench>(() => {
+    const actualWorkbench = createMemo<AgentWorkbench>(() => {
       const root = rootSession()
       const rootData = rootTranscript()
       if (!root || !rootData) return emptyWorkbench(state.loading, state.error, props.sessionID() ?? "")
@@ -348,17 +398,124 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
       }
     })
 
+    const canReplay = createMemo(() => {
+      const source = actualWorkbench()
+      if (!props.active() || state.loading || source.loading || source.error || running()) return false
+      if (source.overviewStatus !== "completed") return false
+      return !!(
+        source.overviewMarkdown.trim() ||
+        source.agents.some((agent) => agent.markdown.trim() || agent.sessionId) ||
+        source.artifacts.length ||
+        source.textReportPath ||
+        source.visualReportPath
+      )
+    })
+
+    const updateReplay = (progress: number) => {
+      const timeline = replayTimeline
+      const frame = replayState.frame
+      if (!timeline || !frame) return
+      const advanced = advanceDeepTradingReplay({
+        timeline,
+        frame,
+        nextCueIndex: replayNextCueIndex,
+        progress,
+      })
+      replayNextCueIndex = advanced.nextCueIndex
+      setReplayState({
+        preparing: false,
+        playing: true,
+        progress: advanced.frame.progress,
+        stage: deepTradingReplayStage(timeline, advanced.frame.progress),
+        frame: advanced.frame,
+      })
+    }
+
+    const finishReplay = (runId: number) => {
+      if (runId !== replayRunId) return
+      stopReplay(true)
+    }
+
+    const startReplay = async () => {
+      if (replayState.preparing || replayState.playing || !canReplay()) return false
+      const runId = ++replayRunId
+      const source = actualWorkbench()
+      const rootSessionId = source.rootSessionId
+      setReplayState("preparing", true)
+
+      if (source.textReportPath) await file.load(source.textReportPath)
+      if (runId !== replayRunId) return false
+      if (actualWorkbench().rootSessionId !== rootSessionId || !canReplay()) {
+        setReplayState("preparing", false)
+        return false
+      }
+
+      const reportState = source.textReportPath ? file.get(source.textReportPath) : undefined
+      const textReportMarkdown = reportState?.content
+        ? artifactText(reportState.content.content, reportState.content.encoding)
+        : ""
+      const timeline = compileDeepTradingReplay({
+        workbench: source,
+        searchUrlEvents: searchUrlEvents(),
+        textReportMarkdown,
+      })
+      replayTimeline = timeline
+      replayNextCueIndex = 0
+      replayStartedAt = performance.now()
+      setState("selectedAgentId", "overview")
+      setReplayState({
+        preparing: false,
+        playing: true,
+        progress: 0,
+        stage: "team",
+        frame: createDeepTradingReplayFrame(timeline),
+      })
+      updateReplay(0.001)
+      replayTimer = window.setInterval(() => {
+        if (runId !== replayRunId) {
+          clearReplayTimer()
+          return
+        }
+        const progress = Math.min(1, (performance.now() - replayStartedAt) / DEEPTRADING_REPLAY_DURATION_MS)
+        updateReplay(progress)
+        if (progress >= 1) finishReplay(runId)
+      }, 500)
+      return true
+    }
+
+    const workbench = createMemo<AgentWorkbench>(() => {
+      const source = actualWorkbench()
+      const timeline = replayTimeline
+      const frame = replayState.frame
+      if (!replayState.playing || !timeline || !frame) return source
+      if (state.selectedAgentId === "overview") return frame.workbench
+      const selected = frame.workbench.agents.find((agent) => agent.id === state.selectedAgentId)
+      if (!selected || selected.status === "waiting") return frame.workbench
+      return {
+        ...frame.workbench,
+        nestedAgentSessions: replayNestedAgentSessions(timeline, source.nestedAgentSessions, replayState.progress),
+        nestedAgentSessionsLoading: source.nestedAgentSessionsLoading,
+        nestedAgentSessionsError: source.nestedAgentSessionsError,
+      }
+    })
+
     createEffect(
       on(
         () => props.active() && running(),
         (running) => {
           if (!running) return
+          stopReplay()
           setState("now", Date.now())
           const timer = window.setInterval(() => setState("now", Date.now()), 1_000)
           onCleanup(() => window.clearInterval(timer))
         },
       ),
     )
+
+    onCleanup(() => {
+      replayRunId += 1
+      clearReplayTimer()
+    })
 
     return {
       workbench,
@@ -369,6 +526,16 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
       },
       retrySession(sessionId: string) {
         return ensureComplete(sessionId, true)
+      },
+      replay: {
+        canReplay,
+        isPreparing: () => replayState.preparing,
+        isReplaying: () => replayState.playing,
+        progress: () => replayState.progress,
+        stage: () => replayState.stage,
+        textReportMarkdown: () => replayState.frame?.textReportMarkdown ?? "",
+        start: startReplay,
+        stop: () => stopReplay(),
       },
     }
   },

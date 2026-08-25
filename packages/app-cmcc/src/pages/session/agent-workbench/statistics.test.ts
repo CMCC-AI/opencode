@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Message, Part, Session } from "@opencode-ai/sdk/v2"
-import { buildWorkbenchStats, collectUniqueSearchUrls, sumSessionTokens } from "./statistics"
+import { buildWorkbenchStats, collectSearchUrlEvents, collectUniqueSearchUrls, sumSessionTokens } from "./statistics"
 import type { SessionTranscript } from "./model"
 
 const session = (id: string, tokens?: Session["tokens"]): Session => ({
@@ -38,7 +38,7 @@ const assistant = (sessionID: string): Message => ({
   tokens: { input: 999, output: 999, reasoning: 999, cache: { read: 999, write: 999 } },
 })
 
-const search = (id: string, sessionID: string, output: string, tool = "websearch"): Part => ({
+const search = (id: string, sessionID: string, output: string, tool = "websearch", end = 300): Part => ({
   id,
   sessionID,
   messageID: `assistant-${sessionID}`,
@@ -51,7 +51,7 @@ const search = (id: string, sessionID: string, output: string, tool = "websearch
     output,
     title: tool,
     metadata: {},
-    time: { start: 200, end: 300 },
+    time: { start: 200, end },
   },
 })
 
@@ -129,6 +129,42 @@ describe("agent workbench statistics", () => {
         .size,
     ).toBe(0)
     expect(invalid).toEqual(["child/assistant-child/s1"])
+  })
+
+  test("keeps completed websearch URLs in chronological replay order", () => {
+    const child = transcript(
+      session("child"),
+      [assistant("child")],
+      [
+        search("later", "child", JSON.stringify({ results: [{ url: "https://example.com/later" }] }), "websearch", 400),
+        search(
+          "earlier",
+          "child",
+          JSON.stringify({
+            results: [{ url: "https://example.com/earlier" }, { url: "https://example.com/earlier" }],
+          }),
+          "websearch",
+          250,
+        ),
+      ],
+    )
+
+    expect(collectSearchUrlEvents([child])).toEqual([
+      {
+        completedAt: 250,
+        sessionId: "child",
+        messageId: "assistant-child",
+        partId: "earlier",
+        urls: ["https://example.com/earlier"],
+      },
+      {
+        completedAt: 400,
+        sessionId: "child",
+        messageId: "assistant-child",
+        partId: "later",
+        urls: ["https://example.com/later"],
+      },
+    ])
   })
 
   test("derives the configured expert count without inventing missing experts", () => {

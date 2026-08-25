@@ -30,6 +30,8 @@ export type NestedAgentSessionView = {
   agentId?: string
   title: string
   status: AgentNodeStatus
+  startedAt?: number
+  completedAt?: number
 }
 
 export type AgentWorkbenchStats = {

@@ -181,8 +181,13 @@ export function DeepTradingTextReportTab() {
       {(content) => (
         <div class="mx-auto w-full max-w-[860px] rounded-[8px] border border-[#e0e4eb] bg-white px-5 py-5 sm:px-7">
           <Markdown
-            text={artifactText(content.content, content.encoding)}
-            cacheKey={`${context.workbench().rootSessionId}:30-final-report`}
+            text={
+              context.replay.isReplaying()
+                ? context.replay.textReportMarkdown()
+                : artifactText(content.content, content.encoding)
+            }
+            cacheKey={`${context.workbench().rootSessionId}:30-final-report${context.replay.isReplaying() ? ":replay" : ""}`}
+            streaming={context.replay.isReplaying()}
             class="select-text text-[13px] leading-7 text-[#313847]"
           />
         </div>
