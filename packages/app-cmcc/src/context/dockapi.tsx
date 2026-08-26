@@ -2,6 +2,7 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { Session } from "@opencode-ai/sdk/v2/client"
+import type { Message, Part, SessionStatus } from "@opencode-ai/sdk/v2"
 import { usePlatform } from "./platform"
 import { Persist, removePersisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
@@ -40,6 +41,72 @@ export type DockApiSession = {
   openCodeStatus: Record<string, unknown> | null
   createdAt: string
   updatedAt: string
+}
+
+export type DockApiCaseSummary = {
+  caseCode: string
+  caseName: string
+  caseTag: string
+  category: string
+  categoryLabel: string
+  agentType: string
+  rootAgent: string
+  coverUrl: string
+  reportCharCount: number
+  publishedAt: string
+}
+
+export type DockApiCaseGroup = {
+  category: string
+  label: string
+  items: DockApiCaseSummary[]
+}
+
+export type DockApiCaseOverview = {
+  groups: DockApiCaseGroup[]
+}
+
+export type DockApiCaseList = {
+  items: DockApiCaseSummary[]
+  total: number
+  page: number
+  size: number
+}
+
+export type DockApiCaseDetail = DockApiCaseSummary & {
+  query: string
+  snapshotVersion: string
+  snapshotBytes: number
+  artifactBytes: number
+}
+
+export type DockApiCaseSnapshotSession = {
+  session: Session
+  status: SessionStatus
+  messages: Array<{ info: Message; parts: Part[] }>
+}
+
+export type DockApiCaseArtifact = {
+  path: string
+  size: number
+  contentType: string
+}
+
+export type DockApiCaseSnapshot = {
+  schemaVersion: number
+  caseCode: string
+  capturedAt: string
+  rootSessionId: string
+  query: string
+  agentType: string
+  rootAgent: string
+  sessions: DockApiCaseSnapshotSession[]
+  artifacts: DockApiCaseArtifact[]
+}
+
+export type DockApiCasePreviewTicket = {
+  baseUrl: string
+  expiresAt: string
 }
 
 export function asOpenCodeSession(value: unknown): Session | undefined {
@@ -130,6 +197,11 @@ function dockApiBaseUrl() {
   return location.origin
 }
 
+export function dockApiUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path
+  return `${dockApiBaseUrl()}${path.startsWith("/") ? "" : "/"}${path}`
+}
+
 async function readResponse<T>(response: Response) {
   const payload = (await response.json().catch(() => undefined)) as ApiResponse<T> | undefined
   if (!response.ok || !payload || payload.code !== 200) {
@@ -204,16 +276,23 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       return refreshRequest
     }
 
-    const request = async <T,>(path: string, init?: RequestInit, canRefresh = true): Promise<T> => {
+    const authorizedFetch = async (path: string, init?: RequestInit, canRefresh = true): Promise<Response> => {
       const headers = new Headers(init?.headers)
-      if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json")
+      if (init?.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json")
+      }
       if (state.accessToken) headers.set("Authorization", `Bearer ${state.accessToken}`)
 
       const response = await fetch(`${dockApiBaseUrl()}${path}`, { ...init, headers })
       if (response.status === 401 && canRefresh && state.refreshToken) {
         await refresh()
-        return request<T>(path, init, false)
+        return authorizedFetch(path, init, false)
       }
+      return response
+    }
+
+    const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+      const response = await authorizedFetch(path, init)
       return readResponse<T>(response)
     }
 
@@ -334,6 +413,59 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           if (!session) throw new DockApiError("未找到业务会话绑定")
           await request<void>(`/api/dockapi/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" })
           setState("sessions", (sessions) => sessions.filter((item) => item.id !== session.id))
+        },
+      },
+      cases: {
+        overview() {
+          return request<DockApiCaseOverview>("/api/dockapi/cases/overview")
+        },
+        list(input: {
+          keyword?: string
+          category?: string
+          sort?: "latest" | "oldest"
+          from?: string
+          to?: string
+          page?: number
+          size?: number
+        }) {
+          const query = new URLSearchParams()
+          if (input.keyword) query.set("keyword", input.keyword)
+          if (input.category) query.set("category", input.category)
+          if (input.sort) query.set("sort", input.sort)
+          if (input.from) query.set("from", input.from)
+          if (input.to) query.set("to", input.to)
+          if (input.page) query.set("page", String(input.page))
+          if (input.size) query.set("size", String(input.size))
+          return request<DockApiCaseList>(`/api/dockapi/cases?${query.toString()}`)
+        },
+        detail(caseCode: string) {
+          return request<DockApiCaseDetail>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`)
+        },
+        async snapshot(caseCode: string) {
+          const response = await authorizedFetch(`/api/dockapi/cases/${encodeURIComponent(caseCode)}/snapshot`)
+          if (!response.ok) return readResponse<DockApiCaseSnapshot>(response)
+          return response.json() as Promise<DockApiCaseSnapshot>
+        },
+        publish(input: {
+          businessSessionId: string
+          caseName: string
+          caseTag: string
+          coverFile: File
+        }) {
+          const form = new FormData()
+          form.append("caseName", input.caseName)
+          form.append("caseTag", input.caseTag)
+          form.append("coverFile", input.coverFile)
+          return request<DockApiCaseSummary>(
+            `/api/dockapi/cases/from-session/${encodeURIComponent(input.businessSessionId)}`,
+            { method: "POST", body: form },
+          )
+        },
+        previewTicket(caseCode: string) {
+          return request<DockApiCasePreviewTicket>(
+            `/api/dockapi/cases/${encodeURIComponent(caseCode)}/preview-ticket`,
+            { method: "POST" },
+          )
         },
       },
     }

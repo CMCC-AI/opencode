@@ -1,6 +1,16 @@
 import { For, Match, Show, Switch, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
+import { useDockApi } from "@/context/dockapi"
+import { useServer } from "@/context/server"
+import { useServerSDK } from "@/context/server-sdk"
+import { useTabs } from "@/context/tabs"
+import {
+  cmccArtifactWorkspace,
+  cmccEnsureWorkspace,
+  cmccRememberConversationWorkspace,
+} from "@/utils/cmcc-workspace"
 import { showToast } from "@/utils/toast"
+import { DEEPTRADING_EXPERT_ID, DEEPTRADING_LEAD_AGENT } from "./config"
 import { DeepTradingFilesTab, DeepTradingTextReportTab, DeepTradingVisualReportTab } from "./report-tabs"
 import type { DeepTradingReplayStage } from "./replay"
 import { DeepTradingTeamTab } from "./team-tab"
@@ -15,8 +25,15 @@ const TABS: Array<{ id: DeepTradingTab; label: string }> = [
   { id: "visual", label: "可视化报告" },
 ]
 
+const REPLAY_BUTTON_CLASS =
+  "h-9 shrink-0 rounded-[18px] bg-[#eff6ff] px-3 text-[14px] font-bold text-[#3b82f6] shadow-[0_4px_10px_rgba(59,130,246,0.12)] transition hover:bg-[#e5efff] disabled:cursor-wait disabled:opacity-60 @min-[340px]:px-5"
+
 export function DeepTradingResultsPanel() {
   const context = useDeepTradingWorkbench()
+  const dockapi = useDockApi()
+  const server = useServer()
+  const serverSDK = useServerSDK()
+  const tabs = useTabs()
   const [state, setState] = createStore({ active: "team" as DeepTradingTab, manualReplayTab: false })
   let wasReplaying = false
 
@@ -65,6 +82,46 @@ export function DeepTradingResultsPanel() {
 
   const showReplayBar = () =>
     context.replay.canReplay() || context.replay.isPreparing() || context.replay.isReplaying()
+
+  const createSame = () => {
+    if (context.replay.isPreparing() || context.replay.isReplaying()) return
+
+    const query = context.workbench().query.trim()
+    if (!query) {
+      showToast({ variant: "default", title: "暂无可复用的查询内容" })
+      return
+    }
+
+    const directory = dockapi.workspace?.directoryPath
+    const artifactDirectory = cmccArtifactWorkspace(directory)
+    if (!directory || !artifactDirectory || !tabs.ready()) {
+      showToast({
+        variant: "error",
+        title: "无法创建同款会话",
+        description: "当前用户工作目录尚未准备完成。",
+      })
+      return
+    }
+
+    tabs.newDraft(
+      { server: server.key, directory, artifactDirectory, expertID: DEEPTRADING_EXPERT_ID },
+      query,
+      { agent: DEEPTRADING_LEAD_AGENT },
+    )
+    cmccRememberConversationWorkspace(directory)
+    server.projects.touch(directory)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
+    ).catch((error) => {
+      showToast({
+        variant: "error",
+        title: "无法准备会话产物目录",
+        description: error instanceof Error ? error.message : String(error),
+      })
+    })
+  }
 
   return (
     <div class="@container relative flex size-full min-w-0 flex-col bg-[#f7f8fb]">
@@ -129,11 +186,16 @@ export function DeepTradingResultsPanel() {
               type="button"
               disabled={context.replay.isPreparing()}
               aria-pressed={context.replay.isReplaying()}
-              class="h-9 shrink-0 rounded-[18px] bg-[#eff6ff] px-3 text-[14px] font-bold text-[#3b82f6] shadow-[0_4px_10px_rgba(59,130,246,0.12)] transition hover:bg-[#e5efff] disabled:cursor-wait disabled:opacity-60 @min-[340px]:px-5"
+              class={REPLAY_BUTTON_CLASS}
               onClick={toggleReplay}
             >
               {context.replay.isPreparing() ? "准备中" : context.replay.isReplaying() ? "停止回放" : "看回放"}
             </button>
+            <Show when={!context.replay.isPreparing() && !context.replay.isReplaying()}>
+              <button type="button" class={REPLAY_BUTTON_CLASS} onClick={createSame}>
+                做同款
+              </button>
+            </Show>
           </div>
         </div>
       </Show>

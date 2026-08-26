@@ -57,7 +57,7 @@ export function DeepTradingSessionView() {
           scroller = element
           autoScroll.scrollRef(element)
         }}
-        class="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        class="deeptrading-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain"
         onScroll={autoScroll.handleScroll}
         onPointerDown={autoScroll.handleInteraction}
       >
@@ -166,7 +166,7 @@ function AgentStrip() {
     <div class="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-4">
       <nav
         aria-label="DeepTrading 分析团队"
-        class="pointer-events-auto flex max-w-full gap-1.5 overflow-x-auto rounded-[8px] border border-[#dfe3eb] bg-white/95 p-2 shadow-[0_10px_30px_rgba(29,38,61,0.14)] backdrop-blur"
+        class="deeptrading-scrollbar pointer-events-auto flex max-w-full gap-1.5 overflow-x-auto rounded-[8px] border border-[#dfe3eb] bg-white/95 p-2 shadow-[0_10px_30px_rgba(29,38,61,0.14)] backdrop-blur"
       >
         <For each={items()}>
           {(item) => (

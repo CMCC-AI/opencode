@@ -8,6 +8,7 @@ const team = cmccTeamExpertByAgent(DEEPTRADING_LEAD_AGENT)
 
 if (!team) throw new Error(`DeepTrading team config not found: ${DEEPTRADING_LEAD_AGENT}`)
 
+export const DEEPTRADING_EXPERT_ID = team.id
 export const DEEPTRADING_MEMBERS = team.members.filter((member) => member.role !== "lead")
 
 export const DEEPTRADING_DAG_LEVELS = [

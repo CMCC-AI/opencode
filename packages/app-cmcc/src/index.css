@@ -25,6 +25,39 @@
   outline: none;
 }
 
+.deeptrading-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-weak-base) transparent;
+}
+
+.deeptrading-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.deeptrading-scrollbar::-webkit-scrollbar-track,
+.deeptrading-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.deeptrading-scrollbar::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.deeptrading-scrollbar::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--border-weak-base);
+  background-clip: padding-box;
+}
+
+.deeptrading-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong-base);
+  background-clip: padding-box;
+}
+
 [data-cmcc-office-preview="excel"] .vue-office-excel,
 [data-cmcc-office-preview="excel"] .vue-office-excel-main,
 [data-cmcc-office-preview="excel"] .x-spreadsheet {

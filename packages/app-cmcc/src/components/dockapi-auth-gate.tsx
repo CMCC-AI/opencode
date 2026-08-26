@@ -1,3 +1,4 @@
+import loginBackground from "@/assets/auth/login-bg.png"
 import { DeepInsightMark } from "@/components/brand"
 import { DockApiError, useDockApi } from "@/context/dockapi"
 import { Show, type ParentProps } from "solid-js"
@@ -45,34 +46,31 @@ export function DockApiAuthGate(props: ParentProps) {
       <Show
         when={dockapi.status === "authenticated" && dockapi.workspace}
         fallback={
-          <main class="relative flex h-dvh w-screen items-center justify-center overflow-hidden bg-white px-5">
-            <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(230,137,221,0.16),transparent_34%),radial-gradient(circle_at_82%_78%,rgba(102,174,255,0.2),transparent_38%)]" />
-            <section class="relative w-full max-w-[400px] rounded-[8px] border border-v2-border-border-base bg-white p-8 shadow-[0_18px_60px_rgba(70,90,140,0.14)]">
-              <div class="mb-7 flex items-center gap-3">
-                <DeepInsightMark class="h-11 w-9" />
-                <div>
-                  <h1 class="text-20-medium text-v2-text-text-strong">DockAPI</h1>
-                  <p class="mt-1 text-13-regular text-v2-text-text-muted">登录后进入智能分析工作台</p>
-                </div>
+          <main class="fixed inset-0 flex items-center justify-end overflow-hidden max-lg:justify-center">
+            <img class="absolute inset-0 size-full object-cover" src={loginBackground} alt="" />
+            <section class="relative z-10 mr-[8%] w-[420px] rounded-[16px] bg-[rgba(255,255,255,0.92)] px-10 py-9 shadow-[0_8px_40px_rgba(0,0,0,0.08)] backdrop-blur-[20px] max-lg:mx-5 max-lg:w-full max-lg:max-w-[420px] max-sm:px-6">
+              <div class="mb-6">
+                <h1 class="m-0 text-[24px] font-bold leading-[1.4] text-[#1a1a2e]">欢迎登录</h1>
+                <p class="mt-1 text-[13px] leading-5 text-[#999]">DeepInsight AI Assistant</p>
               </div>
-              <div class="mb-6 grid grid-cols-2 border-b border-v2-border-border-base">
+              <div class="mb-7 flex gap-6 border-b-2 border-[#f0f0f0]">
                 <button
                   type="button"
-                  class="h-10 border-b-2 text-14-medium"
+                  class="mb-[-2px] border-b-2 pb-[10px] text-[15px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5b3cc4]/20"
                   classList={{
-                    "border-v2-border-border-active text-v2-text-text-strong": form.mode === "login",
-                    "border-transparent text-v2-text-text-muted": form.mode !== "login",
+                    "border-[#3b3dbf] font-semibold text-[#1a1a2e]": form.mode === "login",
+                    "border-transparent text-[#999] hover:text-[#666]": form.mode !== "login",
                   }}
                   onClick={() => setForm({ mode: "login", error: "", notice: "" })}
                 >
-                  登录
+                  登入
                 </button>
                 <button
                   type="button"
-                  class="h-10 border-b-2 text-14-medium"
+                  class="mb-[-2px] border-b-2 pb-[10px] text-[15px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#5b3cc4]/20"
                   classList={{
-                    "border-v2-border-border-active text-v2-text-text-strong": form.mode === "register",
-                    "border-transparent text-v2-text-text-muted": form.mode !== "register",
+                    "border-[#3b3dbf] font-semibold text-[#1a1a2e]": form.mode === "register",
+                    "border-transparent text-[#999] hover:text-[#666]": form.mode !== "register",
                   }}
                   onClick={() => setForm({ mode: "register", error: "", notice: "" })}
                 >
@@ -81,51 +79,49 @@ export function DockApiAuthGate(props: ParentProps) {
               </div>
               <form class="flex flex-col gap-4" onSubmit={submit}>
                 <Show when={form.mode === "register"}>
-                  <label class="flex flex-col gap-2 text-13-medium text-v2-text-text-base">
-                    姓名
-                    <input
-                      class="h-10 rounded-[6px] border border-v2-border-border-base bg-white px-3 text-14-regular outline-none transition-colors focus:border-v2-border-border-active"
-                      autocomplete="name"
-                      maxlength={64}
-                      required
-                      value={form.name}
-                      onInput={(event) => setForm("name", event.currentTarget.value)}
-                    />
-                  </label>
+                  <input
+                    class="h-[46px] w-full rounded-[8px] border border-[#e0e0e0] bg-white px-4 text-[14px] text-[#333] outline-none transition-[border-color,box-shadow] placeholder:text-[#bbb] focus:border-[#5b3cc4] focus:shadow-[0_0_0_3px_rgba(91,60,196,0.08)]"
+                    aria-label="姓名"
+                    autocomplete="name"
+                    maxlength={64}
+                    placeholder="请输入您的姓名"
+                    required
+                    value={form.name}
+                    onInput={(event) => setForm("name", event.currentTarget.value)}
+                  />
                 </Show>
-                <label class="flex flex-col gap-2 text-13-medium text-v2-text-text-base">
-                  手机号
-                  <input
-                    class="h-10 rounded-[6px] border border-v2-border-border-base bg-white px-3 text-14-regular outline-none transition-colors focus:border-v2-border-border-active"
-                    autocomplete="tel"
-                    maxlength={32}
-                    required
-                    value={form.phone}
-                    onInput={(event) => setForm("phone", event.currentTarget.value)}
-                  />
-                </label>
-                <label class="flex flex-col gap-2 text-13-medium text-v2-text-text-base">
-                  密码
-                  <input
-                    class="h-10 rounded-[6px] border border-v2-border-border-base bg-white px-3 text-14-regular outline-none transition-colors focus:border-v2-border-border-active"
-                    type="password"
-                    autocomplete={form.mode === "login" ? "current-password" : "new-password"}
-                    minlength={form.mode === "register" ? 6 : undefined}
-                    maxlength={32}
-                    required
-                    value={form.password}
-                    onInput={(event) => setForm("password", event.currentTarget.value)}
-                  />
-                </label>
+                <input
+                  class="h-[46px] w-full rounded-[8px] border border-[#e0e0e0] bg-white px-4 text-[14px] text-[#333] outline-none transition-[border-color,box-shadow] placeholder:text-[#bbb] focus:border-[#5b3cc4] focus:shadow-[0_0_0_3px_rgba(91,60,196,0.08)]"
+                  aria-label="手机号"
+                  autocomplete="tel"
+                  maxlength={32}
+                  placeholder="请输入您的手机号"
+                  required
+                  value={form.phone}
+                  onInput={(event) => setForm("phone", event.currentTarget.value)}
+                />
+                <input
+                  class="h-[46px] w-full rounded-[8px] border border-[#e0e0e0] bg-white px-4 text-[14px] text-[#333] outline-none transition-[border-color,box-shadow] placeholder:text-[#bbb] focus:border-[#5b3cc4] focus:shadow-[0_0_0_3px_rgba(91,60,196,0.08)]"
+                  aria-label="密码"
+                  type="password"
+                  autocomplete={form.mode === "login" ? "current-password" : "new-password"}
+                  minlength={form.mode === "register" ? 6 : undefined}
+                  maxlength={32}
+                  placeholder="请输入您的密码"
+                  required
+                  value={form.password}
+                  onInput={(event) => setForm("password", event.currentTarget.value)}
+                />
                 <Show when={form.error}>
-                  <p class="text-13-regular text-red-600">{form.error}</p>
+                  <p class="text-[13px] leading-5 text-red-600">{form.error}</p>
                 </Show>
                 <Show when={form.notice}>
-                  <p class="text-13-regular text-blue-600">{form.notice}</p>
+                  <p class="text-[13px] leading-5 text-[#5b3cc4]">{form.notice}</p>
                 </Show>
                 <button
                   type="submit"
-                  class="mt-2 h-10 rounded-[6px] bg-[#3478f6] text-14-medium text-white transition-colors hover:bg-[#2868dd] disabled:cursor-not-allowed disabled:opacity-60"
+                  class="mt-1 h-12 w-full rounded-[8px] bg-[linear-gradient(135deg,#4338ca_0%,#5b3cc4_50%,#6d28d9_100%)] text-[16px] font-semibold tracking-[2px] text-white transition-[transform,box-shadow,opacity] hover:-translate-y-px hover:shadow-[0_4px_16px_rgba(91,60,196,0.35)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                  style={{ color: "#fff" }}
                   disabled={form.pending}
                 >
                   {form.pending ? "请稍候..." : form.mode === "login" ? "登录" : "注册"}

@@ -131,7 +131,7 @@ export function DeepTradingTeamTab() {
           <header class="shrink-0 border-b border-[#edf0f5] px-4 py-2.5">
             <h3 class="m-0 text-[13px] font-semibold leading-5 text-[#293142]">详情信息</h3>
           </header>
-          <div class="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+          <div class="deeptrading-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3">
             <Switch>
               <Match when={context.selectedAgentId() === "overview"}>
                 <DetailEmpty>请选择上方一级专家查看二级 Agent 内容</DetailEmpty>

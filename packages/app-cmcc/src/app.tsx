@@ -91,6 +91,12 @@ const CmccKnowledgeHomeRoute = lazy(() =>
 const CmccKnowledgeNotebookRoute = lazy(() =>
   import("@/pages/cmcc-knowledge").then((module) => ({ default: module.CmccKnowledgeNotebookRoute })),
 )
+const CmccCasesRoute = lazy(() =>
+  import("@/pages/cmcc-cases").then((module) => ({ default: module.CmccCasesRoute })),
+)
+const CmccCaseDetailRoute = lazy(() =>
+  import("@/pages/cmcc-cases").then((module) => ({ default: module.CmccCaseDetailRoute })),
+)
 const cmccAgentWarmups = new Set<string>()
 
 const SessionRoute = () => {
@@ -701,6 +707,8 @@ function Routes() {
         <Route path="/deeplens" component={CmccDeepLensRoute} />
         <Route path="/deeplens/" component={CmccDeepLensRoute} />
         <Route path="/plugins" component={CmccPluginHubRoute} />
+        <Route path="/cases" component={CmccCasesRoute} />
+        <Route path="/cases/:caseCode" component={CmccCaseDetailRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />

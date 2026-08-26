@@ -8,10 +8,9 @@ import { useLocation, useNavigate } from "@solidjs/router"
 import { DebugBar } from "@/components/debug-bar"
 import { HelpButton } from "@/components/help-button"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
-import { useSettingsCommand } from "@/components/settings-dialog"
-import { dockApiHistorySessions, useDockApi } from "@/context/dockapi"
+import { CasePublishDialog } from "@/components/case-publish-dialog"
+import { dockApiHistorySessions, useDockApi, type DockApiSession } from "@/context/dockapi"
 import { useLayout } from "@/context/layout"
-import { usePlatform } from "@/context/platform"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
@@ -26,6 +25,7 @@ import {
   cmccRememberConversationWorkspace,
 } from "@/utils/cmcc-workspace"
 import { cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
+import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByAgentType } from "@/utils/cmcc-cases"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
@@ -254,13 +254,11 @@ function CmccSidebar() {
   const layout = useLayout()
   const location = useLocation()
   const navigate = useNavigate()
-  const platform = usePlatform()
   const server = useServer()
   const serverSDK = useServerSDK()
   const sync = useServerSync()
   const dockapi = useDockApi()
   const tabs = useTabs()
-  const openSettings = useSettingsCommand()
   const knowledgeNotebooks = createMemo(() => {
     location.pathname
     return cmccKnowledgeNotebooks()
@@ -270,6 +268,7 @@ function CmccSidebar() {
     startX: 0,
     startWidth: 0,
   })
+  const [caseDialog, setCaseDialog] = createStore({ session: undefined as DockApiSession | undefined })
   const directory = createMemo(() => dockapi.workspace?.directoryPath)
   const conversations = createMemo(() => {
     const current = directory()
@@ -363,7 +362,13 @@ function CmccSidebar() {
   }
 
   const openSession = (session: Session) => {
-    sync().session.remember(session)
+    const binding = dockapi.sessions.findByOpenCodeId(session.id)
+    if (binding && !session.agent) {
+      // DockAPI history placeholders omit agent metadata and must not satisfy session.resolve().
+      sync().session.evict(session.id)
+    } else {
+      sync().session.remember(session)
+    }
     server.projects.touch(session.directory)
     const tab = tabs.addSessionTab({ server: server.key, sessionId: session.id })
     tabs.select(tab)
@@ -402,6 +407,15 @@ function CmccSidebar() {
       })
   }
 
+  const publishCase = (session: Session) => {
+    const binding = dockapi.sessions.findByOpenCodeId(session.id)
+    if (!binding || !cmccCaseCategoryByAgentType(binding.agentType)) {
+      showToast({ variant: "default", title: "当前会话暂不支持发布案例" })
+      return
+    }
+    setCaseDialog("session", binding)
+  }
+
   const timeLabel = (session: Session) => {
     const at = session.time.updated ?? session.time.created
     const minutes = Math.max(1, Math.floor((Date.now() - at) / 60_000))
@@ -432,6 +446,12 @@ function CmccSidebar() {
           </div>
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-3">
             <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
+            <CmccSidebarAction
+              icon="archive"
+              label="案例库"
+              active={location.pathname === "/cases" || location.pathname.startsWith("/cases/")}
+              onClick={() => navigate("/cases")}
+            />
             <CmccSidebarAction
               icon="glasses"
               label="深度研究"
@@ -493,6 +513,7 @@ function CmccSidebar() {
                   timeLabel={timeLabel(session)}
                   openSession={openSession}
                   deleteSession={deleteSession}
+                  publishCase={cmccCaseCategoryByAgentType(dockapi.sessions.findByOpenCodeId(session.id)?.agentType) ? publishCase : undefined}
                 />
               )}
             </For>
@@ -511,22 +532,6 @@ function CmccSidebar() {
                 退出
               </button>
             </div>
-            <button
-              type="button"
-              class="flex h-9 w-full min-w-0 items-center gap-2.5 rounded-[8px] px-3 text-left text-14-medium text-[#4a4a6a] hover:bg-[rgba(99,102,241,0.08)] hover:text-[#4f46e5]"
-              onClick={openSettings}
-            >
-              <Icon name="settings-gear" class="size-4 shrink-0" />
-              <span class="min-w-0 truncate">设置</span>
-            </button>
-            <button
-              type="button"
-              class="mt-1 flex h-9 w-full min-w-0 items-center gap-2.5 rounded-[8px] px-3 text-left text-14-medium text-[#4a4a6a] hover:bg-[rgba(99,102,241,0.08)] hover:text-[#4f46e5]"
-              onClick={() => platform.openLink("https://opencode.ai/desktop-feedback")}
-            >
-              <Icon name="help" class="size-4 shrink-0" />
-              <span class="min-w-0 truncate">帮助</span>
-            </button>
           </div>
         </div>
       </aside>
@@ -535,6 +540,11 @@ function CmccSidebar() {
         aria-orientation="vertical"
         class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-transparent hover:before:bg-[#a5b4fc]"
         onPointerDown={startDrag}
+      />
+      <CasePublishDialog
+        session={caseDialog.session}
+        onClose={() => setCaseDialog("session", undefined)}
+        onPublished={() => window.dispatchEvent(new Event(CMCC_CASES_UPDATED_EVENT))}
       />
     </>
   )
@@ -614,17 +624,32 @@ function CmccSessionRow(props: {
   timeLabel: string
   openSession: (session: Session) => void
   deleteSession: (session: Session) => void
+  publishCase?: (session: Session) => void
 }) {
   const menuItems = () => (
-    <DropdownMenu.Item onSelect={() => props.deleteSession(props.session)}>
-      <DropdownMenu.ItemLabel>删除</DropdownMenu.ItemLabel>
-    </DropdownMenu.Item>
+    <>
+      <Show when={props.publishCase}>
+        <DropdownMenu.Item onSelect={() => props.publishCase?.(props.session)}>
+          <DropdownMenu.ItemLabel>添加至案例库</DropdownMenu.ItemLabel>
+        </DropdownMenu.Item>
+      </Show>
+      <DropdownMenu.Item onSelect={() => props.deleteSession(props.session)}>
+        <DropdownMenu.ItemLabel>删除</DropdownMenu.ItemLabel>
+      </DropdownMenu.Item>
+    </>
   )
 
   const contextMenuItems = () => (
-    <ContextMenu.Item onSelect={() => props.deleteSession(props.session)}>
-      <ContextMenu.ItemLabel>删除</ContextMenu.ItemLabel>
-    </ContextMenu.Item>
+    <>
+      <Show when={props.publishCase}>
+        <ContextMenu.Item onSelect={() => props.publishCase?.(props.session)}>
+          <ContextMenu.ItemLabel>添加至案例库</ContextMenu.ItemLabel>
+        </ContextMenu.Item>
+      </Show>
+      <ContextMenu.Item onSelect={() => props.deleteSession(props.session)}>
+        <ContextMenu.ItemLabel>删除</ContextMenu.ItemLabel>
+      </ContextMenu.Item>
+    </>
   )
 
   const row = (

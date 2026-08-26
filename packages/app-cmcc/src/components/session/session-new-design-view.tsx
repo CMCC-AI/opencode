@@ -5,16 +5,17 @@ export function NewSessionDesignView(props: { children: JSX.Element }) {
   return (
     <div
       data-component="session-new-design"
-      class="relative flex size-full min-h-0 items-start justify-center overflow-y-auto bg-white"
+      class="relative grid size-full min-h-0 justify-items-center overflow-y-auto bg-white"
       style={{
-        padding: "120px 40px 48px",
+        padding: "48px 40px",
+        "grid-template-rows": "minmax(max-content, 1fr) auto minmax(0, 1fr)",
         "font-family":
           "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
         "-webkit-font-smoothing": "antialiased",
         "-moz-osx-font-smoothing": "grayscale",
       }}
     >
-      <div class="flex w-full max-w-[900px] flex-col items-center">
+      <div class="flex w-full max-w-[900px] self-end flex-col items-center" style={{ "padding-bottom": "60px" }}>
         <div
           class="flex items-center justify-center"
           style={{
@@ -35,7 +36,7 @@ export function NewSessionDesignView(props: { children: JSX.Element }) {
           <h1
             style={{
               margin: "0",
-              "font-size": "34px",
+              "font-size": "39px",
               "font-weight": "500",
               "line-height": "1.25",
               "padding-bottom": "6px",
@@ -54,8 +55,8 @@ export function NewSessionDesignView(props: { children: JSX.Element }) {
         </div>
         <p
           style={{
-            margin: "0 0 60px 0",
-            "font-size": "18px",
+            margin: "0",
+            "font-size": "23px",
             "font-weight": "400",
             color: "#9ca3af",
             "line-height": "1.5",
@@ -66,18 +67,19 @@ export function NewSessionDesignView(props: { children: JSX.Element }) {
             "-moz-osx-font-smoothing": "grayscale",
           }}
         >
-          一键式生成专家级深度研究报告，赋能 AI + 行业与产业洞察
+          您的智能研究助理，一键式深度研究与自动化科研，赋能AI+产业洞察
         </p>
-        <div
-          class="relative z-10 mx-auto w-full"
-          style={{
-            "max-width": "min(90%, 960px)",
-            width: "900px",
-          }}
-        >
-          {props.children}
-        </div>
       </div>
+      <div
+        class="relative z-10 mx-auto w-full"
+        style={{
+          "max-width": "min(90%, 810px)",
+          width: "900px",
+        }}
+      >
+        {props.children}
+      </div>
+      <div aria-hidden="true" />
     </div>
   )
 }

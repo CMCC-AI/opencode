@@ -1,5 +1,14 @@
 import { createSimpleContext } from "@opencode-ai/ui/context"
-import { createEffect, createMemo, on, onCleanup, type Accessor } from "solid-js"
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  on,
+  onCleanup,
+  useContext,
+  type Accessor,
+  type ParentProps,
+} from "solid-js"
 import { createStore } from "solid-js/store"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
@@ -33,10 +42,41 @@ import {
 const MESSAGE_PAGE_SIZE = 200
 const DEEPTRADING_MEMBER_IDS = new Set(DEEPTRADING_MEMBERS.map((member) => member.id))
 
-export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvider } = createSimpleContext({
-  name: "DeepTradingWorkbench",
-  gate: false,
-  init: (props: { sessionID: Accessor<string | undefined>; active: Accessor<boolean> }) => {
+export type DeepTradingArtifactContent = {
+  loaded: boolean
+  loading?: boolean
+  error?: string
+  text?: string
+}
+
+export type DeepTradingArtifactSource = {
+  get: (path: string) => DeepTradingArtifactContent | undefined
+  load: (path: string) => Promise<void>
+  download: (path: string) => Promise<Blob>
+  previewUrl: (path: string) => string | undefined
+}
+
+export type DeepTradingWorkbenchContextValue = {
+  workbench: Accessor<AgentWorkbench>
+  selectedAgentId: Accessor<string>
+  selectAgent: (agentId: string) => void
+  retrySession: (sessionId: string) => Promise<void>
+  artifactSource?: DeepTradingArtifactSource
+  replay: {
+    canReplay: Accessor<boolean>
+    isPreparing: Accessor<boolean>
+    isReplaying: Accessor<boolean>
+    progress: Accessor<number>
+    stage: Accessor<DeepTradingReplayStage>
+    textReportMarkdown: Accessor<string>
+    start: () => Promise<boolean>
+    stop: () => void
+  }
+}
+
+const DeepTradingWorkbenchContext = createContext<DeepTradingWorkbenchContextValue>()
+
+function createLiveDeepTradingWorkbench(props: { sessionID: Accessor<string | undefined>; active: Accessor<boolean> }) {
     const file = useFile()
     const sdk = useSDK()
     const sync = useSync()
@@ -538,8 +578,26 @@ export const { use: useDeepTradingWorkbench, provider: DeepTradingWorkbenchProvi
         stop: () => stopReplay(),
       },
     }
-  },
-})
+}
+
+export function useDeepTradingWorkbench() {
+  const value = useContext(DeepTradingWorkbenchContext)
+  if (!value) throw new Error("DeepTradingWorkbench context must be used within a provider")
+  return value
+}
+
+export function DeepTradingWorkbenchProvider(
+  props: ParentProps<{ sessionID: Accessor<string | undefined>; active: Accessor<boolean> }>,
+) {
+  const value = createLiveDeepTradingWorkbench(props)
+  return <DeepTradingWorkbenchContext.Provider value={value}>{props.children}</DeepTradingWorkbenchContext.Provider>
+}
+
+export function DeepTradingWorkbenchValueProvider(
+  props: ParentProps<{ value: DeepTradingWorkbenchContextValue }>,
+) {
+  return <DeepTradingWorkbenchContext.Provider value={props.value}>{props.children}</DeepTradingWorkbenchContext.Provider>
+}
 
 function emptyWorkbench(loading: boolean, error?: string, rootSessionId = ""): AgentWorkbench {
   return {

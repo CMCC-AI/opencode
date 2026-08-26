@@ -33,6 +33,7 @@ import { base64Encode, checksum } from "@opencode-ai/core/util/encode"
 import { useLocation, useNavigate, useSearchParams } from "@solidjs/router"
 import { NewSessionView, SessionHeader } from "@/components/session"
 import { useComments } from "@/context/comments"
+import { useDockApi } from "@/context/dockapi"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
@@ -68,7 +69,7 @@ import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { DeepTradingSessionView } from "@/pages/session/deeptrading/deeptrading-session-view"
 import { DeepTradingResultsPanel } from "@/pages/session/deeptrading/deeptrading-results-panel"
-import { isDeepTradingRootSession } from "@/pages/session/deeptrading/page-selection"
+import { shouldUseDeepTradingPage } from "@/pages/session/deeptrading/page-selection"
 import { DeepTradingSplitLayout } from "@/pages/session/deeptrading/split-layout"
 import { DeepTradingWorkbenchProvider } from "@/pages/session/deeptrading/workbench-context"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
@@ -130,6 +131,7 @@ export default function Page() {
   const local = useLocal()
   const file = useFile()
   const sync = useSync()
+  const dockapi = useDockApi()
   const queryClient = useQueryClient()
   const dialog = useDialog()
   const language = useLanguage()
@@ -276,7 +278,10 @@ export default function Page() {
   }
 
   const info = createMemo(() => (params.id ? sync().session.get(params.id) : undefined))
-  const deepTrading = createMemo(() => isDeepTradingRootSession(info()))
+  const businessAgentType = createMemo(() =>
+    params.id ? dockapi.sessions.findByOpenCodeId(params.id)?.agentType : undefined,
+  )
+  const deepTrading = createMemo(() => shouldUseDeepTradingPage(info(), businessAgentType()))
   const contentPanelWidth = createMemo(() => (deepTrading() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
