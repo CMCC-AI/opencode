@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show, type Component } from "solid-js"
-import { Portal } from "solid-js/web"
+import { CmccPromptPanel } from "./cmcc-prompt-panel"
 import { Icon } from "@opencode-ai/ui/icon"
 import academicIcon from "../assets/professional-databases/academic.png"
 import bochaIcon from "../assets/professional-databases/bocha.svg"
@@ -78,9 +78,6 @@ export const CMCC_PROFESSIONAL_DATABASES: CmccProfessionalDatabase[] = [
 ]
 
 type CmccPromptActionMenuProps = {
-  open: boolean
-  position?: { left: number; top: number }
-  menuRef: (el: HTMLDivElement) => void
   onAttach: () => void
   onExperts: () => void
   onSkills: () => void
@@ -89,27 +86,19 @@ type CmccPromptActionMenuProps = {
 }
 
 export const CmccPromptActionMenu: Component<CmccPromptActionMenuProps> = (props) => (
-  <Show when={props.open && props.position}>
-    <Portal>
-      <div
-        ref={props.menuRef}
-        class="fixed z-[200] w-[218px] rounded-[10px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-1 shadow-[0_18px_48px_rgba(0,0,0,0.18)]"
-        style={{
-          left: `${props.position?.left ?? 0}px`,
-          top: `${props.position?.top ?? 0}px`,
-        }}
-        onMouseDown={(event) => event.preventDefault()}
-      >
-        <PromptActionItem icon="link" label="添加文件和图片" onClick={props.onAttach} />
-        <PromptActionItem icon="archive" label="专业数据库" active onClick={props.onProfessionalDatabases} />
-        <PromptActionItem icon="mcp" label="专家" arrow onClick={props.onExperts} />
-        <PromptActionItem icon="brain" label="技能" arrow onClick={props.onSkills} />
-        <Show when={props.onKnowledge}>
-          {(onKnowledge) => <PromptActionItem icon="brain" label="知识库" arrow onClick={onKnowledge()} />}
-        </Show>
-      </div>
-    </Portal>
-  </Show>
+  <div
+    data-component="cmcc-prompt-action-menu"
+    class="max-h-[min(420px,45dvh)] w-[218px] max-w-full overflow-y-auto rounded-[10px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.14)]"
+    onMouseDown={(event) => event.preventDefault()}
+  >
+    <PromptActionItem icon="link" label="添加文件和图片" onClick={props.onAttach} />
+    <PromptActionItem icon="archive" label="专业数据库" active onClick={props.onProfessionalDatabases} />
+    <PromptActionItem icon="mcp" label="专家" arrow onClick={props.onExperts} />
+    <PromptActionItem icon="brain" label="技能" arrow onClick={props.onSkills} />
+    <Show when={props.onKnowledge}>
+      {(onKnowledge) => <PromptActionItem icon="brain" label="知识库" arrow onClick={onKnowledge()} />}
+    </Show>
+  </div>
 )
 
 type PromptActionItemProps = {
@@ -149,84 +138,62 @@ export const CmccProfessionalDatabasesDialog: Component<CmccProfessionalDatabase
   )
 
   return (
-    <div
-      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4 py-5"
-      onClick={props.onClose}
-    >
-      <section
-        class="flex max-h-[min(720px,calc(100dvh-32px))] w-full max-w-[800px] flex-col overflow-hidden rounded-[14px] bg-v2-background-bg-layer-01 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header class="flex h-16 shrink-0 items-center justify-between gap-4 px-6">
-          <h2 class="text-[16px] font-medium leading-6 text-v2-text-text-base">专业数据库</h2>
-          <div class="flex min-w-0 items-center">
-            <button
-              type="button"
-              class="flex size-8 shrink-0 items-center justify-center rounded-[7px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base"
-              onClick={props.onClose}
-              aria-label="关闭专业数据库"
-            >
-              <Icon name="close" class="size-4" />
-            </button>
-          </div>
-        </header>
-
-        <div class="min-h-0 flex-1 px-6 pb-6">
-          <div class="flex min-h-0 overflow-hidden rounded-[12px] border border-v2-border-border-base bg-v2-background-bg-base max-md:flex-col">
-            <div class="max-h-[220px] shrink-0 overflow-y-auto border-v2-border-border-base p-2 md:max-h-none md:w-[305px] md:border-r">
-              <For each={CMCC_PROFESSIONAL_DATABASES}>
-                {(database) => (
-                  <button
-                    type="button"
-                    class="flex w-full items-start gap-3 rounded-[10px] px-3 py-3 text-left hover:bg-v2-overlay-simple-overlay-hover"
-                    classList={{ "bg-v2-background-bg-layer-02": active().id === database.id }}
-                    onClick={() => setActiveID(database.id)}
-                  >
-                    <DatabaseMark database={database} />
-                    <div class="min-w-0 flex-1">
-                      <div class="truncate text-[13px] font-medium leading-5 text-v2-text-text-base">{database.name}</div>
-                      <div class="mt-1 line-clamp-2 text-[12px] leading-5 text-v2-text-text-muted">
-                        {database.description}
-                      </div>
-                    </div>
-                  </button>
-                )}
-              </For>
-            </div>
-
-            <div class="min-h-0 flex-1 overflow-y-auto">
-              <div class="flex h-12 items-center justify-between border-b border-v2-border-border-base px-4">
-                <span class="text-[15px] font-medium leading-5 text-v2-text-text-base">示例</span>
+    <CmccPromptPanel title="专业数据库" onClose={props.onClose}>
+      <div class="p-3">
+        <div class="flex min-h-0 overflow-hidden rounded-[12px] border border-v2-border-border-base bg-v2-background-bg-base max-md:flex-col">
+          <div class="max-h-[220px] shrink-0 overflow-y-auto border-v2-border-border-base p-2 md:max-h-none md:w-[305px] md:border-r">
+            <For each={CMCC_PROFESSIONAL_DATABASES}>
+              {(database) => (
                 <button
                   type="button"
-                  class="h-8 rounded-[8px] bg-v2-background-bg-layer-02 px-3 text-[13px] font-medium leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
-                  onClick={() => props.onTry(active())}
+                  class="flex w-full items-start gap-3 rounded-[10px] px-3 py-3 text-left hover:bg-v2-overlay-simple-overlay-hover"
+                  classList={{ "bg-v2-background-bg-layer-02": active().id === database.id }}
+                  onClick={() => setActiveID(database.id)}
                 >
-                  去试试
+                  <DatabaseMark database={database} />
+                  <div class="min-w-0 flex-1">
+                    <div class="truncate text-[13px] font-medium leading-5 text-v2-text-text-base">{database.name}</div>
+                    <div class="mt-1 line-clamp-2 text-[12px] leading-5 text-v2-text-text-muted">
+                      {database.description}
+                    </div>
+                  </div>
                 </button>
-              </div>
+              )}
+            </For>
+          </div>
 
-              <div class="flex flex-col gap-4 px-8 py-5 max-sm:px-4">
-                <div class="ml-auto max-w-[360px] rounded-[12px] bg-v2-background-bg-layer-02 px-4 py-3 text-[15px] leading-6 text-v2-text-text-base">
-                  {active().prompt}
-                </div>
-                <p class="text-[15px] leading-7 text-v2-text-text-base">
-                  我来帮你查询相关数据。让我先查看可用的数据库 API。
-                </p>
-                <div class="flex h-11 items-center gap-2 rounded-[8px] border border-v2-border-border-base px-3 text-[13px] leading-5 text-v2-text-text-muted">
-                  <Icon name="archive" class="size-4 shrink-0 text-v2-icon-icon-muted" />
-                  <span class="min-w-0 truncate">查找相关数据库</span>
-                  <span class="shrink-0 text-v2-text-text-faint">|</span>
-                  <span class="min-w-0 truncate">{active().name}</span>
-                  <Icon name="chevron-right" size="small" class="ml-auto size-3.5 shrink-0 text-v2-icon-icon-muted" />
-                </div>
-                <p class="text-[15px] leading-7 text-v2-text-text-base">{active().detail}</p>
+          <div class="min-h-0 flex-1 overflow-y-auto">
+            <div class="flex h-12 items-center justify-between border-b border-v2-border-border-base px-4">
+              <span class="text-[15px] font-medium leading-5 text-v2-text-text-base">示例</span>
+              <button
+                type="button"
+                class="h-8 rounded-[8px] bg-v2-background-bg-layer-02 px-3 text-[13px] font-medium leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                onClick={() => props.onTry(active())}
+              >
+                去试试
+              </button>
+            </div>
+
+            <div class="flex flex-col gap-4 px-8 py-5 max-sm:px-4">
+              <div class="ml-auto max-w-[360px] rounded-[12px] bg-v2-background-bg-layer-02 px-4 py-3 text-[15px] leading-6 text-v2-text-text-base">
+                {active().prompt}
               </div>
+              <p class="text-[15px] leading-7 text-v2-text-text-base">
+                我来帮你查询相关数据。让我先查看可用的数据库 API。
+              </p>
+              <div class="flex h-11 items-center gap-2 rounded-[8px] border border-v2-border-border-base px-3 text-[13px] leading-5 text-v2-text-text-muted">
+                <Icon name="archive" class="size-4 shrink-0 text-v2-icon-icon-muted" />
+                <span class="min-w-0 truncate">查找相关数据库</span>
+                <span class="shrink-0 text-v2-text-text-faint">|</span>
+                <span class="min-w-0 truncate">{active().name}</span>
+                <Icon name="chevron-right" size="small" class="ml-auto size-3.5 shrink-0 text-v2-icon-icon-muted" />
+              </div>
+              <p class="text-[15px] leading-7 text-v2-text-text-base">{active().detail}</p>
             </div>
           </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </CmccPromptPanel>
   )
 }
 

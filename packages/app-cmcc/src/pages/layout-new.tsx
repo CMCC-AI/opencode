@@ -30,7 +30,13 @@ import {
   cmccWorkspaceRoot,
   cmccWorkspaceSessionPath,
 } from "@/utils/cmcc-workspace"
-import { cmccIsKnowledgeSession, cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
+import {
+  cmccIsKnowledgeSession,
+  cmccKnowledgeNotebookForSession,
+  cmccKnowledgeNotebooks,
+  cmccMainKnowledgeSession,
+  cmccKnowledgeSessionReference,
+} from "@/utils/cmcc-knowledge"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import { displayName, sortedRootSessions } from "./layout/helpers"
@@ -287,13 +293,14 @@ function CmccSidebar() {
     Object.values(sync().session.data.info)
       .filter((session): session is Session => !!session)
       .filter((session) => {
+        if (cmccMainKnowledgeSession(session)) return true
         const directory = runtime()
         const stableRuntime = directory && cmccRuntimeWorkspace(undefined, session.directory) === directory
         if (stableRuntime) return Boolean(cmccArtifactDirectory(session.metadata, directory))
         return cmccIsWorkspaceDirectory(session.directory, home())
       })
       .filter((session) => !session.parentID && !session.time.archived)
-      .filter((session) => !cmccIsKnowledgeSession(knowledgeNotebooks(), session))
+      .filter((session) => cmccMainKnowledgeSession(session) || !cmccIsKnowledgeSession(knowledgeNotebooks(), session))
       .map((session) => ({ directory: session.directory, session }))
       .sort((a, b) => sessionUpdatedAt(b.session) - sessionUpdatedAt(a.session))
       .slice(0, SIDEBAR_SESSION_LIMIT),
@@ -317,6 +324,19 @@ function CmccSidebar() {
     const directory = runtime()
     if (!directory) return
     void sync().project.loadSessions(directory, { limit: SIDEBAR_SESSION_LIMIT })
+  })
+
+  createEffect(() => {
+    if (!sync().data.ready) return
+    knowledgeNotebooks().forEach((notebook) => {
+      void serverSDK()
+        .client.session.list(
+          { directory: notebook.directory, roots: true, limit: SIDEBAR_SESSION_LIMIT },
+          { throwOnError: true },
+        )
+        .then((result) => result.data?.forEach((session) => sync().session.remember(session)))
+        .catch(() => undefined)
+    })
   })
 
   createEffect(() => {
@@ -438,7 +458,7 @@ function CmccSidebar() {
 
   const openSession = (session: Session) => {
     const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
-    if (notebook) {
+    if (notebook && !cmccMainKnowledgeSession(session)) {
       navigate(`/knowledge/${notebook.id}/session/${session.id}`)
       return
     }
@@ -448,7 +468,8 @@ function CmccSidebar() {
 
   const activeSession = (session: Session) => {
     const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
-    if (notebook) return location.pathname === `/knowledge/${notebook.id}/session/${session.id}`
+    if (notebook && !cmccMainKnowledgeSession(session))
+      return location.pathname === `/knowledge/${notebook.id}/session/${session.id}`
     return (
       location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
     )
@@ -678,6 +699,10 @@ function CmccSidebar() {
               {(record) => (
                 <CmccSessionRow
                   session={record.session}
+                  knowledgeName={
+                    cmccKnowledgeNotebookForSession(knowledgeNotebooks(), record.session)?.name ??
+                    cmccKnowledgeSessionReference(record.session)?.name
+                  }
                   active={activeSession(record.session)}
                   timeLabel={timeLabel(record.session)}
                   openSession={openSession}
@@ -797,6 +822,7 @@ function CmccSessionRow(props: {
   archiveSession: (session: Session) => void
   deleteSession: (session: Session) => void
   openDirectory?: () => void
+  knowledgeName?: string
 }) {
   const menuItems = () => (
     <>
@@ -845,6 +871,16 @@ function CmccSessionRow(props: {
         onClick={() => props.openSession(props.session)}
       >
         <span class="min-w-0 flex-1 truncate">{sessionTitle(props.session.title) ?? "未命名对话"}</span>
+        <Show when={props.knowledgeName}>
+          {(name) => (
+            <span
+              class="max-w-24 shrink-0 truncate rounded bg-[#ede9fe] px-1.5 py-0.5 text-[10px] text-[#5b4fd7]"
+              title={`知识库：${name()}`}
+            >
+              知识库 · {name()}
+            </span>
+          )}
+        </Show>
         <span class="shrink-0 text-v2-text-text-faint">{props.timeLabel}</span>
       </button>
       <div class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100">

@@ -30,6 +30,7 @@ export interface SlashCommand {
 }
 
 type PromptPopoverProps = {
+  inline?: boolean
   popover: "at" | "slash" | null
   setSlashPopoverRef: (el: HTMLDivElement) => void
   atFlat: AtOption[]
@@ -54,12 +55,13 @@ export const PromptPopover: Component<PromptPopoverProps> = (props) => {
         ref={(el) => {
           if (props.popover === "slash") props.setSlashPopoverRef(el)
         }}
-        class="absolute inset-x-0 -top-2 -translate-y-full origin-bottom-left max-h-80 min-h-10
-                 overflow-auto no-scrollbar flex flex-col p-2"
+        class="min-h-10 overflow-auto no-scrollbar flex flex-col p-2"
         classList={{
-          "z-[70] rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]": props.newLayoutDesigns,
+          "absolute inset-x-0 -top-2 -translate-y-full origin-bottom-left max-h-80": !props.inline,
+          "z-[70] rounded-[10px] bg-v2-background-bg-base shadow-[var(--v2-elevation-raised)]":
+            props.newLayoutDesigns && !props.inline,
           "rounded-[12px] bg-surface-raised-stronger-non-alpha shadow-[var(--shadow-lg-border-base)]":
-            !props.newLayoutDesigns,
+            !props.newLayoutDesigns && !props.inline,
         }}
         onMouseDown={(e) => e.preventDefault()}
       >

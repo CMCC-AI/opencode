@@ -21,6 +21,11 @@ import { formatServerError } from "@/utils/server-errors"
 import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
 import {
+  cmccKnowledgeSessionMetadata,
+  cmccKnowledgeSystemPrompt,
+  type KnowledgeReference,
+} from "@/utils/cmcc-knowledge"
+import {
   CMCC_ARTIFACT_DIRECTORY_METADATA,
   cmccArtifactDirectory,
   cmccArtifactSystemPrompt,
@@ -37,6 +42,7 @@ const pending = new Map<string, PendingPrompt>()
 export type FollowupDraft = {
   sessionID: string
   sessionDirectory: string
+  attachmentDirectory?: string
   prompt: Prompt
   context: (ContextItem & { key: string })[]
   agent: string
@@ -118,7 +124,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
     text,
     sessionID: input.draft.sessionID,
     messageID,
-    sessionDirectory: input.draft.sessionDirectory,
+    sessionDirectory: input.draft.attachmentDirectory ?? input.draft.sessionDirectory,
   })
 
   const message: Message = {
@@ -200,6 +206,7 @@ type PromptSubmitInput = {
   onAbort?: () => void
   onSubmit?: () => void
   selectedAgent?: Accessor<string | undefined>
+  knowledge?: Accessor<KnowledgeReference | undefined>
 }
 
 export function createPromptSubmit(input: PromptSubmitInput) {
@@ -322,6 +329,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     const projectDirectory = sdk().directory
     const isNewSession = !params.id
+    const knowledge = input.knowledge?.()
     if (isNewSession && creatingSession) return
     if (isNewSession) creatingSession = true
 
@@ -329,7 +337,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     input.resetHistoryNavigation()
 
     const shouldAutoAccept = isNewSession && input.autoAccept()
-    const worktreeSelection = input.newSessionWorktree?.() || "main"
+    const worktreeSelection = knowledge?.directory ?? (input.newSessionWorktree?.() || "main")
 
     let sessionDirectory = projectDirectory
     let client = sdk().client
@@ -375,12 +383,14 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     }
 
     const draftID = search.draftId
-    const artifactDirectory = cmccArtifactDirectory(
-      isNewSession && draftID
-        ? { [CMCC_ARTIFACT_DIRECTORY_METADATA]: tabs.draft(draftID).artifactDirectory }
-        : input.info()?.metadata,
-      sessionDirectory,
-    )
+    const artifactDirectory = knowledge
+      ? undefined
+      : cmccArtifactDirectory(
+          isNewSession && draftID
+            ? { [CMCC_ARTIFACT_DIRECTORY_METADATA]: tabs.draft(draftID).artifactDirectory }
+            : input.info()?.metadata,
+          sessionDirectory,
+        )
 
     if (isNewSession && artifactDirectory) {
       const prepared = await cmccEnsureWorkspace(
@@ -405,7 +415,11 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       const created = await client.session
         .create({
           agent: selectedAgent,
-          metadata: artifactDirectory ? { [CMCC_ARTIFACT_DIRECTORY_METADATA]: artifactDirectory } : undefined,
+          metadata: knowledge
+            ? cmccKnowledgeSessionMetadata(knowledge)
+            : artifactDirectory
+              ? { [CMCC_ARTIFACT_DIRECTORY_METADATA]: artifactDirectory }
+              : undefined,
         })
         .then((x) => x.data ?? undefined)
         .catch((err) => {
@@ -444,11 +458,16 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     const draft: FollowupDraft = {
       sessionID: session.id,
       sessionDirectory,
+      attachmentDirectory: knowledge && isNewSession ? projectDirectory : undefined,
       prompt: currentPrompt,
       context,
       agent,
       model,
-      system: artifactDirectory ? cmccArtifactSystemPrompt(sessionDirectory, artifactDirectory) : undefined,
+      system: knowledge
+        ? cmccKnowledgeSystemPrompt(knowledge)
+        : artifactDirectory
+          ? cmccArtifactSystemPrompt(sessionDirectory, artifactDirectory)
+          : undefined,
       variant,
     }
 
