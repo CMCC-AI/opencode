@@ -1,3 +1,4 @@
+import type { KnowledgeReference } from "@/utils/cmcc-knowledge"
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { createStore, produce } from "solid-js/store"
@@ -23,6 +24,7 @@ export type DraftTab = {
   server: ServerConnection.Key
   directory: string
   artifactDirectory?: string
+  knowledgeNotebook?: KnowledgeReference
   expertID?: string
   worktree?: string
   agent?: string

@@ -52,6 +52,7 @@ import {
   CMCC_KNOWLEDGE_DELETED_MARKER,
   cmccKnowledgeDirectory,
   cmccKnowledgeNotebooks,
+  cmccKnowledgeSystemPrompt,
   cmccKnowledgeRoot,
   cmccRecoverKnowledgeNotebooks,
   cmccRememberKnowledgeSession,
@@ -982,7 +983,7 @@ export function CmccKnowledgeNotebookRoute() {
     const succeeded = await current.session
       .prompt({
         sessionID,
-        system: knowledgeSystemPrompt(activeNotebook),
+        system: cmccKnowledgeSystemPrompt(activeNotebook),
         agent: currentAgent.name,
         model: { providerID: currentModel.provider.id, modelID: currentModel.id },
         variant: local.model.variant.current(),
@@ -1186,7 +1187,7 @@ export function CmccKnowledgeNotebookRoute() {
           await current.session.prompt(
             {
               sessionID,
-              system: knowledgeSystemPrompt(activeNotebook),
+              system: cmccKnowledgeSystemPrompt(activeNotebook),
               agent: execution.agent,
               model: execution.model,
               variant: execution.variant,
@@ -1207,7 +1208,7 @@ export function CmccKnowledgeNotebookRoute() {
     await current.session.prompt(
       {
         sessionID,
-        system: knowledgeSystemPrompt(activeNotebook),
+        system: cmccKnowledgeSystemPrompt(activeNotebook),
         agent: execution.agent,
         model: execution.model,
         variant: execution.variant,
@@ -2846,10 +2847,6 @@ function uniqueRawSourcePath(name: string, used: Set<string>, suffix = 1): strin
   if (used.has(candidate)) return uniqueRawSourcePath(name, used, suffix + 1)
   used.add(candidate)
   return candidate
-}
-
-function knowledgeSystemPrompt(notebook: KnowledgeNotebook) {
-  return `你正在 DeepInsight 知识库笔记本“${notebook.name}”中工作。当前工作目录就是该笔记本目录：${notebook.directory}。知识库维护必须使用内置的 llm-wiki skill，并遵循它的 Ingest、Ask、Craft 和 Q&A Archive 模式。回答知识问题前先读取 index.md，再沿 [[双链]] 检索 02_LLM_Wiki 中的原子知识页；明确区分库内事实、综合推断与外部补充，引用结论时给出相对文件路径。除非用户明确要求，不要访问当前笔记本之外的文件。`
 }
 
 function stagingSystemPrompt(notebook: KnowledgeNotebook) {

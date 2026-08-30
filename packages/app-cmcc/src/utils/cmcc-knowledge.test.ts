@@ -7,6 +7,9 @@ import {
   cmccIsKnowledgeSession,
   cmccKnowledgeNotebookForSession,
   cmccKnowledgeNotebooks,
+  cmccKnowledgeSessionMetadata,
+  cmccKnowledgeSessionReference,
+  cmccMainKnowledgeSession,
   cmccRecoverKnowledgeNotebooks,
   cmccRememberKnowledgeSession,
   cmccSaveKnowledgeNotebooks,
@@ -14,6 +17,17 @@ import {
 } from "./cmcc-knowledge"
 
 describe("cmcc knowledge", () => {
+  test("restores main-chat knowledge references from durable metadata without the browser cache", () => {
+    const notebook = { id: "one", name: "研究", emoji: "📚", directory: "/knowledge/research" }
+    const session = { id: "ses_main", directory: notebook.directory, metadata: cmccKnowledgeSessionMetadata(notebook) }
+    expect(cmccKnowledgeSessionReference(session)).toEqual(notebook)
+    expect(cmccIsKnowledgeSession([], session)).toBe(true)
+    expect(cmccMainKnowledgeSession(session)).toBe(true)
+    expect(cmccMainKnowledgeSession({ metadata: { cmccKnowledgeKind: "chat" } })).toBe(false)
+    expect(cmccMainKnowledgeSession({ metadata: { ...session.metadata, cmccKnowledgeKind: "import" } })).toBe(false)
+    expect(cmccKnowledgeSessionReference({ id: "ordinary", directory: "/workspace" })).toBeUndefined()
+  })
+
   test("creates a stable notebook directory on posix and windows", () => {
     expect(cmccKnowledgeDirectory("/Users/test", "政策研究", "12345678-abcd")).toBe(
       "/Users/test/Documents/DeepInsight/Knowledge/政策研究-12345678",

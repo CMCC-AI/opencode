@@ -24,7 +24,12 @@ import {
   cmccEnsureWorkspace,
   cmccRememberConversationWorkspace,
 } from "@/utils/cmcc-workspace"
-import { cmccKnowledgeNotebookForSession, cmccKnowledgeNotebooks } from "@/utils/cmcc-knowledge"
+import {
+  cmccKnowledgeNotebookForSession,
+  cmccKnowledgeNotebooks,
+  cmccMainKnowledgeSession,
+  cmccKnowledgeSessionReference,
+} from "@/utils/cmcc-knowledge"
 import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByAgentType } from "@/utils/cmcc-cases"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
@@ -273,12 +278,20 @@ function CmccSidebar() {
   const conversations = createMemo(() => {
     const current = directory()
     if (!current) return [] as Session[]
-    return dockApiHistorySessions(current, dockapi.state.sessions)
+    const history = dockApiHistorySessions(current, dockapi.state.sessions)
       .map((session) => {
         const loaded = sync().session.data.info[session.id]
         return loaded ? { ...loaded, title: session.title, directory: current } : session
       })
+    const ids = new Set(history.map((session) => session.id))
+    const knowledge = Object.values(sync().session.data.info)
+      .filter((session): session is Session => !!session)
+      .filter(cmccMainKnowledgeSession)
+      .filter((session) => !session.parentID && !session.time.archived)
+      .filter((session) => !ids.has(session.id))
+    return [...history, ...knowledge]
       .sort((a, b) => sessionUpdatedAt(b) - sessionUpdatedAt(a))
+      .slice(0, SIDEBAR_SESSION_LIMIT)
   })
 
   createEffect(() => {
@@ -288,6 +301,20 @@ function CmccSidebar() {
     server.projects.touch(current)
     void sync().project.loadSessions(current, { limit: SIDEBAR_SESSION_LIMIT })
   })
+
+  createEffect(() => {
+    if (!sync().data.ready) return
+    knowledgeNotebooks().forEach((notebook) => {
+      void serverSDK()
+        .client.session.list(
+          { directory: notebook.directory, roots: true, limit: SIDEBAR_SESSION_LIMIT },
+          { throwOnError: true },
+        )
+        .then((result) => result.data?.forEach((session) => sync().session.remember(session)))
+        .catch(() => undefined)
+    })
+  })
+
   const sidebarMaxWidth = createMemo(() => {
     if (typeof window === "undefined") return SIDEBAR_MAX_WIDTH
     return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, window.innerWidth - SIDEBAR_MAIN_MIN_WIDTH))
@@ -362,6 +389,11 @@ function CmccSidebar() {
   }
 
   const openSession = (session: Session) => {
+    const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
+    if (notebook && !cmccMainKnowledgeSession(session)) {
+      navigate(`/knowledge/${notebook.id}/session/${session.id}`)
+      return
+    }
     const binding = dockapi.sessions.findByOpenCodeId(session.id)
     if (binding && !session.agent) {
       // DockAPI history placeholders omit agent metadata and must not satisfy session.resolve().
@@ -376,7 +408,8 @@ function CmccSidebar() {
 
   const activeSession = (session: Session) => {
     const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
-    if (notebook) return location.pathname === `/knowledge/${notebook.id}/session/${session.id}`
+    if (notebook && !cmccMainKnowledgeSession(session))
+      return location.pathname === `/knowledge/${notebook.id}/session/${session.id}`
     return (
       location.pathname === sessionHref(server.key, session.id) || location.pathname.endsWith(`/session/${session.id}`)
     )
@@ -511,6 +544,10 @@ function CmccSidebar() {
                   active={activeSession(session)}
                   agentType={dockapi.sessions.findByOpenCodeId(session.id)?.agentType}
                   timeLabel={timeLabel(session)}
+                  knowledgeName={
+                    cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)?.name ??
+                    cmccKnowledgeSessionReference(session)?.name
+                  }
                   openSession={openSession}
                   deleteSession={deleteSession}
                   publishCase={cmccCaseCategoryByAgentType(dockapi.sessions.findByOpenCodeId(session.id)?.agentType) ? publishCase : undefined}
@@ -625,6 +662,7 @@ function CmccSessionRow(props: {
   openSession: (session: Session) => void
   deleteSession: (session: Session) => void
   publishCase?: (session: Session) => void
+  knowledgeName?: string
 }) {
   const menuItems = () => (
     <>
@@ -674,6 +712,16 @@ function CmccSessionRow(props: {
               >
                 {props.agentType}
               </span>
+            </Show>
+            <Show when={props.knowledgeName}>
+              {(name) => (
+                <span
+                  class="max-w-[104px] shrink-0 truncate rounded-full bg-[#ede9fe] px-1.5 py-0.5 text-[11px] font-normal leading-[1.4] text-[#5b4fd7]"
+                  title={`知识库：${name()}`}
+                >
+                  知识库 · {name()}
+                </span>
+              )}
             </Show>
           </span>
           <span class="mt-0.5 block text-[11px] font-normal leading-none text-[#8b8daf]">{props.timeLabel}</span>

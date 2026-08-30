@@ -74,10 +74,23 @@ import {
   CmccPromptActionMenu,
   type CmccProfessionalDatabase,
 } from "@/components/cmcc-professional-databases"
-import { cmccExpertCenterHref, cmccExpertChineseName, cmccTeamAvatarUrl, cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
+import {
+  cmccExpertCenterHref,
+  cmccExpertChineseName,
+  cmccTeamAvatarUrl,
+  cmccTeamExpertByAgent,
+} from "@/utils/cmcc-experts"
+import { CmccPromptPanel } from "@/components/cmcc-prompt-panel"
 import { CmccKnowledgePicker } from "@/components/cmcc-knowledge-picker"
-import { cmccKnowledgeNotebooks, type KnowledgeNotebook } from "@/utils/cmcc-knowledge"
-import { useNavigate } from "@solidjs/router"
+import {
+  cmccKnowledgeNotebooks,
+  cmccKnowledgeNotebookForSession,
+  cmccKnowledgeSessionReference,
+  type KnowledgeNotebook,
+  type KnowledgeReference,
+} from "@/utils/cmcc-knowledge"
+import { useNavigate, useSearchParams } from "@solidjs/router"
+import { useTabs } from "@/context/tabs"
 
 export type PromptInputState = ReturnType<typeof usePrompt>
 
@@ -211,6 +224,8 @@ const EXAMPLES = [
 export const PromptInput: Component<PromptInputProps> = (props) => {
   const sdk = useSDK()
   const navigate = useNavigate()
+  const sessionTabs = useTabs()
+  const [search] = useSearchParams<{ draftId?: string }>()
 
   const sync = useSync()
   const files = useFile()
@@ -227,8 +242,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   let fileInputRef: HTMLInputElement | undefined
   let scrollRef!: HTMLDivElement
   let slashPopoverRef!: HTMLDivElement
-  let cmccActionAnchorRef: HTMLDivElement | undefined
-  let cmccActionMenuRef: HTMLDivElement | undefined
+  let cmccPanelRef: HTMLDivElement | undefined
   let restoreEndOnFocus = true
 
   const mirror = { input: false }
@@ -357,10 +371,31 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     () => prompt.capture(),
     Math.floor(Math.random() * EXAMPLES.length),
   )
-  const [cmccActionMenuOpen, setCmccActionMenuOpen] = createSignal(false)
-  const [cmccActionMenuPosition, setCmccActionMenuPosition] = createSignal<{ left: number; top: number }>()
-  const [cmccDatabaseOpen, setCmccDatabaseOpen] = createSignal(false)
-  const [cmccKnowledgeOpen, setCmccKnowledgeOpen] = createSignal(false)
+  const [actions, setActions] = createStore({
+    panel: null as "menu" | "database" | "knowledge" | "skills" | null,
+    selected: undefined as KnowledgeReference | undefined,
+  })
+  createEffect(
+    on(
+      () => prompt.capture(),
+      () => setActions({ panel: null, selected: undefined }),
+      { defer: true },
+    ),
+  )
+  const selectedKnowledge = createMemo(() => {
+    const session = info()
+    if (session) {
+      return (
+        cmccKnowledgeNotebookForSession(cmccKnowledgeNotebooks(), session) ?? cmccKnowledgeSessionReference(session)
+      )
+    }
+    const draft = sessionTabs.store.find((tab) => tab.type === "draft" && tab.draftID === search.draftId)
+    return draft?.type === "draft" ? draft.knowledgeNotebook : actions.selected
+  })
+  const setSelectedKnowledge = (notebook: KnowledgeReference | undefined) => {
+    if (search.draftId) sessionTabs.updateDraft(search.draftId, { knowledgeNotebook: notebook })
+    else setActions("selected", notebook)
+  }
   const selectedTeamExpert = createMemo(() => cmccTeamExpertByAgent(props.selectedExpertAgent))
   const buttonsSpring = useSpring(() => (store.mode === "normal" ? 1 : 0), { visualDuration: 0.2, bounce: 0 })
   const motion = (value: number) => ({
@@ -570,54 +605,45 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     },
   ])
 
-  const closePopover = () => setStore("popover", null)
+  const closePopover = () => {
+    setStore("popover", null)
+    if (actions.panel === "skills") setActions("panel", null)
+  }
 
-  const positionCmccActionMenu = () => {
-    const rect = cmccActionAnchorRef?.getBoundingClientRect()
-    if (!rect) return
-
-    const width = 218
-    const height = newSession() ? 262 : 226
-    setCmccActionMenuPosition({
-      left: Math.min(Math.max(8, rect.left - 4), window.innerWidth - width - 8),
-      top: Math.max(8, rect.top - height - 12),
-    })
+  const closeCmccPanel = () => {
+    setActions("panel", null)
+    closePopover()
+    requestAnimationFrame(() => editorRef?.focus())
   }
 
   const toggleCmccActionMenu = () => {
-    if (cmccActionMenuOpen()) {
-      setCmccActionMenuOpen(false)
-      return
-    }
-
-    positionCmccActionMenu()
-    setCmccActionMenuOpen(true)
+    const open = actions.panel === "menu"
+    closePopover()
+    setActions("panel", open ? null : "menu")
   }
 
   createEffect(() => {
-    if (!cmccActionMenuOpen()) return
-
+    if (!actions.panel) return
     const close = (event: PointerEvent) => {
       const target = event.target
       if (!(target instanceof Node)) return
-      if (cmccActionMenuRef?.contains(target)) return
+      if (cmccPanelRef?.contains(target)) return
       if (target instanceof Element && target.closest('[data-action="prompt-cmcc-actions"]')) return
-      setCmccActionMenuOpen(false)
+      // The skills list keeps the editor available for filtering commands.
+      if (actions.panel === "skills" && editorRef?.contains(target)) return
+      setActions("panel", null)
+      closePopover()
     }
-
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      event.preventDefault()
+      closeCmccPanel()
+    }
     document.addEventListener("pointerdown", close)
-    onCleanup(() => document.removeEventListener("pointerdown", close))
-  })
-
-  createEffect(() => {
-    if (!cmccActionMenuOpen()) return
-
-    positionCmccActionMenu()
-    window.addEventListener("resize", positionCmccActionMenu)
-    window.addEventListener("scroll", positionCmccActionMenu, true)
+    document.addEventListener("keydown", escape)
     onCleanup(() => {
-      window.removeEventListener("resize", positionCmccActionMenu)
-      window.removeEventListener("scroll", positionCmccActionMenu, true)
+      document.removeEventListener("pointerdown", close)
+      document.removeEventListener("keydown", escape)
     })
   })
 
@@ -638,7 +664,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const setPlainPrompt = (text: string) => {
     const images = imageAttachments()
-    setCmccActionMenuOpen(false)
+    setActions("panel", null)
     setStore("mode", "normal")
     setStore("popover", null)
     resetHistoryNavigation(true)
@@ -896,36 +922,32 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     setPlainPrompt("/")
     slashOnInput("")
     setStore("popover", "slash")
+    setActions("panel", "skills")
   }
 
   const openProfessionalDatabases = () => {
-    setCmccActionMenuOpen(false)
-    setCmccDatabaseOpen(true)
+    closePopover()
+    setActions("panel", "database")
   }
 
   const openKnowledge = () => {
-    setCmccActionMenuOpen(false)
-    setCmccKnowledgeOpen(true)
+    closePopover()
+    setActions("panel", "knowledge")
   }
 
   const selectKnowledge = (notebook: KnowledgeNotebook) => {
-    const text = prompt
-      .current()
-      .map((part) => ("content" in part ? part.content : ""))
-      .join("")
-      .trim()
-    const query = text ? `?prompt=${encodeURIComponent(text)}` : ""
-    setCmccKnowledgeOpen(false)
-    navigate(`/knowledge/${encodeURIComponent(notebook.id)}/session/new${query}`)
+    setSelectedKnowledge(notebook)
+    setActions("panel", null)
+    requestAnimationFrame(() => editorRef?.focus())
   }
 
   const openExpertCenter = () => {
-    setCmccActionMenuOpen(false)
+    setActions("panel", null)
     navigate(cmccExpertCenterHref())
   }
 
   const tryProfessionalDatabase = (database: CmccProfessionalDatabase) => {
-    setCmccDatabaseOpen(false)
+    setActions("panel", null)
     setPlainPrompt(database.prompt)
   }
 
@@ -1407,6 +1429,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       onAbort: props.onAbort,
       onSubmit: props.onSubmit,
       selectedAgent: () => props.selectedExpertAgent,
+      knowledge: selectedKnowledge,
     })
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -1639,46 +1662,51 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       restoreFocus()
     },
   }))
+  const promptPopover = (inline = false) => (
+    <PromptPopover
+      inline={inline}
+      popover={store.popover}
+      setSlashPopoverRef={(el) => (slashPopoverRef = el)}
+      atFlat={atFlat()}
+      atActive={atActive() ?? undefined}
+      atKey={atKey}
+      setAtActive={setAtActive}
+      onAtSelect={handleAtSelect}
+      slashFlat={slashFlat()}
+      slashActive={slashActive() ?? undefined}
+      setSlashActive={setSlashActive}
+      onSlashSelect={handleSlashSelect}
+      commandKeybind={command.keybind}
+      commandKeybindParts={command.keybindParts}
+      newLayoutDesigns={props.controls.newLayoutDesigns}
+      t={(key) => language.t(key as Parameters<typeof language.t>[0])}
+    />
+  )
   return (
     <div class="relative size-full flex flex-col gap-0">
       {(promptReady(), null)}
-      <Show when={cmccDatabaseOpen()}>
-        <CmccProfessionalDatabasesDialog
-          onClose={() => setCmccDatabaseOpen(false)}
-          onTry={tryProfessionalDatabase}
-        />
+      <Show when={selectedKnowledge()}>
+        {(notebook) => (
+          <div
+            class="mb-2 flex items-center gap-2 self-start rounded-lg bg-[#ede9fe] px-3 py-1.5 text-[12px] text-[#5b4fd7]"
+            data-component="knowledge-reference"
+          >
+            <span>{notebook().emoji}</span>
+            <span class="max-w-64 truncate" title={notebook().name}>
+              知识库：{notebook().name}
+            </span>
+            <Show when={!props.controls.session.id}>
+              <button type="button" aria-label="移除知识库引用" onClick={() => setSelectedKnowledge(undefined)}>
+                <Icon name="close" class="size-3.5" />
+              </button>
+            </Show>
+          </div>
+        )}
       </Show>
-      <Show when={cmccKnowledgeOpen()}>
-        <CmccKnowledgePicker
-          notebooks={cmccKnowledgeNotebooks()}
-          onClose={() => setCmccKnowledgeOpen(false)}
-          onManage={() => {
-            setCmccKnowledgeOpen(false)
-            navigate("/knowledge")
-          }}
-          onSelect={selectKnowledge}
-        />
-      </Show>
-      <PromptPopover
-        popover={store.popover}
-        setSlashPopoverRef={(el) => (slashPopoverRef = el)}
-        atFlat={atFlat()}
-        atActive={atActive() ?? undefined}
-        atKey={atKey}
-        setAtActive={setAtActive}
-        onAtSelect={handleAtSelect}
-        slashFlat={slashFlat()}
-        slashActive={slashActive() ?? undefined}
-        setSlashActive={setSlashActive}
-        onSlashSelect={handleSlashSelect}
-        commandKeybind={command.keybind}
-        commandKeybindParts={command.keybindParts}
-        newLayoutDesigns={props.controls.newLayoutDesigns}
-        t={(key) => language.t(key as Parameters<typeof language.t>[0])}
-      />
+      <Show when={actions.panel !== "skills"}>{promptPopover()}</Show>
       <Switch>
         <Match when={props.controls.newLayoutDesigns}>
-          <div class="flex flex-col gap-3">
+          <div class="flex min-w-0 flex-col">
             <DockShellForm
               data-component={newSession() ? "session-new-composer" : "session-composer"}
               onSubmit={handleSubmit}
@@ -1769,11 +1797,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               <div class="flex h-11 items-center px-2">
                 <div class="flex min-w-0 flex-1 items-center gap-1">
                   {fileAttachmentInput()}
-                  <TooltipV2
-                    placement="top"
-                    value="更多操作"
-                  >
-                    <div ref={(el) => (cmccActionAnchorRef = el)}>
+                  <TooltipV2 placement="top" value="更多操作">
+                    <div>
                       <IconButton
                         data-action="prompt-cmcc-actions"
                         type="button"
@@ -1785,19 +1810,6 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         disabled={store.mode !== "normal"}
                         tabIndex={store.mode === "normal" ? undefined : -1}
                         aria-label="打开更多操作"
-                      />
-                      <CmccPromptActionMenu
-                        open={cmccActionMenuOpen()}
-                        position={cmccActionMenuPosition()}
-                        menuRef={(el) => (cmccActionMenuRef = el)}
-                        onAttach={() => {
-                          setCmccActionMenuOpen(false)
-                          pick()
-                        }}
-                        onExperts={openExpertCenter}
-                        onSkills={openSkillCommands}
-                        onKnowledge={newSession() ? openKnowledge : undefined}
-                        onProfessionalDatabases={openProfessionalDatabases}
                       />
                     </div>
                   </TooltipV2>
@@ -1822,7 +1834,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                             </div>
                           }
                         >
-                          {(source) => <img src={source()} alt="" class="size-[18px] shrink-0 rounded-full object-cover" />}
+                          {(source) => (
+                            <img src={source()} alt="" class="size-[18px] shrink-0 rounded-full object-cover" />
+                          )}
                         </Show>
                         <span class="min-w-0 truncate">{cmccExpertChineseName(expert())}</span>
                         <Icon name="close" class="size-3.5 shrink-0 text-v2-icon-icon-muted" />
@@ -1891,6 +1905,49 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </TooltipV2>
               </div>
             </DockShellForm>
+            <Show when={actions.panel}>
+              <div
+                ref={(el) => (cmccPanelRef = el)}
+                class="mt-2 flex w-full min-w-0 justify-start"
+                data-component="cmcc-prompt-panels"
+              >
+                <Switch>
+                  <Match when={actions.panel === "menu"}>
+                    <CmccPromptActionMenu
+                      onAttach={() => {
+                        setActions("panel", null)
+                        pick()
+                      }}
+                      onExperts={openExpertCenter}
+                      onSkills={openSkillCommands}
+                      onKnowledge={newSession() ? openKnowledge : undefined}
+                      onProfessionalDatabases={openProfessionalDatabases}
+                    />
+                  </Match>
+                  <Match when={actions.panel === "database"}>
+                    <CmccProfessionalDatabasesDialog onClose={closeCmccPanel} onTry={tryProfessionalDatabase} />
+                  </Match>
+                  <Match when={actions.panel === "knowledge"}>
+                    <CmccKnowledgePicker
+                      notebooks={cmccKnowledgeNotebooks()}
+                      onClose={closeCmccPanel}
+                      onManage={() => {
+                        closeCmccPanel()
+                        navigate("/knowledge")
+                      }}
+                      onSelect={selectKnowledge}
+                    />
+                  </Match>
+                  <Match when={actions.panel === "skills"}>
+                    <div class="w-full min-w-0" onMouseDown={(event) => event.preventDefault()}>
+                      <CmccPromptPanel title="技能" onClose={closeCmccPanel}>
+                        {promptPopover(true)}
+                      </CmccPromptPanel>
+                    </div>
+                  </Match>
+                </Switch>
+              </div>
+            </Show>
           </div>
         </Match>
         <Match when>
