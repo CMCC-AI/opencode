@@ -41,6 +41,12 @@ export type AgentWorkbenchStats = {
   expertCount: number
 }
 
+export type OverviewConversationTurn = {
+  id: string
+  query: string
+  markdown: string
+}
+
 export type ArtifactRole = "text-report" | "visual-report" | "supporting"
 
 export type SessionArtifact = {
@@ -66,6 +72,7 @@ export type AgentWorkbench = {
   rootSessionId: string
   query: string
   overviewMarkdown: string
+  overviewTurns: OverviewConversationTurn[]
   overviewStatus: AgentNodeStatus
   agents: AgentNodeView[]
   nestedAgentSessions: NestedAgentSessionView[]

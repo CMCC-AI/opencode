@@ -136,6 +136,7 @@ export function createDeepTradingReplayFrame(timeline: DeepTradingReplayTimeline
     workbench: {
       ...timeline.source,
       overviewMarkdown: "",
+      overviewTurns: [],
       overviewStatus: "waiting",
       agents: timeline.source.agents.map((agent) => ({ ...agent, status: "waiting", markdown: "" })),
       nestedAgentSessions: [],

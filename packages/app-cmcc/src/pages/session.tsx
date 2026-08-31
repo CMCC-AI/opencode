@@ -281,7 +281,14 @@ export default function Page() {
   const businessAgentType = createMemo(() =>
     params.id ? dockapi.sessions.findByOpenCodeId(params.id)?.agentType : undefined,
   )
-  const deepTrading = createMemo(() => shouldUseDeepTradingPage(info(), businessAgentType()))
+  const initialUserAgent = createMemo(() => {
+    const id = params.id
+    if (!id) return
+    return (sync().data.message[id] ?? [])
+      .filter((message): message is UserMessage => message.role === "user")
+      .sort((left, right) => left.time.created - right.time.created || left.id.localeCompare(right.id))[0]?.agent
+  })
+  const deepTrading = createMemo(() => shouldUseDeepTradingPage(info(), businessAgentType(), initialUserAgent()))
   const contentPanelWidth = createMemo(() => (deepTrading() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))

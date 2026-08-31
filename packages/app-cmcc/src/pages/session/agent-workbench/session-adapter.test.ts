@@ -4,6 +4,7 @@ import {
   buildNestedAgentSessions,
   buildAgentNodes,
   extractAssistantMarkdown,
+  extractOverviewConversation,
   extractTaskChildPreferences,
   extractUserQuery,
 } from "./session-adapter"
@@ -54,7 +55,8 @@ const text = (id: string, messageID: string, value: string): Part => ({
 
 describe("agent workbench session adapter", () => {
   test("extracts only ordered assistant text and the original user query", () => {
-    const messages = [assistant("a2", "root"), user("u1", "root"), assistant("a1", "root")]
+    const followup = { ...assistant("a2", "root"), agent: "build", mode: "build" }
+    const messages = [followup, user("u1", "root"), assistant("a1", "root")]
     const parts = {
       u1: [text("p1", "u1", "研究一下贵州茅台最近怎么样")],
       a1: [text("p2", "a1", "第一段")],
@@ -75,6 +77,30 @@ describe("agent workbench session adapter", () => {
     } satisfies Record<string, Part[]>
 
     expect(extractAssistantMarkdown([message], parts)).toBe("```ts\nconst value = 1\n```\n")
+  })
+
+  test("groups follow-up questions with their assistant replies in chronological order", () => {
+    const initialUser = user("u1", "root")
+    const followupUser = { ...user("u2", "root"), time: { created: 40 }, agent: "build" }
+    const initialReply = { ...assistant("a1", "root"), parentID: initialUser.id }
+    const followupReply = {
+      ...assistant("a2", "root"),
+      parentID: followupUser.id,
+      time: { created: 50, completed: 60 },
+      agent: "build",
+      mode: "build",
+    }
+    const parts = {
+      u1: [text("p1", "u1", "研究贵州茅台")],
+      a1: [text("p2", "a1", "初始分析")],
+      u2: [text("p3", "u2", "它目前估值如何？")],
+      a2: [text("p4", "a2", "当前估值处于历史低位。")],
+    } satisfies Record<string, Part[]>
+
+    expect(extractOverviewConversation([followupReply, initialUser, followupUser, initialReply], parts)).toEqual([
+      { id: "u1", query: "研究贵州茅台", markdown: "初始分析" },
+      { id: "u2", query: "它目前估值如何？", markdown: "当前估值处于历史低位。" },
+    ])
   })
 
   test("keeps configured order and exposes duplicate child sessions as ambiguity", () => {

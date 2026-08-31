@@ -21,6 +21,7 @@ import {
   buildAgentNodes,
   deriveSessionStatus,
   extractAssistantMarkdown,
+  extractOverviewConversation,
   extractTaskChildPreferences,
   extractUserQuery,
   resolveAgentSessions,
@@ -374,7 +375,7 @@ function createLiveDeepTradingWorkbench(props: { sessionID: Accessor<string | un
       if (!root) return { artifacts: [], ambiguities: [] }
       return discoverSessionArtifacts({
         directory: sdk().directory,
-        transcripts: [root, ...selectedChildTranscripts()],
+        transcripts: [root, ...childTranscripts()],
         roles: DEEPTRADING_ARTIFACT_ROLES,
       })
     })
@@ -418,6 +419,7 @@ function createLiveDeepTradingWorkbench(props: { sessionID: Accessor<string | un
         rootSessionId: root.id,
         query: extractUserQuery(rootData.messages, rootData.parts),
         overviewMarkdown: extractAssistantMarkdown(rootData.messages, rootData.parts),
+        overviewTurns: extractOverviewConversation(rootData.messages, rootData.parts),
         overviewStatus: overviewStatus(),
         agents: nodes.agentNodes,
         nestedAgentSessions: nestedAgentSessions(),
@@ -604,6 +606,7 @@ function emptyWorkbench(loading: boolean, error?: string, rootSessionId = ""): A
     rootSessionId,
     query: "",
     overviewMarkdown: "",
+    overviewTurns: [],
     overviewStatus: "waiting",
     agents: DEEPTRADING_MEMBERS.map((member) => ({ ...member, status: "waiting", markdown: "" })),
     nestedAgentSessions: [],

@@ -7,6 +7,7 @@ import {
   buildNestedAgentSessions,
   deriveSessionStatus,
   extractAssistantMarkdown,
+  extractOverviewConversation,
   extractTaskChildPreferences,
   extractUserQuery,
   resolveAgentSessions,
@@ -215,6 +216,7 @@ function buildWorkbench(
     rootSessionId: root.session.id,
     query: extractUserQuery(root.messages, root.parts) || snapshot.query,
     overviewMarkdown: extractAssistantMarkdown(root.messages, root.parts),
+    overviewTurns: extractOverviewConversation(root.messages, root.parts),
     overviewStatus: deriveSessionStatus({
       session: root.session,
       status: root.status,
@@ -303,6 +305,7 @@ function emptyWorkbench(rootSessionId: string, error: string): AgentWorkbench {
     rootSessionId,
     query: "",
     overviewMarkdown: "",
+    overviewTurns: [],
     overviewStatus: "failed",
     agents: DEEPTRADING_MEMBERS.map((member) => ({ ...member, status: "waiting", markdown: "" })),
     nestedAgentSessions: [],

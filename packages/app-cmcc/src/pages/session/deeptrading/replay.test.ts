@@ -14,6 +14,9 @@ const workbench = (): AgentWorkbench => ({
   rootSessionId: "root",
   query: "研究目标公司",
   overviewMarkdown: "# 总览\n总览正文\n\n## 结论\n结论正文",
+  overviewTurns: [
+    { id: "user-1", query: "研究目标公司", markdown: "# 总览\n总览正文\n\n## 结论\n结论正文" },
+  ],
   overviewStatus: "completed",
   agents: [
     {

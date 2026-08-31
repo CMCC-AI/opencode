@@ -4,6 +4,7 @@ import type {
   AgentNodeStatus,
   AgentNodeView,
   NestedAgentSessionView,
+  OverviewConversationTurn,
   SessionTranscript,
 } from "./model"
 
@@ -30,6 +31,27 @@ export function extractAssistantMarkdown(messages: readonly Message[], parts: Se
       return text.trim() ? [text] : []
     })
     .join("\n\n")
+}
+
+export function extractOverviewConversation(messages: readonly Message[], parts: SessionTranscript["parts"]) {
+  const ordered = [...messages].sort(compareMessage)
+  const turns = ordered.flatMap((message): OverviewConversationTurn[] => {
+    if (message.role !== "user") return []
+    const query = joinTextParts(parts[message.id] ?? []).trim()
+    return query ? [{ id: message.id, query, markdown: "" }] : []
+  })
+  const turnIndex = new Map(turns.map((turn, index) => [turn.id, index]))
+
+  for (const message of ordered) {
+    if (message.role !== "assistant") continue
+    const index = turnIndex.get(message.parentID)
+    if (index === undefined) continue
+    const markdown = joinTextParts(parts[message.id] ?? [])
+    if (!markdown.trim()) continue
+    const turn = turns[index]!
+    turns[index] = { ...turn, markdown: turn.markdown ? `${turn.markdown}\n\n${markdown}` : markdown }
+  }
+  return turns
 }
 
 export function extractUserQuery(messages: readonly Message[], parts: SessionTranscript["parts"]) {

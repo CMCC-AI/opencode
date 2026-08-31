@@ -82,6 +82,23 @@ describe("agent workbench artifacts", () => {
     expect(result.artifacts[0]?.sizeBytes).toBe(12)
   })
 
+  test("keeps an earlier report write when a later same-agent session only reads it", () => {
+    const report = `${directory}\\tmp\\trading-workspace\\run-1\\30-final-report.md`
+    const readerSession = { ...session, id: "reader-child", time: { created: 30, updated: 40 } }
+    const readerMessage = { ...message, id: "reader-assistant", sessionID: readerSession.id }
+    const result = discoverSessionArtifacts({
+      directory,
+      transcripts: [
+        transcript([write("p1", report)]),
+        { session: readerSession, messages: [readerMessage], parts: { [readerMessage.id]: [] } },
+      ],
+      roles: { "30-final-report.md": { role: "text-report" } },
+    })
+
+    expect(artifactByRole(result, "text-report")?.path).toBe("tmp/trading-workspace/run-1/30-final-report.md")
+    expect(result.ambiguities).toEqual([])
+  })
+
   test("reports conflicting write path fields instead of choosing one", () => {
     const result = discoverSessionArtifacts({
       directory,

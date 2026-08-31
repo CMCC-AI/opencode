@@ -9,7 +9,12 @@ export function isDeepTradingRootSession(session?: Pick<Session, "agent" | "pare
 export function shouldUseDeepTradingPage(
   session: Pick<Session, "agent" | "parentID"> | undefined,
   agentType: string | undefined,
+  initialUserAgent?: string,
 ) {
   if (session?.parentID) return false
-  return isDeepTradingRootSession(session) || agentType === "deeptrading"
+  return (
+    isDeepTradingRootSession(session) ||
+    agentType?.trim().toLowerCase() === "deeptrading" ||
+    initialUserAgent === DEEPTRADING_LEAD_AGENT
+  )
 }
