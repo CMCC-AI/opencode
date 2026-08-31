@@ -30,7 +30,11 @@ import {
   cmccMainKnowledgeSession,
   cmccKnowledgeSessionReference,
 } from "@/utils/cmcc-knowledge"
-import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByAgentType } from "@/utils/cmcc-cases"
+import {
+  CMCC_CASES_UPDATED_EVENT,
+  cmccCaseCategoryByAgentType,
+  cmccCasePublishingAllowed,
+} from "@/utils/cmcc-cases"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
@@ -446,6 +450,10 @@ function CmccSidebar() {
       showToast({ variant: "default", title: "当前会话暂不支持发布案例" })
       return
     }
+    if (!cmccCasePublishingAllowed(dockapi.user?.casePublishAllowed, binding.agentType)) {
+      showToast({ variant: "default", title: "当前账号无权添加案例库" })
+      return
+    }
     setCaseDialog("session", binding)
   }
 
@@ -550,7 +558,14 @@ function CmccSidebar() {
                   }
                   openSession={openSession}
                   deleteSession={deleteSession}
-                  publishCase={cmccCaseCategoryByAgentType(dockapi.sessions.findByOpenCodeId(session.id)?.agentType) ? publishCase : undefined}
+                  publishCase={
+                    cmccCasePublishingAllowed(
+                      dockapi.user?.casePublishAllowed,
+                      dockapi.sessions.findByOpenCodeId(session.id)?.agentType,
+                    )
+                      ? publishCase
+                      : undefined
+                  }
                 />
               )}
             </For>

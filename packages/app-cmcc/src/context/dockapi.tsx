@@ -21,6 +21,7 @@ export type DockApiUser = {
   name: string
   phone: string
   enabled: boolean
+  casePublishAllowed: boolean
 }
 
 export type DockApiWorkspace = {

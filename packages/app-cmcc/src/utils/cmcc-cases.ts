@@ -62,6 +62,10 @@ export function cmccCaseCategoryByAgentType(agentType: string | undefined) {
   return CMCC_CASE_CATEGORIES.find((item) => item.agentType === agentType)
 }
 
+export function cmccCasePublishingAllowed(casePublishAllowed: boolean | undefined, agentType: string | undefined) {
+  return casePublishAllowed === true && cmccCaseCategoryByAgentType(agentType) !== undefined
+}
+
 export function formatCaseCharacterCount(value: number) {
   const count = Math.max(0, Number.isFinite(value) ? value : 0)
   if (count >= 10_000) return `${(count / 10_000).toFixed(count >= 100_000 ? 0 : 1)}万字`
