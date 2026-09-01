@@ -28,7 +28,7 @@ const CMCC_EXPERT_FRAME_SOURCES = [
 export const csp = (hash = "", deepXivOrigin = process.env.DEEPLIT_PROXY_PUBLIC_ORIGIN) => {
   const deepXivFrameSource = parseFrameSource(deepXivOrigin)
   const frameSources = [...CMCC_EXPERT_FRAME_SOURCES, ...(deepXivFrameSource ? [deepXivFrameSource] : [])].join(" ")
-  return `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; media-src 'self' data:; frame-src 'self' ${frameSources}; connect-src * data:`
+  return `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'${hash ? ` 'sha256-${hash}'` : ""}; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; media-src 'self' data:; frame-src 'self' ${frameSources}; connect-src * data:`
 }
 export const DEFAULT_CSP = csp()
 

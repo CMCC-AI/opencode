@@ -145,7 +145,7 @@ export function CasePublishDialog(props: {
                 </header>
                 <div class="px-[18px] pb-2 pt-4">
                   <label class="mb-2 block text-[13px] font-medium text-[#46516b]">案例图片</label>
-                  <label class="flex aspect-[1.58] w-full cursor-pointer items-center justify-center overflow-hidden rounded-[8px] border border-dashed border-[#9fb7ec] bg-[#f8faff] text-[13px] text-[#7182a8] hover:border-[#6f96ec]">
+                  <label class="flex aspect-[1.8] w-full cursor-pointer items-center justify-center overflow-hidden rounded-[8px] border border-dashed border-[#9fb7ec] bg-[#f8faff] text-[13px] text-[#7182a8] hover:border-[#6f96ec]">
                     <input
                       ref={(element) => {
                         input = element
@@ -156,7 +156,7 @@ export function CasePublishDialog(props: {
                       onChange={selectCover}
                     />
                     <Show when={form.coverPreview} fallback={<span>点击上传封面图片</span>}>
-                      <img src={form.coverPreview} alt="案例封面预览" class="size-full object-cover" />
+                      <img src={form.coverPreview} alt="案例封面预览" class="size-full object-fill" />
                     </Show>
                   </label>
 

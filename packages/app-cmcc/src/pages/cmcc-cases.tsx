@@ -371,7 +371,7 @@ function CaseCard(props: { item: DockApiCaseSummary; onClick: () => void }) {
             <img
               src={dockApiUrl(props.item.coverUrl)}
               alt={props.item.caseName}
-              class="size-full object-cover"
+              class="size-full object-fill"
               loading="lazy"
               onError={() => setState("coverFailed", true)}
             />

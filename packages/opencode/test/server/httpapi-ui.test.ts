@@ -368,6 +368,7 @@ describe("HttpApi UI fallback", () => {
       expect(response.headers.get("vary")).toBe("Accept-Encoding")
       expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval'")
       expect(csp).toContain(`'sha256-${createHash("sha256").update(script).digest("base64")}'`)
+      expect(csp).toContain("img-src 'self' data: https: blob:")
       expect(csp).toContain(
         "frame-src 'self' http://152.136.106.161:3001 http://81.70.174.140:8082 http://81.70.174.140:8888",
       )
