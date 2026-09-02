@@ -1,0 +1,350 @@
+{
+  "id": "ai-for-science-team",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "ai-for-science-team/ai-for-science-team-team-lead",
+  "teamInfo": {
+    "leadAgent": "ai-for-science-team/ai-for-science-team-team-lead",
+    "memberAgents": [
+      "ai-for-science-team/as-intent-router",
+      "ai-for-science-team/as-asset-auditor",
+      "ai-for-science-team/as-feasibility-advisor",
+      "ai-for-science-team/as-research-planner",
+      "ai-for-science-team/as-literature-strategist",
+      "ai-for-science-team/as-literature-researcher",
+      "ai-for-science-team/as-paper-evidence-analyst",
+      "ai-for-science-team/as-research-synthesizer",
+      "ai-for-science-team/as-methodology-designer",
+      "ai-for-science-team/as-experiment-designer",
+      "ai-for-science-team/as-code-data-engineer",
+      "ai-for-science-team/as-experiment-operator",
+      "ai-for-science-team/as-experiment-diagnostician",
+      "ai-for-science-team/as-result-analyst",
+      "ai-for-science-team/as-outline-architect",
+      "ai-for-science-team/as-evidence-writer",
+      "ai-for-science-team/as-figure-citation-editor",
+      "ai-for-science-team/as-independent-reviewer",
+      "ai-for-science-team/as-quality-citation-auditor",
+      "ai-for-science-team/as-research-package-curator"
+    ]
+  },
+  "displayName": {
+    "en": "AI for Science Research Team",
+    "zh": "AI for Science 科研专家团"
+  },
+  "profession": {
+    "en": "AI for Science Research Team",
+    "zh": "AI for Science 科研专家团"
+  },
+  "displayDescription": {
+    "en": "A Chinese research team covering literature review, paper reproduction, experiment design and scientific writing, with traceable evidence and auditable research packages.",
+    "zh": "覆盖文献综述、论文复现、实验设计与科研写作的中文科研专家团，动态组队全程可追溯，交付可审计研究包。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "12-Research",
+  "defaultInitPrompt": {
+    "zh": "帮我做一次关于「我的研究主题」的系统文献综述",
+    "en": "Conduct a systematic literature review on my research topic"
+  },
+  "members": [
+    {
+      "id": "ai-for-science-team/ai-for-science-team-team-lead",
+      "name": {
+        "en": "Gu Yanzhang",
+        "zh": "顾研章"
+      },
+      "profession": {
+        "en": "Chief Research Scientist",
+        "zh": "首席科研专家"
+      },
+      "avatar": "avatars/ai-for-science-team-team-lead.png",
+      "role": "lead",
+      "originalId": "ai-for-science-team-team-lead"
+    },
+    {
+      "id": "ai-for-science-team/as-intent-router",
+      "name": {
+        "en": "Ming Dayi",
+        "zh": "明达意"
+      },
+      "profession": {
+        "en": "Research Intent Analyst",
+        "zh": "科研需求识别专家"
+      },
+      "avatar": "avatars/as-intent-router.png",
+      "role": "member",
+      "originalId": "as-intent-router"
+    },
+    {
+      "id": "ai-for-science-team/as-asset-auditor",
+      "name": {
+        "en": "Jian Qingce",
+        "zh": "简清册"
+      },
+      "profession": {
+        "en": "Research Asset Auditor",
+        "zh": "科研资产审计专家"
+      },
+      "avatar": "avatars/as-asset-auditor.png",
+      "role": "member",
+      "originalId": "as-asset-auditor"
+    },
+    {
+      "id": "ai-for-science-team/as-feasibility-advisor",
+      "name": {
+        "en": "Kang Kexing",
+        "zh": "康可行"
+      },
+      "profession": {
+        "en": "Feasibility Advisor",
+        "zh": "科研可行性顾问"
+      },
+      "avatar": "avatars/as-feasibility-advisor.png",
+      "role": "member",
+      "originalId": "as-feasibility-advisor"
+    },
+    {
+      "id": "ai-for-science-team/as-research-planner",
+      "name": {
+        "en": "Zhan Hongtu",
+        "zh": "展宏图"
+      },
+      "profession": {
+        "en": "Research Planner",
+        "zh": "研究规划专家"
+      },
+      "avatar": "avatars/as-research-planner.png",
+      "role": "member",
+      "originalId": "as-research-planner"
+    },
+    {
+      "id": "ai-for-science-team/as-literature-strategist",
+      "name": {
+        "en": "Su Xunjing",
+        "zh": "苏寻径"
+      },
+      "profession": {
+        "en": "Search Strategy Expert",
+        "zh": "文献检索策略专家"
+      },
+      "avatar": "avatars/as-literature-strategist.png",
+      "role": "member",
+      "originalId": "as-literature-strategist"
+    },
+    {
+      "id": "ai-for-science-team/as-literature-researcher",
+      "name": {
+        "en": "Luo Wenhan",
+        "zh": "罗文瀚"
+      },
+      "profession": {
+        "en": "Paper Discovery Expert",
+        "zh": "论文发现专家"
+      },
+      "avatar": "avatars/as-literature-researcher.png",
+      "role": "member",
+      "originalId": "as-literature-researcher"
+    },
+    {
+      "id": "ai-for-science-team/as-paper-evidence-analyst",
+      "name": {
+        "en": "Shen Duzhen",
+        "zh": "沈读真"
+      },
+      "profession": {
+        "en": "Paper Evidence Analyst",
+        "zh": "论文证据分析专家"
+      },
+      "avatar": "avatars/as-paper-evidence-analyst.png",
+      "role": "member",
+      "originalId": "as-paper-evidence-analyst"
+    },
+    {
+      "id": "ai-for-science-team/as-research-synthesizer",
+      "name": {
+        "en": "Rong Baichuan",
+        "zh": "容百川"
+      },
+      "profession": {
+        "en": "Research Synthesizer",
+        "zh": "研究综合专家"
+      },
+      "avatar": "avatars/as-research-synthesizer.png",
+      "role": "member",
+      "originalId": "as-research-synthesizer"
+    },
+    {
+      "id": "ai-for-science-team/as-methodology-designer",
+      "name": {
+        "en": "Fang Lizheng",
+        "zh": "方立证"
+      },
+      "profession": {
+        "en": "Methodology Designer",
+        "zh": "方法论设计专家"
+      },
+      "avatar": "avatars/as-methodology-designer.png",
+      "role": "member",
+      "originalId": "as-methodology-designer"
+    },
+    {
+      "id": "ai-for-science-team/as-experiment-designer",
+      "name": {
+        "en": "Zhou Miji",
+        "zh": "周密计"
+      },
+      "profession": {
+        "en": "Experiment Designer",
+        "zh": "实验设计专家"
+      },
+      "avatar": "avatars/as-experiment-designer.png",
+      "role": "member",
+      "originalId": "as-experiment-designer"
+    },
+    {
+      "id": "ai-for-science-team/as-code-data-engineer",
+      "name": {
+        "en": "Cheng Kekao",
+        "zh": "程可靠"
+      },
+      "profession": {
+        "en": "Research Code Engineer",
+        "zh": "科研代码工程专家"
+      },
+      "avatar": "avatars/as-code-data-engineer.png",
+      "role": "member",
+      "originalId": "as-code-data-engineer"
+    },
+    {
+      "id": "ai-for-science-team/as-experiment-operator",
+      "name": {
+        "en": "Chi Xingjian",
+        "zh": "池行健"
+      },
+      "profession": {
+        "en": "Experiment Operator",
+        "zh": "实验执行专家"
+      },
+      "avatar": "avatars/as-experiment-operator.png",
+      "role": "member",
+      "originalId": "as-experiment-operator"
+    },
+    {
+      "id": "ai-for-science-team/as-experiment-diagnostician",
+      "name": {
+        "en": "Zhen Chayin",
+        "zh": "甄查因"
+      },
+      "profession": {
+        "en": "Experiment Diagnostician",
+        "zh": "实验诊断专家"
+      },
+      "avatar": "avatars/as-experiment-diagnostician.png",
+      "role": "member",
+      "originalId": "as-experiment-diagnostician"
+    },
+    {
+      "id": "ai-for-science-team/as-result-analyst",
+      "name": {
+        "en": "Bai Ximing",
+        "zh": "白析明"
+      },
+      "profession": {
+        "en": "Result Analyst",
+        "zh": "结果分析专家"
+      },
+      "avatar": "avatars/as-result-analyst.png",
+      "role": "member",
+      "originalId": "as-result-analyst"
+    },
+    {
+      "id": "ai-for-science-team/as-outline-architect",
+      "name": {
+        "en": "Zhang Youxu",
+        "zh": "章有序"
+      },
+      "profession": {
+        "en": "Outline Architect",
+        "zh": "论证大纲专家"
+      },
+      "avatar": "avatars/as-outline-architect.png",
+      "role": "member",
+      "originalId": "as-outline-architect"
+    },
+    {
+      "id": "ai-for-science-team/as-evidence-writer",
+      "name": {
+        "en": "Wen Youju",
+        "zh": "文有据"
+      },
+      "profession": {
+        "en": "Evidence-Based Writer",
+        "zh": "证据写作专家"
+      },
+      "avatar": "avatars/as-evidence-writer.png",
+      "role": "member",
+      "originalId": "as-evidence-writer"
+    },
+    {
+      "id": "ai-for-science-team/as-figure-citation-editor",
+      "name": {
+        "en": "Xiu Wentu",
+        "zh": "修文图"
+      },
+      "profession": {
+        "en": "Figure and Citation Editor",
+        "zh": "图表引用编辑专家"
+      },
+      "avatar": "avatars/as-figure-citation-editor.png",
+      "role": "member",
+      "originalId": "as-figure-citation-editor"
+    },
+    {
+      "id": "ai-for-science-team/as-independent-reviewer",
+      "name": {
+        "en": "Yan Baguan",
+        "zh": "严把关"
+      },
+      "profession": {
+        "en": "Independent Reviewer",
+        "zh": "独立审稿专家"
+      },
+      "avatar": "avatars/as-independent-reviewer.png",
+      "role": "member",
+      "originalId": "as-independent-reviewer"
+    },
+    {
+      "id": "ai-for-science-team/as-quality-citation-auditor",
+      "name": {
+        "en": "Song Zhenping",
+        "zh": "宋真凭"
+      },
+      "profession": {
+        "en": "Citation Audit Expert",
+        "zh": "引用审计专家"
+      },
+      "avatar": "avatars/as-quality-citation-auditor.png",
+      "role": "member",
+      "originalId": "as-quality-citation-auditor"
+    },
+    {
+      "id": "ai-for-science-team/as-research-package-curator",
+      "name": {
+        "en": "Guo Guizhen",
+        "zh": "郭归真"
+      },
+      "profession": {
+        "en": "Research Package Curator",
+        "zh": "研究包归档专家"
+      },
+      "avatar": "avatars/as-research-package-curator.png",
+      "role": "member",
+      "originalId": "as-research-package-curator"
+    }
+  ],
+  "original": {
+    "name": "ai-for-science-team",
+    "version": "1.0.0",
+    "description": "A Chinese-speaking AI for Science research team that dynamically assembles planning, literature, methodology, experiment, writing and review experts into a traceable research package."
+  }
+}
