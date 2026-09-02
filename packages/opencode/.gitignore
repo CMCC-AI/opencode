@@ -6,3 +6,13 @@ app.log
 script/build-*.ts
 temporary-*.md
 .artifacts
+
+# sub-agent run artifacts (workdir isolation, see AGENTS.md)
+runs/
+/figures/
+/writing/
+/reviews/
+__pycache__/
+/0[0-9]-*.json
+/0[0-9]-*.yaml
+/=
