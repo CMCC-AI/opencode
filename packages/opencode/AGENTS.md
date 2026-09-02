@@ -1,3 +1,49 @@
+# AI Agent Behavioral Constraints
+
+## Workspace Isolation (CRITICAL)
+
+When dispatching sub-agents via the `task()` tool, **you MUST always specify the `workdir` parameter** pointing to the active session's isolated output directory (`runs/<run_id>/`). Never rely on the default working directory.
+
+### Why this matters
+
+Sub-agents inherit whatever directory the orchestrator process is running in. Without an explicit `workdir`, all file writes by sub-agents end up in the project root instead of the isolated session directory. This pollutes the repository with temporary artifacts and breaks reproducibility.
+
+### Rule
+
+```
+✅ CORRECT:  task(description="...", prompt="...", subagent_type="...", workdir="E:/path/to/runs/<run_id>/")
+❌ WRONG:    task(description="...", prompt="...", subagent_type="...")   # missing workdir!
+```
+
+The `workdir` value must be the absolute path to the `runs/<session-id>/` directory for the current session. All sub-agent outputs will be confined there.
+
+### Session directory structure convention
+
+Each session gets its own isolated workspace under `runs/<uuid>/`:
+
+```
+runs/
+  <uuid>/
+    00-input.json          # Task specification
+    artifact-registry.json # Produced artifacts registry
+    methodology/           # Theoretical frameworks & derivations
+    code/                  # All scripts and source code
+    experiments/           # Experimental runs & configurations
+    findings/              # Numerical results, diagnostic reports
+    writing/               # Drafts and final papers
+    visualizations/        # Generated charts and plots
+    deliverables/          # Final report packages & manifests
+```
+
+### Remediation if violated
+
+If a sub-agent has already written files outside the session directory:
+1. Copy all external artifacts into the correct `runs/<uuid>/` subdirectories
+2. Delete the external copies from the project root
+3. Log the violation in `deliverables/execution_log.json` under `file_boundary_violations`
+
+---
+
 # opencode database guide
 
 ## Database
