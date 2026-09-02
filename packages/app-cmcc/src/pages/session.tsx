@@ -80,6 +80,10 @@ import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
+import { shouldUseZhengqiPage } from "@/pages/session/zhengqi/page-selection"
+import { ZhengqiWorkbenchProvider } from "@/pages/session/zhengqi/workbench-context"
+import { ZhengqiResultsPanel } from "@/pages/session/zhengqi/zhengqi-results-panel"
+import { ZhengqiSessionView } from "@/pages/session/zhengqi/zhengqi-session-view"
 import { Identifier } from "@/utils/id"
 import { diffs as list } from "@/utils/diffs"
 import { Persist, persisted } from "@/utils/persist"
@@ -294,7 +298,8 @@ export default function Page() {
   })
   const deepTrading = createMemo(() => shouldUseDeepTradingPage(info(), businessAgentType(), initialUserAgent()))
   const deepInspect = createMemo(() => shouldUseDeepInspectPage(info(), businessAgentType(), initialUserAgent()))
-  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect())
+  const zhengqi = createMemo(() => shouldUseZhengqiPage(info(), businessAgentType(), initialUserAgent()))
+  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi())
   const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
@@ -1810,6 +1815,7 @@ export default function Page() {
   return (
     <DeepTradingWorkbenchProvider sessionID={() => params.id} active={deepTrading}>
       <DeepInspectWorkbenchProvider sessionID={() => params.id} active={deepInspect}>
+      <ZhengqiWorkbenchProvider sessionID={() => params.id} active={zhengqi}>
       <div class="relative size-full overflow-hidden flex flex-col">
         {sessionSync() ?? ""}
         <SessionHeader />
@@ -1871,6 +1877,9 @@ export default function Page() {
                         <Match when={deepInspect()}>
                           <DeepInspectResultsPanel />
                         </Match>
+                        <Match when={zhengqi()}>
+                          <ZhengqiResultsPanel />
+                        </Match>
                         <Match when={true}>
                         <div class="relative h-full overflow-hidden">
                           {reviewContent({
@@ -1921,6 +1930,23 @@ export default function Page() {
                                     </>
                                   }
                                   right={<DeepInspectResultsPanel />}
+                                />
+                              </Show>
+                            </Match>
+                            <Match when={zhengqi()}>
+                              <Show when={isDesktop()} fallback={<ZhengqiSessionView />}>
+                                <DeepTradingSplitLayout
+                                  persistKey="zhengqi-panels"
+                                  label="DeepEngage"
+                                  left={
+                                    <>
+                                      <div class="min-h-0 flex-1 overflow-hidden">
+                                        <ZhengqiSessionView />
+                                      </div>
+                                      {composerRegion()}
+                                    </>
+                                  }
+                                  right={<ZhengqiResultsPanel />}
                                 />
                               </Show>
                             </Match>
@@ -2032,6 +2058,7 @@ export default function Page() {
 
         <TerminalPanel />
       </div>
+      </ZhengqiWorkbenchProvider>
       </DeepInspectWorkbenchProvider>
     </DeepTradingWorkbenchProvider>
   )
