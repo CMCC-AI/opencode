@@ -45,8 +45,9 @@ options:
 
 调用方在 prompt 中提供：
 1. `workspace_dir`：workspace 目录路径
-2. `research_topic`：巡查主题
-3. `current_date`：当前日期
+2. `output_path`：固定为 `<workspace_dir>/25-visual-report.json`
+3. `research_topic`：巡查主题
+4. `current_date`：当前日期
 
 你需要读取：
 - `20-report.md` — 完整 markdown 报告
@@ -103,7 +104,7 @@ markdown block 的 content 字段**不放正文原文**，只放占位符：
 
 ## 输出规范
 
-输出**纯 JSON**（不带 markdown 代码块包裹）：
+先生成以下结构的**纯 JSON**（不带 markdown 代码块包裹），使用 `write` 工具原样写入调用方给出的 `output_path`，再将同一份 JSON 作为 task 结果返回。不得改名为 `21-charts.json`，不得只返回 `charts/summary/design_notes` 摘要结构：
 
 ```json
 {
@@ -147,6 +148,7 @@ markdown block 的 content 字段**不放正文原文**，只放占位符：
 4. `hero_stats` 是否为 `[]`？
 5. 可见字符串是否已去除内部编号？
 6. JSON 是否以 `{` 开头、`}` 结尾？
+7. `output_path` 是否严格等于 `<workspace_dir>/25-visual-report.json`，且写入内容能被 JSON 解析？
 
 ## 关键纪律
 
@@ -156,3 +158,4 @@ markdown block 的 content 字段**不放正文原文**，只放占位符：
 4. **图表锚定正文**：用 `after` 绑定支撑的小节
 5. **不重复已有表格**：Markdown 原表保留，不另建同义 table block
 6. **完成可视化后**：将 JSON 结果作为 task 返回值回传给主理人
+7. **单一权威产物**：只写 `25-visual-report.json`，文件内容与 task 返回值必须一致

@@ -156,6 +156,26 @@ describe("agent workbench artifacts", () => {
     expect(result.ambiguities).toHaveLength(1)
   })
 
+  test("allows same-agent retry sessions to update one path only when explicitly enabled", () => {
+    const report = `${directory}\\tmp\\inspection-workspace\\run-1\\20-report.md`
+    const retrySession = { ...session, id: "retry-child", agent: "deepinspect/report-writer" }
+    const firstSession = { ...session, id: "first-child", agent: "deepinspect/report-writer" }
+    const result = discoverSessionArtifacts({
+      directory,
+      transcripts: [
+        { ...transcript([write("p1", report)]), session: firstSession },
+        { ...transcript([write("p2", report, report, "revised")]), session: retrySession },
+      ],
+      roles: { "20-report.md": { role: "text-report" } },
+      allowSameAgentPathRewrites: true,
+    })
+
+    expect(result.ambiguities).toEqual([])
+    expect(result.artifacts).toHaveLength(1)
+    expect(result.artifacts[0]?.ownerSessionId).toBe("retry-child")
+    expect(result.artifacts[0]?.sizeBytes).toBe(7)
+  })
+
   test("keeps the real owner and reports a configured owner mismatch", () => {
     const report = `${directory}\\tmp\\trading-workspace\\run-1\\30-final-report.md`
     const result = discoverSessionArtifacts({

@@ -161,7 +161,7 @@ permission:
 
 收到用户巡查任务后：
 
-1. **建立工作区**：创建 `tmp/inspection-workspace/<run-id>/` 目录
+1. **建立工作区**：必须以系统消息注入的独立产物目录为根，创建 `<artifact-directory>/tmp/inspection-workspace/<run-id>/`，后续所有成员都使用这个绝对 `workspace_dir`。不得在稳定运行目录或用户根目录下另建 `tmp/inspection-workspace`。
 2. **调度 intent-analyst** 分析用户意图，通过 `task` 工具：
    - `subagent_type`: `deepinspect/intent-analyst`
    - `prompt`: "用户原始输入：<input>\n当前日期：<date>\n上传文件清单：<files>"
@@ -263,9 +263,9 @@ permission:
 
 调度 `viz-specialist` 生成可视化组件，通过 `task` 工具：
 - `subagent_type`: `deepinspect/viz-specialist`
-- `prompt`: "workspace_dir: <path>\nresearch_topic: <主题>\ncurrent_date: <date>"
+- `prompt`: "workspace_dir: <path>\noutput_path: <path>/25-visual-report.json\nresearch_topic: <主题>\ncurrent_date: <date>"
 
-绘图明会基于归并统计数据为报告生成图表，写入 `25-visual-report.json`。
+绘图明会基于归并统计数据为报告生成图表，并直接写入 `25-visual-report.json`。主理人必须读取并校验该文件可被 JSON 解析、包含 `layout_version: 2` 和非空 `sections`；不得把 task 返回内容重新整理、改写或另存为第二种 schema。
 
 ### Phase 9: 交付
 
@@ -337,7 +337,7 @@ permission:
 ## 工作区文件约定
 
 ```
-tmp/inspection-workspace/<run-id>/
+<artifact-directory>/tmp/inspection-workspace/<run-id>/
   00-input.json                    # 用户原始输入、任务类型、材料清单、篇幅策略
   02-intent.json                   # 意图分析结果（intent-analyst 输出）
   03-plan.json                     # 研究方案（query-planner 输出）

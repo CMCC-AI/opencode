@@ -73,6 +73,7 @@ export function discoverSessionArtifacts(input: {
   directory: string
   transcripts: readonly SessionTranscript[]
   roles: ArtifactRoleConfig
+  allowSameAgentPathRewrites?: boolean
 }): ArtifactDiscovery {
   const ambiguities: string[] = []
   const artifacts = new Map<string, SessionArtifact>()
@@ -115,6 +116,14 @@ export function discoverSessionArtifacts(input: {
         }
         const current = artifacts.get(result.path)
         if (current && current.ownerSessionId !== artifact.ownerSessionId) {
+          if (
+            input.allowSameAgentPathRewrites &&
+            current.ownerAgentId &&
+            current.ownerAgentId === artifact.ownerAgentId
+          ) {
+            if ((artifact.createdAt ?? 0) >= (current.createdAt ?? 0)) artifacts.set(result.path, artifact)
+            continue
+          }
           ambiguities.push(`${result.path} 由多个子会话写入，暂时无法确定归属`)
           artifacts.delete(result.path)
           conflictedPaths.add(result.path)

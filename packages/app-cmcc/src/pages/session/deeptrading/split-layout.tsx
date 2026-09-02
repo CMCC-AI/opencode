@@ -22,12 +22,17 @@ export function deepTradingRightPercentAfterDrag(input: {
   return clampDeepTradingRightPercent(input.startPercent - deltaPercent)
 }
 
-export function DeepTradingSplitLayout(props: { left: JSX.Element; right: JSX.Element }) {
+export function DeepTradingSplitLayout(props: {
+  left: JSX.Element
+  right: JSX.Element
+  persistKey?: string
+  label?: string
+}) {
   let container: HTMLDivElement | undefined
   let previousUserSelect = ""
   let previousCursor = ""
   const [layout, setLayout] = persisted(
-    Persist.global("deeptrading-panels"),
+    Persist.global(props.persistKey ?? "deeptrading-panels"),
     createStore({ rightPercent: DEEPTRADING_RIGHT_DEFAULT_PERCENT }),
   )
   const [drag, setDrag] = createStore({
@@ -100,7 +105,7 @@ export function DeepTradingSplitLayout(props: { left: JSX.Element; right: JSX.El
       <section class="flex h-full min-w-0 flex-1 flex-col overflow-hidden">{props.left}</section>
       <div
         role="separator"
-        aria-label="调整 DeepTrading 左右栏宽度"
+        aria-label={`调整 ${props.label ?? "DeepTrading"} 左右栏宽度`}
         aria-orientation="vertical"
         aria-valuemin={DEEPTRADING_RIGHT_MIN_PERCENT}
         aria-valuemax={DEEPTRADING_RIGHT_MAX_PERCENT}
@@ -111,7 +116,7 @@ export function DeepTradingSplitLayout(props: { left: JSX.Element; right: JSX.El
         onKeyDown={resizeByKeyboard}
       />
       <aside
-        aria-label="DeepTrading 分析结果"
+        aria-label={`${props.label ?? "DeepTrading"} 分析结果`}
         class="h-full shrink-0 min-w-0 overflow-hidden bg-[#f7f8fb]"
         style={{ width: `${rightPercent()}%` }}
       >

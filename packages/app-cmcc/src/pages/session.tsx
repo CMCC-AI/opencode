@@ -67,6 +67,10 @@ import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { DeepInspectResultsPanel } from "@/pages/session/deepinspect/deepinspect-results-panel"
+import { DeepInspectSessionView } from "@/pages/session/deepinspect/deepinspect-session-view"
+import { shouldUseDeepInspectPage } from "@/pages/session/deepinspect/page-selection"
+import { DeepInspectWorkbenchProvider } from "@/pages/session/deepinspect/workbench-context"
 import { DeepTradingSessionView } from "@/pages/session/deeptrading/deeptrading-session-view"
 import { DeepTradingResultsPanel } from "@/pages/session/deeptrading/deeptrading-results-panel"
 import { shouldUseDeepTradingPage } from "@/pages/session/deeptrading/page-selection"
@@ -289,7 +293,9 @@ export default function Page() {
       .sort((left, right) => left.time.created - right.time.created || left.id.localeCompare(right.id))[0]?.agent
   })
   const deepTrading = createMemo(() => shouldUseDeepTradingPage(info(), businessAgentType(), initialUserAgent()))
-  const contentPanelWidth = createMemo(() => (deepTrading() ? "100%" : sessionPanelWidth()))
+  const deepInspect = createMemo(() => shouldUseDeepInspectPage(info(), businessAgentType(), initialUserAgent()))
+  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect())
+  const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
   const canReview = createMemo(() => !!sync().project)
@@ -415,7 +421,7 @@ export default function Page() {
   })
   const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
   const wantsReview = createMemo(() =>
-    deepTrading()
+    dedicatedAnalysis()
       ? false
       : isDesktop()
         ? desktopFileTreeOpen() || (desktopReviewOpen() && activeTab() === "review")
@@ -1777,7 +1783,7 @@ export default function Page() {
           classes={{ button: compact ? "w-full !py-2" : "w-full" }}
           onClick={() => setStore("mobileTab", "session")}
         >
-          {deepTrading() ? "分析内容" : language.t("session.tab.session")}
+          {dedicatedAnalysis() ? "分析内容" : language.t("session.tab.session")}
         </Tabs.Trigger>
         <Tabs.Trigger
           value="changes"
@@ -1788,7 +1794,7 @@ export default function Page() {
           classes={{ button: compact ? "w-full !py-2" : "w-full" }}
           onClick={() => setStore("mobileTab", "changes")}
         >
-          {deepTrading()
+          {dedicatedAnalysis()
             ? "分析结果"
             : hasReview()
               ? language.t("session.review.filesChanged", { count: reviewCount() })
@@ -1803,10 +1809,11 @@ export default function Page() {
 
   return (
     <DeepTradingWorkbenchProvider sessionID={() => params.id} active={deepTrading}>
+      <DeepInspectWorkbenchProvider sessionID={() => params.id} active={deepInspect}>
       <div class="relative size-full overflow-hidden flex flex-col">
         {sessionSync() ?? ""}
         <SessionHeader />
-        <Show when={cmccLayout() && !deepTrading()}>
+          <Show when={cmccLayout() && !dedicatedAnalysis()}>
           <button
             type="button"
             class="absolute right-3 top-2 z-50 flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-icon-icon-muted transition-[background-color,color] duration-150 hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-border-border-active data-[pressed]:bg-v2-overlay-simple-overlay-hover data-[pressed]:text-v2-icon-icon-base disabled:pointer-events-none disabled:opacity-35"
@@ -1848,7 +1855,7 @@ export default function Page() {
                 "rounded-[10px] overflow-hidden": settings.general.newLayoutDesigns() && !cmccLayout(),
                 "shadow-[var(--v2-elevation-raised)]":
                   settings.general.newLayoutDesigns() && !!params.id && !cmccLayout(),
-                "border-r border-v2-border-border-base": cmccLayout() && !deepTrading(),
+                  "border-r border-v2-border-border-base": cmccLayout() && !dedicatedAnalysis(),
               }}
             >
               <Show when={!isDesktop() && !!params.id && settings.general.newLayoutDesigns() && !mobileTabsBottom()}>
@@ -1857,9 +1864,14 @@ export default function Page() {
               <div class="flex-1 min-h-0 overflow-hidden">
                 <Switch>
                   <Match when={params.id && mobileChanges()}>
-                    <Show
-                      when={deepTrading()}
-                      fallback={
+                      <Switch>
+                        <Match when={deepTrading()}>
+                          <DeepTradingResultsPanel />
+                        </Match>
+                        <Match when={deepInspect()}>
+                          <DeepInspectResultsPanel />
+                        </Match>
+                        <Match when={true}>
                         <div class="relative h-full overflow-hidden">
                           {reviewContent({
                             diffStyle: "unified",
@@ -1873,17 +1885,46 @@ export default function Page() {
                               "h-full pb-64 -mt-4 flex flex-col items-center justify-center text-center gap-6",
                           })}
                         </div>
-                      }
-                    >
-                      <DeepTradingResultsPanel />
-                    </Show>
+                        </Match>
+                      </Switch>
                   </Match>
                   <Match when={params.id}>
                     <Show when={messagesReady() ? params.id : undefined} keyed>
                       {(_id) => (
-                        <Show
-                          when={deepTrading()}
-                          fallback={
+                          <Switch>
+                            <Match when={deepTrading()}>
+                              <Show when={isDesktop()} fallback={<DeepTradingSessionView />}>
+                                <DeepTradingSplitLayout
+                                  left={
+                                    <>
+                                      <div class="min-h-0 flex-1 overflow-hidden">
+                                        <DeepTradingSessionView />
+                                      </div>
+                                      {composerRegion()}
+                                    </>
+                                  }
+                                  right={<DeepTradingResultsPanel />}
+                                />
+                              </Show>
+                            </Match>
+                            <Match when={deepInspect()}>
+                              <Show when={isDesktop()} fallback={<DeepInspectSessionView />}>
+                                <DeepTradingSplitLayout
+                                  persistKey="deepinspect-panels"
+                                  label="DeepInspect"
+                                  left={
+                                    <>
+                                      <div class="min-h-0 flex-1 overflow-hidden">
+                                        <DeepInspectSessionView />
+                                      </div>
+                                      {composerRegion()}
+                                    </>
+                                  }
+                                  right={<DeepInspectResultsPanel />}
+                                />
+                              </Show>
+                            </Match>
+                            <Match when={true}>
                             <MessageTimeline
                               actions={actions}
                               scroll={ui.scroll}
@@ -1920,22 +1961,8 @@ export default function Page() {
                                 scrollToEnd = fn
                               }}
                             />
-                          }
-                        >
-                          <Show when={isDesktop()} fallback={<DeepTradingSessionView />}>
-                            <DeepTradingSplitLayout
-                              left={
-                                <>
-                                  <div class="min-h-0 flex-1 overflow-hidden">
-                                    <DeepTradingSessionView />
-                                  </div>
-                                  {composerRegion()}
-                                </>
-                              }
-                              right={<DeepTradingResultsPanel />}
-                            />
-                          </Show>
-                        </Show>
+                            </Match>
+                          </Switch>
                       )}
                     </Show>
                   </Match>
@@ -1946,14 +1973,16 @@ export default function Page() {
               </div>
 
               <Show
-                when={(params.id || !newSessionDesign()) && !mobileChanges() && (!deepTrading() || !isDesktop())}
+                  when={
+                    (params.id || !newSessionDesign()) && !mobileChanges() && (!dedicatedAnalysis() || !isDesktop())
+                  }
               >
                 {(_) => composerRegion()}
               </Show>
               <Show when={!!params.id && mobileTabsBottom()}>{mobileTabs(true, true)}</Show>
             </div>
 
-            <Show when={desktopReviewOpen() && !cmccLayout() && !deepTrading()}>
+              <Show when={desktopReviewOpen() && !cmccLayout() && !dedicatedAnalysis()}>
               <div onPointerDown={() => size.start()}>
                 <ResizeHandle
                   classList={{
@@ -1972,7 +2001,7 @@ export default function Page() {
             </Show>
           </div>
 
-          <Show when={cmccLayout() && !deepTrading()}>
+            <Show when={cmccLayout() && !dedicatedAnalysis()}>
             <div
               role="separator"
               aria-orientation="vertical"
@@ -1981,7 +2010,7 @@ export default function Page() {
             />
           </Show>
 
-          <Show when={!deepTrading()}>
+            <Show when={!dedicatedAnalysis()}>
             <SessionSidePanel
               canReview={canReview}
               diffs={reviewDiffs}
@@ -2003,6 +2032,7 @@ export default function Page() {
 
         <TerminalPanel />
       </div>
+      </DeepInspectWorkbenchProvider>
     </DeepTradingWorkbenchProvider>
   )
 }
