@@ -6,4 +6,5 @@ bun.lock
 package-lock.json
 references/
 !experts/zhengqi-visit-intel/skills/zhengqi-report-toolkit/references/
+!experts/ai-for-science-team/skills/research-workflow/references/
 skills/.neodata_token

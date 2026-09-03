@@ -75,16 +75,16 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     summary: "洞察人群，生成营销方案与报告",
     image: expertMarketing,
   },
-  "ai-scientist": {
+  "ai-for-science-team": {
     eyebrow: "AI + 科研",
-    summary: "从论文理解到可信复现",
+    summary: "文献综述、论文复现、实验设计与科研写作，交付可审计研究包",
     image: expertResearch,
   },
 }
 
 const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
 // 3 列网格的固定排序：财经/政企/科研 + 推荐/营销/巡查
-const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "ai-scientist", "shoppers-pro", "deepcampaign", "deepinspect"]
+const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "ai-for-science-team", "shoppers-pro", "deepcampaign", "deepinspect"]
 const INDUSTRY_EXPERTS = [
   ...INDUSTRY_ORDER.flatMap((id) => {
     const expert = CMCC_EXPERTS.find((item) => item.id === id)
