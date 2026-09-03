@@ -76,6 +76,10 @@ import { DeepTradingResultsPanel } from "@/pages/session/deeptrading/deeptrading
 import { shouldUseDeepTradingPage } from "@/pages/session/deeptrading/page-selection"
 import { DeepTradingSplitLayout } from "@/pages/session/deeptrading/split-layout"
 import { DeepTradingWorkbenchProvider } from "@/pages/session/deeptrading/workbench-context"
+import { shouldUseShoppersPage } from "@/pages/session/shoppers/page-selection"
+import { ShoppersWorkbenchProvider } from "@/pages/session/shoppers/workbench-context"
+import { ShoppersResultsPanel } from "@/pages/session/shoppers/shoppers-results-panel"
+import { ShoppersSessionView } from "@/pages/session/shoppers/shoppers-session-view"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
@@ -299,7 +303,8 @@ export default function Page() {
   const deepTrading = createMemo(() => shouldUseDeepTradingPage(info(), businessAgentType(), initialUserAgent()))
   const deepInspect = createMemo(() => shouldUseDeepInspectPage(info(), businessAgentType(), initialUserAgent()))
   const zhengqi = createMemo(() => shouldUseZhengqiPage(info(), businessAgentType(), initialUserAgent()))
-  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi())
+  const shoppers = createMemo(() => shouldUseShoppersPage(info(), businessAgentType(), initialUserAgent()))
+  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers())
   const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
@@ -1816,6 +1821,7 @@ export default function Page() {
     <DeepTradingWorkbenchProvider sessionID={() => params.id} active={deepTrading}>
       <DeepInspectWorkbenchProvider sessionID={() => params.id} active={deepInspect}>
       <ZhengqiWorkbenchProvider sessionID={() => params.id} active={zhengqi}>
+      <ShoppersWorkbenchProvider sessionID={() => params.id} active={shoppers}>
       <div class="relative size-full overflow-hidden flex flex-col">
         {sessionSync() ?? ""}
         <SessionHeader />
@@ -1879,6 +1885,9 @@ export default function Page() {
                         </Match>
                         <Match when={zhengqi()}>
                           <ZhengqiResultsPanel />
+                        </Match>
+                        <Match when={shoppers()}>
+                          <ShoppersResultsPanel />
                         </Match>
                         <Match when={true}>
                         <div class="relative h-full overflow-hidden">
@@ -1947,6 +1956,23 @@ export default function Page() {
                                     </>
                                   }
                                   right={<ZhengqiResultsPanel />}
+                                />
+                              </Show>
+                            </Match>
+                            <Match when={shoppers()}>
+                              <Show when={isDesktop()} fallback={<ShoppersSessionView />}>
+                                <DeepTradingSplitLayout
+                                  persistKey="shoppers-pro-panels"
+                                  label="好买手"
+                                  left={
+                                    <>
+                                      <div class="min-h-0 flex-1 overflow-hidden">
+                                        <ShoppersSessionView />
+                                      </div>
+                                      {composerRegion()}
+                                    </>
+                                  }
+                                  right={<ShoppersResultsPanel />}
                                 />
                               </Show>
                             </Match>
@@ -2058,6 +2084,7 @@ export default function Page() {
 
         <TerminalPanel />
       </div>
+      </ShoppersWorkbenchProvider>
       </ZhengqiWorkbenchProvider>
       </DeepInspectWorkbenchProvider>
     </DeepTradingWorkbenchProvider>

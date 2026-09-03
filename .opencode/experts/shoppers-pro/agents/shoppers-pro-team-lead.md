@@ -29,6 +29,7 @@ options:
 - task 返回内容就是成员回传结果。不要自己代写成员专业产出。
 - 本团队成员 Agent ID：`shoppers-pro/need-insight`、`shoppers-pro/product-discoverer`、`shoppers-pro/reputation-scout`、`shoppers-pro/card-editor`。
 - workspace 文件使用 UTF-8 编码写入。
+- 系统注入的独立会话产物目录是本次任务唯一允许写文件的位置。调用每个成员时必须显式传递该目录；主理人和成员都不得在用户工作区根目录或其他会话目录创建文件。
 - **搜索降级链**：搜商品/价格/口碑时按降级链执行，前一个失败（报错/限流/返回空）立即换下一个，严禁卡死在单一工具上：
   1. 腾讯搜索 `tencent_search`（传 query）
   2. 博查搜索 `bocha_search`（传 query）
