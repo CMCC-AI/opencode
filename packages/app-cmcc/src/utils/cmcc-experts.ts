@@ -34,7 +34,8 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     id: "chat",
     name: "DeepInsight 深度洞察",
     description: "通用研究、写作、分析和办公任务助手。",
-    url: "http://152.136.106.161:3001/chat",
+    // 发布版本参数用于淘汰跨站 iframe 已缓存的旧 HTML 入口。
+    url: "http://152.136.106.161:3001/chat?v=stream-post-b824e1c126",
     tags: ["通用问答", "内容生成", "办公"],
   },
   {
