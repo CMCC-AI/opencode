@@ -8,6 +8,7 @@
     "memberAgents": [
       "shoppers-pro/need-insight",
       "shoppers-pro/product-discoverer",
+      "shoppers-pro/price-analyst",
       "shoppers-pro/reputation-scout",
       "shoppers-pro/card-editor"
     ]
@@ -34,8 +35,8 @@
     {
       "id": "shoppers-pro/shoppers-pro-team-lead",
       "name": {
-        "en": "Shen Haoke",
-        "zh": "申浩客"
+        "en": "A Ke",
+        "zh": "阿客"
       },
       "profession": {
         "en": "Chief Buying Advisor",
@@ -48,8 +49,8 @@
     {
       "id": "shoppers-pro/need-insight",
       "name": {
-        "en": "Lin Xueqing",
-        "zh": "林雪晴"
+        "en": "A Cha",
+        "zh": "阿察"
       },
       "profession": {
         "en": "Need Insight Analyst",
@@ -62,8 +63,8 @@
     {
       "id": "shoppers-pro/product-discoverer",
       "name": {
-        "en": "Sou Kuangbiao",
-        "zh": "搜旷标"
+        "en": "A Sou",
+        "zh": "阿搜"
       },
       "profession": {
         "en": "Product Discovery Specialist",
@@ -74,10 +75,24 @@
       "originalId": "product-discoverer"
     },
     {
+      "id": "shoppers-pro/price-analyst",
+      "name": {
+        "en": "A Bi",
+        "zh": "阿比"
+      },
+      "profession": {
+        "en": "Price Analyst",
+        "zh": "价格分析师"
+      },
+      "avatar": "avatars/price-analyst.png",
+      "role": "member",
+      "originalId": "price-analyst"
+    },
+    {
       "id": "shoppers-pro/reputation-scout",
       "name": {
-        "en": "Yan Buhuang",
-        "zh": "严不慌"
+        "en": "A Yan",
+        "zh": "阿严"
       },
       "profession": {
         "en": "Reputation Analyst",
@@ -90,8 +105,8 @@
     {
       "id": "shoppers-pro/card-editor",
       "name": {
-        "en": "Zhen Cuohua",
-        "zh": "甄措花"
+        "en": "A Zhen",
+        "zh": "阿甄"
       },
       "profession": {
         "en": "Recommendation Editor",
