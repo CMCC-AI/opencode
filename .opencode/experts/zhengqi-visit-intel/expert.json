@@ -40,8 +40,8 @@
     {
       "id": "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",
       "name": {
-        "en": "Tan Gaojian",
-        "zh": "谈高见"
+        "en": "A Tan",
+        "zh": "阿谈"
       },
       "profession": {
         "en": "Chief Visit Report Editor",
@@ -54,8 +54,8 @@
     {
       "id": "zhengqi-visit-intel/sensitive-check-officer",
       "name": {
-        "en": "An Wuhuan",
-        "zh": "安无患"
+        "en": "A An",
+        "zh": "阿安"
       },
       "profession": {
         "en": "Zhengqi Sensitive Input Safety Officer",
@@ -68,8 +68,8 @@
     {
       "id": "zhengqi-visit-intel/internal-intel-researcher",
       "name": {
-        "en": "Wen Ruoyuan",
-        "zh": "闻若渊"
+        "en": "A Wen",
+        "zh": "阿闻"
       },
       "profession": {
         "en": "Internal Customer Intelligence Researcher",
@@ -82,8 +82,8 @@
     {
       "id": "zhengqi-visit-intel/research-query-planner",
       "name": {
-        "en": "Mou Dingce",
-        "zh": "牟定策"
+        "en": "A Mou",
+        "zh": "阿谋"
       },
       "profession": {
         "en": "Zhengqi Research Planner",
@@ -96,8 +96,8 @@
     {
       "id": "zhengqi-visit-intel/public-web-researcher",
       "name": {
-        "en": "Luo Guangwen",
-        "zh": "罗广闻"
+        "en": "A Guang",
+        "zh": "阿广"
       },
       "profession": {
         "en": "Authoritative Public Information Researcher",
@@ -110,8 +110,8 @@
     {
       "id": "zhengqi-visit-intel/intelligence-synthesizer",
       "name": {
-        "en": "Zhen Ronghui",
-        "zh": "甄融汇"
+        "en": "A Rong",
+        "zh": "阿融"
       },
       "profession": {
         "en": "Internal-External Intelligence Synthesizer",
@@ -124,8 +124,8 @@
     {
       "id": "zhengqi-visit-intel/research-reflection-analyst",
       "name": {
-        "en": "Shen Siming",
-        "zh": "慎思明"
+        "en": "A Shen",
+        "zh": "阿慎"
       },
       "profession": {
         "en": "Research Quality Reflection Analyst",
@@ -138,8 +138,8 @@
     {
       "id": "zhengqi-visit-intel/outline-architect",
       "name": {
-        "en": "Ke Zhangfa",
-        "zh": "柯章法"
+        "en": "A Gang",
+        "zh": "阿纲"
       },
       "profession": {
         "en": "Visit Report Outline Architect",
@@ -152,8 +152,8 @@
     {
       "id": "zhengqi-visit-intel/report-chief-writer",
       "name": {
-        "en": "Bi Wencheng",
-        "zh": "毕文成"
+        "en": "A Zhuan",
+        "zh": "阿撰"
       },
       "profession": {
         "en": "Zhengqi Report Writer",
@@ -166,8 +166,8 @@
     {
       "id": "zhengqi-visit-intel/evidence-verify-officer",
       "name": {
-        "en": "Yan Kezheng",
-        "zh": "严可证"
+        "en": "A Zheng",
+        "zh": "阿证"
       },
       "profession": {
         "en": "Evidence Verification Officer",
@@ -180,8 +180,8 @@
     {
       "id": "zhengqi-visit-intel/report-visual-designer",
       "name": {
-        "en": "Lan Qitu",
-        "zh": "蓝启图"
+        "en": "A Tu",
+        "zh": "阿图"
       },
       "profession": {
         "en": "Report Visual Designer",

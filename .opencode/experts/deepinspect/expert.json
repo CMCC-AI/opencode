@@ -41,8 +41,8 @@
     {
       "id": "deepinspect/deepinspect-team-lead",
       "name": {
-        "en": "Du Xun'an",
-        "zh": "督巡安"
+        "en": "A Du",
+        "zh": "阿督"
       },
       "profession": {
         "en": "Inspection Orchestration Director",
@@ -55,8 +55,8 @@
     {
       "id": "deepinspect/intent-analyst",
       "name": {
-        "en": "Ming Yizhe",
-        "zh": "明意图"
+        "en": "A Yi",
+        "zh": "阿意"
       },
       "profession": {
         "en": "Intent Analysis Expert",
@@ -69,8 +69,8 @@
     {
       "id": "deepinspect/query-planner",
       "name": {
-        "en": "Mou Fanglue",
-        "zh": "谋方略"
+        "en": "A Mou",
+        "zh": "阿谋"
       },
       "profession": {
         "en": "Research Planning Expert",
@@ -83,8 +83,8 @@
     {
       "id": "deepinspect/risk-identifier",
       "name": {
-        "en": "Bian Jianwei",
-        "zh": "辨见微"
+        "en": "A Bian",
+        "zh": "阿辨"
       },
       "profession": {
         "en": "Risk Identification Expert",
@@ -97,8 +97,8 @@
     {
       "id": "deepinspect/material-researcher",
       "name": {
-        "en": "Qiu Shenrui",
-        "zh": "求甚睿"
+        "en": "A Yan",
+        "zh": "阿研"
       },
       "profession": {
         "en": "Material Research Expert",
@@ -111,8 +111,8 @@
     {
       "id": "deepinspect/web-researcher",
       "name": {
-        "en": "Wang Boyuan",
-        "zh": "网博源"
+        "en": "A Bo",
+        "zh": "阿博"
       },
       "profession": {
         "en": "Web Research Expert",
@@ -125,8 +125,8 @@
     {
       "id": "deepinspect/problem-consolidator",
       "name": {
-        "en": "Gui Yiqing",
-        "zh": "归一清"
+        "en": "A Gui",
+        "zh": "阿归"
       },
       "profession": {
         "en": "Problem Consolidation Analyst",
@@ -139,8 +139,8 @@
     {
       "id": "deepinspect/reflector",
       "name": {
-        "en": "Shen Sijin",
-        "zh": "审思谨"
+        "en": "A Shen",
+        "zh": "阿审"
       },
       "profession": {
         "en": "Reflection Evaluation Expert",
@@ -153,8 +153,8 @@
     {
       "id": "deepinspect/outline-architect",
       "name": {
-        "en": "Gou Hongtu",
-        "zh": "构宏图"
+        "en": "A Gou",
+        "zh": "阿构"
       },
       "profession": {
         "en": "Outline Architecture Expert",
@@ -167,8 +167,8 @@
     {
       "id": "deepinspect/report-writer",
       "name": {
-        "en": "Shu Liming",
-        "zh": "述理明"
+        "en": "A Shu",
+        "zh": "阿述"
       },
       "profession": {
         "en": "Report Writing Expert",
@@ -181,8 +181,8 @@
     {
       "id": "deepinspect/evidence-reviewer",
       "name": {
-        "en": "Zheng Wuyi",
-        "zh": "证无遗"
+        "en": "A Zheng",
+        "zh": "阿证"
       },
       "profession": {
         "en": "Evidence Verification Expert",
@@ -195,8 +195,8 @@
     {
       "id": "deepinspect/viz-specialist",
       "name": {
-        "en": "Hui Tuming",
-        "zh": "绘图明"
+        "en": "A Hui",
+        "zh": "阿绘"
       },
       "profession": {
         "en": "Data Visualization Expert",

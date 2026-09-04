@@ -50,8 +50,8 @@
     {
       "id": "ai-for-science-team/ai-for-science-team-team-lead",
       "name": {
-        "en": "Gu Yanzhang",
-        "zh": "顾研章"
+        "en": "A Gu",
+        "zh": "阿顾"
       },
       "profession": {
         "en": "Chief Research Scientist",
@@ -64,8 +64,8 @@
     {
       "id": "ai-for-science-team/as-intent-router",
       "name": {
-        "en": "Ming Dayi",
-        "zh": "明达意"
+        "en": "A Yi",
+        "zh": "阿意"
       },
       "profession": {
         "en": "Research Intent Analyst",
@@ -78,8 +78,8 @@
     {
       "id": "ai-for-science-team/as-asset-auditor",
       "name": {
-        "en": "Jian Qingce",
-        "zh": "简清册"
+        "en": "A Jian",
+        "zh": "阿简"
       },
       "profession": {
         "en": "Research Asset Auditor",
@@ -92,8 +92,8 @@
     {
       "id": "ai-for-science-team/as-feasibility-advisor",
       "name": {
-        "en": "Kang Kexing",
-        "zh": "康可行"
+        "en": "A Kang",
+        "zh": "阿康"
       },
       "profession": {
         "en": "Feasibility Advisor",
@@ -106,8 +106,8 @@
     {
       "id": "ai-for-science-team/as-research-planner",
       "name": {
-        "en": "Zhan Hongtu",
-        "zh": "展宏图"
+        "en": "A Zhan",
+        "zh": "阿展"
       },
       "profession": {
         "en": "Research Planner",
@@ -120,8 +120,8 @@
     {
       "id": "ai-for-science-team/as-literature-strategist",
       "name": {
-        "en": "Su Xunjing",
-        "zh": "苏寻径"
+        "en": "A Xun",
+        "zh": "阿寻"
       },
       "profession": {
         "en": "Search Strategy Expert",
@@ -134,8 +134,8 @@
     {
       "id": "ai-for-science-team/as-literature-researcher",
       "name": {
-        "en": "Luo Wenhan",
-        "zh": "罗文瀚"
+        "en": "A Luo",
+        "zh": "阿罗"
       },
       "profession": {
         "en": "Paper Discovery Expert",
@@ -148,8 +148,8 @@
     {
       "id": "ai-for-science-team/as-paper-evidence-analyst",
       "name": {
-        "en": "Shen Duzhen",
-        "zh": "沈读真"
+        "en": "A Du",
+        "zh": "阿读"
       },
       "profession": {
         "en": "Paper Evidence Analyst",
@@ -162,8 +162,8 @@
     {
       "id": "ai-for-science-team/as-research-synthesizer",
       "name": {
-        "en": "Rong Baichuan",
-        "zh": "容百川"
+        "en": "A Rong",
+        "zh": "阿容"
       },
       "profession": {
         "en": "Research Synthesizer",
@@ -176,8 +176,8 @@
     {
       "id": "ai-for-science-team/as-methodology-designer",
       "name": {
-        "en": "Fang Lizheng",
-        "zh": "方立证"
+        "en": "A Fang",
+        "zh": "阿方"
       },
       "profession": {
         "en": "Methodology Designer",
@@ -190,8 +190,8 @@
     {
       "id": "ai-for-science-team/as-experiment-designer",
       "name": {
-        "en": "Zhou Miji",
-        "zh": "周密计"
+        "en": "A Mi",
+        "zh": "阿密"
       },
       "profession": {
         "en": "Experiment Designer",
@@ -204,8 +204,8 @@
     {
       "id": "ai-for-science-team/as-code-data-engineer",
       "name": {
-        "en": "Cheng Kekao",
-        "zh": "程可靠"
+        "en": "A Cheng",
+        "zh": "阿程"
       },
       "profession": {
         "en": "Research Code Engineer",
@@ -218,8 +218,8 @@
     {
       "id": "ai-for-science-team/as-experiment-operator",
       "name": {
-        "en": "Chi Xingjian",
-        "zh": "池行健"
+        "en": "A Xing",
+        "zh": "阿行"
       },
       "profession": {
         "en": "Experiment Operator",
@@ -232,8 +232,8 @@
     {
       "id": "ai-for-science-team/as-experiment-diagnostician",
       "name": {
-        "en": "Zhen Chayin",
-        "zh": "甄查因"
+        "en": "A Cha",
+        "zh": "阿查"
       },
       "profession": {
         "en": "Experiment Diagnostician",
@@ -246,8 +246,8 @@
     {
       "id": "ai-for-science-team/as-result-analyst",
       "name": {
-        "en": "Bai Ximing",
-        "zh": "白析明"
+        "en": "A Xi",
+        "zh": "阿析"
       },
       "profession": {
         "en": "Result Analyst",
@@ -260,8 +260,8 @@
     {
       "id": "ai-for-science-team/as-outline-architect",
       "name": {
-        "en": "Zhang Youxu",
-        "zh": "章有序"
+        "en": "A Zhang",
+        "zh": "阿章"
       },
       "profession": {
         "en": "Outline Architect",
@@ -274,8 +274,8 @@
     {
       "id": "ai-for-science-team/as-evidence-writer",
       "name": {
-        "en": "Wen Youju",
-        "zh": "文有据"
+        "en": "A Wen",
+        "zh": "阿文"
       },
       "profession": {
         "en": "Evidence-Based Writer",
@@ -288,8 +288,8 @@
     {
       "id": "ai-for-science-team/as-figure-citation-editor",
       "name": {
-        "en": "Xiu Wentu",
-        "zh": "修文图"
+        "en": "A Xiu",
+        "zh": "阿修"
       },
       "profession": {
         "en": "Figure and Citation Editor",
@@ -302,8 +302,8 @@
     {
       "id": "ai-for-science-team/as-independent-reviewer",
       "name": {
-        "en": "Yan Baguan",
-        "zh": "严把关"
+        "en": "A Yan",
+        "zh": "阿严"
       },
       "profession": {
         "en": "Independent Reviewer",
@@ -316,8 +316,8 @@
     {
       "id": "ai-for-science-team/as-quality-citation-auditor",
       "name": {
-        "en": "Song Zhenping",
-        "zh": "宋真凭"
+        "en": "A Ping",
+        "zh": "阿凭"
       },
       "profession": {
         "en": "Citation Audit Expert",
@@ -330,8 +330,8 @@
     {
       "id": "ai-for-science-team/as-research-package-curator",
       "name": {
-        "en": "Guo Guizhen",
-        "zh": "郭归真"
+        "en": "A Guo",
+        "zh": "阿郭"
       },
       "profession": {
         "en": "Research Package Curator",
