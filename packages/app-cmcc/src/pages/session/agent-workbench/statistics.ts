@@ -61,13 +61,31 @@ export function collectSearchUrlEvents(
       }
     }
   }
-  return events.sort(
-    (left, right) =>
-      left.completedAt - right.completedAt ||
-      left.sessionId.localeCompare(right.sessionId) ||
-      left.messageId.localeCompare(right.messageId) ||
-      left.partId.localeCompare(right.partId),
-  )
+  return events.sort(compareSearchUrlEvents)
+}
+
+export function collectDeepAnalysisUrlEvents(
+  transcripts: readonly SessionTranscript[],
+  onInvalidSearchOutput?: (input: InvalidSearchOutput) => void,
+) {
+  const events = collectSearchUrlEvents(transcripts, onInvalidSearchOutput)
+  for (const transcript of transcripts) {
+    for (const message of transcript.messages) {
+      for (const part of transcript.parts[message.id] ?? []) {
+        if (part.type !== "tool" || part.tool !== "webfetch" || part.state.status !== "completed") continue
+        const url = parseWebFetchInputUrl(part.state.input)
+        if (!url) continue
+        events.push({
+          completedAt: part.state.time.end,
+          sessionId: transcript.session.id,
+          messageId: message.id,
+          partId: part.id,
+          urls: [url],
+        })
+      }
+    }
+  }
+  return events.sort(compareSearchUrlEvents)
 }
 
 function parseSearchOutput(output: string) {
@@ -89,6 +107,28 @@ function parseSearchOutput(output: string) {
 function parseUrlLines(output: string) {
   const urls = [...output.matchAll(/^URL:[ \t]*(https?:\/\/\S+)[ \t]*\r?$/gm)].map((match) => match[1]!.trim())
   return urls.length ? urls : undefined
+}
+
+function parseWebFetchInputUrl(input: unknown) {
+  if (!isRecord(input) || typeof input.url !== "string") return undefined
+  const value = input.url.trim()
+  if (!value) return undefined
+  try {
+    const parsed = new URL(value)
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined
+    return value
+  } catch {
+    return undefined
+  }
+}
+
+function compareSearchUrlEvents(left: SearchUrlEvent, right: SearchUrlEvent) {
+  return (
+    left.completedAt - right.completedAt ||
+    left.sessionId.localeCompare(right.sessionId) ||
+    left.messageId.localeCompare(right.messageId) ||
+    left.partId.localeCompare(right.partId)
+  )
 }
 
 export function calculateElapsedMs(input: {

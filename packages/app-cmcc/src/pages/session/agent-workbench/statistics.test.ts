@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import type { Message, Part, Session } from "@opencode-ai/sdk/v2"
-import { buildWorkbenchStats, collectSearchUrlEvents, collectUniqueSearchUrls, sumSessionTokens } from "./statistics"
+import {
+  buildWorkbenchStats,
+  collectDeepAnalysisUrlEvents,
+  collectSearchUrlEvents,
+  collectUniqueSearchUrls,
+  sumSessionTokens,
+} from "./statistics"
 import type { SessionTranscript } from "./model"
 
 const session = (id: string, tokens?: Session["tokens"]): Session => ({
@@ -50,6 +56,39 @@ const search = (id: string, sessionID: string, output: string, tool = "websearch
     input: {},
     output,
     title: tool,
+    metadata: {},
+    time: { start: 200, end },
+  },
+})
+
+const webfetch = (id: string, sessionID: string, url: string, end = 300): Part => ({
+  id,
+  sessionID,
+  messageID: `assistant-${sessionID}`,
+  type: "tool",
+  callID: id,
+  tool: "webfetch",
+  state: {
+    status: "completed",
+    input: { url, format: "markdown" },
+    output: "Fetched page body with https://example.com/output-only",
+    title: url,
+    metadata: {},
+    time: { start: 200, end },
+  },
+})
+
+const failedWebfetch = (id: string, sessionID: string, url: string, end = 300): Part => ({
+  id,
+  sessionID,
+  messageID: `assistant-${sessionID}`,
+  type: "tool",
+  callID: id,
+  tool: "webfetch",
+  state: {
+    status: "error",
+    input: { url },
+    error: "fetch failed",
     metadata: {},
     time: { start: 200, end },
   },
@@ -164,6 +203,36 @@ describe("agent workbench statistics", () => {
         partId: "later",
         urls: ["https://example.com/later"],
       },
+    ])
+  })
+
+  test("combines websearch results with successful webfetch inputs for DeepTrading", () => {
+    const child = transcript(
+      session("child"),
+      [assistant("child")],
+      [
+        search(
+          "search",
+          "child",
+          JSON.stringify({
+            results: [{ url: "https://example.com/search" }, { url: "https://example.com/shared" }],
+          }),
+          "websearch",
+          250,
+        ),
+        webfetch("fetch", "child", "https://example.com/fetched", 300),
+        webfetch("duplicate", "child", "https://example.com/shared", 325),
+        failedWebfetch("failed", "child", "https://example.com/failed", 350),
+        webfetch("unsupported", "child", "file:///tmp/source", 375),
+      ],
+    )
+
+    const events = collectDeepAnalysisUrlEvents([child])
+    expect(events.map((event) => event.partId)).toEqual(["search", "fetch", "duplicate"])
+    expect([...new Set(events.flatMap((event) => event.urls))].sort()).toEqual([
+      "https://example.com/fetched",
+      "https://example.com/search",
+      "https://example.com/shared",
     ])
   })
 

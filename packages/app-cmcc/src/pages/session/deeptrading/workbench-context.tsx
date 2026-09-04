@@ -26,7 +26,7 @@ import {
   extractUserQuery,
   resolveAgentSessions,
 } from "../agent-workbench/session-adapter"
-import { calculateElapsedMs, collectSearchUrlEvents, sumSessionTokens } from "../agent-workbench/statistics"
+import { calculateElapsedMs, collectDeepAnalysisUrlEvents, sumSessionTokens } from "../agent-workbench/statistics"
 import { DEEPTRADING_ARTIFACT_ROLES, DEEPTRADING_MEMBERS } from "./config"
 import {
   DEEPTRADING_REPLAY_DURATION_MS,
@@ -322,7 +322,7 @@ function createLiveDeepTradingWorkbench(props: { sessionID: Accessor<string | un
       })
     })
     const searchUrlEvents = createMemo(() =>
-      collectSearchUrlEvents(selectedChildTranscripts(), (input) => {
+      collectDeepAnalysisUrlEvents(selectedChildTranscripts(), (input) => {
         const key = `${input.sessionId}/${input.messageId}/${input.partId}`
         if (invalidSearchOutputs.has(key)) return
         invalidSearchOutputs.add(key)

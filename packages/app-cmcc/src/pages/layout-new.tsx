@@ -35,6 +35,7 @@ import {
   cmccCaseCategoryByAgentType,
   cmccCasePublishingAllowed,
 } from "@/utils/cmcc-cases"
+import { cmccHistoryProduct, type CmccHistoryProduct } from "@/utils/cmcc-history-product"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
@@ -551,7 +552,7 @@ function CmccSidebar() {
                   session={session}
                   active={activeSession(session)}
                   running={sync().session.data.session_working(session.id)}
-                  agentType={dockapi.sessions.findByOpenCodeId(session.id)?.agentType}
+                  product={cmccHistoryProduct(dockapi.sessions.findByOpenCodeId(session.id)?.agentType)}
                   timeLabel={timeLabel(session)}
                   knowledgeName={
                     cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)?.name ??
@@ -674,7 +675,7 @@ function CmccSessionRow(props: {
   session: Session
   active: boolean
   running: boolean
-  agentType?: string
+  product?: CmccHistoryProduct
   timeLabel: string
   openSession: (session: Session) => void
   deleteSession: (session: Session) => void
@@ -723,13 +724,21 @@ function CmccSessionRow(props: {
             <span class="min-w-0 flex-1 truncate text-[13px] font-medium">
               {sessionTitle(props.session.title) ?? "未命名对话"}
             </span>
-            <Show when={props.agentType?.trim()}>
-              <span
-                class="max-w-[104px] shrink-0 truncate rounded-full bg-[rgba(96,165,250,0.14)] px-1.5 py-0.5 text-[11px] font-normal leading-[1.4] text-[#2563eb]"
-                title={props.agentType}
-              >
-                {props.agentType}
-              </span>
+            <Show when={props.product}>
+              {(product) => (
+                <span
+                  data-slot="session-product-label"
+                  class="max-w-[104px] shrink-0 truncate rounded-full border px-1.5 py-0.5 text-[11px] font-normal leading-[1.4]"
+                  title={product().label}
+                  style={{
+                    color: product().textColor,
+                    background: product().backgroundColor,
+                    "border-color": product().borderColor,
+                  }}
+                >
+                  {product().label}
+                </span>
+              )}
             </Show>
             <Show when={props.knowledgeName}>
               {(name) => (
@@ -753,7 +762,33 @@ function CmccSessionRow(props: {
           title="任务进行中"
           class="pointer-events-none absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center text-[#4f46e5] transition-opacity group-hover/session:opacity-0 group-focus-within/session:opacity-0"
         >
-          <span class="size-3.5 animate-spin rounded-full border-[1.5px] border-current border-r-transparent" aria-hidden="true" />
+          <svg
+            data-slot="session-running-spinner"
+            viewBox="0 0 16 16"
+            class="size-3.5"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle cx="8" cy="8" r="5.25" stroke="currentColor" stroke-width="1.5" opacity="0.22" />
+            <circle
+              cx="8"
+              cy="8"
+              r="5.25"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-dasharray="7 26"
+            >
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 8 8"
+                to="360 8 8"
+                dur="0.8s"
+                repeatCount="indefinite"
+              />
+            </circle>
+          </svg>
         </span>
       </Show>
       <div class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100">

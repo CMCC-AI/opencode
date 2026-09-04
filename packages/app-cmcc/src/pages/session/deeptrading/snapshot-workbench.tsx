@@ -13,7 +13,7 @@ import {
   resolveAgentSessions,
 } from "../agent-workbench/session-adapter"
 import type { AgentWorkbench, SessionArtifact, SessionTranscript } from "../agent-workbench/model"
-import { calculateElapsedMs, collectSearchUrlEvents, sumSessionTokens } from "../agent-workbench/statistics"
+import { calculateElapsedMs, collectDeepAnalysisUrlEvents, sumSessionTokens } from "../agent-workbench/statistics"
 import { DEEPTRADING_ARTIFACT_ROLES, DEEPTRADING_MEMBERS } from "./config"
 import {
   DEEPTRADING_REPLAY_DURATION_MS,
@@ -56,7 +56,7 @@ export function DeepTradingSnapshotWorkbenchProvider(
 
   const transcripts = createMemo(() => snapshotTranscripts(props.snapshot()))
   const actual = createMemo<AgentWorkbench>(() => buildWorkbench(props.snapshot(), transcripts(), state.selectedAgentId))
-  const searchEvents = createMemo(() => collectSearchUrlEvents([...transcripts().values()]))
+  const searchEvents = createMemo(() => collectDeepAnalysisUrlEvents([...transcripts().values()]))
 
   const clearTimer = () => {
     if (timer === undefined) return
@@ -207,7 +207,7 @@ function buildWorkbench(
     transcripts,
   })
   const allTranscripts = [...transcripts.values()]
-  const searchEvents = collectSearchUrlEvents(allTranscripts)
+  const searchEvents = collectDeepAnalysisUrlEvents(allTranscripts)
   const urls = new Set(searchEvents.flatMap((event) => event.urls))
   const artifacts = snapshotArtifacts(snapshot, allTranscripts)
   const textReport = uniqueArtifact(artifacts, "30-final-report.md")
