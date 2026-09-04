@@ -67,6 +67,10 @@ import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { AiScienceResultsPanel } from "@/pages/session/ai-science/ai-science-results-panel"
+import { AiScienceSessionView } from "@/pages/session/ai-science/ai-science-session-view"
+import { shouldUseAiSciencePage } from "@/pages/session/ai-science/page-selection"
+import { AiScienceWorkbenchProvider } from "@/pages/session/ai-science/workbench-context"
 import { DeepInspectResultsPanel } from "@/pages/session/deepinspect/deepinspect-results-panel"
 import { DeepInspectSessionView } from "@/pages/session/deepinspect/deepinspect-session-view"
 import { shouldUseDeepInspectPage } from "@/pages/session/deepinspect/page-selection"
@@ -304,7 +308,8 @@ export default function Page() {
   const deepInspect = createMemo(() => shouldUseDeepInspectPage(info(), businessAgentType(), initialUserAgent()))
   const zhengqi = createMemo(() => shouldUseZhengqiPage(info(), businessAgentType(), initialUserAgent()))
   const shoppers = createMemo(() => shouldUseShoppersPage(info(), businessAgentType(), initialUserAgent()))
-  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers())
+  const aiScience = createMemo(() => shouldUseAiSciencePage(info(), businessAgentType(), initialUserAgent()))
+  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || aiScience())
   const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
@@ -1822,6 +1827,7 @@ export default function Page() {
       <DeepInspectWorkbenchProvider sessionID={() => params.id} active={deepInspect}>
       <ZhengqiWorkbenchProvider sessionID={() => params.id} active={zhengqi}>
       <ShoppersWorkbenchProvider sessionID={() => params.id} active={shoppers}>
+      <AiScienceWorkbenchProvider sessionID={() => params.id} active={aiScience}>
       <div class="relative size-full overflow-hidden flex flex-col">
         {sessionSync() ?? ""}
         <SessionHeader />
@@ -1888,6 +1894,9 @@ export default function Page() {
                         </Match>
                         <Match when={shoppers()}>
                           <ShoppersResultsPanel />
+                        </Match>
+                        <Match when={aiScience()}>
+                          <AiScienceResultsPanel />
                         </Match>
                         <Match when={true}>
                         <div class="relative h-full overflow-hidden">
@@ -1973,6 +1982,23 @@ export default function Page() {
                                     </>
                                   }
                                   right={<ShoppersResultsPanel />}
+                                />
+                              </Show>
+                            </Match>
+                            <Match when={aiScience()}>
+                              <Show when={isDesktop()} fallback={<AiScienceSessionView />}>
+                                <DeepTradingSplitLayout
+                                  persistKey="ai-for-science-panels"
+                                  label="AI for Science"
+                                  left={
+                                    <>
+                                      <div class="min-h-0 flex-1 overflow-hidden">
+                                        <AiScienceSessionView />
+                                      </div>
+                                      {composerRegion()}
+                                    </>
+                                  }
+                                  right={<AiScienceResultsPanel />}
                                 />
                               </Show>
                             </Match>
@@ -2084,6 +2110,7 @@ export default function Page() {
 
         <TerminalPanel />
       </div>
+      </AiScienceWorkbenchProvider>
       </ShoppersWorkbenchProvider>
       </ZhengqiWorkbenchProvider>
       </DeepInspectWorkbenchProvider>

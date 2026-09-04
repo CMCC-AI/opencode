@@ -488,12 +488,6 @@ function CmccSidebar() {
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-3">
             <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
             <CmccSidebarAction
-              icon="archive"
-              label="案例库"
-              active={location.pathname === "/cases" || location.pathname.startsWith("/cases/")}
-              onClick={() => navigate("/cases")}
-            />
-            <CmccSidebarAction
               icon="glasses"
               label="深度研究"
               active={location.pathname === "/expert/chat"}
@@ -534,6 +528,12 @@ function CmccSidebar() {
               active={isDeepLensPath(location.pathname)}
               onClick={() => navigate("/deeplens")}
             />
+            <CmccSidebarAction
+              icon="archive"
+              label="案例库"
+              active={location.pathname === "/cases" || location.pathname.startsWith("/cases/")}
+              onClick={() => navigate("/cases")}
+            />
           </nav>
           <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#c7d2fe] [&::-webkit-scrollbar]:w-1">
             <CmccSidebarSection
@@ -550,6 +550,7 @@ function CmccSidebar() {
                 <CmccSessionRow
                   session={session}
                   active={activeSession(session)}
+                  running={sync().session.data.session_working(session.id)}
                   agentType={dockapi.sessions.findByOpenCodeId(session.id)?.agentType}
                   timeLabel={timeLabel(session)}
                   knowledgeName={
@@ -672,6 +673,7 @@ function CmccSidebarSection(props: {
 function CmccSessionRow(props: {
   session: Session
   active: boolean
+  running: boolean
   agentType?: string
   timeLabel: string
   openSession: (session: Session) => void
@@ -709,6 +711,7 @@ function CmccSessionRow(props: {
     <div
       class="group/session relative mb-0.5 flex min-h-12 w-full min-w-0 items-center rounded-[6px] text-[#4a4a6a] transition-colors duration-150 hover:bg-[rgba(99,102,241,0.06)] data-[selected]:bg-[rgba(99,102,241,0.10)] data-[selected]:text-[#4f46e5]"
       data-selected={props.active ? "" : undefined}
+      data-running={props.running ? "" : undefined}
     >
       <button
         type="button"
@@ -742,6 +745,17 @@ function CmccSessionRow(props: {
           <span class="mt-0.5 block text-[11px] font-normal leading-none text-[#8b8daf]">{props.timeLabel}</span>
         </span>
       </button>
+      <Show when={props.running}>
+        <span
+          data-slot="session-running-indicator"
+          role="status"
+          aria-label="任务进行中"
+          title="任务进行中"
+          class="pointer-events-none absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center text-[#4f46e5] transition-opacity group-hover/session:opacity-0 group-focus-within/session:opacity-0"
+        >
+          <span class="size-3.5 animate-spin rounded-full border-[1.5px] border-current border-r-transparent" aria-hidden="true" />
+        </span>
+      </Show>
       <div class="absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover/session:opacity-100 group-focus-within/session:opacity-100">
         <DropdownMenu>
           <DropdownMenu.Trigger
