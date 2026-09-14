@@ -283,8 +283,8 @@ permission:
    - 填充模板生成 `30-report.html`
 
 2. **PDF 导出**：`node <BASE>/scripts/export-report-pdf.mjs <WORKSPACE_DIR>/30-report.html <WORKSPACE_DIR>/35-report.pdf`
-   - 需要本机有 Chrome/Edge/Chromium
-   - 失败时自动降级到 WeasyPrint（Python）
+   - 需要本机有 Chrome/Edge/Chromium（缺失时设 `CHROME_PATH`）
+   - 失败（含 pageChecks 未通过）时，修复报告或图表本身后重试一次；仍失败则停止生成正式 PDF，保留 HTML 交付。严禁改用 WeasyPrint 或其他工具导出；为通过检查而删除图表属于违规，无图交付必须显式告知用户并等待确认
 
 3. **质量验证**：`node <BASE>/scripts/validate-run.mjs <WORKSPACE_DIR>`
    - 检查 HTML/PDF 完整性、引用门槛、结构验收

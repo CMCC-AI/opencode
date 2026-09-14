@@ -250,7 +250,9 @@ __PRINT_CSS__
           }
         });
       }
-      if (!option.textStyle) option.textStyle = { color: '#333333', fontFamily: 'Songti SC, STSong, SimSun, serif' };
+      /* 前置注入字体族（report-pdf 共享导出器注入的 @font-face 名），保证 ECharts 丈量与最终渲染同字体，避免导出重排后标签溢出；浏览器预览时自然回退。 */
+      var reportFont = '"OpenCode Report CJK", "Microsoft YaHei", "Songti SC", "STSong", "SimSun", serif';
+      option.textStyle = Object.assign({ color: '#333333' }, option.textStyle, { fontFamily: reportFont });
       if (isPrint) {
         option.animation = false;
         option.grid = Object.assign({ containLabel: true }, option.grid || {});
