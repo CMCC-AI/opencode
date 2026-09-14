@@ -1,0 +1,200 @@
+{
+  "id": "deepinsight",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "deepinsight/deepinsight-team-lead",
+  "teamInfo": {
+    "leadAgent": "deepinsight/deepinsight-team-lead",
+    "memberAgents": [
+      "deepinsight/di-intent-analyst",
+      "deepinsight/di-query-planner",
+      "deepinsight/di-local-researcher",
+      "deepinsight/di-web-researcher",
+      "deepinsight/di-reflector",
+      "deepinsight/di-outline-architect",
+      "deepinsight/di-report-writer",
+      "deepinsight/di-evidence-reviewer",
+      "deepinsight/di-viz",
+      "deepinsight/di-publisher"
+    ]
+  },
+  "displayName": {
+    "en": "DeepInsight",
+    "zh": "DeepInsight 深度研究专家团"
+  },
+  "profession": {
+    "en": "DeepInsight",
+    "zh": "DeepInsight 深度研究专家团"
+  },
+  "displayDescription": {
+    "en": "Evidence-driven deep research team: internal material mining, hybrid and public-web research modes, reflection loops and independent evidence review, delivering traceable Markdown/HTML/PDF reports.",
+    "zh": "证据驱动深度研究团队：材料深挖、内外混合与公开信息三模式研究，经反思核验交付可追溯的 Markdown/HTML/PDF 研究报告。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "12-IndustryConsultant",
+  "defaultInitPrompt": {
+    "zh": "深度研究 2026 年中国低空经济的发展趋势与产业格局",
+    "en": "Deep research on China's low-altitude economy trends and industry landscape in 2026"
+  },
+  "members": [
+    {
+      "id": "deepinsight/deepinsight-team-lead",
+      "name": {
+        "en": "Gu Quanzhi",
+        "zh": "顾全之"
+      },
+      "profession": {
+        "en": "Research Editor",
+        "zh": "研究主编"
+      },
+      "avatar": "avatars/deepinsight-team-lead.png",
+      "role": "lead",
+      "originalId": "deepinsight-team-lead"
+    },
+    {
+      "id": "deepinsight/di-intent-analyst",
+      "name": {
+        "en": "Ming Bianqiu",
+        "zh": "明辨秋"
+      },
+      "profession": {
+        "en": "Safety & Intent Analyst",
+        "zh": "安全与需求分析师"
+      },
+      "avatar": "avatars/di-intent-analyst.png",
+      "role": "member",
+      "originalId": "di-intent-analyst"
+    },
+    {
+      "id": "deepinsight/di-query-planner",
+      "name": {
+        "en": "Mou Dingyuan",
+        "zh": "谋定远"
+      },
+      "profession": {
+        "en": "Research Planning Expert",
+        "zh": "研究规划专家"
+      },
+      "avatar": "avatars/di-query-planner.png",
+      "role": "member",
+      "originalId": "di-query-planner"
+    },
+    {
+      "id": "deepinsight/di-local-researcher",
+      "name": {
+        "en": "Wen Juejin",
+        "zh": "文掘金"
+      },
+      "profession": {
+        "en": "Local Materials Research Expert",
+        "zh": "材料研究专家"
+      },
+      "avatar": "avatars/di-local-researcher.png",
+      "role": "member",
+      "originalId": "di-local-researcher"
+    },
+    {
+      "id": "deepinsight/di-web-researcher",
+      "name": {
+        "en": "Guang Lanchuan",
+        "zh": "广览川"
+      },
+      "profession": {
+        "en": "Public Web Research Expert",
+        "zh": "公开信息研究专家"
+      },
+      "avatar": "avatars/di-web-researcher.png",
+      "role": "member",
+      "originalId": "di-web-researcher"
+    },
+    {
+      "id": "deepinsight/di-reflector",
+      "name": {
+        "en": "Sheng Xingwu",
+        "zh": "盛省吾"
+      },
+      "profession": {
+        "en": "Evidence Reflection Expert",
+        "zh": "证据反思专家"
+      },
+      "avatar": "avatars/di-reflector.png",
+      "role": "member",
+      "originalId": "di-reflector"
+    },
+    {
+      "id": "deepinsight/di-outline-architect",
+      "name": {
+        "en": "Liang Gouchen",
+        "zh": "梁构辰"
+      },
+      "profession": {
+        "en": "Outline Architecture Expert",
+        "zh": "大纲架构专家"
+      },
+      "avatar": "avatars/di-outline-architect.png",
+      "role": "member",
+      "originalId": "di-outline-architect"
+    },
+    {
+      "id": "deepinsight/di-report-writer",
+      "name": {
+        "en": "Yin Youju",
+        "zh": "殷有据"
+      },
+      "profession": {
+        "en": "Evidence-based Report Writer",
+        "zh": "证据型写作专家"
+      },
+      "avatar": "avatars/di-report-writer.png",
+      "role": "member",
+      "originalId": "di-report-writer"
+    },
+    {
+      "id": "deepinsight/di-evidence-reviewer",
+      "name": {
+        "en": "Yan Hezhen",
+        "zh": "严核真"
+      },
+      "profession": {
+        "en": "Independent Evidence Reviewer",
+        "zh": "独立证据核验专家"
+      },
+      "avatar": "avatars/di-evidence-reviewer.png",
+      "role": "member",
+      "originalId": "di-evidence-reviewer"
+    },
+    {
+      "id": "deepinsight/di-viz",
+      "name": {
+        "en": "Tu Zhengxian",
+        "zh": "涂证显"
+      },
+      "profession": {
+        "en": "Evidence-based Visualization Expert",
+        "zh": "证据型可视化专家"
+      },
+      "avatar": "avatars/di-viz.png",
+      "role": "member",
+      "originalId": "di-viz"
+    },
+    {
+      "id": "deepinsight/di-publisher",
+      "name": {
+        "en": "Ding Gaoxuan",
+        "zh": "丁稿宣"
+      },
+      "profession": {
+        "en": "Publication Engineer",
+        "zh": "发布工程师"
+      },
+      "avatar": "avatars/di-publisher.png",
+      "role": "member",
+      "originalId": "di-publisher"
+    }
+  ],
+  "original": {
+    "name": "deepinsight",
+    "version": "1.0.0",
+    "description": "Evidence-driven deep research expert team with multi-agent orchestration, reflection loops and traceable report delivery"
+  }
+}

@@ -40,6 +40,7 @@ import { cmccHistoryProduct, type CmccHistoryProduct } from "@/utils/cmcc-histor
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
+import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
 
 const SIDEBAR_MIN_WIDTH = 280
 const SIDEBAR_MAX_WIDTH = 420
@@ -395,6 +396,31 @@ function CmccSidebar() {
     })
   }
 
+  const summonDeepInsight = () => {
+    const expert = CMCC_TEAM_EXPERTS.find((e) => e.id === "deepinsight")
+    if (!expert) return
+    const current = directory()
+    const artifactDirectory = cmccArtifactWorkspace(current)
+    if (!current || !artifactDirectory || !tabs.ready()) return
+
+    tabs.newDraft({ server: server.key, directory: current, artifactDirectory, expertID: expert.id }, expert.defaultPrompt, {
+      agent: expert.leadAgent,
+    })
+    cmccRememberConversationWorkspace(current)
+    server.projects.touch(current)
+    void cmccEnsureWorkspace(
+      artifactDirectory,
+      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
+      serverSDK().scope,
+    ).catch((error) => {
+      showToast({
+        title: "无法准备专家团产物目录",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "error",
+      })
+    })
+  }
+
   const openSession = (session: Session) => {
     const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
     if (notebook && !cmccMainKnowledgeSession(session)) {
@@ -493,8 +519,7 @@ function CmccSidebar() {
             <CmccSidebarAction
               icon="glasses"
               label="深度研究"
-              active={location.pathname === "/expert/chat"}
-              onClick={() => navigate("/expert/chat")}
+              onClick={() => void summonDeepInsight()}
             />
             <CmccSidebarAction
               icon="mcp"

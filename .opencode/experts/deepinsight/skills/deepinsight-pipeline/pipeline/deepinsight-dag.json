@@ -1,0 +1,237 @@
+{
+  "schema_version": 2,
+  "pipeline": "deepinsight",
+  "execution_policy": {
+    "principle": "fixed_dag_bounded_local_loops",
+    "max_total_task_starts": 28,
+    "max_attempts_per_round": 2,
+    "research": {
+      "routing_mode": "dynamic_evidence_sufficiency",
+      "max_rounds": 3,
+      "round_1_early_exit_requires": [
+        "all_p0_fully_covered",
+        "no_material_research_gaps",
+        "confidence_level_gte_8",
+        "early_exit_reason"
+      ],
+      "round_3_requires": [
+        "material_research_gaps",
+        "new_evidence_path",
+        "exception_round_approved"
+      ]
+    },
+    "web_research": {
+      "query_scope": "planned_queries_only",
+      "max_parallel_search_calls": 3,
+      "max_parallel_fetch_calls": 2,
+      "max_unique_engines_per_query": 4,
+      "max_same_engine_attempts_per_query": 1,
+      "max_consecutive_low_yield_batches": 2,
+      "max_consecutive_fetch_failures": 2,
+      "external_reference_pool_min": 50,
+      "external_reference_pool_target_max": 70
+    },
+    "evidence_review": {
+      "max_rounds": 2,
+      "input_mode": "bounded_risk_packet",
+      "packet_max_bytes": 64000,
+      "review_output_max_bytes": 10240,
+      "round_2_mode": "p0_delta_only",
+      "max_blocking_findings": 6,
+      "max_nonblocking_findings": 4
+    },
+    "writing": {
+      "max_rounds": 2,
+      "initial_mode": "outline_driven_chapter_batches",
+      "batch_plan_artifact": "11-writing-plan.json",
+      "batch_limit": "derived_from_outline",
+      "revision_mode": "single_targeted_p0_pass"
+    },
+    "visualization": {
+      "figure_target_min": 4,
+      "figure_target_max": 8,
+      "evidence_shortfall_allowed": true
+    },
+    "pdf": {
+      "max_exports": 2,
+      "max_visual_review_rounds": 2
+    }
+  },
+  "layer_1": {
+    "agent": "deepinsight-team-lead",
+    "responsibility": "orchestration_state_routing_and_deterministic_delivery"
+  },
+  "nodes": [
+    {
+      "order": 10,
+      "node": "safety",
+      "layer": 2,
+      "agent": "di-intent-analyst",
+      "condition": "always",
+      "third_layer_tools": [],
+      "artifact_patterns": [
+        "^01-safety\\.json$"
+      ],
+      "max_rounds": 1
+    },
+    {
+      "order": 20,
+      "node": "intent",
+      "layer": 2,
+      "agent": "di-intent-analyst",
+      "condition": "always",
+      "third_layer_tools": [],
+      "artifact_patterns": [
+        "^02-intent\\.json$",
+        "^01-requirements\\.json$"
+      ],
+      "max_rounds": 1
+    },
+    {
+      "order": 30,
+      "node": "planning",
+      "layer": 2,
+      "agent": "di-query-planner",
+      "condition": "always",
+      "third_layer_tools": [],
+      "artifact_patterns": [
+        "^03-plan\\.json$"
+      ],
+      "max_rounds": 1
+    },
+    {
+      "order": 40,
+      "node": "local_research",
+      "layer": 2,
+      "agent": "di-local-researcher",
+      "condition": "has_local_files",
+      "third_layer_tools": [
+        "read"
+      ],
+      "artifact_patterns": [
+        "^05-local-findings-\\d+\\.md$",
+        "^05-local-findings-\\d+\\.meta\\.json$"
+      ],
+      "max_rounds": 3
+    },
+    {
+      "order": 40,
+      "node": "web_research",
+      "layer": 2,
+      "agent": "di-web-researcher",
+      "condition": "external_or_planned_hybrid_web",
+      "third_layer_tools": [
+        "search_bocha_*",
+        "search_tencent_*",
+        "search_doubao_*",
+        "websearch",
+        "webfetch"
+      ],
+      "artifact_patterns": [
+        "^05-web-findings-\\d+\\.md$",
+        "^05-web-findings-\\d+\\.meta\\.json$"
+      ],
+      "max_rounds": 3
+    },
+    {
+      "order": 50,
+      "node": "reflection",
+      "layer": 2,
+      "agent": "di-reflector",
+      "condition": "after_at_least_one_research_node",
+      "third_layer_tools": [
+        "read"
+      ],
+      "artifact_patterns": [
+        "^07-reflection-\\d+\\.json$"
+      ],
+      "max_rounds": 3
+    },
+    {
+      "order": 60,
+      "node": "outline",
+      "layer": 2,
+      "agent": "di-outline-architect",
+      "condition": "always",
+      "third_layer_tools": [
+        "read"
+      ],
+      "artifact_patterns": [
+        "^10-outline\\.json$"
+      ],
+      "max_rounds": 1
+    },
+    {
+      "order": 70,
+      "node": "writing",
+      "layer": 2,
+      "agent": "di-report-writer",
+      "condition": "always_and_repeat_after_failed_review",
+      "third_layer_tools": [
+        "read"
+      ],
+      "artifact_patterns": [
+        "^20-report\\.md$"
+      ],
+      "max_rounds": 2
+    },
+    {
+      "order": 80,
+      "node": "evidence_review",
+      "layer": 2,
+      "agent": "di-evidence-reviewer",
+      "condition": "after_each_writing_attempt",
+      "third_layer_tools": [
+        "read"
+      ],
+      "artifact_patterns": [
+        "^21-evidence-review-\\d+\\.json$"
+      ],
+      "max_rounds": 2
+    },
+    {
+      "order": 90,
+      "node": "visualization",
+      "layer": 2,
+      "agent": "di-viz",
+      "condition": "after_final_evidence_review_and_deterministic_reference_postprocess",
+      "third_layer_tools": [
+        "read"
+      ],
+      "artifact_patterns": [
+        "^25-visual-report\\.json$"
+      ],
+      "max_rounds": 1
+    },
+    {
+      "order": 100,
+      "node": "html_render",
+      "layer": 2,
+      "agent": "di-publisher",
+      "condition": "after_visualization",
+      "third_layer_tools": [
+        "render-report.mjs"
+      ],
+      "artifact_patterns": [
+        "^30-report\\.html$",
+        "^31-render-state\\.json$"
+      ],
+      "max_rounds": 1
+    },
+    {
+      "order": 110,
+      "node": "pdf_export",
+      "layer": 2,
+      "agent": "di-publisher",
+      "condition": "after_html_render",
+      "third_layer_tools": [
+        "export-report-pdf.mjs"
+      ],
+      "artifact_patterns": [
+        "^35-report\\.pdf$",
+        "^36-pdf-export-state\\.json$"
+      ],
+      "max_rounds": 1
+    }
+  ]
+}
