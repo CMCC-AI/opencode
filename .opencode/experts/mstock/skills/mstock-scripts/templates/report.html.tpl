@@ -171,6 +171,38 @@
     .mini-kpi-row { flex-direction: column; }
     .mini-kpi-item { border-right: none; border-bottom: 1px solid var(--border); }
   }
+  @media print {
+    @page { size: A4; margin: 18mm 17mm 16mm 19mm; }
+    /* 打印强制浅色变量，避免暗色模式导出深底 PDF */
+    :root {
+      --bg: #faf8ff; --surface: #ffffff; --text: #1a1a2e; --text-soft: #555;
+      --border: #e5e0f0; --accent: #7c3aed; --accent-dark: #5b21b6; --neutral: #64748b;
+      --info-bg: #eff6ff; --info-border: #3b82f6; --info-text: #1e40af;
+      --positive-bg: #ecfdf5; --positive-border: #10b981; --positive-text: #065f46;
+      --warning-bg: #fffbeb; --warning-border: #f59e0b; --warning-text: #92400e;
+      --negative-bg: #fef2f2; --negative-border: #ef4444; --negative-text: #991b1b;
+    }
+    body { background: #fff !important; }
+    .toc { display: none !important; }
+    .layout { display: block; max-width: none; }
+    .main { padding: 0; }
+    .hero { break-after: avoid; }
+    .hero::after { display: none; }
+    section { break-inside: auto; }
+    section > h2, h2, h3, h4 { break-after: avoid; }
+    tr { break-inside: avoid; }
+    .block-chart { break-inside: avoid; box-shadow: none; }
+    .block-table { break-inside: avoid; overflow-x: visible; }
+    .block-stat_grid { break-inside: avoid; }
+    .block-callout { break-inside: avoid; }
+    .block-quote_card { break-inside: avoid; }
+    .block-timeline { break-inside: avoid; }
+    .block-chip_list { break-inside: avoid; }
+    .block-progress_bar { break-inside: avoid; }
+    .block-mini_kpi_row { break-inside: avoid; }
+    .block-markdown table { break-inside: auto; }
+    .references { break-before: auto; }
+  }
 </style>
 </head>
 <body>
