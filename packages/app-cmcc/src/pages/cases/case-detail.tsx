@@ -4,7 +4,7 @@ import { SessionTurn } from "@opencode-ai/session-ui/session-turn"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { createMediaQuery } from "@solid-primitives/media"
-import { For, Match, Show, Switch, createMemo, createResource, onCleanup, untrack, type JSX } from "solid-js"
+import { For, Match, Show, Switch, Suspense, lazy, createMemo, createResource, onCleanup, untrack, type JSX, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useNavigate, useParams } from "@solidjs/router"
 import type { Message, Part, SessionStatus } from "@opencode-ai/sdk/v2"
@@ -14,35 +14,17 @@ import { CaseDeleteDialog } from "@/components/case-delete-dialog"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
 import { useTabs } from "@/context/tabs"
-import { AiScienceResultsPanel } from "@/pages/session/ai-science/ai-science-results-panel"
-import { AiScienceSessionView } from "@/pages/session/ai-science/ai-science-session-view"
-import { AiScienceSnapshotWorkbenchProvider } from "@/pages/session/ai-science/snapshot-workbench"
-import { AI_SCIENCE_DAG_LEVELS } from "@/pages/session/ai-science/config"
-import { DeepInspectResultsPanel } from "@/pages/session/deepinspect/deepinspect-results-panel"
-import { DeepInspectSessionView } from "@/pages/session/deepinspect/deepinspect-session-view"
-import { DeepInspectSnapshotWorkbenchProvider } from "@/pages/session/deepinspect/snapshot-workbench"
-import { DEEPINSPECT_DAG_LEVELS } from "@/pages/session/deepinspect/config"
-import { DeepTradingResultsPanel } from "@/pages/session/deeptrading/deeptrading-results-panel"
-import { DeepTradingSessionView } from "@/pages/session/deeptrading/deeptrading-session-view"
-import { DeepTradingSnapshotWorkbenchProvider } from "@/pages/session/deeptrading/snapshot-workbench"
-import { DeepTradingSplitLayout } from "@/pages/session/deeptrading/split-layout"
 import type {
   DeepTradingArtifactSource,
   DeepTradingArtifactContent,
 } from "@/pages/session/deeptrading/workbench-context"
-import { ShoppersResultsPanel } from "@/pages/session/shoppers/shoppers-results-panel"
-import { ShoppersSessionView } from "@/pages/session/shoppers/shoppers-session-view"
-import { ShoppersSnapshotWorkbenchProvider } from "@/pages/session/shoppers/snapshot-workbench"
-import { SHOPPERS_DAG_LEVELS } from "@/pages/session/shoppers/config"
-import { ZhengqiSnapshotWorkbenchProvider } from "@/pages/session/zhengqi/snapshot-workbench"
-import { ZhengqiResultsPanel } from "@/pages/session/zhengqi/zhengqi-results-panel"
-import { ZhengqiSessionView } from "@/pages/session/zhengqi/zhengqi-session-view"
-import { ZHENGQI_DAG_LEVELS } from "@/pages/session/zhengqi/config"
 import { cmccArtifactWorkspace, cmccEnsureWorkspace, cmccRememberConversationWorkspace } from "@/utils/cmcc-workspace"
 import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByAgentType, cmccCaseManagementAllowed } from "@/utils/cmcc-cases"
 import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { CASE_REPLAY_DURATION_MS, caseReplayFrame, compileCaseReplay } from "./replay"
+import { resolveCaseSnapshotAttachments } from "./snapshot-attachments"
+import type { DedicatedCaseProps } from "./dedicated-case-layout"
 import {
   CASE_FILE_PANEL_DEFAULT_WIDTH,
   caseFilePanelMaxWidth,
@@ -50,7 +32,14 @@ import {
   clampCaseFilePanelWidth,
 } from "./file-panel-layout"
 import echartsRuntimeUrl from "../../../node_modules/echarts/dist/echarts.min.js?url"
-import "./dedicated-case.css"
+
+const dedicatedViews: Record<string, Component<DedicatedCaseProps>> = {
+  finance: lazy(() => import("./views/finance")),
+  inspection: lazy(() => import("./views/inspection")),
+  government: lazy(() => import("./views/government")),
+  recommendation: lazy(() => import("./views/recommendation")),
+  science: lazy(() => import("./views/science")),
+}
 
 type LoadedCase = {
   detail: DockApiCaseDetail
@@ -75,7 +64,7 @@ export function CmccCaseDetailRoute() {
       }
       return {
         detail,
-        snapshot,
+        snapshot: resolveCaseSnapshotAttachments(snapshot, dockApiUrl(ticket.baseUrl)),
         previewBaseUrl: dockApiUrl(ticket.baseUrl).replace(/\/$/, ""),
       }
     },
@@ -185,80 +174,13 @@ function CaseDetailContent(props: { value: LoadedCase }) {
     />
   )
 
-  if (category === "finance") {
+  const View = category ? dedicatedViews[category] : undefined
+  if (View) {
     return (
       <>
-        <DeepTradingSnapshotWorkbenchProvider snapshot={() => props.value.snapshot} artifactSource={source}>
-          <DedicatedCaseLayout header={header} left={<DeepTradingSessionView />} right={<DeepTradingResultsPanel />} />
-        </DeepTradingSnapshotWorkbenchProvider>
-        {deleteDialog}
-      </>
-    )
-  }
-  if (category === "inspection") {
-    return (
-      <>
-        <DeepInspectSnapshotWorkbenchProvider snapshot={() => props.value.snapshot} artifactSource={source}>
-          <DedicatedCaseLayout
-            header={header}
-            persistKey="deepinspect-panels"
-            label="DeepInspect"
-            dagRows={DEEPINSPECT_DAG_LEVELS.length}
-            left={<DeepInspectSessionView />}
-            right={<DeepInspectResultsPanel onCreateSame={createSame} />}
-          />
-        </DeepInspectSnapshotWorkbenchProvider>
-        {deleteDialog}
-      </>
-    )
-  }
-  if (category === "government") {
-    return (
-      <>
-        <ZhengqiSnapshotWorkbenchProvider snapshot={() => props.value.snapshot} artifactSource={source}>
-          <DedicatedCaseLayout
-            header={header}
-            persistKey="zhengqi-panels"
-            label="DeepEngage"
-            dagRows={ZHENGQI_DAG_LEVELS.length}
-            left={<ZhengqiSessionView />}
-            right={<ZhengqiResultsPanel onCreateSame={createSame} />}
-          />
-        </ZhengqiSnapshotWorkbenchProvider>
-        {deleteDialog}
-      </>
-    )
-  }
-  if (category === "recommendation") {
-    return (
-      <>
-        <ShoppersSnapshotWorkbenchProvider snapshot={() => props.value.snapshot} artifactSource={source}>
-          <DedicatedCaseLayout
-            header={header}
-            persistKey="shoppers-pro-panels"
-            label="好买手"
-            dagRows={SHOPPERS_DAG_LEVELS.length}
-            left={<ShoppersSessionView />}
-            right={<ShoppersResultsPanel onCreateSame={createSame} />}
-          />
-        </ShoppersSnapshotWorkbenchProvider>
-        {deleteDialog}
-      </>
-    )
-  }
-  if (category === "science") {
-    return (
-      <>
-        <AiScienceSnapshotWorkbenchProvider snapshot={() => props.value.snapshot} artifactSource={source}>
-          <DedicatedCaseLayout
-            header={header}
-            persistKey="ai-for-science-panels"
-            label="AI for Science"
-            dagRows={AI_SCIENCE_DAG_LEVELS.length}
-            left={<AiScienceSessionView />}
-            right={<AiScienceResultsPanel onCreateSame={createSame} />}
-          />
-        </AiScienceSnapshotWorkbenchProvider>
+        <Suspense fallback={<div class="flex size-full items-center justify-center text-[13px] text-[#8b94a7]">正在加载案例详情...</div>}>
+          <View snapshot={() => props.value.snapshot} artifactSource={source} header={header} onCreateSame={createSame} />
+        </Suspense>
         {deleteDialog}
       </>
     )
@@ -273,65 +195,6 @@ function CaseDetailContent(props: { value: LoadedCase }) {
       />
       {deleteDialog}
     </>
-  )
-}
-
-function DedicatedCaseLayout(props: {
-  header: JSX.Element
-  left: JSX.Element
-  right: JSX.Element
-  persistKey?: string
-  label?: string
-  dagRows?: number
-}) {
-  const desktop = createMediaQuery("(min-width: 768px)")
-  const [state, setState] = createStore({ mobileView: "content" as "content" | "results" })
-  const results = () => props.dagRows ? (
-    <div class="case-dedicated-results size-full min-h-0" style={{ "--case-dag-height": `${props.dagRows * 42}px` }}>
-      {props.right}
-    </div>
-  ) : props.right
-  return (
-    <div class="flex size-full min-h-0 flex-col overflow-hidden bg-[#f7f8fb]" classList={{ "max-md:pt-10": !!props.dagRows }}>
-      {props.header}
-      <div class="min-h-0 flex-1">
-        <Show
-          when={desktop()}
-          fallback={
-            <div class="flex size-full min-h-0 flex-col">
-              <div class="grid h-10 shrink-0 grid-cols-2 border-b border-[#e0e4eb] bg-white p-1">
-                <button
-                  type="button"
-                  data-selected={state.mobileView === "content" ? "" : undefined}
-                  class="rounded-[6px] text-[12px] text-[#7a8498] data-[selected]:bg-[#edf3ff] data-[selected]:text-[#3474e8]"
-                  onClick={() => setState("mobileView", "content")}
-                >
-                  分析内容
-                </button>
-                <button
-                  type="button"
-                  data-selected={state.mobileView === "results" ? "" : undefined}
-                  class="rounded-[6px] text-[12px] text-[#7a8498] data-[selected]:bg-[#edf3ff] data-[selected]:text-[#3474e8]"
-                  onClick={() => setState("mobileView", "results")}
-                >
-                  分析结果
-                </button>
-              </div>
-              <div class="min-h-0 flex-1 overflow-hidden">
-                {state.mobileView === "content" ? props.left : results()}
-              </div>
-            </div>
-          }
-        >
-          <DeepTradingSplitLayout
-            left={props.left}
-            right={results()}
-            persistKey={props.persistKey}
-            label={props.label}
-          />
-        </Show>
-      </div>
-    </div>
   )
 }
 

@@ -106,7 +106,7 @@ async function prepare(page: Page, scienceCount = 4, canManage = false) {
       .poll(() => page.locator('[data-page="cmcc-cases"]').evaluate((element) => element.clientWidth))
       .toBeGreaterThan(380)
   }
-  return { listRequests }
+  return { listRequests, groups }
 }
 
 async function boxes(cards: Locator) {
@@ -274,4 +274,36 @@ test("delete entry and opening the case retain their existing actions", async ({
   await expect(page).toHaveURL(/\/cases\/deep-research-1$/)
   await expect(page.getByText("通用深度研究案例 1", { exact: true }).first()).toBeVisible()
   expect(errors).toEqual([])
+})
+
+test("list does not load case detail chunks and returning displays cache before revalidation", async ({ page }) => {
+  const requested: string[] = []
+  page.on("request", (request) => requested.push(request.url()))
+  const { groups } = await prepare(page)
+  expect(requested.some((url) => /case-detail|\/cases\/views\//.test(url))).toBe(false)
+  const snapshotRequest = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith("/snapshot"))
+  await page.locator('[data-case-card="deep-research-1"] > button').first().click()
+  expect(new URL((await snapshotRequest).url()).searchParams.get("delivery")).toBe("1")
+  await expect(page.getByRole("button", { name: "返回案例库", exact: true })).toBeVisible()
+
+  const pending = Promise.withResolvers<void>()
+  let revalidating = false
+  await page.route("**/api/dockapi/cases/overview", async (route) => {
+    revalidating = true
+    await pending.promise
+    await route.fulfill({
+      json: { code: 200, data: { groups: groups.map((group) => group.category === "deep-research" ? { ...group, items: group.items.slice(1) } : group) } },
+      headers: { "access-control-allow-origin": "*" },
+    })
+  })
+  try {
+    await page.getByRole("button", { name: "返回案例库", exact: true }).click()
+    await expect.poll(() => revalidating).toBe(true)
+    await expect(page.locator('[data-case-group="deep-research"] [data-case-card]')).toHaveCount(4)
+    await expect(page.locator('[data-page="cmcc-cases"] .animate-pulse')).toHaveCount(0)
+  } finally {
+    pending.resolve()
+  }
+  await expect(page.locator('[data-case-group="deep-research"] [data-case-card]')).toHaveCount(3)
+  await expect(page.locator('[data-case-card="deep-research-1"]')).toHaveCount(0)
 })

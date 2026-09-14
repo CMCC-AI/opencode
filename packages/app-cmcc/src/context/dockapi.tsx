@@ -6,6 +6,8 @@ import type { Message, Part, SessionStatus } from "@opencode-ai/sdk/v2"
 import { usePlatform } from "./platform"
 import { Persist, removePersisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
+import { createCaseListCache } from "@/utils/case-list-cache"
+import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
 
 const ACCESS_TOKEN_KEY = "dockapi.accessToken"
 const REFRESH_TOKEN_KEY = "dockapi.refreshToken"
@@ -72,6 +74,28 @@ export type DockApiCaseList = {
   total: number
   page: number
   size: number
+}
+
+export type DockApiCaseQuery = {
+  keyword?: string
+  category?: string
+  sort?: "latest" | "oldest"
+  from?: string
+  to?: string
+  page?: number
+  size?: number
+}
+
+function caseListPath(input: DockApiCaseQuery) {
+  const query = new URLSearchParams()
+  if (input.keyword) query.set("keyword", input.keyword)
+  if (input.category) query.set("category", input.category)
+  if (input.sort) query.set("sort", input.sort)
+  if (input.from) query.set("from", input.from)
+  if (input.to) query.set("to", input.to)
+  if (input.page) query.set("page", String(input.page))
+  if (input.size) query.set("size", String(input.size))
+  return `/api/dockapi/cases?${query.toString()}`
 }
 
 export type DockApiCaseDetail = DockApiCaseSummary & {
@@ -226,8 +250,16 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
 
     let authEpoch = 0
     let refreshRequest: Promise<void> | undefined
+    const caseOverview = createCaseListCache<DockApiCaseOverview>()
+    const caseLists = createCaseListCache<DockApiCaseList>()
+    const clearCaseCache = () => {
+      caseOverview.clear()
+      caseLists.clear()
+    }
+    onCleanup(clearCaseCache)
 
     const saveTokens = (auth: AuthResponse) => {
+      if (state.user?.id !== auth.user.id) clearCaseCache()
       storageSet(ACCESS_TOKEN_KEY, auth.accessToken)
       storageSet(REFRESH_TOKEN_KEY, auth.refreshToken)
       setState({
@@ -240,6 +272,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
 
     const clear = () => {
       authEpoch += 1
+      clearCaseCache()
       window.dispatchEvent(new Event("dockapi-auth-cleared"))
       storageSet(ACCESS_TOKEN_KEY, null)
       storageSet(REFRESH_TOKEN_KEY, null)
@@ -369,6 +402,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       const sync = (event: StorageEvent) => {
         if (event.key !== null && event.key !== ACCESS_TOKEN_KEY && event.key !== REFRESH_TOKEN_KEY) return
         authEpoch += 1
+        clearCaseCache()
         setState({
           status: "loading",
           accessToken: storageGet(ACCESS_TOKEN_KEY) ?? undefined,
@@ -380,7 +414,9 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         void restore()
       }
       window.addEventListener("storage", sync)
+      window.addEventListener(CMCC_CASES_UPDATED_EVENT, clearCaseCache)
       onCleanup(() => window.removeEventListener("storage", sync))
+      onCleanup(() => window.removeEventListener(CMCC_CASES_UPDATED_EVENT, clearCaseCache))
       void restore()
     })
 
@@ -469,37 +505,28 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         },
       },
       cases: {
-        overview() {
-          return request<DockApiCaseOverview>("/api/dockapi/cases/overview")
+        cachedOverview() {
+          return caseOverview.peek("overview")
         },
-        list(input: {
-          keyword?: string
-          category?: string
-          sort?: "latest" | "oldest"
-          from?: string
-          to?: string
-          page?: number
-          size?: number
-        }) {
-          const query = new URLSearchParams()
-          if (input.keyword) query.set("keyword", input.keyword)
-          if (input.category) query.set("category", input.category)
-          if (input.sort) query.set("sort", input.sort)
-          if (input.from) query.set("from", input.from)
-          if (input.to) query.set("to", input.to)
-          if (input.page) query.set("page", String(input.page))
-          if (input.size) query.set("size", String(input.size))
-          return request<DockApiCaseList>(`/api/dockapi/cases?${query.toString()}`)
+        overview() {
+          return caseOverview.load("overview", () => request<DockApiCaseOverview>("/api/dockapi/cases/overview"))
+        },
+        cachedList(input: DockApiCaseQuery) {
+          return caseLists.peek(caseListPath(input))
+        },
+        list(input: DockApiCaseQuery) {
+          const path = caseListPath(input)
+          return caseLists.load(path, () => request<DockApiCaseList>(path))
         },
         detail(caseCode: string) {
           return request<DockApiCaseDetail>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`)
         },
         async snapshot(caseCode: string) {
-          const response = await authorizedFetch(`/api/dockapi/cases/${encodeURIComponent(caseCode)}/snapshot`)
+          const response = await authorizedFetch(`/api/dockapi/cases/${encodeURIComponent(caseCode)}/snapshot?delivery=1`)
           if (!response.ok) return readResponse<DockApiCaseSnapshot>(response)
           return response.json() as Promise<DockApiCaseSnapshot>
         },
-        publish(input: {
+        async publish(input: {
           businessSessionId: string
           caseName: string
           caseTag: string
@@ -509,13 +536,16 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           form.append("caseName", input.caseName)
           form.append("caseTag", input.caseTag)
           form.append("coverFile", input.coverFile)
-          return request<DockApiCaseSummary>(
+          const result = await request<DockApiCaseSummary>(
             `/api/dockapi/cases/from-session/${encodeURIComponent(input.businessSessionId)}`,
             { method: "POST", body: form },
           )
+          clearCaseCache()
+          return result
         },
-        remove(caseCode: string) {
-          return request<void>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`, { method: "DELETE" })
+        async remove(caseCode: string) {
+          await request<void>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`, { method: "DELETE" })
+          clearCaseCache()
         },
         previewTicket(caseCode: string) {
           return request<DockApiCasePreviewTicket>(

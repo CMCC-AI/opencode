@@ -268,6 +268,21 @@ async function prepare(
   return { errors, apiRequests, fileRequests }
 }
 
+test("finance retains its dedicated layout after lazy loading", async ({ page }) => {
+  const state = await prepare(page, {
+    type: "deeptrading",
+    lead: "deeptrading/deeptrading-team-lead",
+    member: "deeptrading/technical-analyst",
+    category: "finance",
+    experts: 9,
+  })
+  await expect(page.getByRole("button", { name: "分析团队", exact: true })).toBeVisible()
+  await expect(page.getByText("9 位", { exact: true })).toBeVisible()
+  await expect(page.locator('[contenteditable="true"]')).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "看回放", exact: true })).toBeVisible()
+  expect(state.errors).toEqual([])
+})
+
 for (const input of cases) {
   test(`${input.category}: dedicated snapshot, files and replay are read-only`, async ({ page }) => {
     test.setTimeout(120000)

@@ -95,7 +95,7 @@ const CmccCasesRoute = lazy(() =>
   import("@/pages/cmcc-cases").then((module) => ({ default: module.CmccCasesRoute })),
 )
 const CmccCaseDetailRoute = lazy(() =>
-  import("@/pages/cmcc-cases").then((module) => ({ default: module.CmccCaseDetailRoute })),
+  import("@/pages/cases/case-detail").then((module) => ({ default: module.CmccCaseDetailRoute })),
 )
 const cmccAgentWarmups = new Set<string>()
 

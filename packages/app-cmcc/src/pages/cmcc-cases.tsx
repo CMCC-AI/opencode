@@ -36,6 +36,7 @@ export function CmccCasesRoute() {
     page: 1,
     loading: true,
     loadingMore: false,
+    refreshing: false,
     error: "",
     searchInput: "",
     keyword: "",
@@ -55,33 +56,49 @@ export function CmccCasesRoute() {
 
   const loadOverview = async () => {
     const run = ++generation
-    setState({ loading: true, loadingMore: false, error: "" })
+    const cached = dockapi.cases.cachedOverview()
+    setState({ loading: !cached, refreshing: !!cached, loadingMore: false, error: "" })
+    if (cached) setState("overview", cached.groups)
     await dockapi.cases
       .overview()
       .then((result) => {
         if (run !== generation) return
-        setState({ overview: result.groups, loading: false })
+        setState({ overview: result.groups, loading: false, refreshing: false })
       })
       .catch((error) => {
         if (run !== generation) return
-        setState({ loading: false, error: error instanceof Error ? error.message : String(error) })
+        setState({
+          loading: false,
+          refreshing: false,
+          error: cached ? "" : error instanceof Error ? error.message : String(error),
+        })
       })
   }
 
   const loadList = async (page = 1) => {
     const run = page === 1 ? ++generation : generation
-    if (page === 1) setState({ loading: true, loadingMore: false, error: "", items: [], total: 0, page: 1 })
+    const input = {
+      keyword: state.keyword || undefined,
+      category: state.category === "all" ? undefined : state.category,
+      sort: state.sort,
+      from: state.from || undefined,
+      to: state.to || undefined,
+      page,
+      size: 24,
+    }
+    const cached = page === 1 ? dockapi.cases.cachedList(input) : undefined
+    if (page === 1) setState({
+      loading: !cached,
+      refreshing: !!cached,
+      loadingMore: false,
+      error: "",
+      items: cached?.items ?? [],
+      total: cached?.total ?? 0,
+      page: 1,
+    })
     else setState("loadingMore", true)
     await dockapi.cases
-      .list({
-        keyword: state.keyword || undefined,
-        category: state.category === "all" ? undefined : state.category,
-        sort: state.sort,
-        from: state.from || undefined,
-        to: state.to || undefined,
-        page,
-        size: 24,
-      })
+      .list(input)
       .then((result) => {
         if (run !== generation) return
         setState({
@@ -90,6 +107,7 @@ export function CmccCasesRoute() {
           page: result.page,
           loading: false,
           loadingMore: false,
+          refreshing: false,
         })
       })
       .catch((error) => {
@@ -97,7 +115,8 @@ export function CmccCasesRoute() {
         setState({
           loading: false,
           loadingMore: false,
-          error: error instanceof Error ? error.message : String(error),
+          refreshing: false,
+          error: cached ? "" : error instanceof Error ? error.message : String(error),
         })
       })
   }
@@ -128,13 +147,23 @@ export function CmccCasesRoute() {
     window.addEventListener(CMCC_CASES_UPDATED_EVENT, reload)
     observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return
-      if (!filtered() || state.loading || state.loadingMore || state.items.length >= state.total) return
+      if (!filtered() || state.loading || state.refreshing || state.loadingMore || state.items.length >= state.total) return
       void loadList(state.page + 1)
     }, { rootMargin: "240px" })
     if (sentinel) observer.observe(sentinel)
   })
 
+  createEffect(on(
+    () => [state.loading, state.refreshing],
+    () => {
+      if (state.loading || state.refreshing || !sentinel || !observer) return
+      observer.unobserve(sentinel)
+      observer.observe(sentinel)
+    },
+  ))
+
   onCleanup(() => {
+    generation += 1
     window.removeEventListener(CMCC_CASES_UPDATED_EVENT, reload)
     observer?.disconnect()
   })
@@ -404,6 +433,7 @@ function CaseSectionHeading(props: { category: string }) {
 
 function CaseCard(props: { item: DockApiCaseSummary; onClick: () => void; onDelete?: () => void }) {
   const [state, setState] = createStore({ coverFailed: false })
+  createEffect(on(() => props.item.coverUrl, () => setState("coverFailed", false)))
   const product = () => cmccHistoryProduct(props.item.agentType)
   return (
     <div data-case-card={props.item.caseCode} class="group relative min-w-0 text-left">
@@ -422,6 +452,7 @@ function CaseCard(props: { item: DockApiCaseSummary; onClick: () => void; onDele
                 alt={props.item.caseName}
                 class="size-full object-fill"
                 loading="lazy"
+                decoding="async"
                 onError={() => setState("coverFailed", true)}
               />
             </Show>
@@ -493,5 +524,3 @@ function CaseSkeletons() {
     </div>
   )
 }
-
-export { CmccCaseDetailRoute } from "./cases/case-detail"
