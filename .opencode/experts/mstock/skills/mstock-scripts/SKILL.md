@@ -1,13 +1,13 @@
 ---
 name: mstock-scripts
-description: DeepTrading 多股对比中心的后处理脚本集（报告扫描、元数据注入、HTML 看板渲染、统计验收）。mstock 团长编排流程的阶段 0/4/5 依赖这些脚本。
+description: DeepTrading 多股对比中心的后处理脚本集（报告扫描、元数据注入、HTML 看板渲染、A4 PDF 导出、统计验收）。mstock 团长编排流程的阶段 0/4/5 依赖这些脚本。
 ---
 
 # mstock 后处理脚本
 
-本 skill 打包多股对比流程的 4 个 Python 3 脚本（纯标准库）与 HTML 模板。**脚本与模板的绝对路径以 skill 工具加载本 skill 时返回的 Base directory 为准**（下文用 `<BASE>` 表示），不要自行猜测或拼接路径。
+本 skill 打包多股对比流程的 4 个 Python 3 脚本（纯标准库）、1 个 Node PDF 导出脚本与 HTML 模板。**脚本与模板的绝对路径以 skill 工具加载本 skill 时返回的 Base directory 为准**（下文用 `<BASE>` 表示），不要自行猜测或拼接路径。
 
-运行方式：Linux/macOS 用 `python3`，Windows 用 `python`。
+运行方式：Linux/macOS 用 `python3`，Windows 用 `python`；PDF 导出脚本用 `node`（需 Node.js 18+）。
 
 ## 脚本清单
 
@@ -44,6 +44,14 @@ python3 <BASE>/scripts/stats.py <WORKSPACE_DIR>
 ```
 
 统计本次对比的耗时、报告汉字数（去引用/URL/表格符号后计 `[\u4e00-\u9fa5]`）、章节数（一~七）、表格行数、标的数，写入 `50-stats.json` 并输出摘要（`标的数 / 耗时 / 报告字数 / 章节数`）。其中"汉字数 ≥2600"是流程硬性质量门，必须以本脚本输出为准。
+
+### 5. `<BASE>/scripts/export-report-pdf.mjs` — 导出 A4 PDF
+
+```bash
+node <BASE>/scripts/export-report-pdf.mjs <WORKSPACE_DIR>/40-comparison-report.html <WORKSPACE_DIR>/45-comparison-report.pdf
+```
+
+薄入口，委托仓库级 `report-pdf` 技能的共享导出器：CDP 控制 Chrome/Edge/Chromium 无头浏览器、注入并验证中文字体、等待 ECharts 图表渲染完成后打印 A4 PDF。依赖本机 Chrome/Edge/Chromium，缺失时用 `CHROME_PATH` 环境变量指定；缺少可嵌入中文字体时用 `REPORT_PDF_FONT_REGULAR` / `REPORT_PDF_FONT_BOLD` 指定。
 
 ## 编码约定
 

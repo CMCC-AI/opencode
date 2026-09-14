@@ -269,6 +269,20 @@ python3 <BASE>/scripts/render_html.py <WORKSPACE_DIR>
 - 文件末尾 `</html>`
 - **全文搜索 `__CH` 应 0 命中**（占位符已全部回填为正文；若仍有命中，说明 4.2 回填步骤未执行或 `20-comparison-report.md` 缺失，需重跑渲染）
 
+### 4.4 导出 A4 PDF
+
+HTML 验证通过后导出 PDF（与其他专家团统一使用仓库级 `report-pdf` 共享导出器）：
+
+```bash
+node <BASE>/scripts/export-report-pdf.mjs <WORKSPACE_DIR>/40-comparison-report.html <WORKSPACE_DIR>/45-comparison-report.pdf
+```
+
+脚本通过 CDP 控制无头 Chrome/Edge/Chromium，注入并校验中文字体，等待 ECharts 图表渲染完成后打印 A4 PDF（需本机有 Chrome/Edge/Chromium，缺失时用 `CHROME_PATH` 环境变量指定）。
+
+**核验**：`45-comparison-report.pdf` 存在、非空（≥1KB）、文件头为 `%PDF`。
+
+**失败处理**：技术性失败（无浏览器/缺字体）允许重试 1 次；连续 2 次失败则跳过 PDF 继续阶段 5，不阻塞交付。
+
 ## 阶段 5：统计与交付
 
 ### 5.1 跑统计脚本
@@ -306,12 +320,13 @@ Stats written to <WORKSPACE_DIR>/50-stats.json
 **交付物**：
 - **Markdown 对比报告**：本消息正文
 - **HTML 横评看板**：已生成，可在浏览器中打开查看（含多股 ECharts 图表/对比表/配置建议）
+- **A4 PDF 对比报告**：已生成，便于存档与分享
 - **横向对比矩阵**：已生成
 
 > 本报告不构成投资建议，仅供研究参考。
 ```
 
-`<...>` 占位符用 `50-stats.json` 字段值替换。若阶段 4 失败（HTML 渲染出错），交付清单加一句"HTML 横评看板生成失败"。**不要**因 HTML 失败阻塞 markdown 报告交付。**交付清单中不写任何文件路径。**
+`<...>` 占位符用 `50-stats.json` 字段值替换。若阶段 4 失败（HTML 渲染出错），交付清单去掉 HTML 与 PDF 两行并加一句"看板生成失败"；若仅 PDF 导出失败（4.4），去掉 PDF 行并加一句"PDF 导出失败"。**不要**因 HTML/PDF 失败阻塞 markdown 报告交付。**交付清单中不写任何文件路径。**
 
 # 工具使用纪律
 
@@ -344,6 +359,8 @@ Stats written to <WORKSPACE_DIR>/50-stats.json
 [ms-visualizer]  → 30-visual-report.json（横评可视化 blocks）
    ↓
 [渲染脚本]       → 40-comparison-report.html（注入模板，多股横评看板）
+   ↓
+[PDF 导出脚本]   → 45-comparison-report.pdf（A4 PDF，统一 report-pdf 导出器）
    ↓
 [统计脚本]       → 50-stats.json
    ↓
