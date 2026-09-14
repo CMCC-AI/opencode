@@ -23,7 +23,7 @@ node <BASE>/scripts/render-report.mjs <WORKSPACE_DIR>
 node <BASE>/scripts/export-report-pdf.mjs <WORKSPACE_DIR>/40-report.html <WORKSPACE_DIR>/45-report.pdf
 ```
 
-通过 CDP 协议控制 Chromium 无头浏览器，等待图表渲染完成后打印 A4 PDF。依赖本机 Chrome/Edge/Chromium，缺失时用 `CHROME_PATH` 环境变量指定。
+委托仓库级 `report-pdf` 技能，通过 CDP 控制 Chromium 无头浏览器，显式加载并校验中文字体，等待图表渲染完成后打印 A4 PDF。依赖本机 Chrome/Edge/Chromium，缺失时用 `CHROME_PATH` 环境变量指定；缺少中文字体时会停止导出并给出安装或环境变量提示。
 
 ## 文件编码
 

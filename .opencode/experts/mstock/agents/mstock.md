@@ -6,6 +6,10 @@ permission:
   edit: allow
   read: allow
   bash: allow
+  skill:
+    "mstock-common": allow
+    "mstock-orchestrator": allow
+    "mstock-scripts": allow
   task:
     "*": deny
     "mstock/ms-*": allow

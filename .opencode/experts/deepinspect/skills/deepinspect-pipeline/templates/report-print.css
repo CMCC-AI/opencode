@@ -1,0 +1,455 @@
+@media print {
+  @page {
+    size: A4;
+    margin: 20mm 17mm 19mm 20mm;
+  }
+
+  html,
+  body {
+    width: auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+    color: #111 !important;
+    font-family: "Noto Serif CJK SC", "Songti SC", "STSong", "SimSun", serif;
+    font-size: 10.5pt;
+    line-height: 1.82;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .layout {
+    display: block;
+    max-width: none;
+    margin: 0;
+  }
+
+  .toc {
+    display: none !important;
+  }
+
+  .main {
+    min-width: 0;
+    padding: 0;
+  }
+
+  .hero {
+    position: relative;
+    display: flex;
+    min-height: 244mm;
+    margin: 0;
+    padding: 34mm 18mm 24mm;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    border: 1px solid #d7d7d7;
+    border-top: 7mm solid #8b1e1e;
+    border-bottom: 1.5mm solid #8b1e1e;
+    border-radius: 0;
+    background: #fff !important;
+    color: #111 !important;
+    box-shadow: none;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .hero::before {
+    content: "内部资料  注意保管";
+    position: absolute;
+    top: 9mm;
+    right: 12mm;
+    color: #8b1e1e;
+    font-family: "Noto Sans CJK SC", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+  }
+
+  .hero::after {
+    content: "巡察材料智能整编成果";
+    position: absolute;
+    top: 25mm;
+    left: 18mm;
+    width: auto;
+    height: auto;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: #666;
+    font-family: "Noto Sans CJK SC", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-size: 10pt;
+    letter-spacing: 0.3em;
+  }
+
+  .hero h1 {
+    position: relative;
+    z-index: 1;
+    margin: 0;
+    color: #8b1e1e !important;
+    font-family: "Noto Serif CJK SC", "STZhongsong", "Songti SC", "SimSun", serif;
+    font-size: 27pt;
+    font-weight: 700;
+    line-height: 1.45;
+    text-align: center;
+    letter-spacing: 0.08em;
+  }
+
+  .hero .subtitle {
+    position: relative;
+    z-index: 1;
+    margin: 10mm 0 0;
+    color: #333 !important;
+    font-size: 14pt;
+    line-height: 1.7;
+    text-align: center;
+  }
+
+  .hero .meta {
+    position: relative;
+    z-index: 1;
+    margin: 14mm 0 0;
+    color: #555 !important;
+    font-family: "Noto Sans CJK SC", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-size: 10pt;
+    text-align: center;
+  }
+
+  /* 正式归档版不呈现网页式数字卡片。 */
+  .hero .hero-stats { display: none !important; }
+
+  .hero .hero-stat {
+    min-height: 20mm;
+    padding: 4mm;
+    border: 0.3mm solid #d8c5c5;
+    border-radius: 0;
+    background: #faf6f6 !important;
+    text-align: center;
+  }
+
+  .hero .hero-stat .hs-label {
+    color: #666 !important;
+    font-family: "Noto Sans CJK SC", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-size: 8pt;
+    letter-spacing: 0.04em;
+  }
+
+  .hero .hero-stat .hs-value {
+    margin-top: 1.5mm;
+    color: #8b1e1e !important;
+    font-size: 17pt;
+    font-weight: 700;
+  }
+
+  .print-toc {
+    display: block !important;
+    min-height: 235mm;
+    padding-top: 8mm;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-toc h2 {
+    margin: 0 0 12mm;
+    padding-bottom: 4mm;
+    border-bottom: 0.6mm solid #8b1e1e;
+    color: #8b1e1e;
+    font-family: "Noto Serif CJK SC", "STZhongsong", "Songti SC", serif;
+    font-size: 20pt;
+    text-align: center;
+    letter-spacing: 0.5em;
+  }
+
+  .print-toc-list a {
+    display: block;
+    padding: 2.3mm 0;
+    border-bottom: 0.2mm dotted #bbb;
+    color: #222 !important;
+    font-size: 11pt;
+    text-decoration: none;
+  }
+
+  .print-toc-list a.lvl-3 {
+    padding-left: 8mm;
+    color: #555 !important;
+    font-size: 9.5pt;
+  }
+
+  #report-body > section {
+    margin: 0 0 9mm;
+  }
+
+  section > h2 {
+    margin: 0 0 7mm;
+    padding: 0 0 3mm;
+    border-bottom: 0.7mm solid #8b1e1e;
+    color: #8b1e1e !important;
+    font-family: "Noto Serif CJK SC", "STZhongsong", "Songti SC", serif;
+    font-size: 18pt;
+    font-weight: 700;
+    line-height: 1.45;
+    page-break-after: avoid;
+    break-after: avoid-page;
+  }
+
+  section > h3,
+  .block-markdown h2,
+  .block-markdown h3,
+  .block-markdown h4 {
+    color: #222 !important;
+    font-family: "Noto Sans CJK SC", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-weight: 700;
+    page-break-after: avoid;
+    break-after: avoid-page;
+  }
+
+  section > h3 {
+    margin: 7mm 0 3mm;
+    font-size: 14pt;
+  }
+
+  .block-markdown h2 { font-size: 14pt; }
+  .block-markdown h3 { font-size: 12pt; }
+  .block-markdown h4 { font-size: 11pt; }
+
+  .block,
+  .block-markdown p {
+    margin: 0 0 3.2mm;
+  }
+
+  .block-markdown p {
+    text-align: justify;
+    text-indent: 2em;
+    orphans: 3;
+    widows: 3;
+  }
+
+  .block-markdown li,
+  .callout-content p,
+  .references li {
+    text-align: justify;
+    orphans: 3;
+    widows: 3;
+  }
+
+  .block-chart,
+  .block-stat_grid,
+  .stat-card,
+  .block-callout,
+  .block-quote_card,
+  .timeline-item,
+  figure,
+  img {
+    page-break-inside: avoid;
+    break-inside: avoid-page;
+  }
+
+  .block-chart {
+    margin: 5mm 0 6mm;
+    padding: 2mm 0 0;
+    border: 0;
+    border-radius: 0;
+    background: #fff !important;
+    box-shadow: none;
+  }
+
+  .chart-title,
+  .stat-grid-title {
+    color: #222 !important;
+    font-family: "Noto Sans CJK SC", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-size: 10.5pt;
+    font-weight: 700;
+    text-align: center;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .chart-description {
+    color: #666 !important;
+    font-size: 8.5pt;
+    text-align: center;
+  }
+
+  .chart-canvas {
+    height: 72mm !important;
+  }
+
+  .chart-canvas.tall {
+    height: 82mm !important;
+  }
+
+  .chart-canvas.pie {
+    height: 88mm !important;
+  }
+
+  .figure-caption,
+  .table-caption {
+    color: #555 !important;
+    font-family: "Noto Serif CJK SC", "Songti SC", "STSong", "SimSun", serif;
+    font-size: 8.5pt;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .figure-caption {
+    margin: 2mm 0 0;
+  }
+
+  .table-caption {
+    margin: 0 0 2.5mm;
+  }
+
+  .block-stat_grid,
+  .block-chip_list { display: none !important; }
+
+  .stat-card {
+    padding: 3.5mm;
+    border: 0.25mm solid #d4d4d4;
+    border-left: 1mm solid #8b1e1e !important;
+    border-radius: 0;
+    background: #fafafa !important;
+    box-shadow: none;
+  }
+
+  .stat-card .label,
+  .stat-card .caption {
+    color: #666 !important;
+    font-size: 8pt;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .stat-card .value {
+    color: #8b1e1e !important;
+    font-size: 15pt;
+  }
+
+  .block-table,
+  .block-markdown table {
+    overflow: visible;
+  }
+
+  .block-table {
+    margin: 5mm 0 6mm;
+    padding: 4mm 4mm 3mm;
+    border-left: 1mm solid #8b1e1e;
+    background: #faf6f6 !important;
+  }
+
+  svg {
+    shape-rendering: geometricPrecision;
+    text-rendering: geometricPrecision;
+  }
+
+  .block-table table,
+  .block-markdown table {
+    width: 100%;
+    margin: 5mm 0;
+    border: 0.25mm solid #999;
+    border-collapse: collapse;
+    border-radius: 0;
+    background: transparent !important;
+    font-size: 8.5pt;
+  }
+
+  .block-table thead,
+  .block-markdown thead {
+    display: table-header-group;
+  }
+
+  .block-table tr,
+  .block-markdown tr {
+    page-break-inside: avoid;
+    break-inside: avoid-page;
+  }
+
+  .block-table th,
+  .block-table td,
+  .block-markdown th,
+  .block-markdown td {
+    padding: 2.2mm 2.5mm;
+    border: 0.2mm solid #aaa;
+    color: #111 !important;
+    line-height: 1.55;
+    vertical-align: top;
+  }
+
+  .block-table th,
+  .block-markdown th {
+    border-bottom: 0.45mm solid #8b1e1e;
+    background: #f2eaea !important;
+    font-family: "Noto Sans CJK SC", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-weight: 700;
+  }
+
+  .block-callout,
+  .block-quote_card,
+  .block-markdown blockquote {
+    margin: 5mm 0;
+    padding: 3.5mm 4.5mm;
+    border: 0;
+    border-left: 1mm solid #8b1e1e !important;
+    border-radius: 0;
+    background: #f8f5f3 !important;
+    color: #222 !important;
+    font-style: normal;
+  }
+
+  .block-callout p,
+  .block-markdown blockquote p {
+    margin: 0;
+    text-indent: 0;
+  }
+
+  sup.citation a.ref,
+  .references a {
+    color: #8b1e1e !important;
+    text-decoration: none;
+  }
+
+  .references {
+    margin: 0;
+    padding-top: 0;
+    border-top: 0;
+    page-break-before: always;
+    break-before: page;
+  }
+
+  .references h2 {
+    padding-bottom: 3mm;
+    border-bottom: 0.7mm solid #8b1e1e;
+    color: #8b1e1e !important;
+    font-family: "Noto Serif CJK SC", "STZhongsong", "Songti SC", serif;
+    font-size: 18pt;
+  }
+
+  .references ol {
+    padding-left: 8mm;
+    font-size: 8.5pt;
+  }
+
+  .references li {
+    margin-bottom: 2mm;
+    word-break: break-all;
+  }
+
+  .references li span {
+    display: block;
+    color: #777 !important;
+    font-size: 7.5pt !important;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  .fallback {
+    border: 0.25mm solid #8b1e1e;
+    background: #fff !important;
+    color: #8b1e1e !important;
+  }
+}
+
+.print-toc {
+  display: none;
+}

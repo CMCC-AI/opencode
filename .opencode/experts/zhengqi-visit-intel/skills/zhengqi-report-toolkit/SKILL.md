@@ -34,7 +34,7 @@ node scripts/finalize-citations.mjs <workspace_dir>
 node scripts/render-report.mjs <workspace_dir>
 # 用 templates/report.html.tpl + report-print.css 生成 30-report.html
 
-# 4. PDF 导出（HTML 成功后运行；需要 Chrome/Edge/Chromium，可用 CHROME_PATH 指定）
+# 4. PDF 导出（统一使用 report-pdf 渲染器，并强制校验中文字体）
 node scripts/export-report-pdf.mjs <workspace_dir>/30-report.html <workspace_dir>/35-report.pdf
 
 # 5. 结构验收（交付前运行）
@@ -56,5 +56,5 @@ node scripts/validate-run.mjs <workspace_dir>
 
 ## 注意事项
 
-- 脚本要求 Node.js 18+（使用了原生 fetch 与 WebSocket）；export-report-pdf.mjs 依赖本机 Chrome/Edge/Chromium，缺失时用 `CHROME_PATH` 环境变量指定。
+- 脚本要求 Node.js 18+（使用了原生 fetch 与 WebSocket）；export-report-pdf.mjs 委托仓库级 `report-pdf` 技能，依赖本机 Chrome/Edge/Chromium 和可嵌入的中文字体。缺失时分别用 `CHROME_PATH`、`REPORT_PDF_FONT_REGULAR` 和 `REPORT_PDF_FONT_BOLD` 指定。
 - 真实敏感客户材料不得提交到 Git；端到端测试使用虚构材料。

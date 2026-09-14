@@ -62,10 +62,12 @@ NeoData Financial Search 是一个面向金融场景的自然语言金融数据�
 
 ### 默认行为：直接查询
 
+> 下文 `<BASE>` 指本 skill 的 Base directory（`skill` 工具加载本 skill 时返回的根目录绝对路径）。Windows 用 `python`，Linux/macOS 用 `python3`。
+
 **第一步永远是直接执行查询**，不要提前获取凭证：
 
 ```bash
-python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "用户的查询"
+python3 <BASE>/scripts/query.py --query "用户的查询"
 ```
 
 脚本会自动完成以下判断：
@@ -78,8 +80,8 @@ python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "用�
 
 1. 本项目不内置 WorkBuddy 云凭证工具。请用户配置 `NEODATA_TOKEN` 环境变量，或提供可保存到本地缓存的 NeoData token
 2. 如果用户提供 token，使用 `--save-token` 保存到本地缓存；不要在最终回复中展示 token
-3. 执行 `python3 .opencode/skills/neodata-financial-search/scripts/query.py --save-token "<凭证>"` 保存到缓存文件
-4. 重新执行查询：`python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "用户的查询"`
+3. 执行 `python3 <BASE>/scripts/query.py --save-token "<凭证>"` 保存到缓存文件
+4. 重新执行查询：`python3 <BASE>/scripts/query.py --query "用户的查询"`
 
 > **凭证可能较长，禁止在 Bash 命令中明文内联。** 必须通过 `--save-token` 保存到文件后，由脚本自动读取。
 
@@ -114,13 +116,13 @@ python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "用�
 
 **完整调用流程**：
 ```
-1. python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "用户的查询"
+1. python3 <BASE>/scripts/query.py --query "用户的查询"
    - 成功 → 返回结果，结束 ✅
    - 输出 TOKEN_EXPIRED / TOKEN_MISSING → 继续 Step 2
    - 鉴权失败（401/403）→ 继续 Step 2
 2. 如果提示凭证缺失，请让用户配置 `NEODATA_TOKEN`，或提供 token 后用 `--save-token` 保存
-3. python3 .opencode/skills/neodata-financial-search/scripts/query.py --save-token "<凭证>"
-4. python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "用户的查询"
+3. python3 <BASE>/scripts/query.py --save-token "<凭证>"
+4. python3 <BASE>/scripts/query.py --query "用户的查询"
 5. 若仍失败 → 告知用户服务不可用，停止
 ```
 
@@ -130,25 +132,25 @@ python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "用�
 ```bash
 # 直接查询，脚本自动处理缓存凭证（12 小时有效期）
 # 默认行为：不传 --data-type，等价于 data_type=all（同时召回结构化API与文章），覆盖面最广，强烈推荐
-python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "腾讯最新财报"
-python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "贵州茅台股价"
-python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "黄金价格"
+python3 <BASE>/scripts/query.py --query "腾讯最新财报"
+python3 <BASE>/scripts/query.py --query "贵州茅台股价"
+python3 <BASE>/scripts/query.py --query "黄金价格"
 
 # 仅当明确判断查询是"纯结构化数据需求"且不需要任何资讯文章时，才显式使用 --data-type api
 # 仅当查询明确就是"找新闻/研报/公告"时，才显式使用 --data-type doc
 # 其他所有情况一律不传，避免因过早收窄数据通路导致召回为空
 
 # 保存凭证（仅当脚本提示 TOKEN_EXPIRED/TOKEN_MISSING 时才需要）
-python3 .opencode/skills/neodata-financial-search/scripts/query.py --save-token "<凭证>"
+python3 <BASE>/scripts/query.py --save-token "<凭证>"
 ```
 
 **Shell（备选）**：
 ```bash
-bash .opencode/skills/neodata-financial-search/scripts/query.sh "腾讯最新财报"
-bash .opencode/skills/neodata-financial-search/scripts/query.sh "贵州茅台股价"
+bash <BASE>/scripts/query.sh "腾讯最新财报"
+bash <BASE>/scripts/query.sh "贵州茅台股价"
 
 # 保存凭证
-bash .opencode/skills/neodata-financial-search/scripts/query.sh --save-token "<凭证>"
+bash <BASE>/scripts/query.sh --save-token "<凭证>"
 ```
 
 ## 请求参数

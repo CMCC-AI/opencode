@@ -20,14 +20,24 @@ options:
       en: "Chief Research Scientist"
       zh: "首席科研专家"
 permission:
-  "*": deny
   question: allow
   read: allow
   write: allow
   edit: allow
   glob: allow
   grep: allow
-  external_directory: ask
+  websearch: deny
+  webfetch: deny
+  skill:
+    "experimental-methodology": allow
+    "literature-review": allow
+    "paper-analysis": allow
+    "research-integrity": allow
+    "research-workflow": allow
+    "scientific-writing": allow
+  external_directory:
+    "*": ask
+    "*/.opencode/experts/*": allow
   task:
     "*": deny
     "ai-for-science-team/as-intent-router": allow

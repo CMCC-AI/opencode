@@ -46,7 +46,7 @@ AkShare / NeoData 取不到或失败时，不卡住，用下一级兜底。
 本项目可用以下结构化金融数据能力，各团员应按优先级使用：
 
 - **AkShare MCP**（最优）：9 个 A 股结构化数据工具——`akshare_get_stock_data`（日线 OHLCV）、`akshare_get_indicators`（技术指标）、`akshare_get_fundamentals`（公司概况+财务摘要）、`akshare_get_balance_sheet`、`akshare_get_cashflow`、`akshare_get_income_statement`、`akshare_get_news`（公司新闻）、`akshare_get_market_news`（市场快讯）、`akshare_get_company_announcements`（公告）
-- **neodata-financial-search**：自然语言金融数据搜索，查询股票（A股/港股/美股）、基金、指数、板块、宏观、外汇、大宗商品。调用：`python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "查询内容"`
+- **neodata-financial-search**：自然语言金融数据搜索，查询股票（A股/港股/美股）、基金、指数、板块、宏观、外汇、大宗商品。调用：先用 `skill` 工具加载 `neodata-financial-search`，按其返回的 Base directory 执行 `python <该目录>/scripts/query.py --query "查询内容"`（Windows 用 `python`，Linux/macOS 用 `python3`）
 
 ## 质控原则
 

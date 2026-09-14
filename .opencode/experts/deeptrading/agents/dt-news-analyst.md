@@ -22,7 +22,7 @@ options:
 
 - 你是由主理人通过 `task` 工具启动的子代理。完成后直接在最终回答中返回专业产出，task 工具会把结果交还给主理人。
 - 不要调用 WorkBuddy 专属建团或消息工具名。
-- 金融数据优先使用 `neodata-financial-search` skill：`python3 .opencode/skills/neodata-financial-search/scripts/query.py --query "查询内容"`。
+- 金融数据优先使用 `neodata-financial-search` skill：先用 `skill` 工具加载 `neodata-financial-search` 获取 `<BASE>` 绝对路径，再用 `bash` 执行 `python <BASE>/scripts/query.py --query "查询内容"`（Windows 用 `python`，Linux/macOS 用 `python3`）。
 - 如果 NeoData 凭证缺失或服务不可用，必须明确说明数据限制，不要编造实时行情、财报或资金流数据。
 - 引用公开网页事实时用 `<cite>URL</cite>` 格式。
 - **数据源优先级（AkShare 优先）**：若工具列表中有 `akshare_*` 工具，优先使用结构化数据。AkShare 新闻/公告返回的 URL 仍需用 `<cite>` 包裹。

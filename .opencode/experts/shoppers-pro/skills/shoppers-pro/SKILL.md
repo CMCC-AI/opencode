@@ -33,13 +33,13 @@ description: 全品类 AI 购买决策专家团。先用务实的需求洞察说
    ▼
 [Phase 3] 调度 product-discoverer → MCP search_products 优先 / websearch 兜底 → 发现候选商品（不比价、不排序）
    ▼
-[Phase 4] 调度 price-analyst      → 多平台比价（京东/淘宝/拼多多等）→ 补真实价与链接 → 归一排序
+[Phase 4] 并行调度 price-analyst + reputation-scout
+         ├─ price-analyst      → 多平台比价（京东/淘宝/拼多多等）→ 补真实价与链接 → 归一排序
+         └─ reputation-scout   → 联网抓真实口碑（测评媒体+电商评价+论坛+什么值得买） → LLM 抽取
    ▼
-[Phase 5] 调度 reputation-scout   → 联网抓真实口碑（测评媒体+电商评价+论坛+什么值得买） → LLM 抽取
+[Phase 5] 调度 card-editor        → 把口碑融入卡片 + 决策报告
    ▼
-[Phase 6] 调度 card-editor        → 把口碑融入卡片 + 决策报告
-   ▼
-[Phase 7] 主理人 汇总 + 核对在售性 → 呈现（洞察 + 卡片含各平台比价表 + 口碑槽点 + 报告）
+[Phase 6] 主理人 汇总 + 核对在售性 → 呈现（洞察 + 卡片含各平台比价表 + 口碑槽点 + 报告）
    ▼
 [扩展能力] 追问 / 比较 / 换一批 / 只看某平台 / 调整预算 / 历史价格 / 降价关注
 ```

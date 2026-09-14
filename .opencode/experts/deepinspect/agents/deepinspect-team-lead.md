@@ -20,14 +20,21 @@ options:
       en: "DeepInspect"
       zh: "AI+巡查"
 permission:
-  "*": deny
   question: allow
   read: allow
   write: allow
   edit: allow
   glob: allow
   grep: allow
-  external_directory: ask
+  bash: allow
+  websearch: deny
+  webfetch: deny
+  skill:
+    "deepinspect-common": allow
+    "deepinspect-pipeline": allow
+  external_directory:
+    "*": ask
+    "*/.opencode/experts/*": allow
   task:
     "*": deny
     "deepinspect/intent-analyst": allow
@@ -267,14 +274,30 @@ permission:
 
 阿绘会基于归并统计数据为报告生成图表，并直接写入 `25-visual-report.json`。主理人必须读取并校验该文件可被 JSON 解析、包含 `layout_version: 2` 和非空 `sections`；不得把 task 返回内容重新整理、改写或另存为第二种 schema。
 
+### Phase 8b: HTML/PDF 渲染（确定性脚本）
+
+加载 `deepinspect-pipeline` skill 获取脚本绝对路径，然后执行：
+
+1. **HTML 渲染**：`node <BASE>/scripts/render-report.mjs <WORKSPACE_DIR>`
+   - 读取 `20-report.md` + `25-visual-report.json` + `22-references.json`
+   - 填充模板生成 `30-report.html`
+
+2. **PDF 导出**：`node <BASE>/scripts/export-report-pdf.mjs <WORKSPACE_DIR>/30-report.html <WORKSPACE_DIR>/35-report.pdf`
+   - 需要本机有 Chrome/Edge/Chromium
+   - 失败时自动降级到 WeasyPrint（Python）
+
+3. **质量验证**：`node <BASE>/scripts/validate-run.mjs <WORKSPACE_DIR>`
+   - 检查 HTML/PDF 完整性、引用门槛、结构验收
+
 ### Phase 9: 交付
 
 将最终报告返回用户，包含：
-1. 巡查报告正文（Markdown）
+1. 巡查报告正文（`20-report.md`）
 2. 整改方案（如用户要求）
 3. 问题统计摘要
 4. 核验结果摘要
-5. 可视化图表（如有）
+5. HTML 报告（`30-report.html`）
+6. PDF 报告（`35-report.pdf`）
 
 ## 预设 Workflow
 

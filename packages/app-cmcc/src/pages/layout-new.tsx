@@ -7,6 +7,7 @@ import { createStore } from "solid-js/store"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { DebugBar } from "@/components/debug-bar"
 import { HelpButton } from "@/components/help-button"
+import { useSettingsDialog } from "@/components/settings-dialog"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { CasePublishDialog } from "@/components/case-publish-dialog"
 import { dockApiHistorySessions, useDockApi, type DockApiSession } from "@/context/dockapi"
@@ -269,6 +270,7 @@ function CmccSidebar() {
   const sync = useServerSync()
   const dockapi = useDockApi()
   const tabs = useTabs()
+  const openSettings = useSettingsDialog()
   const knowledgeNotebooks = createMemo(() => {
     location.pathname
     return cmccKnowledgeNotebooks()
@@ -573,19 +575,33 @@ function CmccSidebar() {
             </For>
           </div>
           <div class="shrink-0 border-t border-[rgba(99,102,241,0.10)] px-3 py-3.5">
-            <div class="mb-2 flex h-9 min-w-0 items-center gap-2 rounded-[8px] px-2 text-14-medium text-[#4a4a6a] hover:bg-[rgba(99,102,241,0.06)]">
-              <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-12-medium text-blue-700">
-                {dockapi.user?.name.slice(0, 1) || "用"}
-              </span>
-              <span class="min-w-0 flex-1 truncate">{dockapi.user?.name}</span>
-              <button
-                type="button"
-                class="shrink-0 text-12-regular text-[#7c7fbd] hover:text-[#4f46e5]"
-                onClick={() => void dockapi.auth.logout()}
-              >
-                退出
-              </button>
-            </div>
+            <DropdownMenu gutter={8} placement="top-start">
+              <DropdownMenu.Trigger class="mb-2 flex h-9 w-full min-w-0 items-center gap-2 rounded-[8px] px-2 text-14-medium text-[#4a4a6a] outline-none hover:bg-[rgba(99,102,241,0.06)] focus-visible:ring-2 focus-visible:ring-[#818cf8] data-[expanded]:bg-[rgba(99,102,241,0.08)]">
+                <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-12-medium text-blue-700">
+                  {dockapi.user?.name.slice(0, 1) || "用"}
+                </span>
+                <span class="min-w-0 flex-1 truncate text-left">{dockapi.user?.name}</span>
+                <Icon name="chevron-down" class="size-4 shrink-0 text-[#7c7fbd]" />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content class="w-[calc(var(--kb-popper-anchor-width)-8px)] min-w-[220px] rounded-[12px] border border-[rgba(99,102,241,0.14)] bg-white p-1.5 text-[#4a4a6a] shadow-[0_12px_32px_rgba(49,46,129,0.18)] outline-none">
+                  <DropdownMenu.Item
+                    class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)] data-[highlighted]:text-[#4f46e5]"
+                    onSelect={openSettings}
+                  >
+                    <Icon name="settings-gear" class="size-4 shrink-0" />
+                    <DropdownMenu.ItemLabel>设置</DropdownMenu.ItemLabel>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)] data-[highlighted]:text-[#4f46e5]"
+                    onSelect={() => void dockapi.auth.logout()}
+                  >
+                    <Icon name="enter" class="size-4 shrink-0 rotate-180" />
+                    <DropdownMenu.ItemLabel>退出登录</DropdownMenu.ItemLabel>
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu>
           </div>
         </div>
       </aside>

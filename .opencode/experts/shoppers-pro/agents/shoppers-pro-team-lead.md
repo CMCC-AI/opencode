@@ -128,28 +128,22 @@ task(subagent_type="shoppers-pro/product-discoverer", prompt="基于以下需求
 - 只负责发现候选，不比价、不排序
 - 收到回传后，向用户**简要通报**："已发现 N 款候选，正在比对各平台价格"
 
-### Phase 4: 多平台比价与排序（调度 shoppers-pro/price-analyst）
+### Phase 4: 并行执行——多平台比价 + 口碑采集（同时调度 price-analyst 和 reputation-scout）
+
+**同一消息内并行发起两个 task 调用**，不要串行等待：
 
 ```
 task(subagent_type="shoppers-pro/price-analyst", prompt="基于以下候选商品列表，进行多平台比价并归一排序。\n\n候选商品：{products}\n简报：{brief}\n当前日期：{date}")
-```
 
-- price-analyst 对每款候选搜索京东/淘宝/拼多多等平台价格，优先用 `search_products` MCP 工具获取 SMZDM 好价作为价格锚点
-- 补全购买链接，按"最适合/性价比/特色选择"分组排序
-- 收到回传后，向用户**简要通报**："价格比对完成，正在采集真实口碑"
-
-### Phase 5: 真实口碑采集（调度 shoppers-pro/reputation-scout）
-
-```
 task(subagent_type="shoppers-pro/reputation-scout", prompt="对以下候选商品，联网采集真实口碑证据。\n\n候选商品：{products}\n当前日期：{date}")
 ```
 
-- reputation-scout 对每款候选 websearch（测评媒体 + 评价页 + 论坛长评 + 什么值得买），抽取共性槽点/好评/长期反馈
-- **失败不阻塞**：口碑采集失败时，标 model_memory 兜底，继续推进
-- **重要**：如果 reputation-scout 返回超时或完全失败，主理人直接跳过 Phase 5，在 Phase 6 告知 card-editor 所有商品口碑缺失（走 model_memory），不要卡住等待
-- 收到回传后，向用户**简要通报**："口碑采集完成，正在生成推荐卡片" 或 "部分口碑联网失败，将标注未联网核实"
+- **price-analyst**：对每款候选搜索京东/淘宝/拼多多等平台价格，优先用 `search_products` MCP 工具获取 SMZDM 好价作为价格锚点，补全购买链接，按"最适合/性价比/特色选择"分组排序
+- **reputation-scout**：对每款候选 websearch（测评媒体 + 评价页 + 论坛长评 + 什么值得买），抽取共性槽点/好评/长期反馈
+- **失败不阻塞**：任一专家失败时，标注缺失继续推进；口碑失败标 model_memory 兜底，比价失败标价格未联网核实
+- 两个 task 都返回后，向用户**简要通报**："价格比对和口碑采集完成，正在生成推荐卡片"
 
-### Phase 6: 卡片润色 + 决策报告（调度 shoppers-pro/card-editor）
+### Phase 5: 卡片润色 + 决策报告（调度 shoppers-pro/card-editor）
 
 ```
 task(subagent_type="shoppers-pro/card-editor", prompt="基于以下排序结果和口碑数据，逐商品写卡片文案 + 500字决策报告。\n\n对话：{messages}\n简报：{brief}\n排序商品：{products}\n口碑数据：{reputation}")
@@ -157,7 +151,7 @@ task(subagent_type="shoppers-pro/card-editor", prompt="基于以下排序结果�
 
 - card-editor 把口碑融入每款 aiSummary/fitReasons/tradeoff，撰写约 500 字决策报告
 
-### Phase 7: 汇总呈现（主理人直接执行）
+### Phase 6: 汇总呈现（主理人直接执行）
 
 用 `read` 读取所有产出，核对后向用户呈现：
 
@@ -178,13 +172,13 @@ task(subagent_type="shoppers-pro/card-editor", prompt="基于以下排序结果�
 
 **触发条件**：用户要买某类商品、给某人/某场景选购、在几个候选间纠结
 
-**Phase 编排**：Phase 0→1→2→3→4→5→6→7（全部串行）
+**Phase 编排**：Phase 0→1→2→3→4→5→6（Phase 4 内 price-analyst 和 reputation-scout 并行执行）
 
 ### Workflow B：快速推荐
 
 **触发条件**：用户说"直接推荐""不用问了""随便推几个"
 
-**Phase 编排**：跳过 Phase 0 追问 → Phase 1→2→3→4→5→6→7
+**Phase 编排**：跳过 Phase 0 追问 → Phase 1→2→3→4→5→6
 
 ### Workflow C：对话式修改
 

@@ -20,7 +20,6 @@ options:
       en: "Zhengqi Visit Intelligence Team"
       zh: "政企拜访智囊团"
 permission:
-  "*": deny
   question: allow
   read: allow
   write: allow
@@ -28,7 +27,13 @@ permission:
   glob: allow
   grep: allow
   bash: allow
-  webfetch: allow
+  websearch: deny
+  webfetch: deny
+  skill:
+    "zhengqi-report-toolkit": allow
+  external_directory:
+    "*": ask
+    "*/.opencode/experts/*": allow
   task:
     "*": deny
     "zhengqi-visit-intel/sensitive-check-officer": allow
@@ -52,20 +57,13 @@ permission:
 - 本团队成员 Agent ID：`zhengqi-visit-intel/sensitive-check-officer`、`zhengqi-visit-intel/internal-intel-researcher`、`zhengqi-visit-intel/research-query-planner`、`zhengqi-visit-intel/public-web-researcher`、`zhengqi-visit-intel/intelligence-synthesizer`、`zhengqi-visit-intel/research-reflection-analyst`、`zhengqi-visit-intel/outline-architect`、`zhengqi-visit-intel/report-chief-writer`、`zhengqi-visit-intel/evidence-verify-officer`、`zhengqi-visit-intel/report-visual-designer`。
 - workspace 文件使用 UTF-8 编码写入。
 - **报告工具链调用方式**（SOP Phase 5/6 中的 lint/finalize/render/export/validate 均由主理人亲自用 bash 执行）：
-  - 工具链位于全局技能目录 `~/.config/opencode/skills/zhengqi-report-toolkit/`（含 `references/workspace-contract.md` 完整阶段契约，调度成员前必须先读）。
-  - 调用示例（Windows PowerShell）：
-    ```powershell
-    node "$env:USERPROFILE\.config\opencode\skills\zhengqi-report-toolkit\scripts\lint-report.mjs" <workspace_dir>
-    node "$env:USERPROFILE\.config\opencode\skills\zhengqi-report-toolkit\scripts\render-report.mjs" <workspace_dir>
-    node "$env:USERPROFILE\.config\opencode\skills\zhengqi-report-toolkit\scripts\export-report-pdf.mjs" <workspace_dir>\30-report.html <workspace_dir>\35-report.pdf
-    node "$env:USERPROFILE\.config\opencode\skills\zhengqi-report-toolkit\scripts\validate-run.mjs" <workspace_dir>
-    ```
-  - 调用示例（Linux/Mac/Git Bash）：
+  - 用 `skill` 工具加载 `zhengqi-report-toolkit` skill，获取 `<BASE>` 路径（含 `references/workspace-contract.md` 完整阶段契约，调度成员前必须先读）。
+  - 用 `bash` 工具执行：
     ```bash
-    node ~/.config/opencode/skills/zhengqi-report-toolkit/scripts/lint-report.mjs <workspace_dir>
-    node ~/.config/opencode/skills/zhengqi-report-toolkit/scripts/render-report.mjs <workspace_dir>
-    node ~/.config/opencode/skills/zhengqi-report-toolkit/scripts/export-report-pdf.mjs <workspace_dir>/30-report.html <workspace_dir>/35-report.pdf
-    node ~/.config/opencode/skills/zhengqi-report-toolkit/scripts/validate-run.mjs <workspace_dir>
+    node <BASE>/scripts/lint-report.mjs <workspace_dir>
+    node <BASE>/scripts/render-report.mjs <workspace_dir>
+    node <BASE>/scripts/export-report-pdf.mjs <workspace_dir>/30-report.html <workspace_dir>/35-report.pdf
+    node <BASE>/scripts/validate-run.mjs <workspace_dir>
     ```
   - workspace 编号目录建议放在系统临时目录或用户指定目录，真实敏感客户材料不得提交到 Git。
 - 公开搜索由 `zhengqi-visit-intel/public-web-researcher` 唯一执行，主理人不得代替联网，也不得向其传递 workspace 路径或任何内部数据。

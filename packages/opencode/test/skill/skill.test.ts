@@ -599,4 +599,34 @@ description: A skill in the .opencode/skills directory.
       { git: true },
     ),
   )
+
+  it.live("discovers skills from expert team directories", () =>
+    provideTmpdirInstance(
+      (dir) =>
+        Effect.gen(function* () {
+          yield* Effect.promise(() =>
+            Bun.write(
+              path.join(dir, ".opencode", "experts", "test-team", "skills", "test-expert-skill", "SKILL.md"),
+              `---
+name: test-expert-skill
+description: A skill shipped with an expert team.
+---
+
+# Test Expert Skill
+`,
+            ),
+          )
+
+          const skill = yield* Skill.Service
+          const list = (yield* skill.all()).filter((s) => s.location !== "<built-in>")
+          expect(list.length).toBe(1)
+          const item = list.find((x) => x.name === "test-expert-skill")
+          expect(item).toBeDefined()
+          expect(item!.location).toContain(
+            path.join("experts", "test-team", "skills", "test-expert-skill", "SKILL.md"),
+          )
+        }),
+      { git: true },
+    ),
+  )
 })

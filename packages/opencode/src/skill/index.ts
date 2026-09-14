@@ -22,6 +22,7 @@ const CLAUDE_EXTERNAL_DIR = ".claude"
 const AGENTS_EXTERNAL_DIR = ".agents"
 const EXTERNAL_SKILL_PATTERN = "skills/**/SKILL.md"
 const OPENCODE_SKILL_PATTERN = "{skill,skills}/**/SKILL.md"
+const EXPERT_SKILL_PATTERN = "experts/*/{skill,skills}/**/SKILL.md"
 const SKILL_PATTERN = "**/SKILL.md"
 
 // Built-in skill that ships with opencode. The model's intuition for what an
@@ -209,6 +210,7 @@ const discoverSkills = Effect.fnUntraced(function* (
   const configDirs = yield* config.directories()
   for (const dir of configDirs) {
     yield* scan(state, dir, OPENCODE_SKILL_PATTERN)
+    yield* scan(state, dir, EXPERT_SKILL_PATTERN)
   }
 
   const cfg = yield* config.get()
