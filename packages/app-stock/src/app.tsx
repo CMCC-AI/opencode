@@ -14,6 +14,8 @@ import type {
 import { renderMarkdown } from "./lib/markdown"
 
 const storedModelKey = "alphalab.stock.model"
+const stockLabModelsMessage = "cmcc:stock-lab-models"
+const stockLabModelsReadyMessage = "cmcc:stock-lab-models-ready"
 
 type ChatMessage = {
   role: "assistant" | "user"
@@ -97,10 +99,21 @@ export function App() {
   let messagesElement: HTMLDivElement | undefined
 
   onMount(() => {
+    const receiveModels = (event: MessageEvent) => {
+      if (!embedded || event.source !== window.parent || !isHostModelsMessage(event.data)) return
+      const stored = readStoredModel()
+      const modelId = event.data.models.some((model) => model.id === stored) ? stored : event.data.models[0]?.id
+      setChat({ models: event.data.models, modelsLoading: false, modelId, modelError: undefined })
+    }
+    window.addEventListener("message", receiveModels)
+    onCleanup(() => window.removeEventListener("message", receiveModels))
+    if (embedded) window.parent.postMessage({ type: stockLabModelsReadyMessage }, "*")
+
     void request<HealthResponse>("/api/health")
       .then((health) => setView({ health, healthUnavailable: false }))
       .catch(() => setView("healthUnavailable", true))
-    void request<ModelsResponse>("/api/models")
+    if (!embedded)
+      void request<ModelsResponse>("/api/models")
       .then((response) => {
         const stored = readStoredModel()
         const modelId = response.models.some((model) => model.id === stored) ? stored : response.defaultModelId
@@ -404,7 +417,7 @@ export function App() {
                 </div>
               </div>
               <div class="ai-heading-actions">
-                <label class="model-picker" title={chat.modelError ?? "仅显示已连接且支持工具调用的模型"}>
+                <label class="model-picker" title={chat.modelError ?? "与主对话使用相同的模型列表"}>
                   <span>模型</span>
                   <select
                     value={chat.modelId ?? ""}
@@ -417,11 +430,7 @@ export function App() {
                       fallback={<option value="">{chat.modelsLoading ? "加载中…" : "使用默认模型"}</option>}
                     >
                       <For each={chat.models}>
-                        {(model) => (
-                          <option value={model.id}>
-                            {model.providerName} · {model.name} · {model.free ? "免费" : "可能计费"}
-                          </option>
-                        )}
+                        {(model) => <option value={model.id}>{model.name}</option>}
                       </For>
                     </Show>
                   </select>
@@ -881,6 +890,24 @@ function formatElapsed(seconds: number) {
 
 function isApiError(value: unknown): value is ApiErrorResponse {
   return typeof value === "object" && value !== null && "error" in value && typeof value.error === "string"
+}
+
+function isHostModelsMessage(value: unknown): value is { type: string; models: ModelOption[] } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  const message = value as Record<string, unknown>
+  if (message.type !== stockLabModelsMessage || !Array.isArray(message.models)) return false
+  return message.models.every(
+    (model) =>
+      model &&
+      typeof model === "object" &&
+      !Array.isArray(model) &&
+      typeof model.id === "string" &&
+      typeof model.providerID === "string" &&
+      typeof model.modelID === "string" &&
+      typeof model.name === "string" &&
+      typeof model.providerName === "string" &&
+      typeof model.free === "boolean",
+  )
 }
 
 function strategyContext(
