@@ -1,4 +1,4 @@
-export type DataProvider = "tushare" | "alpha_vantage"
+export type DataProvider = "baostock" | "akshare" | "westock" | "tushare" | "alpha_vantage"
 
 export type Bar = {
   symbol: string

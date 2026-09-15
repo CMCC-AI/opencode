@@ -176,6 +176,57 @@ export function CmccExpertCenterRoute() {
             </For>
           </div>
         </section>
+
+        <section class="mt-8 w-full" aria-labelledby="quant-research-heading">
+          <h2 id="quant-research-heading" class="m-0 text-[16px] font-medium leading-6 text-[#49386e]">
+            AI + 量化研究
+          </h2>
+          <p class="m-0 mt-1 text-[14px] leading-5 text-[#49386e]/55">
+            用历史数据验证投资假设，让策略结论可解释、可复现
+          </p>
+          <button
+            type="button"
+            class="group relative mt-3 grid min-h-[184px] w-full cursor-pointer grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] overflow-hidden rounded-[16px] border border-[#d7def7] bg-white p-0 text-left shadow-[0_8px_30px_rgba(67,66,116,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-[#bcb8f4] hover:shadow-[0_16px_38px_rgba(88,75,170,0.12)] max-md:grid-cols-1"
+            onClick={() => navigate("/stock-lab")}
+          >
+            <span class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(239,226,255,0.72),transparent_32%),radial-gradient(circle_at_82%_80%,rgba(220,239,255,0.78),transparent_38%)]" />
+            <span class="relative z-10 flex min-w-0 flex-col justify-center px-7 py-6 max-sm:px-5">
+              <span class="mb-4 flex size-10 items-center justify-center rounded-[12px] bg-[linear-gradient(135deg,#7c3aed,#2c5dff)] text-white shadow-[0_8px_20px_rgba(92,69,214,0.24)]">
+                <Icon name="sliders" class="size-5" />
+              </span>
+              <span class="text-[22px] font-semibold leading-8 text-[#2a155a]">策略回测</span>
+              <span class="mt-1.5 max-w-[620px] text-[13px] leading-5 text-[#64677d]">
+                设置标的、区间与交易规则，查看收益、回撤、参数敏感性和完整成交记录
+              </span>
+              <span class="mt-5 flex flex-wrap gap-2 text-[11px] text-[#655a85]">
+                <span class="rounded-full border border-[#ddd9f6] bg-white/75 px-2.5 py-1">A 股 / 美股</span>
+                <span class="rounded-full border border-[#ddd9f6] bg-white/75 px-2.5 py-1">成本建模</span>
+                <span class="rounded-full border border-[#ddd9f6] bg-white/75 px-2.5 py-1">AI 策略解读</span>
+              </span>
+            </span>
+            <span class="relative z-10 flex min-h-[184px] items-center px-7 py-6 max-md:min-h-[140px] max-md:pt-0">
+              <svg class="h-[116px] w-full overflow-visible" viewBox="0 0 520 150" fill="none" aria-hidden="true">
+                <defs>
+                  <linearGradient id="quant-card-line" x1="20" y1="120" x2="500" y2="24" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#8B5CF6" />
+                    <stop offset="1" stop-color="#2C5DFF" />
+                  </linearGradient>
+                  <linearGradient id="quant-card-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop stop-color="#7C3AED" stop-opacity="0.2" />
+                    <stop offset="1" stop-color="#7C3AED" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <path d="M18 122H502M18 82H502M18 42H502" stroke="#DDE3F6" stroke-dasharray="4 6" />
+                <path d="M18 125C74 120 97 91 143 101C190 111 212 78 260 82C310 87 331 48 376 59C422 70 446 32 502 24V140H18V125Z" fill="url(#quant-card-fill)" />
+                <path d="M18 125C74 120 97 91 143 101C190 111 212 78 260 82C310 87 331 48 376 59C422 70 446 32 502 24" stroke="url(#quant-card-line)" stroke-width="4" stroke-linecap="round" />
+                <circle cx="502" cy="24" r="6" fill="#2C5DFF" stroke="white" stroke-width="3" />
+              </svg>
+            </span>
+            <span class="absolute right-5 top-5 z-20 flex items-center gap-1 text-[12px] font-medium text-[#6d4aff] transition group-hover:translate-x-0.5">
+              进入工作台 <span aria-hidden="true">→</span>
+            </span>
+          </button>
+        </section>
       </div>
 
       <Show when={active()}>

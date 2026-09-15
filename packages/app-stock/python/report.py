@@ -96,7 +96,51 @@ def render_html(report: dict[str, object]) -> str:
     return f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title><style>
-:root{{font-family:Inter,"Noto Sans SC",system-ui,sans-serif;color:#e8f2ed;background:#07100c}}*{{box-sizing:border-box}}body{{margin:0;background:radial-gradient(circle at 50% -20%,#183b2b,transparent 34%),#07100c}}main{{max-width:1220px;margin:auto;padding:42px 24px 64px}}header{{border-left:3px solid #38d996;padding-left:18px;margin-bottom:24px}}h1{{margin:4px 0;font-size:30px}}h2{{font-size:18px;margin:0 0 16px}}h3{{font-size:14px;color:#b8cbc1}}p,small,td,th{{color:#91a39a;line-height:1.65}}b{{color:#dcebe4}}.eyebrow{{color:#38d996;font-size:12px;letter-spacing:.16em}}.panel{{background:#0d1813;border:1px solid rgba(196,226,211,.13);border-radius:14px;padding:20px;margin:14px 0;overflow:auto}}.grid{{display:grid;grid-template-columns:1fr 1fr;gap:14px}}.metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}}.metric{{background:#09140f;border-radius:10px;padding:16px}}.metric span,.metric strong{{display:block}}.metric span{{color:#84978d;font-size:12px}}.metric strong{{font-size:22px;margin-top:6px}}.summary{{font-size:15px;background:linear-gradient(135deg,rgba(56,217,150,.09),transparent)}}svg{{width:100%;height:250px}}.legend{{display:flex;gap:18px;font-size:12px;color:#91a39a}}.dot{{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}}.strategy-dot{{background:#38d996}}.benchmark-dot{{background:#7da7ff}}.pass{{color:#38d996}}.warn{{color:#ffbe5c}}.fail{{color:#ff6f78}}ul{{list-style:none;padding:0;margin:0}}li{{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(196,226,211,.1)}}li span{{color:#91a39a}}table{{width:100%;border-collapse:collapse;font-size:12px}}th,td{{padding:10px;text-align:left;border-bottom:1px solid rgba(196,226,211,.1);white-space:nowrap}}td:last-child{{white-space:normal}}.positive{{color:#38d996}}.negative{{color:#ff6f78}}.method{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}}.method div{{background:#09140f;border-radius:10px;padding:14px}}.method span{{display:block;color:#71847a;font-size:11px;margin-bottom:4px}}footer{{margin-top:28px;color:#71847a;font-size:11px}}@media(max-width:760px){{.metrics{{grid-template-columns:repeat(2,1fr)}}.grid,.method{{grid-template-columns:1fr}}}}
+:root{{font-family:Inter,"Noto Sans SC",system-ui,sans-serif;color:#241b45;background:#f7f8ff}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:radial-gradient(circle at 8% 0,rgba(231,219,255,.86),transparent 30%),radial-gradient(circle at 92% 12%,rgba(213,236,255,.82),transparent 32%),#f7f8ff}}
+body::before{{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(109,74,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(109,74,255,.025) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,black,transparent 70%)}}
+main{{position:relative;max-width:1240px;margin:auto;padding:42px 24px 64px}}
+header{{position:relative;overflow:hidden;margin-bottom:20px;padding:24px 26px;border:1px solid #dce1f2;border-radius:16px;background:rgba(255,255,255,.9);box-shadow:0 12px 40px rgba(64,57,112,.08)}}
+header::after{{content:"";position:absolute;width:260px;height:260px;right:-90px;top:-155px;border-radius:50%;background:radial-gradient(circle,rgba(109,74,255,.2),transparent 68%)}}
+h1{{margin:5px 0;font-size:30px;letter-spacing:-.025em;color:#2a155a}}
+h2{{font-size:17px;margin:0 0 16px;color:#2a155a}}
+h3{{font-size:14px;color:#5f5878}}
+p,small,td,th{{color:#68708a;font-size:13px;line-height:1.65}}
+b{{color:#342c50}}
+.eyebrow{{color:#6d4aff;font-size:11px;font-weight:700;letter-spacing:.17em}}
+.panel{{background:rgba(255,255,255,.92);border:1px solid #dce1f2;border-radius:14px;padding:20px;margin:14px 0;overflow:auto;box-shadow:0 10px 32px rgba(64,57,112,.055)}}
+.grid{{display:grid;grid-template-columns:1fr 1fr;gap:14px}}
+.metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}}
+.metric{{position:relative;overflow:hidden;background:rgba(255,255,255,.9);border:1px solid #e0e3f2;border-radius:12px;padding:16px;box-shadow:0 8px 24px rgba(64,57,112,.045)}}
+.metric::after{{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,#8b5cf6,#2c5dff);opacity:.72}}
+.metric span,.metric strong{{display:block}}
+.metric span{{color:#77718c;font-size:13px}}
+.metric strong{{color:#2a155a;font-size:26px;margin-top:7px}}
+.summary{{font-size:15px;border-color:#d9d3fb;background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(44,93,255,.025) 62%,rgba(255,255,255,.94))}}
+svg{{width:100%;height:300px;border-radius:10px;background:linear-gradient(180deg,#fbfbff,#fff)}}
+.legend{{display:flex;gap:18px;font-size:12px;color:#68708a}}
+.dot{{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}}
+.strategy-dot{{background:#6d4aff}}
+.benchmark-dot{{background:#7697d6}}
+.pass{{color:#12805f}}
+.warn{{color:#b7791f}}
+.fail{{color:#d9485f}}
+ul{{list-style:none;padding:0;margin:0}}
+li{{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid #e5e7f2}}
+li span{{color:#68708a}}
+table{{width:100%;border-collapse:collapse;font-size:13px}}
+th,td{{padding:10px;text-align:left;border-bottom:1px solid #e5e7f2;white-space:nowrap}}
+th{{color:#5f5878;font-weight:600;background:#f8f8fc}}
+tbody tr:hover{{background:#faf9ff}}
+td:last-child{{white-space:normal}}
+.positive{{color:#12805f}}
+.negative{{color:#d9485f}}
+.method{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}}
+.method div{{background:#f8f8fc;border:1px solid #e5e7f2;border-radius:10px;padding:14px;color:#403957}}
+.method span{{display:block;color:#817b94;font-size:11px;margin-bottom:4px}}
+footer{{margin-top:28px;padding-top:18px;border-top:1px solid #dce1f2;color:#817b94;font-size:11px}}
+@media(max-width:760px){{main{{padding:20px 14px 42px}}header{{padding:20px}}.metrics{{grid-template-columns:repeat(2,1fr)}}.grid,.method{{grid-template-columns:1fr}}}}
 </style></head><body><main>
 <header><span class="eyebrow">ALPHALAB · STRATEGY REPORT</span><h1>{title}</h1><p>{html.escape(str(period["start"]))} — {html.escape(str(period["end"]))} · {html.escape(str(strategy["rebalance"]))}</p></header>
 <section class="metrics">{metric_cards}</section>
@@ -130,9 +174,9 @@ def equity_svg(curve: list[dict[str, object]]) -> str:
     ]
     return (
         '<svg viewBox="0 0 1000 250" preserveAspectRatio="none" role="img" aria-label="策略权益曲线">'
-        '<line x1="20" y1="230" x2="980" y2="230" stroke="rgba(196,226,211,.15)"/>'
-        f'<polyline points="{" ".join(coordinates)}" fill="none" stroke="#38d996" stroke-width="3" vector-effect="non-scaling-stroke"/>'
-        f'<polyline points="{" ".join(benchmark_coordinates)}" fill="none" stroke="#7da7ff" stroke-width="2" vector-effect="non-scaling-stroke"/>'
+        '<line x1="20" y1="230" x2="980" y2="230" stroke="#e3e5f1"/>'
+        f'<polyline points="{" ".join(coordinates)}" fill="none" stroke="#6d4aff" stroke-width="3" vector-effect="non-scaling-stroke"/>'
+        f'<polyline points="{" ".join(benchmark_coordinates)}" fill="none" stroke="#7697d6" stroke-width="2" vector-effect="non-scaling-stroke"/>'
         "</svg>"
     )
 
@@ -149,7 +193,7 @@ def drawdown_svg(curve: list[dict[str, object]]) -> str:
     low = min(values)
     spread = max(abs(low), 0.01)
     coordinates = [f'{20 + index / max(len(values) - 1, 1) * 960:.1f},{20 + abs(value) / spread * 210:.1f}' for index, value in enumerate(values)]
-    return '<svg viewBox="0 0 1000 250" preserveAspectRatio="none" role="img" aria-label="策略回撤曲线"><line x1="20" y1="20" x2="980" y2="20" stroke="rgba(196,226,211,.15)"/>' f'<polyline points="{" ".join(coordinates)}" fill="none" stroke="#ff6f78" stroke-width="3" vector-effect="non-scaling-stroke"/></svg>'
+    return '<svg viewBox="0 0 1000 250" preserveAspectRatio="none" role="img" aria-label="策略回撤曲线"><line x1="20" y1="20" x2="980" y2="20" stroke="#e3e5f1"/>' f'<polyline points="{" ".join(coordinates)}" fill="none" stroke="#d9485f" stroke-width="3" vector-effect="non-scaling-stroke"/></svg>'
 
 
 def annual_return_rows(curve: list[dict[str, object]], initial_cash: float) -> str:

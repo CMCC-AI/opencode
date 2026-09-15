@@ -88,7 +88,7 @@ export type ModelsResponse = {
 
 export type HealthResponse = {
   ok: true
-  providers: { baostock: boolean; akshare: boolean; tushare: boolean; alphaVantage: boolean }
+  providers: { baostock: boolean; akshare: boolean; westock: boolean; tushare: boolean; alphaVantage: boolean }
   opencode: { configured: boolean }
 }
 

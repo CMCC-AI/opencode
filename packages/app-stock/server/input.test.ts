@@ -14,6 +14,17 @@ describe("独立股票产品请求校验", () => {
     expect(result.lotSize).toBe(100)
   })
 
+  test("接受免费 A 股数据源并使用 100 股交易单位", () => {
+    const result = parseBacktestRequest({
+      provider: "baostock",
+      symbol: "600519",
+      startDate: "2023-01-01",
+      endDate: "2026-01-01",
+    })
+    expect(result.provider).toBe("baostock")
+    expect(result.lotSize).toBe(100)
+  })
+
   test("拒绝长短均线倒置", () => {
     expect(() =>
       parseBacktestRequest({

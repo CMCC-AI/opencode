@@ -1,6 +1,6 @@
 import { join, resolve } from "node:path"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2/client"
-import { analyzeBars, assessBacktest, fetchBars, runSmaCrossBacktest, runSmaSensitivity } from "@opencode-ai/stock-core"
+import { analyzeBars, assessBacktest, fetchBars, runSmaCrossBacktest, runSmaSensitivity, type FetchBarsInput } from "@opencode-ai/stock-core"
 import type {
   AnalyzeResponse,
   BacktestResponse,
@@ -12,6 +12,7 @@ import type {
 } from "../src/lib/contracts"
 import { parseAnalyzeRequest, parseBacktestRequest, parseCancelChatRequest, parseChatRequest } from "./input"
 import { parseStrategyArtifact, safeSessionId, summarizeStrategyArtifact } from "./artifact"
+import { fetchFreeBars } from "./free-data"
 
 const port = Number(process.env.PORT ?? 4174)
 const repositoryRoot = resolve(import.meta.dir, "../../..")
@@ -79,6 +80,7 @@ async function health() {
     providers: {
       baostock: await Bun.file(resolve(import.meta.dir, "../python/.venv/bin/python")).exists(),
       akshare: await Bun.file(resolve(import.meta.dir, "../python/uv.lock")).exists(),
+      westock: await Bun.file(resolve(process.env.HOME ?? "", ".local/bin/westock")).exists(),
       tushare: Boolean(process.env.TUSHARE_TOKEN?.trim()),
       alphaVantage: Boolean(process.env.ALPHA_VANTAGE_API_KEY?.trim()),
     },
@@ -292,11 +294,24 @@ async function readJson(request: Request) {
   return JSON.parse(body) as unknown
 }
 
-async function marketData(input: Parameters<typeof fetchBars>[0]) {
-  return fetchBars(input).catch((error) => {
-    const message = error instanceof Error ? error.message : "行情数据请求失败"
-    throw new HttpError(message.startsWith("缺少 ") ? 503 : 502, message)
-  })
+async function marketData(input: FetchBarsInput) {
+  if (input.provider === "baostock" || input.provider === "akshare" || input.provider === "westock") {
+    return fetchFreeBars({
+      provider: input.provider,
+      symbol: input.symbol,
+      startDate: input.startDate,
+      endDate: input.endDate,
+    }).catch(marketDataError)
+  }
+  return fetchBars(input).catch(marketDataError)
+}
+
+function marketDataError(error: unknown): never {
+  const message = error instanceof Error ? error.message : "行情数据请求失败"
+  if (message.includes("adj_factor")) {
+    throw new HttpError(403, "当前 Tushare Token 没有 adj_factor 复权因子权限。请切换至 BaoStock（免费主源）、AKShare 或腾讯行情；EPS 沪深300策略默认使用 BaoStock，不需要 Tushare。")
+  }
+  throw new HttpError(message.startsWith("缺少 ") ? 503 : 502, message)
 }
 
 async function withMarketSlot<T>(task: () => Promise<T>) {

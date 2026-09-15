@@ -562,12 +562,6 @@ function CmccSidebar() {
               onClick={() => navigate("/deeplens")}
             />
             <CmccSidebarAction
-              icon="sliders"
-              label="AlphaLab 策略实验室"
-              active={isStockLabPath(location.pathname)}
-              onClick={() => navigate("/stock-lab")}
-            />
-            <CmccSidebarAction
               icon="archive"
               label="案例库"
               active={location.pathname === "/cases" || location.pathname.startsWith("/cases/")}

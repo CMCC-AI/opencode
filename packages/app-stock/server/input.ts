@@ -26,7 +26,7 @@ export function parseBacktestRequest(value: unknown): BacktestRequest {
     minimumCommission: numberField(input.minimumCommission, defaults.minimumCommission, "最低佣金"),
     stampDutyRate: numberField(input.stampDutyRate, defaults.stampDutyRate, "印花税率"),
     slippageBps: numberField(input.slippageBps, defaults.slippageBps, "滑点"),
-    lotSize: numberField(input.lotSize, provider === "tushare" ? defaults.lotSize : 1, "交易单位"),
+    lotSize: numberField(input.lotSize, provider === "alpha_vantage" ? 1 : defaults.lotSize, "交易单位"),
   }
   if (result.fastWindow <= 0 || result.fastWindow >= result.slowWindow)
     throw new Error("均线窗口必须满足 0 < 短均线 < 长均线")
@@ -88,8 +88,8 @@ function record(value: unknown) {
 }
 
 function providerField(value: unknown): BacktestRequest["provider"] {
-  if (value === "tushare" || value === "alpha_vantage") return value
-  throw new Error("数据源必须是 tushare 或 alpha_vantage")
+  if (value === "baostock" || value === "akshare" || value === "westock" || value === "tushare" || value === "alpha_vantage") return value
+  throw new Error("数据源必须是 baostock、akshare、westock、tushare 或 alpha_vantage")
 }
 
 function stringField(value: unknown, label: string, maximumLength = 256) {

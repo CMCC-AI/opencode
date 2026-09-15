@@ -30,22 +30,22 @@ export function CmccStockLabFrame(props: { active: boolean }) {
     <div
       aria-hidden={!props.active}
       inert={!props.active}
-      class="absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col bg-[#07100c]"
+      class="absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col bg-[#fbfcff]"
       classList={{ "invisible pointer-events-none": !props.active }}
     >
       <Show when={!state.loaded && !state.failed}>
-        <div class="absolute inset-0 grid place-items-center bg-[#07100c] text-sm text-[#84978d]">
+        <div class="absolute inset-0 grid place-items-center bg-[#fbfcff] text-sm text-[#6b7280]">
           正在加载 AlphaLab 策略实验室…
         </div>
       </Show>
       <Show when={state.failed}>
-        <div class="absolute inset-0 z-10 grid place-items-center bg-[#07100c] px-6 text-center text-sm text-[#ffabb0]">
+        <div class="absolute inset-0 z-10 grid place-items-center bg-[#fbfcff] px-6 text-center text-sm text-[#d9485f]">
           AlphaLab 策略实验室暂时无法加载，请检查股票产品服务地址。
         </div>
       </Show>
       <iframe
         title="AlphaLab AI 策略实验室"
-        class="min-h-0 min-w-0 flex-1 border-0 bg-[#07100c]"
+        class="min-h-0 min-w-0 flex-1 border-0 bg-[#fbfcff]"
         src={STOCK_LAB_URL}
         onLoad={() => setState({ loaded: true, failed: false })}
         onError={() => setState({ loaded: false, failed: true })}

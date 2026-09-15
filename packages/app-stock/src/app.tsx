@@ -41,7 +41,7 @@ function readStoredModel() {
 }
 
 const initialForm: BacktestRequest = {
-  provider: "tushare",
+  provider: "baostock",
   symbol: "600519",
   ...defaultDates(),
   fastWindow: 20,
@@ -78,12 +78,14 @@ export function App() {
     modelsLoading: boolean
     modelId?: string
     modelError?: string
+    assistantOpen: boolean
   }>({
     input: "",
     sending: false,
     elapsedSeconds: 0,
     models: [],
     modelsLoading: true,
+    assistantOpen: false,
     messages: [
       {
         role: "assistant",
@@ -244,9 +246,10 @@ export function App() {
       <main class="workspace">
         <section class="intro">
           <div>
+            <p class="breadcrumb">产业洞察&nbsp;&nbsp;/&nbsp;&nbsp;AI + 量化研究&nbsp;&nbsp;/&nbsp;&nbsp;策略回测</p>
             <p class="eyebrow">STRATEGY WORKBENCH</p>
-            <h1>把投资想法，变成可验证的策略。</h1>
-            <p>用真实历史行情回测规则，再让 AI 解释收益来自哪里、风险藏在哪里、下一轮应该验证什么。</p>
+            <h1>策略回测工作台</h1>
+            <p>用真实历史行情验证交易规则，识别收益来源、风险暴露与参数稳定性。</p>
           </div>
           <div class="intro-note">
             <span>当前能力</span>
@@ -271,14 +274,13 @@ export function App() {
                   value={form.provider}
                   onChange={(event) => {
                     const provider = event.currentTarget.value as BacktestRequest["provider"]
-                    setForm({
-                      provider,
-                      symbol: provider === "tushare" ? "600519" : "AAPL",
-                      lotSize: provider === "tushare" ? 100 : 1,
-                    })
+                    setForm({ provider, symbol: provider === "alpha_vantage" ? "AAPL" : "600519", lotSize: provider === "alpha_vantage" ? 1 : 100 })
                   }}
                 >
-                  <option value="tushare">A 股 · Tushare</option>
+                  <option value="baostock">A 股 · BaoStock（免费）</option>
+                  <option value="akshare">A 股 · AKShare（免费）</option>
+                  <option value="westock">A 股 · 腾讯行情（免费）</option>
+                  <option value="tushare">A 股 · Tushare（需权限）</option>
                   <option value="alpha_vantage">美股 · Alpha Vantage</option>
                 </select>
               </Field>
@@ -287,7 +289,7 @@ export function App() {
                 <input
                   value={form.symbol}
                   onInput={(event) => setForm("symbol", event.currentTarget.value)}
-                  placeholder={form.provider === "tushare" ? "例如 600519" : "例如 AAPL"}
+                  placeholder={form.provider === "alpha_vantage" ? "例如 AAPL" : "例如 600519"}
                   spellcheck={false}
                 />
               </Field>
@@ -379,13 +381,26 @@ export function App() {
             </form>
           </aside>
 
-          <aside class="ai-panel panel">
+          <Show when={chat.assistantOpen}>
+            <button
+              type="button"
+              class="assistant-backdrop"
+              aria-label="关闭策略研究助手"
+              onClick={() => setChat("assistantOpen", false)}
+            />
+          </Show>
+
+          <aside
+            class="ai-panel panel"
+            classList={{ open: chat.assistantOpen }}
+            aria-hidden={!chat.assistantOpen}
+            inert={!chat.assistantOpen}
+          >
             <div class="panel-heading ai-heading">
               <div>
                 <span class="ai-orb">AI</span>
                 <div>
                   <h2>策略研究助手</h2>
-                  <small>由 OpenCode 驱动</small>
                 </div>
               </div>
               <div class="ai-heading-actions">
@@ -418,6 +433,14 @@ export function App() {
                   onClick={() => (chat.sending ? cancelChat() : newChat())}
                 >
                   {chat.sending ? "停止" : chat.sessionId ? "新建会话" : "新会话"}
+                </button>
+                <button
+                  type="button"
+                  class="assistant-close"
+                  aria-label="关闭策略研究助手"
+                  onClick={() => setChat("assistantOpen", false)}
+                >
+                  ×
                 </button>
               </div>
             </div>
@@ -506,6 +529,15 @@ export function App() {
             </Show>
           </section>
         </div>
+
+        <button type="button" class="assistant-launcher" onClick={() => setChat("assistantOpen", true)}>
+          <span class="ai-orb">AI</span>
+          <span>
+            <strong>策略研究助手</strong>
+            <small>解读当前参数与回测结果</small>
+          </span>
+          <b aria-hidden="true">→</b>
+        </button>
       </main>
 
       <footer>历史回测不代表未来表现。所有结果仅用于研究与工程验证，不构成投资建议。</footer>
@@ -796,15 +828,15 @@ function EquityChart(props: { points: Array<{ date: string; value: number }> }) 
       <svg viewBox="0 0 900 220" preserveAspectRatio="none" role="img" aria-label="策略权益曲线">
         <defs>
           <linearGradient id="equity-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#38d996" stop-opacity=".32" />
-            <stop offset="1" stop-color="#38d996" stop-opacity="0" />
+            <stop offset="0" stop-color="#6d4aff" stop-opacity=".24" />
+            <stop offset="1" stop-color="#6d4aff" stop-opacity="0" />
           </linearGradient>
         </defs>
         <path d={chart().area} fill="url(#equity-fill)" />
         <polyline
           points={chart().line}
           fill="none"
-          stroke="#38d996"
+          stroke="#6d4aff"
           stroke-width="3"
           vector-effect="non-scaling-stroke"
         />
@@ -880,7 +912,11 @@ function strategyContext(
 }
 
 function providerName(provider: BacktestRequest["provider"]) {
-  return provider === "tushare" ? "Tushare" : "Alpha Vantage"
+  if (provider === "baostock") return "BaoStock"
+  if (provider === "akshare") return "AKShare"
+  if (provider === "westock") return "腾讯行情"
+  if (provider === "tushare") return "Tushare"
+  return "Alpha Vantage"
 }
 
 function percent(value: number | null) {
@@ -910,7 +946,7 @@ function ratingLabel(rating: BacktestResponse["evaluation"]["rating"]) {
 }
 
 function currencyFor(provider: BacktestRequest["provider"]) {
-  return provider === "tushare" ? "CNY" : "USD"
+  return provider === "alpha_vantage" ? "USD" : "CNY"
 }
 
 function backtestRequestKey(value: BacktestRequest) {

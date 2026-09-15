@@ -9,7 +9,8 @@ type TushareResponse = {
 export async function fetchBars(input: FetchBarsInput): Promise<BarSeries> {
   validateDateRange(input.startDate, input.endDate)
   if (input.provider === "tushare") return fetchTushareBars(input)
-  return fetchAlphaVantageBars(input)
+  if (input.provider === "alpha_vantage") return fetchAlphaVantageBars(input)
+  throw new Error(`${input.provider} 需要通过免费 A 股数据桥获取行情`)
 }
 
 export function normalizeSymbol(provider: DataProvider, value: string) {
