@@ -10,6 +10,8 @@
     "dev:desktop": "bun --cwd packages/desktop dev",
     "dev:web": "bun --cwd packages/app dev",
     "dev:cmcc": "bun --cwd packages/app-cmcc dev",
+    "dev:stock": "bun --cwd packages/app-stock dev",
+    "dev:cmcc-stock": "bun ./script/dev-cmcc-stock.ts",
     "dev:console": "ulimit -n 10240 2>/dev/null; bun run --cwd packages/console/app dev",
     "dev:stats": "bun sst shell --stage=production -- bun run --cwd packages/stats/app dev",
     "dev:storybook": "bun --cwd packages/storybook storybook",

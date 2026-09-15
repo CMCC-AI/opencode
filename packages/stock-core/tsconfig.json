@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "composite": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "outDir": "node_modules/.ts-dist",
+    "types": ["bun"]
+  },
+  "include": ["src"]
+}

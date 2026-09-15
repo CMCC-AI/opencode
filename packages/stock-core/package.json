@@ -1,0 +1,17 @@
+{
+  "name": "@opencode-ai/stock-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo -b",
+    "test": "bun test ./src"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
+}

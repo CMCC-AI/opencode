@@ -51,6 +51,7 @@ import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout
 import NewLayout from "@/pages/layout-new"
 import { CmccDeepXivRoute } from "@/pages/cmcc-deepxiv"
 import { CmccDeepLensRoute } from "@/pages/cmcc-deeplens"
+import { CmccStockLabRoute } from "@/pages/cmcc-stock-lab"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
 import {
@@ -92,9 +93,7 @@ const CmccKnowledgeHomeRoute = lazy(() =>
 const CmccKnowledgeNotebookRoute = lazy(() =>
   import("@/pages/cmcc-knowledge").then((module) => ({ default: module.CmccKnowledgeNotebookRoute })),
 )
-const CmccCasesRoute = lazy(() =>
-  import("@/pages/cmcc-cases").then((module) => ({ default: module.CmccCasesRoute })),
-)
+const CmccCasesRoute = lazy(() => import("@/pages/cmcc-cases").then((module) => ({ default: module.CmccCasesRoute })))
 const CmccCaseDetailRoute = lazy(() =>
   import("@/pages/cases/case-detail").then((module) => ({ default: module.CmccCaseDetailRoute })),
 )
@@ -708,6 +707,8 @@ function Routes() {
         <Route path="/deepxiv/" component={CmccDeepXivRoute} />
         <Route path="/deeplens" component={CmccDeepLensRoute} />
         <Route path="/deeplens/" component={CmccDeepLensRoute} />
+        <Route path="/stock-lab" component={CmccStockLabRoute} />
+        <Route path="/stock-lab/" component={CmccStockLabRoute} />
         <Route path="/plugins" component={CmccPluginHubRoute} />
         <Route path="/cases" component={CmccCasesRoute} />
         <Route path="/cases/:caseCode" component={CmccCaseDetailRoute} />

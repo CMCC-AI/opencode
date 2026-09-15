@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "composite": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "outDir": "node_modules/.ts-dist",
+    "types": ["vite/client"]
+  },
+  "include": ["src"],
+  "references": [{ "path": "../stock-core" }]
+}

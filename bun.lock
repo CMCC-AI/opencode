@@ -159,6 +159,24 @@
         "vite-plugin-solid": "catalog:",
       },
     },
+    "packages/app-stock": {
+      "name": "@opencode-ai/app-stock",
+      "version": "0.1.0",
+      "dependencies": {
+        "@opencode-ai/sdk": "workspace:*",
+        "@opencode-ai/stock-core": "workspace:*",
+        "dompurify": "3.3.1",
+        "marked": "catalog:",
+        "solid-js": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+        "vite-plugin-solid": "catalog:",
+      },
+    },
     "packages/cli": {
       "name": "@opencode-ai/cli",
       "version": "1.17.12",
@@ -969,6 +987,14 @@
         "@types/node": "catalog:",
         "@typescript/native-preview": "catalog:",
         "typescript": "catalog:",
+      },
+    },
+    "packages/stock-core": {
+      "name": "@opencode-ai/stock-core",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
       },
     },
     "packages/storybook": {
@@ -1992,6 +2018,8 @@
 
     "@opencode-ai/app-cmcc": ["@opencode-ai/app-cmcc@workspace:packages/app-cmcc"],
 
+    "@opencode-ai/app-stock": ["@opencode-ai/app-stock@workspace:packages/app-stock"],
+
     "@opencode-ai/cli": ["@opencode-ai/cli@workspace:packages/cli"],
 
     "@opencode-ai/client": ["@opencode-ai/client@workspace:packages/client"],
@@ -2049,6 +2077,8 @@
     "@opencode-ai/stats-core": ["@opencode-ai/stats-core@workspace:packages/stats/core"],
 
     "@opencode-ai/stats-server": ["@opencode-ai/stats-server@workspace:packages/stats/server"],
+
+    "@opencode-ai/stock-core": ["@opencode-ai/stock-core@workspace:packages/stock-core"],
 
     "@opencode-ai/storybook": ["@opencode-ai/storybook@workspace:packages/storybook"],
 

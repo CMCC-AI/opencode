@@ -1,0 +1,29 @@
+{
+  "name": "@opencode-ai/app-stock",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun ./scripts/dev.ts",
+    "dev:web": "vite --host 0.0.0.0 --port 3010",
+    "dev:server": "bun --watch ./server/index.ts",
+    "build": "vite build",
+    "start": "bun ./server/index.ts",
+    "typecheck": "tsgo -b && tsgo -p tsconfig.server.json --noEmit",
+    "test": "bun test ./server ./src"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "workspace:*",
+    "@opencode-ai/stock-core": "workspace:*",
+    "dompurify": "3.3.1",
+    "marked": "catalog:",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-solid": "catalog:"
+  }
+}

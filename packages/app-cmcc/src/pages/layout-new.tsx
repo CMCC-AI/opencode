@@ -20,25 +20,18 @@ import { setNavigate } from "@/utils/notification-click"
 import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
 import { showToast, setV2Toast, ToastRegion } from "@/utils/toast"
-import {
-  cmccArtifactWorkspace,
-  cmccEnsureWorkspace,
-  cmccRememberConversationWorkspace,
-} from "@/utils/cmcc-workspace"
+import { cmccArtifactWorkspace, cmccEnsureWorkspace, cmccRememberConversationWorkspace } from "@/utils/cmcc-workspace"
 import {
   cmccKnowledgeNotebookForSession,
   cmccKnowledgeNotebooks,
   cmccMainKnowledgeSession,
   cmccKnowledgeSessionReference,
 } from "@/utils/cmcc-knowledge"
-import {
-  CMCC_CASES_UPDATED_EVENT,
-  cmccCaseCategoryByAgentType,
-  cmccCasePublishingAllowed,
-} from "@/utils/cmcc-cases"
+import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByAgentType, cmccCasePublishingAllowed } from "@/utils/cmcc-cases"
 import { cmccHistoryProduct, type CmccHistoryProduct } from "@/utils/cmcc-history-product"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
+import { CmccStockLabFrame, isStockLabPath } from "./cmcc-stock-lab"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
 import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
 
@@ -61,6 +54,7 @@ export default function NewLayout(props: ParentProps) {
   const [persistentViews, setPersistentViews] = createStore({
     deepXivMounted: isDeepXivPath(location.pathname),
     deepLensMounted: isDeepLensPath(location.pathname),
+    stockLabMounted: isStockLabPath(location.pathname),
   })
   setNavigate(navigate)
 
@@ -72,6 +66,9 @@ export default function NewLayout(props: ParentProps) {
   })
   createEffect(() => {
     if (isDeepLensPath(location.pathname)) setPersistentViews("deepLensMounted", true)
+  })
+  createEffect(() => {
+    if (isStockLabPath(location.pathname)) setPersistentViews("stockLabMounted", true)
   })
   createEffect(() => {
     if (!layout.ready()) return
@@ -150,6 +147,9 @@ export default function NewLayout(props: ParentProps) {
             </Show>
             <Show when={persistentViews.deepLensMounted}>
               <CmccDeepLensFrame active={isDeepLensPath(location.pathname)} />
+            </Show>
+            <Show when={persistentViews.stockLabMounted}>
+              <CmccStockLabFrame active={isStockLabPath(location.pathname)} />
             </Show>
           </div>
         </section>
@@ -286,11 +286,10 @@ function CmccSidebar() {
   const conversations = createMemo(() => {
     const current = directory()
     if (!current) return [] as Session[]
-    const history = dockApiHistorySessions(current, dockapi.state.sessions)
-      .map((session) => {
-        const loaded = sync().session.data.info[session.id]
-        return loaded ? { ...loaded, title: session.title, directory: current } : session
-      })
+    const history = dockApiHistorySessions(current, dockapi.state.sessions).map((session) => {
+      const loaded = sync().session.data.info[session.id]
+      return loaded ? { ...loaded, title: session.title, directory: current } : session
+    })
     const ids = new Set(history.map((session) => session.id))
     const knowledge = Object.values(sync().session.data.info)
       .filter((session): session is Session => !!session)
@@ -563,6 +562,12 @@ function CmccSidebar() {
               onClick={() => navigate("/deeplens")}
             />
             <CmccSidebarAction
+              icon="sliders"
+              label="AlphaLab 策略实验室"
+              active={isStockLabPath(location.pathname)}
+              onClick={() => navigate("/stock-lab")}
+            />
+            <CmccSidebarAction
               icon="archive"
               label="案例库"
               active={location.pathname === "/cases" || location.pathname.startsWith("/cases/")}
@@ -809,13 +814,7 @@ function CmccSessionRow(props: {
           title="任务进行中"
           class="pointer-events-none absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center text-[#4f46e5] transition-opacity group-hover/session:opacity-0 group-focus-within/session:opacity-0"
         >
-          <svg
-            data-slot="session-running-spinner"
-            viewBox="0 0 16 16"
-            class="size-3.5"
-            fill="none"
-            aria-hidden="true"
-          >
+          <svg data-slot="session-running-spinner" viewBox="0 0 16 16" class="size-3.5" fill="none" aria-hidden="true">
             <circle cx="8" cy="8" r="5.25" stroke="currentColor" stroke-width="1.5" opacity="0.22" />
             <circle
               cx="8"
