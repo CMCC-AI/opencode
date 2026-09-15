@@ -54,10 +54,9 @@ export function CmccCaseDetailRoute() {
   const [loaded] = createResource(
     () => params.caseCode,
     async (caseCode): Promise<LoadedCase> => {
-      const metadata = dockapi.cases.detail(caseCode)
       const [detail, snapshot, ticket] = await Promise.all([
-        metadata,
-        metadata.then((detail) => dockapi.cases.snapshot(caseCode, detail.snapshotVersion)),
+        dockapi.cases.detail(caseCode),
+        dockapi.cases.snapshot(caseCode),
         dockapi.cases.previewTicket(caseCode),
       ])
       if (snapshot.schemaVersion !== 1 || snapshot.caseCode !== detail.caseCode) {
