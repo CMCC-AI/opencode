@@ -30,6 +30,34 @@ export type CmccExpert = ExternalExpert | TeamExpert
 
 export const CMCC_EXPERTS: CmccExpert[] = [
   {
+    kind: "team",
+    id: "deepinsight",
+    name: "DeepInsight 深度研究专家团",
+    description:
+      "证据驱动深度研究团队：材料深挖、内外混合与公开信息三模式研究，经反思核验交付可追溯的 Markdown/HTML/PDF 研究报告。",
+    leadAgent: "deepinsight/deepinsight-team-lead",
+    defaultPrompt: "深度研究 2026 年中国低空经济的发展趋势与产业格局",
+    tags: ["深度研究", "证据溯源", "研究报告"],
+    examples: [
+      "深度研究 2026 年中国低空经济的发展趋势与产业格局",
+      "基于我上传的材料做内部证据研究，输出带引用的深度报告",
+      "内外混合模式研究：结合这份材料与最新公开信息分析竞争格局",
+    ],
+    members: [
+      { id: "deepinsight/deepinsight-team-lead", name: "顾全之", profession: "研究主编", role: "lead" },
+      { id: "deepinsight/di-intent-analyst", name: "明辨秋", profession: "安全与需求分析师" },
+      { id: "deepinsight/di-query-planner", name: "谋定远", profession: "研究规划专家" },
+      { id: "deepinsight/di-local-researcher", name: "文掘金", profession: "材料研究专家" },
+      { id: "deepinsight/di-web-researcher", name: "广览川", profession: "公开信息研究专家" },
+      { id: "deepinsight/di-reflector", name: "盛省吾", profession: "证据反思专家" },
+      { id: "deepinsight/di-outline-architect", name: "梁构辰", profession: "大纲架构专家" },
+      { id: "deepinsight/di-report-writer", name: "殷有据", profession: "证据型写作专家" },
+      { id: "deepinsight/di-evidence-reviewer", name: "严核真", profession: "独立证据核验专家" },
+      { id: "deepinsight/di-viz", name: "涂证显", profession: "证据型可视化专家" },
+      { id: "deepinsight/di-publisher", name: "丁稿宣", profession: "发布工程师" },
+    ],
+  },
+  {
     kind: "external",
     id: "chat",
     name: "DeepInsight 深度洞察",

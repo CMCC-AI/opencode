@@ -5,7 +5,7 @@ description: Export HTML reports to PDF with deterministic CJK font loading, bro
 
 # 统一 PDF 报告导出
 
-使用 `scripts/export-report-pdf.mjs` 导出专家团生成的 HTML 报告。脚本通过 CDP pipe 兼容 Node.js 18+，会显式加载当前平台的中文字体、等待页面与字体完成渲染，并在打印前确认真实中文节点使用了该字体；验证失败时停止生成，避免交付方框字 PDF。
+使用 `scripts/export-report-pdf.mjs` 导出专家团生成的 HTML 报告。脚本通过 CDP pipe 兼容 Node.js 18+，会显式加载当前平台的中文字体、等待页面与字体完成渲染，并在打印前确认真实中文节点使用了该字体；验证失败时停止生成，避免交付方框字 PDF。伪元素（`::before`/`::after`）与图表 SVG `<text>` 中的中文同样会被强制使用注入字体并校验（图表库重绘会擦除逐元素补丁，靠 CSS 规则兜底），未生效即中止导出；专家团模板不要依赖 CSS `content` 承载需要特殊字体的中文。
 
 ```bash
 node scripts/export-report-pdf.mjs <input.html> [output.pdf]

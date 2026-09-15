@@ -23,9 +23,9 @@ node <BASE>/scripts/render-report.mjs <WORKSPACE_DIR>
 node <BASE>/scripts/export-report-pdf.mjs <WORKSPACE_DIR>/30-report.html <WORKSPACE_DIR>/35-report.pdf
 ```
 
-通过 CDP 协议控制 Chromium 无头浏览器，等待图表渲染完成后打印 A4 PDF。依赖本机 Chrome/Edge/Chromium，缺失时用 `CHROME_PATH` 环境变量指定。
+薄入口，委托仓库级 `report-pdf` 技能的共享导出器：CDP 控制 Chrome/Edge/Chromium 无头浏览器、注入并验证中文字体、执行 pageChecks（正文污染、图表清晰度）通过后打印 A4 PDF。依赖本机 Chrome/Edge/Chromium，缺失时用 `CHROME_PATH` 环境变量指定。
 
-**降级策略**：Chromium snap 版本权限受限时，自动切换到 WeasyPrint（Python）。
+**降级策略**：导出失败（含 pageChecks 未通过）时，修复报告或图表本身后重试一次；仍失败则停止生成正式 PDF，保留 HTML 交付。严禁改用 WeasyPrint、浏览器命令行或其他工具自行导出 PDF；为通过检查而删除图表同样违规，无图交付必须显式告知用户并等待确认。
 
 ### 3. `<BASE>/scripts/validate-run.mjs` — 质量验证
 

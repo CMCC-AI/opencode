@@ -13,12 +13,23 @@
     --text: #1a1a1a;
     --text-soft: #555;
     --border: #e5e7eb;
-    --accent: #8b1e1e;
+    --accent: #2563eb;
     --neutral: #64748b;
     --info-bg: #eff6ff; --info-border: #3b82f6; --info-text: #1e40af;
     --positive-bg: #ecfdf5; --positive-border: #10b981; --positive-text: #065f46;
     --warning-bg: #fffbeb; --warning-border: #f59e0b; --warning-text: #92400e;
     --negative-bg: #fef2f2; --negative-border: #ef4444; --negative-text: #991b1b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --text: #e2e8f0; --text-soft: #94a3b8;
+      --border: #334155; --accent: #60a5fa;
+      --neutral: #94a3b8;
+      --info-bg: #1e3a5f; --info-border: #3b82f6; --info-text: #bfdbfe;
+      --positive-bg: #14532d; --positive-border: #10b981; --positive-text: #a7f3d0;
+      --warning-bg: #78350f; --warning-border: #f59e0b; --warning-text: #fde68a;
+      --negative-bg: #7f1d1d; --negative-border: #ef4444; --negative-text: #fecaca;
+    }
   }
   * { box-sizing: border-box; }
   body {
@@ -40,7 +51,7 @@
   .toc a:hover { background: var(--surface); color: var(--text); }
   .toc a.lvl-3 { padding-left: 20px; font-size: 12px; }
   .main { padding: 48px 56px 120px; min-width: 0; }
-  .hero { margin-bottom: 40px; padding: 40px 44px; border-radius: 8px; background: linear-gradient(135deg, #8b1e1e 0%, #6f1818 100%); color: #fff; position: relative; overflow: hidden; }
+  .hero { margin-bottom: 40px; padding: 40px 44px; border-radius: 12px; background: linear-gradient(135deg, var(--accent) 0%, #1e40af 100%); color: #fff; position: relative; overflow: hidden; }
   .hero::after { content: ''; position: absolute; top: -50%; right: -10%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); border-radius: 50%; }
   .hero h1 { font-size: 38px; line-height: 1.2; margin: 0 0 10px 0; font-weight: 800; letter-spacing: -0.02em; position: relative; z-index: 1; }
   .hero .subtitle { font-size: 18px; color: rgba(255,255,255,0.85); margin: 0; position: relative; z-index: 1; }
@@ -71,9 +82,7 @@
   .block-markdown h1 { font-size: 22px; margin: 24px 0 12px; font-weight: 600; }
   .block-markdown h2 { font-size: 20px; margin: 24px 0 12px; font-weight: 600; }
   .block-markdown h3 { font-size: 17px; margin: 20px 0 8px; font-weight: 600; color: var(--text); }
-  sup.citation { vertical-align: super; font-size: 0.75em; line-height: 0; }
-  sup.citation a.ref { color: var(--accent); text-decoration: none; font-weight: 600; padding: 0 2px; }
-  sup.citation a.ref:hover { text-decoration: underline; }
+  sup a.ref { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.75em; padding: 0 2px; }
   .block-table { overflow-x: auto; }
   .block-table table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
   .block-table th, .block-table td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
@@ -121,13 +130,12 @@
   .chart-description { font-size: 13px; color: var(--text-soft); margin-bottom: 12px; line-height: 1.5; }
   .chart-canvas { width: 100%; height: 320px; }
   .chart-canvas.tall { height: 400px; }
-  .figure-caption, .table-caption { margin: 8px 0 0; color: var(--text-soft); font-size: 12px; line-height: 1.5; }
-  .table-caption { margin: 0 0 10px; font-weight: 600; color: var(--text); }
   .references { margin-top: 64px; padding-top: 32px; border-top: 2px solid var(--accent); }
   .references h2 { font-size: 22px; margin: 0 0 20px 0; }
   .references ol { padding-left: 24px; color: var(--text); font-size: 14px; }
   .references li { margin: 6px 0; word-break: break-all; }
   .references a { color: var(--accent); }
+  .reference-title { font-weight: 600; word-break: normal; }
   .fallback { background: var(--warning-bg); color: var(--warning-text); padding: 12px 16px; border-radius: 6px; margin: 16px 0; font-size: 14px; }
   @media (max-width: 900px) {
     .layout { grid-template-columns: 1fr; }
@@ -135,8 +143,6 @@
     .main { padding: 24px 16px 80px; }
     .hero h1 { font-size: 26px; }
   }
-</style>
-<style id="report-print-style">
 __PRINT_CSS__
 </style>
 </head>
@@ -150,10 +156,6 @@ __PRINT_CSS__
       <p class="meta" id="report-meta"></p>
       <div class="hero-stats" id="hero-stats"></div>
     </header>
-    <section class="print-toc" aria-label="目录">
-      <h2>目录</h2>
-      <div class="print-toc-list" id="print-toc-list"></div>
-    </section>
     <div id="report-body"></div>
     <section class="references" id="references" style="display:none">
       <h2>参考文献</h2>
@@ -174,10 +176,10 @@ __PRINT_CSS__
     });
   }
   function annotateRefs(html){
-    // 正常流程已经生成显式 sup.citation；这里只保留旧报告的降级兼容。
-    // 不再全局替换普通的 [N]，避免把表格序号、条例编号等误判成引用。
-    return html.replace(/<cite>([^<]+)<\/cite>/g, function(m, url){
-      return '<sup class="citation"><a class="ref" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">[来源]</a></sup>';
+    return html.replace(/\[(\d+)\]/g, function(m, n){
+      return '<sup><a class="ref" href="#ref-'+n+'" title="参考文献 '+n+'">['+n+']</a></sup>';
+    }).replace(/<cite>([^<]+)<\/cite>/g, function(m, url){
+      return '<sup><a class="ref" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">[src]</a></sup>';
     });
   }
   function renderMarkdown(content){
@@ -193,8 +195,6 @@ __PRINT_CSS__
     }
   }
   var CHART_INSTANCES = [];
-  var FIGURE_COUNTER = 0;
-  var TABLE_COUNTER = 0;
   function reviveFunctions(obj){
     if (obj == null) return obj;
     if (typeof obj === 'string'){
@@ -215,59 +215,43 @@ __PRINT_CSS__
   function renderChartAsync(containerId, chartBlock){
     if (typeof echarts === 'undefined') {
       var el = document.getElementById(containerId);
-      if (el) el.innerHTML = '<div class="fallback">ECharts CDN 加载失败，无法渲染图表「'+escapeHtml(chartBlock.title||'')+'」</div>';
+      if (el) {
+        var option = chartBlock.option || {};
+        var categories = (option.xAxis && option.xAxis.data) || [];
+        var series = option.series || [];
+        var h = '<div class="chart-data-fallback"><table><thead><tr><th>项目</th>';
+        series.forEach(function(s){ h += '<th>'+escapeHtml(s.name || '数值')+'</th>'; });
+        h += '</tr></thead><tbody>';
+        categories.forEach(function(label, i){
+          h += '<tr><td>'+escapeHtml(label)+'</td>';
+          series.forEach(function(s){
+            var raw = (s.data || [])[i];
+            var value = raw && typeof raw === 'object' ? raw.value : raw;
+            h += '<td>'+escapeHtml(value == null ? '' : value)+'</td>';
+          });
+          h += '</tr>';
+        });
+        h += '</tbody></table><p class="chart-description">图表组件不可用，已保留完整数据表。</p></div>';
+        el.innerHTML = h;
+      }
       return;
     }
     var el = document.getElementById(containerId);
     if (!el) return;
     try {
-      /* SVG 在浏览器打印为 PDF 时保持矢量清晰度。 */
+      /* SVG 在浏览器打印为 PDF 时保持矢量，不再把图表栅格化为低清 canvas。 */
       var chart = echarts.init(el, null, { renderer: 'svg' });
       var option = reviveFunctions(chartBlock.option || {});
       var chartType = String(chartBlock.type || '').toLowerCase();
       var isPrint = window.matchMedia && window.matchMedia('print').matches;
-      var colorSemantic = String(chartBlock.color_semantic || 'normal').toLowerCase();
-      /* 参考正式财务图表：普通数据默认用同源蓝灰的深、中、浅层次。 */
-      var chartPalette = ['#4b6685','#6485b3','#8fa8c7','#b3c5dc','#d3deeb'];
-      var isDarkRed = function(color){
-        var value = String(color || '').toLowerCase().replace(/\s/g, '');
-        return /^#(?:8b1e1e|a33a32|991b1b|9b1c1c|7f1d1d)$/.test(value) || /^rgb\((?:1[2-9]\d|2[0-2]\d),\s*[0-7]?\d,\s*[0-7]?\d\)$/.test(value);
-      };
-      var axes = function(axis){ return Array.isArray(axis) ? axis : (axis ? [axis] : []); };
       var shorten = function(value, limit){
         var text = String(value == null ? '' : value).trim();
         return text.length > limit ? text.slice(0, Math.max(1, limit - 1)) + '…' : text;
       };
-      /* 红色属于报告版式；普通图表默认使用低饱和同源蓝灰，风险项才使用砖红。 */
-      if (!option.color || (colorSemantic === 'normal' && Array.isArray(option.color) && option.color.length && option.color.every(isDarkRed))) {
-        option.color = colorSemantic === 'risk' ? ['#a33a32','#b8873b','#6f5c58']
-          : colorSemantic === 'positive' ? ['#4f8055','#7f9b9b','#91a9c6'] : chartPalette;
-      }
-      if (colorSemantic === 'normal') {
-        (option.series || []).forEach(function(series, index){
-          if (series && series.itemStyle && isDarkRed(series.itemStyle.color)) {
-            series.itemStyle = Object.assign({}, series.itemStyle, { color: chartPalette[index % 3] });
-          }
-        });
-      }
-      /* 前置注入字体族（report-pdf 共享导出器注入的 @font-face 名），保证 ECharts 丈量与最终渲染同字体，避免导出重排后标签溢出；浏览器预览时自然回退。 */
-      var reportFont = '"OpenCode Report CJK", "Microsoft YaHei", "Songti SC", "STSong", "SimSun", serif';
-      option.textStyle = Object.assign({ color: '#333333' }, option.textStyle, { fontFamily: reportFont });
-      if (isPrint) {
-        option.animation = false;
-        option.grid = Object.assign({ containLabel: true }, option.grid || {});
-        axes(option.xAxis).forEach(function(axis){
-          var count = Array.isArray(axis.data) ? axis.data.length : 0;
-          axis.axisLabel = Object.assign({}, axis.axisLabel || {}, {
-            hideOverlap: true, overflow: 'truncate', width: count > 6 ? 62 : 92,
-            rotate: count > 8 ? 28 : (axis.axisLabel && axis.axisLabel.rotate) || 0
-          });
-        });
-        axes(option.yAxis).forEach(function(axis){
-          axis.axisLabel = Object.assign({}, axis.axisLabel || {}, { hideOverlap: true, overflow: 'truncate', width: 76 });
-        });
-      }
-      if (isPrint && (chartType === 'pie' || (option.series || []).some(function(series){ return series.type === 'pie'; }))) {
+      var axes = function(axis){ return Array.isArray(axis) ? axis : (axis ? [axis] : []); };
+
+      if (isPrint && (chartType === 'pie' || (option.series || []).some(function(s){ return s.type === 'pie'; }))) {
+        /* 饼图外侧标签已表达分类，打印时隐藏重复图例，并限制长标签占用范围。 */
         option.legend = Object.assign({}, option.legend || {}, { show: false });
         (option.series || []).forEach(function(series){
           if (series.type !== 'pie') return;
@@ -284,6 +268,20 @@ __PRINT_CSS__
           series.labelLayout = Object.assign({}, series.labelLayout || {}, { hideOverlap: true, moveOverlap: 'shiftY' });
         });
       }
+
+      if (isPrint) {
+        axes(option.xAxis).forEach(function(axis){
+          var count = Array.isArray(axis.data) ? axis.data.length : 0;
+          axis.axisLabel = Object.assign({}, axis.axisLabel || {}, {
+            hideOverlap: true, overflow: 'truncate', width: count > 6 ? 62 : 90,
+            rotate: count > 8 ? 28 : (axis.axisLabel && axis.axisLabel.rotate) || 0
+          });
+        });
+        axes(option.yAxis).forEach(function(axis){
+          axis.axisLabel = Object.assign({}, axis.axisLabel || {}, { hideOverlap: true, overflow: 'truncate', width: 72 });
+        });
+      }
+      if (!option.color && !option.series) option.color = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#94a3b8'];
       chart.setOption(option);
       CHART_INSTANCES.push(chart);
     } catch(e) {
@@ -300,26 +298,27 @@ __PRINT_CSS__
     }
     if (t === 'chart') {
       var ch = block.chart || {};
-      var figureNumber = ++FIGURE_COUNTER;
       var id = 'chart-' + (ch.id || Math.random().toString(36).slice(2,10));
       var chartType = (ch.type || 'bar').toLowerCase();
       var tall = (chartType === 'line' || chartType === 'scatter' || chartType === 'radar') ? ' tall' : '';
-      var pie = chartType === 'pie' ? ' pie' : '';
-      var h = '<figure class="block block-chart">';
+      var typeClass = chartType === 'pie' ? ' pie' : '';
+      var series = (ch.option && ch.option.series) || [];
+      var pointCount = series.reduce(function(total, s){
+        return total + (s && Array.isArray(s.data) ? s.data.filter(function(v){ return v !== null && v !== undefined && v !== ''; }).length : 0);
+      }, 0);
+      var densityClass = pointCount > 0 && pointCount < 3 && ch.print_essential !== true ? ' low-density-chart' : '';
+      var h = '<div class="block block-chart'+densityClass+'">';
       if (ch.title) h += '<div class="chart-title">'+escapeHtml(ch.title)+'</div>';
       if (ch.description) h += '<div class="chart-description">'+escapeHtml(ch.description)+'</div>';
-      h += '<div id="'+id+'" class="chart-canvas'+tall+pie+'"></div>';
-      h += '<figcaption class="figure-caption">图'+figureNumber+'：'+escapeHtml(ch.title || '数据图表')+'</figcaption>';
-      h += '</figure>';
+      h += '<div id="'+id+'" class="chart-canvas'+tall+typeClass+'"></div>';
+      h += '</div>';
       window.setTimeout(function(){ renderChartAsync(id, ch); }, 0);
       return h;
     }
     if (t === 'table') {
       var cols = block.columns || [], rows = block.rows || [];
       if (!cols.length || !rows.length) return '';
-      var tableNumber = ++TABLE_COUNTER;
-      var tableTitle = block.title || '数据表';
-      var h = '<figure class="block block-table"><figcaption class="table-caption">表'+tableNumber+'：'+escapeHtml(tableTitle)+'</figcaption><table><thead><tr>';
+      var h = '<div class="block block-table">' + (block.title ? '<div class="stat-grid-title">'+escapeHtml(block.title)+'</div>' : '') + '<table><thead><tr>';
       cols.forEach(function(c){ h += '<th>'+escapeHtml(c)+'</th>'; });
       h += '</tr></thead><tbody>';
       rows.forEach(function(r){
@@ -327,7 +326,7 @@ __PRINT_CSS__
         (r || []).forEach(function(cell){ h += '<td>'+escapeHtml(cell)+'</td>'; });
         h += '</tr>';
       });
-      return h + '</tbody></table></figure>';
+      return h + '</tbody></table></div>';
     }
     if (t === 'stat_grid') {
       var items = (block.items || []).filter(function(it){ return it && it.label && it.value; });
@@ -400,8 +399,7 @@ __PRINT_CSS__
   }
   function buildToc(sections){
     var list = document.getElementById('toc-list');
-    var printList = document.getElementById('print-toc-list');
-    if ((!list && !printList) || !sections || !sections.length) return;
+    if (!list || !sections || !sections.length) return;
     sections.forEach(function(s, i){
       var id = s.id || ('section-'+i);
       var a = document.createElement('a');
@@ -413,8 +411,7 @@ __PRINT_CSS__
         var el = document.getElementById(id);
         if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
       };
-      if (list) list.appendChild(a);
-      if (printList) printList.appendChild(a.cloneNode(true));
+      list.appendChild(a);
     });
   }
   function renderReferences(refs){
@@ -424,13 +421,12 @@ __PRINT_CSS__
     refs.forEach(function(r){
       var li = document.createElement('li');
       li.id = 'ref-' + r.n;
-      if (r.kind === 'local' || !r.url) {
-        li.textContent = r.title || ('本地材料' + r.n);
-      } else if (r.title) {
-        li.innerHTML = '<a href="'+escapeHtml(r.url)+'" target="_blank" rel="noopener">'+escapeHtml(r.title)+'</a>';
-      } else {
-        li.innerHTML = '<a href="'+escapeHtml(r.url)+'" target="_blank" rel="noopener">'+escapeHtml(r.url)+'</a>';
-      }
+      var url = r.target || r.url || r.key || '';
+      var title = r.title || r.site || (r.kind === 'local' ? r.displayTarget : '') || '来源链接';
+      var titleHtml = url
+        ? '<a class="reference-title" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">'+escapeHtml(title)+'</a>'
+        : '<span class="reference-title">'+escapeHtml(title)+'</span>';
+      li.innerHTML = titleHtml;
       ol.appendChild(li);
     });
     sec.style.display = 'block';
@@ -448,7 +444,7 @@ __PRINT_CSS__
     document.getElementById('report-title').textContent = report.title || '研究报告';
     if (report.subtitle) document.getElementById('report-subtitle').textContent = report.subtitle;
     var meta = document.getElementById('report-meta');
-    /* 用户 query/prompt 只用于研究过程，封面仅保留正式报告日期。 */
+    /* 封面不展示用户原始 prompt；仅保留正式报告日期。 */
     if (report.current_date) meta.textContent = '报告日期：' + report.current_date;
     var heroStatsEl = document.getElementById('hero-stats');
     if (heroStatsEl && report.hero_stats && report.hero_stats.length) {
@@ -464,15 +460,9 @@ __PRINT_CSS__
     sections.forEach(function(s){ body.innerHTML += renderSection(s); });
     buildToc(sections);
     renderReferences(refs);
+    window.setTimeout(function(){ window.__REPORT_READY__ = true; }, 2500);
     window.addEventListener('resize', function(){
       CHART_INSTANCES.forEach(function(c){ try { c.resize(); } catch(e){} });
-    });
-    var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
-    fontsReady.then(function(){
-      window.setTimeout(function(){
-        CHART_INSTANCES.forEach(function(c){ try { c.resize(); } catch(e){} });
-        window.__REPORT_READY__ = true;
-      }, 1200);
     });
   }
   if (document.readyState === 'loading') {

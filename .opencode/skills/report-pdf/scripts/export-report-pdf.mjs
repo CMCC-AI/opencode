@@ -148,6 +148,8 @@ async function installAndVerifyFont(client, sessionId, font) {
   const css = `
     @font-face { font-family: "${FONT_FAMILY}"; src: local("${font.systemFamily}"), url("${regularUrl}"); font-style: normal; font-weight: 100 500; font-display: block; }
     @font-face { font-family: "${FONT_FAMILY}"; src: local("${font.systemFamily}"), url("${boldUrl}"); font-style: normal; font-weight: 600 900; font-display: block; }
+    *::before, *::after { font-family: "${FONT_FAMILY}", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif !important; }
+    svg text { font-family: "${FONT_FAMILY}", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif !important; }
   `;
   const installed = await client.send("Runtime.evaluate", {
     expression: `(async function(){
@@ -191,6 +193,21 @@ async function installAndVerifyFont(client, sessionId, font) {
         window.__REPORT_PDF_CJK_NODE__=node;
         break;
       }
+      const pseudoBad=[];
+      document.body.querySelectorAll("*").forEach(function(hostEl){
+        if(!(hostEl instanceof HTMLElement)) return;
+        ["::before","::after"].forEach(function(pseudo){
+          const style=getComputedStyle(hostEl,pseudo);
+          const content=style.content||"";
+          if(typeof content!=="string"||!/[\\u3400-\\u9fff]/.test(content)) return;
+          if(style.fontFamily.replace(/"/g,"").indexOf("${FONT_FAMILY}")===-1) pseudoBad.push(pseudo+":"+content.slice(0,24));
+        });
+      });
+      document.body.querySelectorAll("svg text").forEach(function(textEl){
+        if(!/[\\u3400-\\u9fff]/.test(textEl.textContent||"")) return;
+        if(getComputedStyle(textEl).fontFamily.replace(/"/g,"").indexOf("${FONT_FAMILY}")===-1) pseudoBad.push("svg-text:"+(textEl.textContent||"").slice(0,24));
+      });
+      if(pseudoBad.length) return {ok:false,reason:"伪元素或SVG图表文本中文字体未生效："+pseudoBad.slice(0,3).join("；")};
       return {ok:true,hasCjk:Boolean(node)};
     })()`,
     awaitPromise: true,
