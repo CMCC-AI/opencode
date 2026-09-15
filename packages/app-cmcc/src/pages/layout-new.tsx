@@ -533,6 +533,12 @@ function CmccSidebar() {
               onClick={() => navigate("/expert")}
             />
             <CmccSidebarAction
+              icon="mcp"
+              label="AI for Science"
+              active={location.pathname === "/ai-for-science"}
+              onClick={() => navigate("/ai-for-science")}
+            />
+            <CmccSidebarAction
               icon="brain"
               label="AI Wiki"
               active={location.pathname === "/knowledge" || location.pathname.startsWith("/knowledge/")}

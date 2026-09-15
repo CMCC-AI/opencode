@@ -76,6 +76,7 @@ const LegacyLayout = lazy(() => import("@/pages/layout"))
 const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
 const LegacyHome = lazy(() => import("@/pages/home").then((module) => ({ default: module.LegacyHome })))
+const CmccScienceRoute = lazy(() => import("@/pages/cmcc-science"))
 const CmccExpertCenterRoute = lazy(() =>
   import("@/pages/cmcc-experts").then((module) => ({ default: module.CmccExpertCenterRoute })),
 )
@@ -697,6 +698,7 @@ function Routes() {
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
         <Route path="/app" component={CmccDefaultRoute} />
+        <Route path="/ai-for-science" component={CmccScienceRoute} />
         <Route path="/expert" component={CmccExpertCenterRoute} />
         <Route path="/expert/:id" component={CmccExpertRoute} />
         <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />

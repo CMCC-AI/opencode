@@ -474,7 +474,7 @@ function ExpertDetailDialog(props: {
   )
 }
 
-function useCmccExpertDraftLauncher() {
+export function useCmccExpertDraftLauncher() {
   const server = useServer()
   const dockapi = useDockApi()
   const serverSDK = useServerSDK()
@@ -484,7 +484,10 @@ function useCmccExpertDraftLauncher() {
   return async (expert: TeamExpert, prompt = expert.defaultPrompt) => {
     const directory = dockapi.workspace?.directoryPath
     const artifactDirectory = cmccArtifactWorkspace(directory)
-    if (!directory || !artifactDirectory || !tabs.ready()) return
+    if (!directory || !artifactDirectory || !tabs.ready()) {
+      showToast({ title: "工作区尚未就绪", description: "请等待工作区加载完成后重试。", variant: "error" })
+      return
+    }
 
     const agents = await serverSDK()
       .client.app.agents({ directory }, { throwOnError: true })
