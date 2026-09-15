@@ -7,6 +7,7 @@ import { usePlatform } from "./platform"
 import { Persist, removePersisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { createCaseListCache } from "@/utils/case-list-cache"
+import { createCaseSnapshotCache } from "@/utils/case-snapshot-cache"
 import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
 
 const ACCESS_TOKEN_KEY = "dockapi.accessToken"
@@ -252,9 +253,11 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
     let refreshRequest: Promise<void> | undefined
     const caseOverview = createCaseListCache<DockApiCaseOverview>()
     const caseLists = createCaseListCache<DockApiCaseList>()
+    const caseSnapshots = createCaseSnapshotCache<DockApiCaseSnapshot>()
     const clearCaseCache = () => {
       caseOverview.clear()
       caseLists.clear()
+      caseSnapshots.clear()
     }
     onCleanup(clearCaseCache)
 
@@ -519,12 +522,28 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           return caseLists.load(path, () => request<DockApiCaseList>(path))
         },
         detail(caseCode: string) {
-          return request<DockApiCaseDetail>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`)
+          return request<DockApiCaseDetail>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`, { cache: "no-store" })
         },
-        async snapshot(caseCode: string) {
-          const response = await authorizedFetch(`/api/dockapi/cases/${encodeURIComponent(caseCode)}/snapshot?delivery=1`)
-          if (!response.ok) return readResponse<DockApiCaseSnapshot>(response)
-          return response.json() as Promise<DockApiCaseSnapshot>
+        snapshot(caseCode: string, version: string) {
+          const epoch = authEpoch
+          const key = JSON.stringify([dockApiBaseUrl(), state.user?.id, caseCode])
+          return caseSnapshots.load(key, version, async () => {
+            const path = `/api/dockapi/cases/${encodeURIComponent(caseCode)}`
+            const response = await authorizedFetch(`${path}/snapshot?delivery=1`, { cache: "no-store" })
+            if (!response.ok) return readResponse<never>(response)
+            const text = await response.text()
+            const value = JSON.parse(text) as DockApiCaseSnapshot
+            if (value.schemaVersion !== 1 || value.caseCode !== caseCode) {
+              throw new DockApiError("案例快照版本或编号不匹配")
+            }
+            // Publication may replace the snapshot during download. Never cache it under an older version.
+            const latest = await request<DockApiCaseDetail>(path, { cache: "no-store" })
+            if (latest.caseCode !== caseCode || latest.snapshotVersion !== version) {
+              throw new DockApiError("案例已更新，请重新打开以加载最新内容", 409)
+            }
+            if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
+            return { value, size: text.length * 2 }
+          })
         },
         async publish(input: {
           businessSessionId: string

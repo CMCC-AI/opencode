@@ -27,6 +27,8 @@ async function prepare(page: Page, scienceCount = 4, canManage = false) {
     ),
   }))
   const listRequests: URLSearchParams[] = []
+  const requests = { snapshots: 0, details: 0, tickets: 0 }
+  const serverState = { version: "test", detailStatus: 200, changeDuringSnapshot: false }
   await mockOpenCodeServer(page, { ...fixture, sessions: [], pageMessages: () => ({ items: [] }) })
   await page.addInitScript(() => localStorage.setItem("dockapi.accessToken", "case-layout-test-token"))
   await page.route("**/api/**", (route) => {
@@ -39,11 +41,13 @@ async function prepare(page: Page, scienceCount = 4, canManage = false) {
         workspace: { id: 999, workspaceKey: "test", directoryPath: fixture.directory, status: "READY" },
       })
     if (url.pathname === "/api/dockapi/cases/overview") return json({ groups })
-    if (url.pathname.endsWith("/preview-ticket"))
+    if (url.pathname.endsWith("/preview-ticket")) {
+      requests.tickets += 1
       return json({
         baseUrl: "http://localhost:8081/api/dockapi/case-preview/card-test",
         expiresAt: "2099-01-01T00:00:00Z",
       })
+    }
     if (url.pathname === "/api/dockapi/cases") {
       listRequests.push(url.searchParams)
       const category = url.searchParams.get("category")
@@ -57,16 +61,28 @@ async function prepare(page: Page, scienceCount = 4, canManage = false) {
     const detail = groups
       .flatMap((group) => group.items)
       .find((item) => url.pathname === `/api/dockapi/cases/${item.caseCode}`)
-    if (detail)
+    if (detail) {
+      requests.details += 1
+      if (serverState.detailStatus !== 200) return route.fulfill({
+        status: serverState.detailStatus,
+        json: { code: serverState.detailStatus, message: "案例不可访问", data: null },
+        headers: { "access-control-allow-origin": "*" },
+      })
       return json({
         ...detail,
         query: detail.caseName,
         rootAgent: "build",
-        snapshotVersion: "test",
+        snapshotVersion: serverState.version,
         snapshotBytes: 0,
         artifactBytes: 0,
       })
-    if (url.pathname.endsWith("/snapshot"))
+    }
+    if (url.pathname.endsWith("/snapshot")) {
+      requests.snapshots += 1
+      if (serverState.changeDuringSnapshot) {
+        serverState.version = "updated-during-download"
+        serverState.changeDuringSnapshot = false
+      }
       return route.fulfill({
         json: {
           schemaVersion: 1,
@@ -96,6 +112,7 @@ async function prepare(page: Page, scienceCount = 4, canManage = false) {
         },
         headers: { "access-control-allow-origin": "*" },
       })
+    }
     return json([])
   })
   await page.goto("/cases")
@@ -106,7 +123,7 @@ async function prepare(page: Page, scienceCount = 4, canManage = false) {
       .poll(() => page.locator('[data-page="cmcc-cases"]').evaluate((element) => element.clientWidth))
       .toBeGreaterThan(380)
   }
-  return { listRequests, groups }
+  return { listRequests, groups, requests, serverState }
 }
 
 async function boxes(cards: Locator) {
@@ -306,4 +323,76 @@ test("list does not load case detail chunks and returning displays cache before 
   }
   await expect(page.locator('[data-case-group="deep-research"] [data-case-card]')).toHaveCount(3)
   await expect(page.locator('[data-case-card="deep-research-1"]')).toHaveCount(0)
+})
+
+async function openFirstCase(page: Page) {
+  await page.locator('[data-case-card="deep-research-1"] > button').first().click()
+  await expect(page.getByRole("heading", { name: "通用深度研究案例 1", exact: true })).toBeVisible()
+}
+
+async function returnToCases(page: Page) {
+  await page.getByRole("button", { name: "返回案例库", exact: true }).click()
+  await expect(page.locator('[data-case-card="deep-research-1"]')).toBeVisible()
+}
+
+test("same-version reopening avoids snapshot download but rechecks metadata and refreshes tickets", async ({ page }, info) => {
+  const { requests } = await prepare(page)
+  await openFirstCase(page)
+  const initialDetails = requests.details
+  const initialTickets = requests.tickets
+  await returnToCases(page)
+  await openFirstCase(page)
+  await info.attach("request-counts", { body: JSON.stringify(requests), contentType: "application/json" })
+  expect(requests.snapshots).toBe(1)
+  expect(requests.details).toBeGreaterThan(initialDetails)
+  expect(requests.tickets).toBe(initialTickets + 1)
+})
+
+test("a new snapshot version and a case mutation event both invalidate cached data", async ({ page }) => {
+  const { requests, serverState } = await prepare(page)
+  await openFirstCase(page)
+  await returnToCases(page)
+  serverState.version = "new-version"
+  await openFirstCase(page)
+  expect(requests.snapshots).toBe(2)
+  await returnToCases(page)
+  await page.evaluate(() => window.dispatchEvent(new Event("cmcc:cases-updated")))
+  await openFirstCase(page)
+  expect(requests.snapshots).toBe(3)
+})
+
+for (const status of [403, 404]) {
+  test(`cached snapshots cannot bypass current access checks (${status})`, async ({ page }) => {
+    const { requests, serverState } = await prepare(page)
+    await openFirstCase(page)
+    await returnToCases(page)
+    serverState.detailStatus = status
+    await page.locator('[data-case-card="deep-research-1"] > button').first().click()
+    await expect(page.getByText("案例详情加载失败", { exact: true })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "通用深度研究案例 1", exact: true })).toHaveCount(0)
+    expect(requests.snapshots).toBe(1)
+  })
+}
+
+test("publication during download never caches a snapshot under the wrong version", async ({ page }) => {
+  const { requests, serverState } = await prepare(page)
+  serverState.changeDuringSnapshot = true
+  await page.locator('[data-case-card="deep-research-1"] > button').first().click()
+  await expect(page.getByText("案例已更新，请重新打开以加载最新内容", { exact: true })).toBeVisible()
+  await returnToCases(page)
+  await openFirstCase(page)
+  expect(requests.snapshots).toBe(2)
+  await returnToCases(page)
+  await openFirstCase(page)
+  expect(requests.snapshots).toBe(2)
+})
+
+test("an authentication storage change clears cached snapshots before restoring the session", async ({ page }) => {
+  const { requests } = await prepare(page)
+  await openFirstCase(page)
+  await returnToCases(page)
+  await page.evaluate(() => window.dispatchEvent(new StorageEvent("storage", { key: "dockapi.accessToken" })))
+  await expect(page.locator('[data-case-card="deep-research-1"]')).toBeVisible()
+  await openFirstCase(page)
+  expect(requests.snapshots).toBe(2)
 })
