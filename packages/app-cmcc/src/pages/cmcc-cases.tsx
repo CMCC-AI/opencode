@@ -338,7 +338,13 @@ function OverviewGroups(props: {
           </div>
         </section>
       </Show>
-      <div class="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 max-md:grid-cols-1">
+      <Show when={others().length}>
+        <div class="mt-6 flex min-w-0 items-baseline gap-3">
+          <h2 class="shrink-0 text-[15px] font-semibold text-[#6038e4]">AI+产业洞察</h2>
+          <p class="truncate text-[14px] text-[#596176]">垂类专家团专业化研究</p>
+        </div>
+      </Show>
+      <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 max-md:grid-cols-1">
         <For each={others()}>
           {(group) => {
             const category = () => cmccCaseCategoryByCode(group.category)
