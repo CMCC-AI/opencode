@@ -19,9 +19,10 @@ const MAX_BATCH_TARGET_WORDS = 5000;
 const MIN_COMBINED_BATCH_WORDS = 2800;
 
 const buildPlan = (outline) => {
-  if (!Array.isArray(outline.sections) || outline.sections.length === 0) throw new Error('10-outline.json 缺少 sections，无法规划章节写作批次');
+  const sections = outline.sections || outline.outline?.sections || [];
+  if (!Array.isArray(sections) || sections.length === 0) throw new Error('10-outline.json 缺少 sections，无法规划章节写作批次');
   const units = [];
-  for (const section of outline.sections) {
+  for (const section of sections) {
     const sectionNumber = String(section.section_number || '').trim();
     const sectionTitle = titleOf(section);
     if (!sectionTitle) throw new Error('大纲存在无标题章节');

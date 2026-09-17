@@ -579,7 +579,9 @@ function CmccSidebar() {
                   session={session}
                   active={activeSession(session)}
                   running={sync().session.data.session_working(session.id)}
-                  product={cmccHistoryProduct(dockapi.sessions.findByOpenCodeId(session.id)?.agentType)}
+                  product={cmccHistoryProduct(dockapi.sessions.findByOpenCodeId(session.id)?.agentType, session.agent,
+                    sync().session.data.message[session.id]?.filter((message) => message.role === "user")
+                      .sort((left, right) => left.time.created - right.time.created || left.id.localeCompare(right.id))[0]?.agent)}
                   timeLabel={timeLabel(session)}
                   knowledgeName={
                     cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)?.name ??

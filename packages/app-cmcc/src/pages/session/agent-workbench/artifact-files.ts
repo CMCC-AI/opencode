@@ -21,8 +21,14 @@ export async function scanSessionArtifactFiles(input: {
   root: string
   list: (path: string) => Promise<FileNode[]>
   isCurrent?: () => boolean
+  legacyResearch?: boolean
 }) {
-  if (!safeRelative(input.root)?.startsWith("runs/")) throw new Error("缺少有效的会话产物目录")
+  const safeRoot = safeRelative(input.root)
+  if (
+    !safeRoot?.startsWith("runs/") &&
+    !(input.legacyResearch && /^tmp\/research-workspace\/\d{8}-\d{4}$/.test(safeRoot ?? ""))
+  )
+    throw new Error("缺少有效的会话产物目录")
   const paths = new Set<string>()
   const visited = new Set<string>()
   const queue = [{ path: input.root, depth: 0 }]

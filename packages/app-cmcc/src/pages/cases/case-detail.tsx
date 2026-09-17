@@ -6,10 +6,10 @@ import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { createMediaQuery } from "@solid-primitives/media"
 import { For, Match, Show, Switch, Suspense, lazy, createMemo, createResource, onCleanup, untrack, type JSX, type Component } from "solid-js"
 import { createStore } from "solid-js/store"
-import { useNavigate, useParams } from "@solidjs/router"
+import { useLocation, useNavigate, useParams } from "@solidjs/router"
 import type { Message, Part, SessionStatus } from "@opencode-ai/sdk/v2"
-import type { DockApiCaseArtifact, DockApiCaseDetail, DockApiCaseSnapshot } from "@/context/dockapi"
-import { dockApiUrl, useDockApi } from "@/context/dockapi"
+import type { DockApiCaseArtifact, DockApiCaseSnapshot, DockApiLoadedCase } from "@/context/dockapi"
+import { useDockApi } from "@/context/dockapi"
 import { CaseDeleteDialog } from "@/components/case-delete-dialog"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
@@ -23,8 +23,9 @@ import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByAgentType, cmccCaseManageme
 import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { CASE_REPLAY_DURATION_MS, caseReplayFrame, compileCaseReplay } from "./replay"
-import { resolveCaseSnapshotAttachments } from "./snapshot-attachments"
+import { loadCaseData } from "./load-case"
 import type { DedicatedCaseProps } from "./dedicated-case-layout"
+import { DEEPINSIGHT_LEAD_AGENT, shouldUseDeepInsightPage } from "@/pages/session/deepinsight/page-selection"
 import {
   CASE_FILE_PANEL_DEFAULT_WIDTH,
   caseFilePanelMaxWidth,
@@ -33,7 +34,8 @@ import {
 } from "./file-panel-layout"
 import echartsRuntimeUrl from "../../../node_modules/echarts/dist/echarts.min.js?url"
 
-const dedicatedViews: Record<string, Component<DedicatedCaseProps>> = {
+const dedicatedViews: Record<string, ReturnType<typeof lazy<Component<DedicatedCaseProps>>>> = {
+  "deep-research": lazy(() => import("./views/deep-research")),
   finance: lazy(() => import("./views/finance")),
   inspection: lazy(() => import("./views/inspection")),
   government: lazy(() => import("./views/government")),
@@ -41,32 +43,35 @@ const dedicatedViews: Record<string, Component<DedicatedCaseProps>> = {
   science: lazy(() => import("./views/science")),
 }
 
-type LoadedCase = {
-  detail: DockApiCaseDetail
-  snapshot: DockApiCaseSnapshot
-  previewBaseUrl: string
+type LoadedCase = DockApiLoadedCase
+
+function dedicatedCaseView(value: LoadedCase) {
+  const category = cmccCaseCategoryByAgentType(value.detail.agentType)?.code
+  const root = value.snapshot.sessions.find((entry) => entry.session.id === value.snapshot.rootSessionId)
+  const deepResearch = value.detail.rootAgent === DEEPINSIGHT_LEAD_AGENT || shouldUseDeepInsightPage(root?.session,
+    root?.messages.find((message) => message.info.role === "user")?.info.agent)
+  return category && (category !== "deep-research" || deepResearch) ? dedicatedViews[category] : undefined
+}
+
+export async function preloadCaseDetail(value: LoadedCase) {
+  await dedicatedCaseView(value)?.preload()
 }
 
 export function CmccCaseDetailRoute() {
   const params = useParams<{ caseCode: string }>()
+  const location = useLocation<{ caseOpenToken?: string }>()
   const dockapi = useDockApi()
   const navigate = useNavigate()
+  let request: AbortController | undefined
+  onCleanup(() => request?.abort())
   const [loaded] = createResource(
     () => params.caseCode,
-    async (caseCode): Promise<LoadedCase> => {
-      const [detail, snapshot, ticket] = await Promise.all([
-        dockapi.cases.detail(caseCode),
-        dockapi.cases.snapshot(caseCode),
-        dockapi.cases.previewTicket(caseCode),
-      ])
-      if (snapshot.schemaVersion !== 1 || snapshot.caseCode !== detail.caseCode) {
-        throw new Error("案例快照版本或编号不匹配")
-      }
-      return {
-        detail,
-        snapshot: resolveCaseSnapshotAttachments(snapshot, dockApiUrl(ticket.baseUrl)),
-        previewBaseUrl: dockApiUrl(ticket.baseUrl).replace(/\/$/, ""),
-      }
+    (caseCode): LoadedCase | Promise<LoadedCase> => {
+      request?.abort()
+      const prepared = dockapi.cases.takeNavigation(caseCode, location.state?.caseOpenToken)
+      if (prepared) return prepared
+      request = new AbortController()
+      return loadCaseData(dockapi.cases, caseCode, request.signal)
     },
   )
 
@@ -174,7 +179,7 @@ function CaseDetailContent(props: { value: LoadedCase }) {
     />
   )
 
-  const View = category ? dedicatedViews[category] : undefined
+  const View = dedicatedCaseView(props.value)
   if (View) {
     return (
       <>

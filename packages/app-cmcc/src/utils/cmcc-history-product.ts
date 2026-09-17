@@ -55,7 +55,13 @@ const products: Record<string, CmccHistoryProduct> = {
   },
 }
 
-export function cmccHistoryProduct(agentType: string | undefined): CmccHistoryProduct | undefined {
+export function cmccHistoryProduct(
+  agentType: string | undefined,
+  rootAgent?: string,
+  initialAgent?: string,
+): CmccHistoryProduct | undefined {
+  if (rootAgent === "deepinsight/deepinsight-team-lead" || initialAgent === "deepinsight/deepinsight-team-lead")
+    return { ...deepResearch, label: "深度研究" }
   const key = agentType?.trim().toLowerCase()
   if (!key) return undefined
   return products[key]

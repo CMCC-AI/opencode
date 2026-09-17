@@ -7,6 +7,7 @@ import { usePlatform } from "./platform"
 import { Persist, removePersisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { createCaseListCache } from "@/utils/case-list-cache"
+import { createCaseHandoff } from "@/utils/case-handoff"
 import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
 
 const ACCESS_TOKEN_KEY = "dockapi.accessToken"
@@ -134,6 +135,12 @@ export type DockApiCasePreviewTicket = {
   expiresAt: string
 }
 
+export type DockApiLoadedCase = {
+  detail: DockApiCaseDetail
+  snapshot: DockApiCaseSnapshot
+  previewBaseUrl: string
+}
+
 export function asOpenCodeSession(value: unknown): Session | undefined {
   if (!value || typeof value !== "object") return
   const session = value as Partial<Session>
@@ -252,9 +259,11 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
     let refreshRequest: Promise<void> | undefined
     const caseOverview = createCaseListCache<DockApiCaseOverview>()
     const caseLists = createCaseListCache<DockApiCaseList>()
+    const caseHandoff = createCaseHandoff<DockApiLoadedCase>()
     const clearCaseCache = () => {
       caseOverview.clear()
       caseLists.clear()
+      caseHandoff.clear()
     }
     onCleanup(clearCaseCache)
 
@@ -518,13 +527,29 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           const path = caseListPath(input)
           return caseLists.load(path, () => request<DockApiCaseList>(path))
         },
-        detail(caseCode: string) {
-          return request<DockApiCaseDetail>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`)
+        detail(caseCode: string, signal?: AbortSignal) {
+          return request<DockApiCaseDetail>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`, { signal })
         },
-        async snapshot(caseCode: string) {
-          const response = await authorizedFetch(`/api/dockapi/cases/${encodeURIComponent(caseCode)}/snapshot?delivery=1`)
+        async snapshot(caseCode: string, signal?: AbortSignal) {
+          const epoch = authEpoch
+          const response = await authorizedFetch(`/api/dockapi/cases/${encodeURIComponent(caseCode)}/snapshot?delivery=1`, { signal })
           if (!response.ok) return readResponse<DockApiCaseSnapshot>(response)
-          return response.json() as Promise<DockApiCaseSnapshot>
+          const snapshot = await response.json() as DockApiCaseSnapshot
+          if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
+          return snapshot
+        },
+        get navigationScope() {
+          return authEpoch
+        },
+        stageNavigation(value: DockApiLoadedCase, scope: number) {
+          if (state.status !== "authenticated" || scope !== authEpoch) throw new DockApiError("登录状态已变化", 401)
+          return caseHandoff.stage(value.detail.caseCode, authEpoch, value)
+        },
+        takeNavigation(caseCode: string, token: unknown) {
+          return caseHandoff.take(caseCode, authEpoch, token)
+        },
+        discardNavigation(token: string) {
+          caseHandoff.clear(token)
         },
         async publish(input: {
           businessSessionId: string
@@ -547,10 +572,10 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           await request<void>(`/api/dockapi/cases/${encodeURIComponent(caseCode)}`, { method: "DELETE" })
           clearCaseCache()
         },
-        previewTicket(caseCode: string) {
+        previewTicket(caseCode: string, signal?: AbortSignal) {
           return request<DockApiCasePreviewTicket>(
             `/api/dockapi/cases/${encodeURIComponent(caseCode)}/preview-ticket`,
-            { method: "POST" },
+            { method: "POST", signal },
           )
         },
       },

@@ -127,3 +127,31 @@ test("missing metadata does not scan another directory and failures are visible 
     f.dispose()
   }
 })
+
+test("DeepInsight refreshes a proven legacy run on producer completion without polling", async () => {
+  const run = "tmp/research-workspace/20260916-0917"
+  const f = createRoot((dispose) => {
+    const [state, setState] = createStore({ path: run as string | undefined, revision: "write-one", pdf: false })
+    const calls: string[] = []
+    const catalog = createArtifactFileCatalog({ root: () => session("one"), status: () => ({ type: "busy" }), artifacts: () => [],
+      rootPath: () => state.path, revision: () => state.revision, legacyResearch: true,
+      list: async (path) => { calls.push(path); return state.pdf ? [node(`${path}/35-report.pdf`)] : [] },
+    })
+    return { dispose, setState, calls, catalog }
+  })
+  try {
+    await flush()
+    expect(f.calls).toEqual([run])
+    f.setState("pdf", true)
+    await flush()
+    expect(f.calls).toHaveLength(1)
+    f.setState("revision", "write-one:pdf-completed")
+    await flush()
+    expect(f.calls).toEqual([run, run])
+    expect(f.catalog.files()[0].filename).toBe("35-report.pdf")
+    f.setState("path", undefined)
+    await flush()
+    expect(f.catalog.files()).toEqual([])
+    expect(f.calls).toHaveLength(2)
+  } finally { f.dispose() }
+})

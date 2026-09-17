@@ -9,11 +9,18 @@ export function createArtifactFileCatalog(input: {
   status: Accessor<SessionStatus | undefined>
   artifacts: Accessor<readonly SessionArtifact[]>
   list: (path: string) => Promise<FileNode[]>
+  rootPath?: Accessor<string | undefined>
+  legacyResearch?: boolean
+  revision?: Accessor<string>
 }) {
   const [state, setState] = createStore({ paths: [] as string[], loading: false, warnings: [] as string[] })
   const scope = createMemo(() => {
     const root = input.root()
-    const path = root ? sessionArtifactRoot(root.directory, root.metadata) : undefined
+    const path = root
+      ? input.rootPath
+        ? input.rootPath()
+        : sessionArtifactRoot(root.directory, root.metadata)
+      : undefined
     return root && path ? { id: root.id, directory: root.directory, path } : undefined
   })
   const key = createMemo(() => {
@@ -38,6 +45,7 @@ export function createArtifactFileCatalog(input: {
     const task = scanSessionArtifactFiles({
       directory: source.directory,
       root: source.path,
+      legacyResearch: input.legacyResearch,
       list,
       isCurrent: () => generation === current,
     })
@@ -62,7 +70,7 @@ export function createArtifactFileCatalog(input: {
 
   createEffect(
     on(
-      () => ({ key: key(), busy: busy() }),
+      () => ({ key: key(), busy: busy(), revision: input.revision?.() }),
       (next, previous) => {
         if (next.key !== previous?.key) {
           generation += 1
@@ -72,7 +80,7 @@ export function createArtifactFileCatalog(input: {
           refresh()
           return
         }
-        if (previous?.busy && !next.busy) refresh()
+        if ((previous?.busy && !next.busy) || (previous && next.revision !== previous.revision)) refresh()
       },
     ),
   )

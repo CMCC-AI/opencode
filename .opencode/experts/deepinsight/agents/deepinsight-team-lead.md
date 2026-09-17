@@ -101,7 +101,7 @@ permission:
 
 ### Phase 0: 准备 workspace（主理人亲自）
 
-1. 创建目录 `tmp/research-workspace/<run-id>/`（run-id = `YYYYMMDD-HHMM` 时间戳，用 Bash `date +%Y%m%d-%H%M` 获取）
+1. 优先使用系统注入的“本次会话的独立产物目录”作为 workspace_dir，所有脚本显式传入这个绝对路径，Bash 的 workdir 也使用该目录。不得在用户工作区根目录另建 tmp/research-workspace。只有独立运行且系统没有注入产物目录时，才在当前工作目录创建 `tmp/research-workspace/<run-id>/`（run-id = `YYYYMMDD-HHMM` 时间戳）。调用每个子 Agent 时必须传递同一个 workspace_dir，并要求其所有写入、下载、HTML/PDF 导出都在该目录内。
 2. 写入 `00-input.json`：
 
 ```json

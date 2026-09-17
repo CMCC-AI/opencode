@@ -67,6 +67,10 @@ import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { DeepInsightResultsPanel } from "@/pages/session/deepinsight/deepinsight-results-panel"
+import { DeepInsightSessionView } from "@/pages/session/deepinsight/deepinsight-session-view"
+import { shouldUseDeepInsightPage } from "@/pages/session/deepinsight/page-selection"
+import { DeepInsightWorkbenchProvider } from "@/pages/session/deepinsight/workbench-context"
 import { AiScienceResultsPanel } from "@/pages/session/ai-science/ai-science-results-panel"
 import { AiScienceSessionView } from "@/pages/session/ai-science/ai-science-session-view"
 import { shouldUseAiSciencePage } from "@/pages/session/ai-science/page-selection"
@@ -309,7 +313,8 @@ export default function Page() {
   const zhengqi = createMemo(() => shouldUseZhengqiPage(info(), businessAgentType(), initialUserAgent()))
   const shoppers = createMemo(() => shouldUseShoppersPage(info(), businessAgentType(), initialUserAgent()))
   const aiScience = createMemo(() => shouldUseAiSciencePage(info(), businessAgentType(), initialUserAgent()))
-  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || aiScience())
+  const deepInsight = createMemo(() => shouldUseDeepInsightPage(info(), initialUserAgent()))
+  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || aiScience() || deepInsight())
   const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
@@ -1824,6 +1829,7 @@ export default function Page() {
 
   return (
     <DeepTradingWorkbenchProvider sessionID={() => params.id} active={deepTrading}>
+      <DeepInsightWorkbenchProvider sessionID={() => params.id} active={deepInsight}>
       <DeepInspectWorkbenchProvider sessionID={() => params.id} active={deepInspect}>
       <ZhengqiWorkbenchProvider sessionID={() => params.id} active={zhengqi}>
       <ShoppersWorkbenchProvider sessionID={() => params.id} active={shoppers}>
@@ -1889,6 +1895,9 @@ export default function Page() {
                         <Match when={deepInspect()}>
                           <DeepInspectResultsPanel />
                         </Match>
+                        <Match when={deepInsight()}>
+                          <DeepInsightResultsPanel />
+                        </Match>
                         <Match when={zhengqi()}>
                           <ZhengqiResultsPanel />
                         </Match>
@@ -1932,6 +1941,13 @@ export default function Page() {
                                   }
                                   right={<DeepTradingResultsPanel />}
                                 />
+                              </Show>
+                            </Match>
+                            <Match when={deepInsight()}>
+                              <Show when={isDesktop()} fallback={<DeepInsightSessionView />}>
+                                <DeepTradingSplitLayout persistKey="deepinsight-panels" label="深度研究"
+                                  left={<><div class="min-h-0 flex-1 overflow-hidden"><DeepInsightSessionView /></div>{composerRegion()}</>}
+                                  right={<DeepInsightResultsPanel />} />
                               </Show>
                             </Match>
                             <Match when={deepInspect()}>
@@ -2114,6 +2130,7 @@ export default function Page() {
       </ShoppersWorkbenchProvider>
       </ZhengqiWorkbenchProvider>
       </DeepInspectWorkbenchProvider>
+      </DeepInsightWorkbenchProvider>
     </DeepTradingWorkbenchProvider>
   )
 }

@@ -32,7 +32,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   {
     kind: "team",
     id: "deepinsight",
-    name: "DeepInsight 深度研究专家团",
+    name: "深度研究",
     description:
       "证据驱动深度研究团队：材料深挖、内外混合与公开信息三模式研究，经反思核验交付可追溯的 Markdown/HTML/PDF 研究报告。",
     leadAgent: "deepinsight/deepinsight-team-lead",

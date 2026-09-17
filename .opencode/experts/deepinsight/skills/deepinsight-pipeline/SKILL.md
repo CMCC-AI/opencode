@@ -26,7 +26,7 @@ description: DeepInsight 深度研究专家团共享运行时规范——三模�
 
 ## Workspace 数据协议
 
-每次研究在当前工作目录创建 `tmp/research-workspace/<run-id>/`（run-id 用 `YYYYMMDD-HHMM` 时间戳），所有文件 UTF-8 无 BOM：
+每次研究优先使用系统注入的独立会话产物目录作为 workspace_dir；脚本参数、Bash workdir 和所有子 Agent 都必须使用这个绝对路径，所有产物及 HTML/PDF 导出不得越出该目录。只有系统未注入产物目录的独立运行环境，才在当前工作目录创建 `tmp/research-workspace/<run-id>/`（run-id 用 `YYYYMMDD-HHMM` 时间戳）。所有文本文件 UTF-8 无 BOM：
 
 ```text
 00-input.json                     用户原始输入、文件和运行设置

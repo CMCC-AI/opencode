@@ -35,6 +35,13 @@ const cases = [
     category: "science",
     experts: 20,
   },
+  {
+    type: "deepinsight",
+    lead: "deepinsight/deepinsight-team-lead",
+    member: "deepinsight/di-report-writer",
+    category: "deep-research",
+    experts: 10,
+  },
 ]
 
 type CaseInput = (typeof cases)[number]
@@ -105,7 +112,7 @@ function snapshot(input: CaseInput): DockApiCaseSnapshot {
   const root = entry("case-root", input.lead)
   const child = entry("case-child", input.member, "case-root")
   const filenames =
-    input.category === "science"
+    input.category === "deep-research" ? ["20-report.md", "30-report.html", "25-visual-report.json"] : input.category === "science"
       ? ["writing/paper.md", "figures/chart.svg", "reports/view.html"]
       : ["20-report.md", "25-visual-report.json", "06-consolidated-issues.json"]
   for (const path of filenames) {
@@ -215,6 +222,9 @@ async function prepare(
       if (options.fileError)
         return route.fulfill({ status: 404, body: "missing", headers: { "access-control-allow-origin": "*" } })
       let body = reportText
+      if (path.endsWith("30-report.html")) return route.fulfill({
+        contentType: "text/html; charset=utf-8", body: "<!doctype html><html><body>深度研究可视化正文</body></html>",
+      })
       if (path.endsWith("report.docx") && wordBuffer)
         return route.fulfill({
           contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -331,6 +341,8 @@ for (const input of cases) {
         )
         .toBe(true)
       await page.screenshot({ path: `e2e/test-results/case-${input.category}-visual.png`, fullPage: true })
+    } else if (input.category === "deep-research") {
+      await expect(page.frameLocator('iframe[title="30-report.html"]').getByText("深度研究可视化正文")).toBeVisible()
     } else if (input.category === "science") {
       const report = page.frameLocator('iframe[title="view.html"]')
       await expect(report.getByText("科研可视化测试", { exact: true })).toBeVisible()
@@ -385,6 +397,27 @@ for (const input of cases) {
     expect(state.errors).toEqual([])
   })
 }
+
+test("old ordinary conversations in deep-research keep the generic read-only page", async ({ page }) => {
+  await prepare(page, { ...cases[4], lead: "build", member: "build" })
+  await expect(page.getByRole("button", { name: "分析团队", exact: true })).toHaveCount(0)
+  await expect(page.locator('[contenteditable="true"]')).toHaveCount(0)
+  await expect(page.getByText("案例总览结论", { exact: true })).toBeVisible()
+})
+
+test("deep research case creates a research draft without sending it", async ({ page }) => {
+  const input = cases[4]
+  const state = await prepare(page, input, { wordReport: true })
+  await page.getByRole("button", { name: "文字报告", exact: true }).click()
+  await page.getByRole("button", { name: "report.docx", exact: true }).click()
+  await expect(page.getByText("案例 Word 正文", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "做同款", exact: true }).click()
+  await expect(page).toHaveURL(/\/new-session\?/)
+  await expect(page.locator('[contenteditable="true"]')).toContainText("案例原始查询")
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("opencode.global.dat:tabs"))).toContain(`"agent":"${input.lead}"`)
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("opencode.global.dat:tabs"))).toContain('"expertID":"deepinsight"')
+  expect(state.apiRequests.filter((value) => value.startsWith("POST /session"))).toEqual([])
+})
 
 async function expectRightFold(page: Page, count: number) {
   const dag = page.locator("[data-serial-dag]")

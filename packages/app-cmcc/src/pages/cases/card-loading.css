@@ -1,0 +1,55 @@
+.case-card-loading {
+  position: absolute;
+  inset-inline: 1px;
+  bottom: 1px;
+  z-index: 20;
+  min-height: 52px;
+  padding: 7px 10px 10px;
+  border-top: 1px solid #dce6f5;
+  border-radius: 0 0 7px 7px;
+  background: rgb(248 251 255 / 96%);
+  color: #3e66a9;
+  transition: transform 150ms;
+}
+
+[data-case-card]:hover > .case-card-loading {
+  transform: translateY(-2px);
+}
+
+.case-card-loading[data-error] {
+  border-color: #f0d9d9;
+  color: #a54747;
+}
+
+.case-card-loading-track {
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #dce8fc;
+}
+
+.case-card-loading-bar {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: inherit;
+  background: #4779e6;
+  animation: case-card-loading 1.25s ease-in-out infinite;
+}
+
+@keyframes case-card-loading {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(275%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .case-card-loading-bar {
+    animation: none;
+    transform: translateX(80%);
+  }
+}
