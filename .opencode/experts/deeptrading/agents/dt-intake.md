@@ -55,7 +55,7 @@ options:
 
 ## 输出规范
 
-完成后通过 SendMessage 向主理人回传以下结构化结果：
+完成后在最终回答中向主理人回传以下结构化结果：
 
 ```
 标的已识别：<company_name>（<ticker>.<exchange>），置信度 <confidence>。

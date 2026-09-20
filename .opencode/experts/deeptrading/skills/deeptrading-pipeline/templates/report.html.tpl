@@ -208,6 +208,7 @@
 <script>
 (function(){
   var TONES = ['neutral','info','positive','warning','negative'];
+  var REFS_TOTAL = 0;
   function safeTone(t){ return TONES.indexOf(t) >= 0 ? t : 'neutral'; }
   function escapeHtml(s){
     return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
@@ -216,6 +217,8 @@
   }
   function annotateRefs(html){
     return html.replace(/\[(\d+)\]/g, function(m, n){
+      var num = Number(n);
+      if (num < 1 || num > REFS_TOTAL) return m;
       return '<sup><a class="ref" href="#ref-'+n+'" title="参考文献 '+n+'">['+n+']</a></sup>';
     }).replace(/<cite>([^<]+)<\/cite>/g, function(m, url){
       return '<sup><a class="ref" href="'+escapeHtml(url)+'" target="_blank" rel="noopener">[src]</a></sup>';
@@ -260,7 +263,8 @@
     var el = document.getElementById(containerId);
     if (!el) return;
     try {
-      var chart = echarts.init(el);
+      /* SVG 渲染与巡查/政企对齐：文本保持矢量，统一 PDF 导出器的 svg text 字体规则与审计才能覆盖（canvas 位图会把缺字体的豆腐直接烤进图片且审计不可见）。 */
+      var chart = echarts.init(el, null, { renderer: 'svg' });
       var option = reviveFunctions(chartBlock.option || {});
       if (!option.color && !option.series) option.color = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#94a3b8'];
       chart.setOption(option);
@@ -451,6 +455,7 @@
       return;
     }
     try { refs = JSON.parse(refData); } catch(e) { refs = []; }
+    REFS_TOTAL = Array.isArray(refs) ? refs.length : 0;
     document.title = report.title || '深度研究报告';
     document.getElementById('report-title').textContent = report.title || '深度研究报告';
     if (report.subtitle) document.getElementById('report-subtitle').textContent = report.subtitle;

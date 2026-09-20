@@ -40,12 +40,13 @@ options:
 
 1. **读取报告**：用 Read 工具读取主理人传入的 `30-final-report.md`
 2. **切分章节**：按"一、二、...、七、"切分七章
-3. **扫描数据**：识别所有 Markdown 表格、数字密集段、明确建议、时间线
-4. **提炼 hero_stats**：从全文挑 5-6 个最醒目数据点
-5. **设计图表**：从数据池和表格设计至少 5 个 chart block
-6. **组装 sections**：每章先放可视化 block，再放正文 block
-7. **自检**：跑自检清单（chart ≥5、table ≥5、stat_grid ≥3、callout ≥3）
-8. **回传结果**：通过 SendMessage 向主理人回传结构化 JSON（只输出 JSON，不生成 HTML）
+3. **正文优先落块**：每章的正文段落必须以 `markdown` block **原样搬运**（不得改写、删减、总结、重组为组件），正文中的 `[N]` 引用标记必须一字不动保留
+4. **扫描数据**：在正文之外识别 Markdown 表格、数字密集段、明确建议、时间线
+5. **提炼 hero_stats**：从全文挑 5-6 个最醒目数据点
+6. **设计图表**：从数据池和表格设计至少 5 个 chart block
+7. **组装 sections**：每章先放本章 `markdown` 正文块，可视化 block 作为补充放在对应正文之后，**不得替代正文**
+8. **自检**：跑自检清单（每章 markdown 块 ≥1；全文 `[N]` 标记数量与 `30-final-report.md` 完全一致；chart ≥5、table ≥5、stat_grid ≥3、callout ≥3）
+9. **回传结果**：在最终回答中向主理人回传结构化 JSON（只输出 JSON，不生成 HTML）
 
 ## 支持的 block 类型
 
@@ -86,6 +87,7 @@ options:
       "id": "section_1",
       "heading": "一、公司概况",
       "blocks": [
+        {"type": "markdown", "content": "（本章正文原样搬运，含 [1] [2] 引用标记）"},
         {"type": "stat_grid", "title": "...", "items": [...]},
         {"type": "chart", "chart": {...}},
         {"type": "table", "title": "...", "columns": [...], "rows": [...]},
@@ -98,6 +100,7 @@ options:
 
 **硬性要求**：
 - sections 恰好 7 个，标题与总报告七章一致
+- **每章至少 1 个 markdown block，七章正文合计必须覆盖总报告全部段落；正文含 `[N]` 引用标记时必须原样保留（渲染脚本会校验，缺失即报错重做）**
 - 至少 5 个 chart block（至少 2 种图表类型）
 - 至少 5 个 table block
 - 至少 3 个 stat_grid block
@@ -113,4 +116,4 @@ options:
 - `formatter` 用字符串模板 `"{b}: {c}%"` 或函数字符串
 - 所有字符串必须正确转义
 - 第七章必须有醒目 callout（明确投资建议）
-- 完成后通过 SendMessage 向主理人回传完整 JSON
+- 完成后在最终回答中向主理人回传完整 JSON
