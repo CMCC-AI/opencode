@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { readFileSync } from "node:fs"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
 
@@ -14,7 +15,7 @@ async function prepare(page: Page) {
     categoryLabel: "通用深度研究",
     agentType: "deepinsight",
     rootAgent: id === "two" ? "deepinsight/deepinsight-team-lead" : "build",
-    coverUrl: `${base}/landing/assets/grid-07-CnyNXoAJ.png`,
+    coverUrl: `${base}/__test__/case-cover.png`,
     reportCharCount: 10,
     publishedAt: "2026-09-17",
     query: `案例 ${id}`,
@@ -29,6 +30,12 @@ async function prepare(page: Page) {
   let userId = 999
   page.on("pageerror", (error) => errors.push(error.message))
   await mockOpenCodeServer(page, { ...fixture, sessions: [], pageMessages: () => ({ items: [] }) })
+  await page.route("**/__test__/case-cover.png", (route) =>
+    route.fulfill({
+      contentType: "image/png",
+      body: readFileSync(new URL("./fixtures/case-cover.png", import.meta.url)),
+    }),
+  )
   await page.addInitScript(() => {
     if (window === window.top) localStorage.setItem("dockapi.accessToken", "case-loading-test")
   })

@@ -22,11 +22,13 @@ export async function scanSessionArtifactFiles(input: {
   list: (path: string) => Promise<FileNode[]>
   isCurrent?: () => boolean
   legacyResearch?: boolean
+  legacyComparison?: boolean
 }) {
   const safeRoot = safeRelative(input.root)
   if (
     !safeRoot?.startsWith("runs/") &&
-    !(input.legacyResearch && /^tmp\/research-workspace\/\d{8}-\d{4}$/.test(safeRoot ?? ""))
+    !(input.legacyResearch && /^tmp\/research-workspace\/\d{8}-\d{4}$/.test(safeRoot ?? "")) &&
+    !(input.legacyComparison && /^tmp\/comparison-workspace\/\d{8}-\d{4}$/.test(safeRoot ?? ""))
   )
     throw new Error("缺少有效的会话产物目录")
   const paths = new Set<string>()

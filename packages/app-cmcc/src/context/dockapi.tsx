@@ -19,6 +19,8 @@ type ApiResponse<T> = {
   data: T
 }
 
+export type MstockSource = { businessSessionId: string; title: string; companyName?: string; ticker?: string; createdAt: string }
+
 export type DockApiUser = {
   id: number
   name: string
@@ -481,6 +483,9 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       },
       sessions: {
         list: loadSessions,
+        get(id: string) {
+          return request<DockApiSession>(`/api/dockapi/sessions/${encodeURIComponent(id)}`)
+        },
         findByOpenCodeId(sessionID: string) {
           return state.sessions.find((session) => session.openCodeSessionId === sessionID)
         },
@@ -511,6 +516,14 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           if (!session) throw new DockApiError("未找到业务会话绑定")
           await request<void>(`/api/dockapi/sessions/${encodeURIComponent(session.id)}`, { method: "DELETE" })
           setState("sessions", (sessions) => sessions.filter((item) => item.id !== session.id))
+        },
+      },
+      mstock: {
+        sources(page = 0) {
+          return request<{ items: MstockSource[]; nextPage: number | null }>(`/api/dockapi/mstock/sources?page=${page}`)
+        },
+        prepare(targetBusinessSessionId: string, sourceBusinessSessionIds: string[]) {
+          return request<Array<{ businessSessionId: string; title: string; path: string }>>("/api/dockapi/mstock/sources/prepare", { method: "POST", body: JSON.stringify({ targetBusinessSessionId, sourceBusinessSessionIds }) })
         },
       },
       cases: {

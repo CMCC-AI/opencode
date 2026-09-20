@@ -39,3 +39,14 @@ test("turns outside the rightmost nodes and enters the bottom row from the right
   const bottom = rect(340, 220, 128, 56)
   expect(serialDagEdgePath(top, bottom, bounds)).toBe("M 419 58 H 484 Q 494 58 494 68 V 208 Q 494 218 484 218 H 423")
 })
+
+test("vertical mode keeps one node per row in execution order", () => {
+  expect(serialDagRows([1, 2, 3], "vertical")).toEqual([[1], [2], [3]])
+  expect(serialDagRows([], "vertical")).toEqual([])
+  expect(serialDagRows([1, 2, 3])).toEqual([[1, 2], [3]])
+})
+
+test("vertical edges connect the bottom and top centres without a side turn", () => {
+  const bounds = rect(50, 30, 500, 340)
+  expect(serialDagEdgePath(rect(210, 70, 180, 56), rect(210, 200, 180, 56), bounds, "vertical")).toBe("M 250 97 V 165")
+})

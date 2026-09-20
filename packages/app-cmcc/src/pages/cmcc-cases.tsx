@@ -5,6 +5,7 @@ import { useNavigate } from "@solidjs/router"
 import type { DockApiCaseGroup, DockApiCaseSummary } from "@/context/dockapi"
 import { dockApiUrl, useDockApi } from "@/context/dockapi"
 import { CaseDeleteDialog } from "@/components/case-delete-dialog"
+import { CmccPageBackground } from "@/components/cmcc-page-background"
 import {
   CMCC_CASES_UPDATED_EVENT,
   CMCC_CASE_CATEGORIES,
@@ -234,7 +235,7 @@ export function CmccCasesRoute() {
   return (
     <main class="relative size-full overflow-x-hidden overflow-y-auto bg-[#fbfcff]" data-page="cmcc-cases"
       onKeyDown={(event) => { if (event.key === "Escape" && state.opening) cancelOpening() }}>
-      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(239,226,255,0.58),transparent_31%),radial-gradient(circle_at_82%_78%,rgba(220,239,255,0.62),transparent_34%)]" />
+      <CmccPageBackground />
       <div class="relative mx-auto w-full max-w-[1320px] px-6 pb-12 pt-10 max-sm:px-4 max-sm:pt-6">
         <header class="relative z-30">
           <h1 class="text-[30px] font-semibold leading-10 text-[#6d42ef]">精选案例</h1>

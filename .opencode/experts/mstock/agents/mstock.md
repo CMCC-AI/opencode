@@ -115,6 +115,8 @@ python3 <BASE>/scripts/scan_reports.py
 
 ### 0.5 创建 workspace 并写入文件
 
+**优先使用系统注入的当前会话产物目录作为 `<WORKSPACE_DIR>`，并将同一个绝对路径传给每个子代理及后处理脚本。已有明确报告引用或上传材料时，只读取这些输入，不自动扫描历史目录，不扩展选定标的。仅在独立运行且系统没有注入产物目录时，才使用以下旧目录回退。**
+
 用时间戳创建目录（输出 run-id，后续所有路径都用它）：
 
 ```bash
@@ -180,9 +182,9 @@ python3 -c "from datetime import datetime; from pathlib import Path; rid = datet
 用 Task 调用 `ms-comparator`：
 
 ```
-Task(subagent_type="ms-comparator",
+Task(subagent_type="mstock/ms-comparator",
      description="多股横向对比分析",
-     prompt="workspace_dir: tmp/comparison-workspace/<run-id>/\ncomparison_dimensions: <维度列表，逗号分隔>")
+     prompt="workspace_dir: <WORKSPACE_DIR>\ncomparison_dimensions: <维度列表，逗号分隔>")
 ```
 
 ms-comparator 会读 `01-sources.json`，围绕指定维度做多维度交叉对比，提取各标的的核心指标与相对优劣势，写入 `10-comparison-matrix.md`。
@@ -194,9 +196,9 @@ ms-comparator 会读 `01-sources.json`，围绕指定维度做多维度交叉对
 用 Task 调用 `ms-report-writer`：
 
 ```
-Task(subagent_type="ms-report-writer",
+Task(subagent_type="mstock/ms-report-writer",
      description="七章对比总报告",
-     prompt="workspace_dir: tmp/comparison-workspace/<run-id>/\ntarget_hanzi: 2600")
+     prompt="workspace_dir: <WORKSPACE_DIR>\ntarget_hanzi: 2600")
 ```
 
 ms-report-writer 会读 `10-comparison-matrix.md` + `01-sources.json`，撰写七章通俗深度《多股票投研数据综合对比总报告》（≥2600 汉字，含≥6张对比表），写入 `20-comparison-report.md`。
@@ -215,9 +217,9 @@ ms-report-writer 会读 `10-comparison-matrix.md` + `01-sources.json`，撰写�
 用 Task 调用 `ms-visualizer`：
 
 ```
-Task(subagent_type="ms-visualizer",
+Task(subagent_type="mstock/ms-visualizer",
      description="横评可视化看板",
-     prompt="workspace_dir: tmp/comparison-workspace/<run-id>/")
+     prompt="workspace_dir: <WORKSPACE_DIR>")
 ```
 
 ms-visualizer 会读 `20-comparison-report.md`，生成结构化 JSON（七章 sections + chart/stat_grid/table/progress_bar/timeline 等横评 block），写入 `30-visual-report.json`。
@@ -333,7 +335,7 @@ Stats written to <WORKSPACE_DIR>/50-stats.json
 1. **每次 Task 调用都要传足够上下文**：worker 是无状态的，prompt 里要包含它需要的所有信息（或可读的 workspace 路径）
 2. **每次 Task 返回后立刻核验并落盘**：worker 直接写 workspace 文件，你负责 read 抽查质量
 3. **JSON 解析失败兜底**：worker 偶尔包 markdown ```json 代码块，去掉包裹再解析
-4. **workspace 路径用相对路径**：`tmp/comparison-workspace/<run-id>/`
+4. **workspace 使用系统注入的当前会话产物目录**，所有子任务继承同一个绝对路径；禁止另建共享临时目录。
 5. **阶段间严格顺序**：阶段 0→1→2→3→4→5 顺序执行
 6. **失败处理**：某 worker 连续 2 次失败 → 终止流程，把已完成 workspace 路径告知主代理
 

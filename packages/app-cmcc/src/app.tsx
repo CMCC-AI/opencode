@@ -82,6 +82,12 @@ const CmccExpertCenterRoute = lazy(() =>
 const CmccExpertRoute = lazy(() =>
   import("@/pages/cmcc-experts").then((module) => ({ default: module.CmccExpertRoute })),
 )
+const MstockForm = lazy(() => import("@/pages/mstock/form"))
+function MstockRoute() {
+  const dockapi = useDockApi()
+  const server = useServer()
+  return <Show when={dockapi.workspace?.directoryPath}>{(directory) => <TargetServerScopedProviders directory={directory}><SDKProvider directory={directory}><DirectoryDataProvider directory={directory} server={() => server.key}><MstockForm /></DirectoryDataProvider></SDKProvider></TargetServerScopedProviders>}</Show>
+}
 const CmccPluginHubRoute = lazy(() =>
   import("@/pages/cmcc-plugin-hub").then((module) => ({ default: module.CmccPluginHubRoute })),
 )
@@ -698,6 +704,7 @@ function Routes() {
       <Show when={settings.general.newLayoutDesigns()}>
         <Route path="/app" component={CmccDefaultRoute} />
         <Route path="/expert" component={CmccExpertCenterRoute} />
+        <Route path="/mstock" component={MstockRoute} />
         <Route path="/expert/:id" component={CmccExpertRoute} />
         <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />
         <Route path="/knowledge/:id/session/:sessionID" component={KnowledgeNotebookRoute} />

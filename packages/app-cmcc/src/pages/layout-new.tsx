@@ -37,6 +37,7 @@ import {
   cmccCasePublishingAllowed,
 } from "@/utils/cmcc-cases"
 import { cmccHistoryProduct, type CmccHistoryProduct } from "@/utils/cmcc-history-product"
+import { mstockMention } from "@/pages/session/mstock/page-selection"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
@@ -483,7 +484,7 @@ function CmccSidebar() {
       showToast({ variant: "default", title: "当前账号无权添加案例库" })
       return
     }
-    setCaseDialog("session", binding)
+    setCaseDialog("session", mstockMention(sync().session.data.message[session.id] ?? [], sync().session.data.part) ? { ...binding, agentType: "mstock" } : binding)
   }
 
   const timeLabel = (session: Session) => {
@@ -579,7 +580,7 @@ function CmccSidebar() {
                   session={session}
                   active={activeSession(session)}
                   running={sync().session.data.session_working(session.id)}
-                  product={cmccHistoryProduct(dockapi.sessions.findByOpenCodeId(session.id)?.agentType, session.agent,
+                  product={cmccHistoryProduct(dockapi.sessions.findByOpenCodeId(session.id)?.agentType, mstockMention(sync().session.data.message[session.id] ?? [], sync().session.data.part) ? "mstock/mstock" : session.agent,
                     sync().session.data.message[session.id]?.filter((message) => message.role === "user")
                       .sort((left, right) => left.time.created - right.time.created || left.id.localeCompare(right.id))[0]?.agent)}
                   timeLabel={timeLabel(session)}

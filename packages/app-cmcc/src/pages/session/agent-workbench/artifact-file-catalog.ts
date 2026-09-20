@@ -11,6 +11,7 @@ export function createArtifactFileCatalog(input: {
   list: (path: string) => Promise<FileNode[]>
   rootPath?: Accessor<string | undefined>
   legacyResearch?: boolean
+  legacyComparison?: boolean
   revision?: Accessor<string>
 }) {
   const [state, setState] = createStore({ paths: [] as string[], loading: false, warnings: [] as string[] })
@@ -46,6 +47,7 @@ export function createArtifactFileCatalog(input: {
       directory: source.directory,
       root: source.path,
       legacyResearch: input.legacyResearch,
+      legacyComparison: input.legacyComparison,
       list,
       isCurrent: () => generation === current,
     })

@@ -324,6 +324,7 @@ function ExpertDetailDialog(props: {
   onOpenExternal: (expert: ExternalExpert) => void
   onSummon: (expert: TeamExpert, prompt?: string) => void
 }) {
+  const navigate = useNavigate()
   const presentation = createMemo(
     () =>
       EXPERT_PRESENTATION[props.expert.id] ?? {
@@ -418,7 +419,12 @@ function ExpertDetailDialog(props: {
             </Show>
           </div>
 
-          <footer class="flex h-[68px] shrink-0 items-center justify-end gap-3 border-t border-[#edf0f7] px-6 shadow-[0_-5px_16px_rgba(52,42,89,0.04)]">
+          <footer class="flex h-[68px] shrink-0 items-center justify-end gap-3 border-t border-[#edf0f7] px-6 shadow-[0_-5px_16px_rgba(52,42,89,0.04)]" classList={{ "!gap-2 !px-3 sm:!gap-3 sm:!px-6 [&_button]:!px-2 [&_button]:whitespace-nowrap [&_button]:shrink-0 sm:[&_button]:!px-5": props.expert.id === "deeptrading" }}>
+            <Show when={props.expert.id === "deeptrading"}>
+              <button type="button" class="mr-auto flex h-9 items-center justify-center gap-2 rounded-[8px] bg-[linear-gradient(90deg,#8758f5,#3b6dff)] px-5 text-[13px] font-medium text-[#fff] shadow-[0_6px_14px_rgba(120,95,245,0.25)] transition hover:brightness-105" onClick={() => { props.onClose(); navigate("/mstock") }}>
+                <Icon name="fork" class="size-4" style={{ color: "#fff" }} />多股对比
+              </button>
+            </Show>
             <Show when={props.expert.id === "shoppers-pro"}>
               <button
                 type="button"

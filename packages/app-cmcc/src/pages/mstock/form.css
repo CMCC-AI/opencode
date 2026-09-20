@@ -1,0 +1,619 @@
+.mstock-form {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: #fbfcff;
+  color: #20232a;
+  font-size: 14px;
+  letter-spacing: 0;
+  container: mstock-form / inline-size;
+}
+.mstock-form button {
+  cursor: pointer;
+}
+.mstock-form [data-component="icon"] {
+  color: inherit;
+}
+.mstock-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+.mstock-form button:focus-visible,
+.mstock-form input:focus-visible {
+  outline: 2px solid #547beb;
+  outline-offset: 3px;
+}
+.mstock-heading {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 24px;
+  border-bottom: 1px solid #e7e9ef;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(4px);
+}
+.mstock-nav-clearance .mstock-heading {
+  padding-top: 44px;
+  min-height: 102px;
+}
+.mstock-heading h1 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 19px;
+  font-weight: 500;
+  color: #111;
+}
+.mstock-heading-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #2563eb;
+}
+.mstock-heading-nav button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: #111827;
+  border-radius: 6px;
+}
+.mstock-heading-nav button:hover {
+  color: #2563eb;
+  background: #eef4ff;
+}
+.mstock-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+.mstock-body {
+  position: relative;
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 20px 22px 32px;
+}
+.mstock-hero {
+  min-height: 208px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px 28px 20px;
+  border: 1px solid rgba(229, 229, 229, 0.55);
+  border-radius: 16px;
+  background: url("../../assets/mstock/comparison-hero-background.svg") center/cover no-repeat;
+  box-shadow: 0 8px 24px rgba(57, 76, 118, 0.05);
+  overflow: hidden;
+}
+.mstock-hero h2 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  font-size: 20px;
+}
+.mstock-hero h2 strong {
+  color: transparent;
+  background: linear-gradient(90deg, #165dff, #4b00fa);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+.mstock-hero h2 span {
+  color: #111;
+  font-weight: 650;
+}
+.mstock-hero-copy p {
+  margin: 8px 0 16px;
+  color: #707783;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.mstock-steps {
+  display: grid;
+  grid-template-columns: minmax(124px, auto) minmax(36px, 1fr) minmax(136px, auto) minmax(36px, 1fr) minmax(138px, auto);
+  align-items: center;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 2px solid #dce3ee;
+}
+.mstock-workflow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  color: #555d69;
+}
+.mstock-workflow-step > img {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  object-fit: contain;
+}
+.mstock-workflow-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+.mstock-workflow-label strong {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mstock-step-status {
+  display: flex;
+  width: 15px;
+  height: 15px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #9db8e8;
+  border-radius: 50%;
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+.mstock-step-status > * {
+  width: 12px;
+  height: 12px;
+  visibility: hidden;
+}
+.mstock-step-status.completed {
+  border-color: #3b82f6;
+}
+.mstock-step-status.completed > * {
+  visibility: visible;
+}
+.mstock-workflow-line {
+  position: relative;
+  align-self: end;
+  height: 1px;
+  margin-bottom: 8px;
+  background: #8cb4ff;
+}
+.mstock-workflow-line::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -2px;
+  border-left: 5px solid #8cb4ff;
+  border-top: 2.5px solid transparent;
+  border-bottom: 2.5px solid transparent;
+}
+.mstock-workflow-line.dashed {
+  height: 0;
+  border-top: 1px dashed #8cb4ff;
+  background: transparent;
+}
+.mstock-section {
+  margin-top: 18px;
+  border: 1px solid rgba(229, 229, 229, 0.55);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 24px rgba(57, 76, 118, 0.045);
+  overflow: hidden;
+}
+.mstock-section > header {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #e7eaf0;
+  background-repeat: no-repeat;
+  background-size:
+    100% 100%,
+    100% auto;
+}
+.mstock-source-section > header {
+  background-image:
+    linear-gradient(90deg, rgba(235, 239, 255, 0.54), rgba(255, 255, 255, 0.7)), url("/mstock/module-background.png");
+  background-position:
+    center,
+    center top;
+}
+.mstock-upload-section > header {
+  background-image:
+    linear-gradient(90deg, rgba(231, 246, 255, 0.54), rgba(255, 255, 255, 0.7)), url("/mstock/module-background.png");
+  background-position:
+    center,
+    center 52%;
+}
+.mstock-dimensions-section > header {
+  background-image:
+    linear-gradient(90deg, rgba(241, 236, 255, 0.56), rgba(255, 255, 255, 0.72)), url("/mstock/module-background.png");
+  background-position:
+    center,
+    center bottom;
+}
+.mstock-section > header > img {
+  width: 27px;
+  height: 27px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.mstock-section h3 {
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 650;
+}
+.mstock-section h3 em {
+  color: #2563eb;
+  font-style: normal;
+}
+.mstock-section > header > button {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: #647ca8;
+  border-radius: 6px;
+}
+.mstock-section > header > button:hover {
+  background: #fff;
+  color: #2563eb;
+}
+.mstock-section-content {
+  padding: 16px 18px;
+}
+.mstock-source-section .mstock-section-content {
+  min-height: 130px;
+}
+.mstock-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  max-height: 286px;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+.mstock-source {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto 20px;
+  align-items: center;
+  gap: 12px;
+  min-height: 74px;
+  padding: 12px 14px;
+  border: 1px solid rgba(229, 229, 229, 0.58);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  color: inherit;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(57, 76, 118, 0.04);
+}
+.mstock-source:hover {
+  border-color: #bfdbfe;
+  background: #fafdff;
+}
+.mstock-source:has(input:checked) {
+  border-color: #60a5fa;
+  background: #f5f9ff;
+}
+.mstock-source-kind {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  justify-self: center;
+}
+.mstock-source-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.mstock-source-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 650;
+}
+.mstock-source-info small {
+  color: #8a9099;
+  font-size: 12px;
+}
+.mstock-ready {
+  padding: 5px 9px;
+  color: #0057ff;
+  background: #eef4ff;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.mstock-source input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+.mstock-more {
+  display: block;
+  margin: 14px auto 0;
+  color: #4975ce;
+}
+.mstock-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  margin: 0;
+  color: #8a9099;
+  font-size: 13px;
+  text-align: center;
+}
+.mstock-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 154px;
+  padding: 20px;
+  border: 1px dashed #77a4ff;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(242, 246, 255, 0.96), rgba(237, 244, 255, 0.9));
+  color: #3f4652;
+}
+.mstock-upload:hover:not(:disabled),
+.mstock-upload[data-dragging="true"] {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+.mstock-upload > img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.mstock-upload > span {
+  font-size: 14px;
+}
+.mstock-uploaded-files {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.mstock-uploaded {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e4e8ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #4b5563;
+}
+.mstock-uploaded > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.mstock-uploaded strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+}
+.mstock-uploaded small {
+  color: #9ca3af;
+  font-size: 11px;
+}
+.mstock-uploaded button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: #9ca3af;
+}
+.mstock-uploaded button:hover {
+  color: #dc2626;
+}
+.mstock-dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.mstock-dimensions label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid #dce1e9;
+  border-radius: 7px;
+  background: #fff;
+  color: #5f6671;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.mstock-dimensions label:hover {
+  border-color: #93c5fd;
+}
+.mstock-dimensions label.selected {
+  border-color: #60a5fa;
+  background: #eff6ff;
+  color: #2563eb;
+}
+.mstock-dimensions label:focus-within {
+  outline: 2px solid #547beb;
+  outline-offset: 2px;
+}
+.mstock-dimensions input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.mstock-dimension-check {
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  visibility: hidden;
+}
+.mstock-dimension-check > * {
+  width: 100%;
+  height: 100%;
+}
+.mstock-dimensions .selected .mstock-dimension-check {
+  visibility: visible;
+}
+.mstock-launch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0f4;
+}
+.mstock-launch > span {
+  color: #8a9099;
+  font-size: 12px;
+}
+.mstock-launch-options {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: #637398;
+}
+.mstock-model {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.mstock-model > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mstock-model > :last-child {
+  flex-shrink: 0;
+}
+.mstock-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 220px;
+  height: 42px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #5b4cff, #2c5dff);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 5px 14px rgba(79, 112, 235, 0.2);
+}
+.mstock-start:disabled {
+  box-shadow: none;
+}
+.mstock-error {
+  margin: 12px 0 0;
+  color: #b45309;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+@container mstock-form (max-width: 760px) {
+  .mstock-heading {
+    gap: 8px;
+    padding-inline: 14px;
+  }
+  .mstock-heading h1 {
+    font-size: 16px;
+  }
+  .mstock-heading-nav {
+    gap: 8px;
+    font-size: 13px;
+  }
+  .mstock-body {
+    padding: 12px;
+  }
+  .mstock-hero {
+    padding: 20px 16px;
+  }
+  .mstock-steps {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .mstock-workflow-line {
+    display: none;
+  }
+  .mstock-workflow-step {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+  .mstock-section > header {
+    padding-inline: 12px;
+  }
+  .mstock-section-content {
+    padding: 12px;
+  }
+  .mstock-source {
+    grid-template-columns: 24px minmax(0, 1fr) 18px;
+    padding: 12px;
+  }
+  .mstock-ready {
+    display: none;
+  }
+  .mstock-uploaded-files {
+    grid-template-columns: 1fr;
+  }
+  .mstock-launch {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .mstock-start {
+    width: 100%;
+    min-width: 0;
+  }
+  .mstock-launch-options {
+    justify-content: flex-start;
+  }
+}
