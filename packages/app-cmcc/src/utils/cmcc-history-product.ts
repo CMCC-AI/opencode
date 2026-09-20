@@ -20,6 +20,7 @@ const aiScience = {
 } as const
 
 const products: Record<string, CmccHistoryProduct> = {
+  mstock: { label: "多股对比", backgroundColor: "#e4f5ef", borderColor: "#c6e9dd", textColor: "#187a60" },
   deepinsight: deepResearch,
   "zhengqi-visit-intel": {
     label: "AI+政企",
@@ -60,6 +61,7 @@ export function cmccHistoryProduct(
   rootAgent?: string,
   initialAgent?: string,
 ): CmccHistoryProduct | undefined {
+  if (rootAgent === "mstock/mstock" || initialAgent === "mstock/mstock") return products.mstock
   if (rootAgent === "deepinsight/deepinsight-team-lead" || initialAgent === "deepinsight/deepinsight-team-lead")
     return { ...deepResearch, label: "深度研究" }
   const key = agentType?.trim().toLowerCase()

@@ -7,6 +7,7 @@ import { countReportCharacters } from "./report-length"
 export function createReportLength(input: {
   scope: Accessor<string | undefined>
   report: Accessor<SessionArtifact | undefined>
+  filename?: string
   revision?: Accessor<number | undefined>
   source: {
     get: (path: string) => AgentArtifactContent | undefined
@@ -19,7 +20,7 @@ export function createReportLength(input: {
   const key = createMemo(() => {
     const scope = input.scope()
     const report = input.report()
-    if (!scope || report?.filename !== "20-report.md") return undefined
+    if (!scope || report?.filename !== (input.filename ?? "20-report.md")) return undefined
     return JSON.stringify([scope, report.path, report.createdAt, input.revision?.()])
   })
   let generation = 0

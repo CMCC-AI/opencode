@@ -74,6 +74,7 @@ export function discoverSessionArtifacts(input: {
   transcripts: readonly SessionTranscript[]
   roles: ArtifactRoleConfig
   allowSameAgentPathRewrites?: boolean
+  allowWorkflowPathRewrites?: boolean
 }): ArtifactDiscovery {
   const ambiguities: string[] = []
   const artifacts = new Map<string, SessionArtifact>()
@@ -117,9 +118,9 @@ export function discoverSessionArtifacts(input: {
         const current = artifacts.get(result.path)
         if (current && current.ownerSessionId !== artifact.ownerSessionId) {
           if (
-            input.allowSameAgentPathRewrites &&
+            input.allowWorkflowPathRewrites || (input.allowSameAgentPathRewrites &&
             current.ownerAgentId &&
-            current.ownerAgentId === artifact.ownerAgentId
+            current.ownerAgentId === artifact.ownerAgentId)
           ) {
             if ((artifact.createdAt ?? 0) >= (current.createdAt ?? 0)) artifacts.set(result.path, artifact)
             continue

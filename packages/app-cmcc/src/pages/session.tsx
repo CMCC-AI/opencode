@@ -71,6 +71,10 @@ import { DeepInsightResultsPanel } from "@/pages/session/deepinsight/deepinsight
 import { DeepInsightSessionView } from "@/pages/session/deepinsight/deepinsight-session-view"
 import { shouldUseDeepInsightPage } from "@/pages/session/deepinsight/page-selection"
 import { DeepInsightWorkbenchProvider } from "@/pages/session/deepinsight/workbench-context"
+import { MstockWorkbenchProvider } from "@/pages/session/mstock/workbench-context"
+import { MstockResultsPanel } from "@/pages/session/mstock/mstock-results-panel"
+import { MstockSessionView } from "@/pages/session/mstock/mstock-session-view"
+import { mstockMention, shouldUseMstockPage } from "@/pages/session/mstock/page-selection"
 import { AiScienceResultsPanel } from "@/pages/session/ai-science/ai-science-results-panel"
 import { AiScienceSessionView } from "@/pages/session/ai-science/ai-science-session-view"
 import { shouldUseAiSciencePage } from "@/pages/session/ai-science/page-selection"
@@ -314,7 +318,8 @@ export default function Page() {
   const shoppers = createMemo(() => shouldUseShoppersPage(info(), businessAgentType(), initialUserAgent()))
   const aiScience = createMemo(() => shouldUseAiSciencePage(info(), businessAgentType(), initialUserAgent()))
   const deepInsight = createMemo(() => shouldUseDeepInsightPage(info(), initialUserAgent()))
-  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || aiScience() || deepInsight())
+  const mstock = createMemo(() => shouldUseMstockPage(info(), businessAgentType(), mstockMention(sync().data.message[params.id ?? ""] ?? [], sync().data.part)))
+  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || aiScience() || deepInsight() || mstock())
   const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
@@ -1830,6 +1835,7 @@ export default function Page() {
   return (
     <DeepTradingWorkbenchProvider sessionID={() => params.id} active={deepTrading}>
       <DeepInsightWorkbenchProvider sessionID={() => params.id} active={deepInsight}>
+      <MstockWorkbenchProvider sessionID={() => params.id} active={mstock}>
       <DeepInspectWorkbenchProvider sessionID={() => params.id} active={deepInspect}>
       <ZhengqiWorkbenchProvider sessionID={() => params.id} active={zhengqi}>
       <ShoppersWorkbenchProvider sessionID={() => params.id} active={shoppers}>
@@ -1898,6 +1904,7 @@ export default function Page() {
                         <Match when={deepInsight()}>
                           <DeepInsightResultsPanel />
                         </Match>
+                        <Match when={mstock()}><MstockResultsPanel /></Match>
                         <Match when={zhengqi()}>
                           <ZhengqiResultsPanel />
                         </Match>
@@ -1948,6 +1955,11 @@ export default function Page() {
                                 <DeepTradingSplitLayout persistKey="deepinsight-panels" label="深度研究"
                                   left={<><div class="min-h-0 flex-1 overflow-hidden"><DeepInsightSessionView /></div>{composerRegion()}</>}
                                   right={<DeepInsightResultsPanel />} />
+                              </Show>
+                            </Match>
+                            <Match when={mstock()}>
+                              <Show when={isDesktop()} fallback={<MstockSessionView />}>
+                                <DeepTradingSplitLayout persistKey="mstock-panels" label="多股对比" left={<><div class="min-h-0 flex-1 overflow-hidden"><MstockSessionView /></div>{composerRegion()}</>} right={<MstockResultsPanel />} />
                               </Show>
                             </Match>
                             <Match when={deepInspect()}>
@@ -2130,6 +2142,7 @@ export default function Page() {
       </ShoppersWorkbenchProvider>
       </ZhengqiWorkbenchProvider>
       </DeepInspectWorkbenchProvider>
+      </MstockWorkbenchProvider>
       </DeepInsightWorkbenchProvider>
     </DeepTradingWorkbenchProvider>
   )

@@ -35,6 +35,7 @@ import {
 import echartsRuntimeUrl from "../../../node_modules/echarts/dist/echarts.min.js?url"
 
 const dedicatedViews: Record<string, ReturnType<typeof lazy<Component<DedicatedCaseProps>>>> = {
+  mstock: lazy(() => import("./views/mstock")),
   "deep-research": lazy(() => import("./views/deep-research")),
   finance: lazy(() => import("./views/finance")),
   inspection: lazy(() => import("./views/inspection")),
@@ -46,6 +47,7 @@ const dedicatedViews: Record<string, ReturnType<typeof lazy<Component<DedicatedC
 type LoadedCase = DockApiLoadedCase
 
 function dedicatedCaseView(value: LoadedCase) {
+  if (value.detail.agentType === "mstock" || value.detail.rootAgent === "mstock/mstock" || value.snapshot.agentType === "mstock") return dedicatedViews.mstock
   const category = cmccCaseCategoryByAgentType(value.detail.agentType)?.code
   const root = value.snapshot.sessions.find((entry) => entry.session.id === value.snapshot.rootSessionId)
   const deepResearch = value.detail.rootAgent === DEEPINSIGHT_LEAD_AGENT || shouldUseDeepInsightPage(root?.session,
@@ -111,6 +113,7 @@ function CaseDetailContent(props: { value: LoadedCase }) {
   const serverSDK = useServerSDK()
   const tabs = useTabs()
   const createSame = () => {
+    if (props.value.detail.agentType === "mstock" || props.value.detail.rootAgent === "mstock/mstock") { navigate("/mstock?fresh=1"); return }
     const query = props.value.detail.query.trim()
     const directory = dockapi.workspace?.directoryPath
     const artifactDirectory = cmccArtifactWorkspace(directory)

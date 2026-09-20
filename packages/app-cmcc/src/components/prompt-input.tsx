@@ -50,7 +50,7 @@ import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES, pickAttachmentFiles } from "./prompt-input/files"
-import { docxText, fileBase64, isDocx, isWordDocument, safeUploadedFilename } from "./prompt-input/word-documents"
+import { fileBase64, isWordDocument, safeUploadedFilename, wordAttachmentText } from "./prompt-input/word-documents"
 import {
   canNavigateHistoryAtCursor,
   navigatePromptHistory,
@@ -1424,23 +1424,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       )
 
       const absolutePath = `${artifactDirectory}/attachments/${name}`
-      if (!isDocx(file, mime)) {
-        return {
-          path: absolutePath,
-          content: `用户上传的旧版 Word 文档已保存到 ${absolutePath}。该格式是二进制 .doc，请使用当前环境可用的 Office 转换工具读取，并优先转换为 DOCX、PDF 或纯文本后再分析。`,
-        }
-      }
-
-      const extracted = await docxText(file).catch(() => "")
-      const limit = 120_000
-      const content = extracted.slice(0, limit)
-      const suffix = extracted.length > limit ? `\n\n[正文过长，已截取前 ${limit} 个字符；完整文件位于上述路径。]` : ""
-      return {
-        path: absolutePath,
-        content: content
-          ? `用户上传的 DOCX 文档已保存到 ${absolutePath}。以下是从文档中提取的正文：\n\n${content}${suffix}`
-          : `用户上传的 DOCX 文档已保存到 ${absolutePath}，但未能直接提取正文。请使用当前环境可用的 Office 或 ZIP/XML 工具读取该文件。`,
-      }
+      return { path: absolutePath, content: await wordAttachmentText(file, mime, absolutePath) }
     },
   })
 

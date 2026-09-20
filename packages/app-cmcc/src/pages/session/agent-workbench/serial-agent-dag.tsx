@@ -6,6 +6,7 @@ import { serialDagEdgePath, serialDagRows } from "./serial-dag-layout"
 import "./serial-agent-dag.css"
 
 export function SerialAgentDag(props: {
+  layout?: "folded" | "vertical"
   label: string
   order: readonly string[]
   edges: readonly (readonly [string, string])[]
@@ -17,7 +18,7 @@ export function SerialAgentDag(props: {
 }) {
   let surface: HTMLDivElement | undefined
   const elements = new Map<string, HTMLButtonElement>()
-  const rows = createMemo(() => serialDagRows(props.order))
+  const rows = createMemo(() => serialDagRows(props.order, props.layout))
   const columns = createMemo(() => Math.max(1, ...rows().map((row) => row.length)))
   const nodes = createMemo(() => new Map(props.nodes.map((node) => [node.id, node])))
   const [geometry, setGeometry] = createStore({
@@ -49,7 +50,7 @@ export function SerialAgentDag(props: {
               key: `${source}->${target}`,
               source,
               target,
-              d: serialDagEdgePath(from.getBoundingClientRect(), to.getBoundingClientRect(), bounds),
+              d: serialDagEdgePath(from.getBoundingClientRect(), to.getBoundingClientRect(), bounds, props.layout),
             },
           ]
         }),
@@ -75,6 +76,7 @@ export function SerialAgentDag(props: {
       aria-label={props.label}
       class="serial-agent-dag deeptrading-scrollbar"
       data-serial-dag
+      data-layout={props.layout ?? "folded"}
       data-columns={columns()}
       style={{
         "--serial-node-width": `calc((100% - ${(columns() - 1) * 12}px) / ${columns()})`,
@@ -131,7 +133,7 @@ export function SerialAgentDag(props: {
         >
           <For each={rows()}>
             {(row, index) => (
-              <div class="serial-dag-row" data-reversed={index() === 1 ? "" : undefined}>
+              <div class="serial-dag-row" data-reversed={props.layout !== "vertical" && index() === 1 ? "" : undefined}>
                 <For each={row}>
                   {(agentId) => {
                     const node = createMemo(() => nodes().get(agentId))

@@ -128,3 +128,22 @@
     text-align: center;
   }
 }
+
+.serial-agent-dag[data-layout="vertical"] {
+  height: 100%;
+}
+.serial-agent-dag[data-layout="vertical"] .serial-dag-surface {
+  min-height: 300px;
+  padding: 16px;
+}
+.serial-agent-dag[data-layout="vertical"] .serial-dag-row {
+  justify-content: center;
+}
+.serial-agent-dag[data-layout="vertical"] .serial-dag-node {
+  max-width: 180px;
+  height: 56px;
+  flex-direction: row;
+  gap: 6px;
+  border-radius: 28px;
+  text-align: left;
+}
