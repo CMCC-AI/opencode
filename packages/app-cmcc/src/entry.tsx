@@ -192,6 +192,7 @@ if (root instanceof HTMLElement) {
       },
     }),
   )
+  document.getElementById("app-startup-loading")?.remove()
   render(
     () => (
       <PlatformProvider value={platform}>

@@ -66,6 +66,7 @@ import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
+import { HomeActionsPopover, HomeAgentControl, HomeModelControl } from "./prompt-input/home-controls"
 import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
@@ -1658,7 +1659,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const designPlaceholder = () => {
     if (store.mode === "shell") return placeholder()
-    if (newSession()) return "请告诉我您要研究的问题？ @ 引用对话文件，/ 调用技能与指令"
+    if (newSession()) return "请告诉您要研究的问题？@召唤领域专家团，/调用技能与指令"
     return language.t("prompt.placeholder.simple")
   }
 
@@ -1730,6 +1731,68 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       newLayoutDesigns={props.controls.newLayoutDesigns}
       t={(key) => language.t(key as Parameters<typeof language.t>[0])}
     />
+  )
+  const cmccActionButton = () => (
+    <TooltipV2 placement="top" value="更多操作">
+      <div>
+        <IconButton
+          data-action="prompt-cmcc-actions"
+          type="button"
+          icon={newSession() && actions.panel ? "close" : "plus"}
+          variant="ghost"
+          class="size-7 rounded-md p-[6px] text-v2-icon-icon-muted"
+          style={buttons()}
+          onClick={toggleCmccActionMenu}
+          onKeyDown={(event) => {
+            if (!newSession() || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return
+            event.preventDefault()
+            setActions("panel", "menu")
+            requestAnimationFrame(() => cmccPanelRef?.querySelector("button")?.focus({ preventScroll: true }))
+          }}
+          disabled={store.mode !== "normal"}
+          tabIndex={store.mode === "normal" ? undefined : -1}
+          aria-label="打开更多操作"
+          aria-expanded={!!actions.panel}
+        />
+      </div>
+    </TooltipV2>
+  )
+  const cmccPanelContent = () => (
+    <Switch>
+      <Match when={actions.panel === "menu"}>
+        <CmccPromptActionMenu
+          onAttach={() => {
+            setActions("panel", null)
+            pick()
+          }}
+          onExperts={openExpertCenter}
+          onSkills={openSkillCommands}
+          onKnowledge={newSession() ? openKnowledge : undefined}
+          onProfessionalDatabases={openProfessionalDatabases}
+        />
+      </Match>
+      <Match when={actions.panel === "database"}>
+        <CmccProfessionalDatabasesDialog onClose={closeCmccPanel} onTry={tryProfessionalDatabase} />
+      </Match>
+      <Match when={actions.panel === "knowledge"}>
+        <CmccKnowledgePicker
+          notebooks={cmccKnowledgeNotebooks()}
+          onClose={closeCmccPanel}
+          onManage={() => {
+            closeCmccPanel()
+            navigate("/knowledge")
+          }}
+          onSelect={selectKnowledge}
+        />
+      </Match>
+      <Match when={actions.panel === "skills"}>
+        <div class="w-full min-w-0" onMouseDown={(event) => event.preventDefault()}>
+          <CmccPromptPanel title="技能" onClose={closeCmccPanel}>
+            {promptPopover(true)}
+          </CmccPromptPanel>
+        </div>
+      </Match>
+    </Switch>
   )
   return (
     <div class="relative size-full flex flex-col gap-0">
@@ -1843,25 +1906,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   </div>
                 </div>
               </div>
-              <div class="flex h-11 items-center px-2">
+              <div class="flex h-11 items-center px-2" classList={{ "home-composer-toolbar": newSession() }}>
                 <div class="flex min-w-0 flex-1 items-center gap-1">
                   {fileAttachmentInput()}
-                  <TooltipV2 placement="top" value="更多操作">
-                    <div>
-                      <IconButton
-                        data-action="prompt-cmcc-actions"
-                        type="button"
-                        icon="plus"
-                        variant="ghost"
-                        class="size-7 rounded-md p-[6px] text-v2-icon-icon-muted"
-                        style={buttons()}
-                        onClick={toggleCmccActionMenu}
-                        disabled={store.mode !== "normal"}
-                        tabIndex={store.mode === "normal" ? undefined : -1}
-                        aria-label="打开更多操作"
-                      />
-                    </div>
-                  </TooltipV2>
+                  <Show when={newSession()} fallback={cmccActionButton()}>
+                    <HomeActionsPopover
+                      open={!!actions.panel}
+                      menu={actions.panel === "menu"}
+                      ref={(element) => (cmccPanelRef = element)}
+                      content={cmccPanelContent()}
+                    >
+                      {cmccActionButton()}
+                    </HomeActionsPopover>
+                  </Show>
                   <Show when={selectedTeamExpert()}>
                     {(expert) => (
                       <button
@@ -1892,11 +1949,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       </button>
                     )}
                   </Show>
-                  <Show when={showAgentControl()}>
+                  <Show when={!newSession() && showAgentControl()}>
                     <ComposerAgentControl state={agentControlState()} />
                   </Show>
                   {props.toolbar}
-                  <ComposerModelControl state={modelControlState()} />
+                  <Show when={newSession()} fallback={<ComposerModelControl state={modelControlState()} />}>
+                    <HomeModelControl
+                      model={props.controls.model.selection}
+                      loading={providersLoading()}
+                      style={control()}
+                      onOpen={() => {
+                        setActions("panel", null)
+                        closePopover()
+                      }}
+                      onClose={restoreFocus}
+                    />
+                  </Show>
                   <Show when={!newSession() && !providersLoading() && store.mode !== "shell" && showVariantControl()}>
                     <div
                       data-component="prompt-variant-control"
@@ -1936,6 +2004,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </div>
                   </Show>
                 </div>
+                <Show when={newSession() && showAgentControl()}>
+                  <HomeAgentControl
+                    options={props.controls.agents.options}
+                    current={props.controls.agents.current}
+                    style={buttons()}
+                    onSelect={(name) => {
+                      props.controls.agents.select(name)
+                      restoreFocus()
+                    }}
+                  />
+                </Show>
                 <TooltipV2 placement="top" inactive={!working() && blank()} value={tip()}>
                   <IconButton
                     data-action="prompt-submit"
@@ -1954,47 +2033,13 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </TooltipV2>
               </div>
             </DockShellForm>
-            <Show when={actions.panel}>
+            <Show when={!newSession() && actions.panel}>
               <div
                 ref={(el) => (cmccPanelRef = el)}
                 class="mt-2 flex w-full min-w-0 justify-start"
                 data-component="cmcc-prompt-panels"
               >
-                <Switch>
-                  <Match when={actions.panel === "menu"}>
-                    <CmccPromptActionMenu
-                      onAttach={() => {
-                        setActions("panel", null)
-                        pick()
-                      }}
-                      onExperts={openExpertCenter}
-                      onSkills={openSkillCommands}
-                      onKnowledge={newSession() ? openKnowledge : undefined}
-                      onProfessionalDatabases={openProfessionalDatabases}
-                    />
-                  </Match>
-                  <Match when={actions.panel === "database"}>
-                    <CmccProfessionalDatabasesDialog onClose={closeCmccPanel} onTry={tryProfessionalDatabase} />
-                  </Match>
-                  <Match when={actions.panel === "knowledge"}>
-                    <CmccKnowledgePicker
-                      notebooks={cmccKnowledgeNotebooks()}
-                      onClose={closeCmccPanel}
-                      onManage={() => {
-                        closeCmccPanel()
-                        navigate("/knowledge")
-                      }}
-                      onSelect={selectKnowledge}
-                    />
-                  </Match>
-                  <Match when={actions.panel === "skills"}>
-                    <div class="w-full min-w-0" onMouseDown={(event) => event.preventDefault()}>
-                      <CmccPromptPanel title="技能" onClose={closeCmccPanel}>
-                        {promptPopover(true)}
-                      </CmccPromptPanel>
-                    </div>
-                  </Match>
-                </Switch>
+                {cmccPanelContent()}
               </div>
             </Show>
           </div>

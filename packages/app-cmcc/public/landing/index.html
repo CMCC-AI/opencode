@@ -6,13 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="DeepInsight 深度洞察——从通用 Deep Research 出发，构建 AI + 产业洞察能力。" />
     <title>DeepInsight 深度洞察</title>
-    <!-- 预热主应用：Chrome 将 prerender 当作 NoStatePrefetch，只拉取不执行 -->
-    <link rel="prerender" href="/app" />
-    <link rel="prefetch" href="/app" />
-    <script type="module" crossorigin src="/landing/assets/index-BeH2U3D-.js"></script>
-    <link rel="stylesheet" crossorigin href="/landing/assets/index-DQujaLyt.css">
+    <link rel="preload" as="image" href="/landing/assets/hero-poster-hAACfnR4.webp" fetchpriority="high" />
+    <script type="module" crossorigin src="/landing/assets/index-GF7g-L4R.js"></script>
+    <link rel="stylesheet" crossorigin href="/landing/assets/index-Tto2-c08.css">
   </head>
   <body>
+    <!-- Start the real media request before Vue mounts; App reuses this element. -->
+    <video id="hero-video" class="hero-video" hidden autoplay muted playsinline loop preload="auto"
+      poster="/landing/assets/hero-poster-hAACfnR4.webp" aria-hidden="true">
+      <source src="/landing/assets/hero-bg-DPJEai1p.mp4" type="video/mp4" />
+    </video>
     <div id="app"></div>
   </body>
 </html>

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { modelSelectorItems } from "./model-selector"
+import { modelSelectorGroups, modelSelectorItems } from "./model-selector"
 
 const model = (providerID: string, modelID: string) => ({
   id: modelID,
@@ -40,4 +40,23 @@ test("excludes models disabled by model management", () => {
       visible: (item) => item.modelID === visible.id,
     }).map((item) => item.id),
   ).toEqual(["visible-free"])
+})
+
+test("groups by real provider IDs without guessing a brand from model names", () => {
+  const items = [
+    { ...model("gateway", "qwen-test"), provider: { id: "gateway", name: "Company gateway" } },
+    { ...model("gateway", "deepseek-test"), provider: { id: "gateway", name: "Company gateway" } },
+    { ...model("deepseek", "deepseek-test"), provider: { id: "deepseek", name: "DeepSeek" } },
+  ]
+  const groups = modelSelectorGroups(items)
+  expect(groups.map((group) => [group.id, group.name, group.models.length])).toEqual([
+    ["gateway", "Company gateway", 2],
+    ["deepseek", "DeepSeek", 1],
+  ])
+  expect(groups[1].models[0]).toBe(items[2])
+})
+
+test("keeps custom provider IDs as the label when no name is available", () => {
+  expect(modelSelectorGroups([model("custom-provider", "example")])[0].name).toBe("custom-provider")
+  expect(modelSelectorGroups([])).toEqual([])
 })

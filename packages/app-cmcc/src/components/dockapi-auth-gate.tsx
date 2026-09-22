@@ -1,5 +1,5 @@
 import loginBackground from "@/assets/auth/login-bg.png"
-import { DeepInsightMark } from "@/components/brand"
+import { AppLoading } from "@/components/app-loading"
 import { DockApiError, useDockApi } from "@/context/dockapi"
 import { Show, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -35,14 +35,7 @@ export function DockApiAuthGate(props: ParentProps) {
   }
 
   return (
-    <Show
-      when={dockapi.status !== "loading"}
-      fallback={
-        <div class="flex h-dvh w-screen items-center justify-center bg-white">
-          <DeepInsightMark class="h-16 w-12 animate-pulse opacity-50" />
-        </div>
-      }
-    >
+    <Show when={dockapi.status !== "loading"} fallback={<AppLoading />}>
       <Show
         when={dockapi.status === "authenticated" && dockapi.workspace}
         fallback={

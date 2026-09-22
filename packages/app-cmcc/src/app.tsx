@@ -71,6 +71,7 @@ import {
 import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
+import { AppLoading } from "@/components/app-loading"
 
 const LegacyLayout = lazy(() => import("@/pages/layout"))
 const Session = lazy(() => import("@/pages/session"))
@@ -550,14 +551,7 @@ function ConnectionGate(props: ParentProps<{ disableHealthCheck?: boolean }>) {
   )
 
   return (
-    <Show
-      when={!checking()}
-      fallback={
-        <div class="h-dvh w-screen flex flex-col items-center justify-center bg-background-base">
-          <DeepInsightMark class="w-16 h-20 opacity-50 animate-pulse" />
-        </div>
-      }
-    >
+    <Show when={!checking()} fallback={<AppLoading />}>
       <Show
         when={startupHealthCheck.latest}
         fallback={

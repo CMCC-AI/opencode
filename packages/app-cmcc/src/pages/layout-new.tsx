@@ -512,7 +512,7 @@ function CmccSidebar() {
       >
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
           <div class="flex items-center gap-2.5 px-4 pb-4 pt-12">
-            <img src={jiutianSidebarLogo} alt="深度洞察" class="h-10 w-auto max-w-[92px] shrink-0 object-contain" />
+            <img src={jiutianSidebarLogo} alt="深度洞察" class="h-11 w-auto max-w-[101px] shrink-0 object-contain" />
             <span class="text-[16px] font-semibold text-[#1a1a2e]">深度洞察</span>
           </div>
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-3">

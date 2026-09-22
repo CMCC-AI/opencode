@@ -7,6 +7,8 @@
       content="width=device-width, initial-scale=1, interactive-widget=resizes-content, viewport-fit=cover"
     />
     <title>九天DeepInsight</title>
+    <link rel="preload" as="image" href="/src/assets/auth/startup-loading.webp" fetchpriority="high" />
+    <link rel="stylesheet" href="/src/components/app-loading.css" />
     <link rel="icon" type="image/png" href="/src/assets/home-v6/jiutian-logo.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-v3.png" />
     <link rel="manifest" href="/site.webmanifest" />
@@ -23,8 +25,28 @@
     <script id="oc-theme-preload-script" src="/oc-theme-preload.js"></script>
   </head>
   <body class="antialiased overscroll-none text-12-regular overflow-hidden bg-v2-background-bg-deep">
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root" class="flex flex-col h-dvh bg-v2-background-bg-deep p-px"></div>
+    <noscript>
+      <style>
+        #app-startup-loading {
+          display: none;
+        }
+      </style>
+      You need to enable JavaScript to run this app.
+    </noscript>
+    <div id="root" class="flex flex-col h-dvh bg-v2-background-bg-deep p-px">
+      <div
+        id="app-startup-loading"
+        class="app-loading"
+        data-component="app-loading"
+        role="status"
+        aria-label="系统加载中"
+        aria-busy="true"
+      >
+        <div class="app-loading-scene" aria-hidden="true">
+          <div class="app-loading-dots"><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    </div>
     <script src="/src/entry.tsx" type="module"></script>
   </body>
 </html>

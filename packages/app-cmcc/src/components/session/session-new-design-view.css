@@ -1,0 +1,140 @@
+.cmcc-home {
+  padding: 48px 40px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(max-content, 1fr) auto minmax(0, 1fr);
+  container: cmcc-home / inline-size;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.cmcc-home-heading {
+  display: flex;
+  width: 100%;
+  max-width: 960px;
+  min-width: 0;
+  align-self: end;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 60px;
+  text-align: center;
+}
+
+.cmcc-home-brand {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cmcc-home-brand img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.cmcc-home-brand h1 {
+  min-width: 0;
+  margin: 0 0 -6px;
+  padding-bottom: 6px;
+  font-size: 43px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: 0;
+  background: linear-gradient(135deg, #1e3a8a 0%, #5b4fd7 50%, #9b59f0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.cmcc-home-heading p {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #9ca3af;
+}
+
+.cmcc-home-composer {
+  width: 100%;
+  max-width: 900px;
+  min-width: 0;
+}
+
+/* Scope the larger editor and controls to the homepage, not history or agent pages. */
+.cmcc-home [data-component="session-new-composer"] {
+  min-height: 160px;
+}
+
+.cmcc-home [data-component="session-new-composer"] > div:has([data-component="prompt-input"]) {
+  min-height: 112px;
+}
+
+.cmcc-home [data-component="prompt-input"],
+.cmcc-home [data-component="session-new-design-text"] {
+  font-size: 17px;
+  line-height: 26px;
+}
+
+.cmcc-home [data-component="prompt-input"] {
+  min-height: 112px;
+}
+
+.cmcc-home [data-component="session-new-design-text"] {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+.cmcc-home [data-action="prompt-agent"] [data-slot="select-select-trigger-value"],
+.cmcc-home [data-action="prompt-model"],
+.cmcc-home [data-action="prompt-selected-expert"] {
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.cmcc-home [data-action="prompt-submit"],
+.cmcc-home [data-action="prompt-cmcc-actions"] {
+  width: 32px;
+  height: 32px;
+}
+
+@container cmcc-home (max-width: 640px) {
+  .cmcc-home-brand h1 {
+    font-size: 36px;
+  }
+
+  .cmcc-home-heading p {
+    font-size: 23px;
+  }
+}
+
+@container cmcc-home (max-width: 480px) {
+  .cmcc-home-brand {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cmcc-home-brand h1 {
+    font-size: 32px;
+  }
+
+  .cmcc-home-heading p {
+    font-size: 20px;
+  }
+
+  .cmcc-home-heading {
+    padding-bottom: 32px;
+  }
+}
+
+@media (max-width: 760px) {
+  .cmcc-home {
+    padding: 64px 20px 32px;
+  }
+}
