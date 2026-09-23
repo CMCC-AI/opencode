@@ -1,3 +1,5 @@
+import { artifactExtension } from "./artifact-preview"
+
 export type ExcelPreviewCell = {
   value: string
   colSpan?: number
@@ -23,9 +25,12 @@ const MAX_COLUMNS = 100
 const MIN_ROWS = 20
 const MIN_COLUMNS = 12
 
-export async function parseExcelPreview(data: ArrayBuffer): Promise<ExcelPreviewWorkbook> {
+export async function parseExcelPreview(data: ArrayBuffer, path?: string): Promise<ExcelPreviewWorkbook> {
   const { read, utils } = await import("xlsx")
-  const workbook = read(data, { type: "array", cellDates: true, cellStyles: true })
+  const workbook =
+    artifactExtension(path ?? "") === "csv"
+      ? read(csvText(data), { type: "string", raw: true })
+      : read(data, { type: "array", cellDates: true, cellStyles: true })
 
   return {
     sheets: workbook.SheetNames.flatMap((name) => {
@@ -91,5 +96,18 @@ export async function parseExcelPreview(data: ArrayBuffer): Promise<ExcelPreview
         },
       ]
     }),
+  }
+}
+
+function csvText(data: ArrayBuffer) {
+  const bytes = new Uint8Array(data)
+  const encoding =
+    bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le" : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be" : "utf-8"
+  try {
+    const text = new TextDecoder(encoding, { fatal: true }).decode(data)
+    if (text.includes("\0")) throw new Error("Unexpected NUL in CSV text")
+    return text
+  } catch {
+    throw new Error("CSV 文本编码无法识别，请将文件另存为 UTF-8 后重试。原文件未被修改，可下载查看。")
   }
 }

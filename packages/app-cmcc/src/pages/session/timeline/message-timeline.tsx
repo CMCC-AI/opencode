@@ -59,6 +59,9 @@ import { normalize } from "@opencode-ai/session-ui/session-diff"
 import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/message-gesture"
 import { SessionContextUsage } from "@/components/session-context-usage"
+import lingxiAvatar from "@/assets/chat/lingxi.png"
+import userAvatar from "@/assets/chat/user.png"
+import { generalChatReplyStarts, generalChatSpeaker } from "../general-chat"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
 import { useSessionLayout } from "@/pages/session/session-layout"
@@ -237,6 +240,7 @@ function TimelineDiffView(props: { diff: SummaryDiff }) {
 }
 
 export function MessageTimeline(props: {
+  generalChat?: boolean
   actions?: UserActions
   scroll: { overflow: boolean; bottom: boolean; jump: boolean }
   onResumeScroll: () => void
@@ -338,6 +342,7 @@ export function MessageTimeline(props: {
   const messageRowIndex = projection.messageRowIndex
   const timelineRowByKey = projection.rowByKey
   const timelineRows = projection.rows
+  const replyStarts = createMemo(() => generalChatReplyStarts(props.generalChat ? timelineRows() : []))
 
   let prependAnchor: { key: string; offset: number } | undefined
   let prependAnchorFrame: number | undefined
@@ -1042,6 +1047,12 @@ export function MessageTimeline(props: {
   }
 
   function TimelineRowFrame(input: { row: Accessor<FramedTimelineRow>; children: JSX.Element }) {
+    const speaker = () => (props.generalChat ? generalChatSpeaker(input.row()) : undefined)
+    const showAvatar = () => {
+      if (speaker() === "user") return true
+      const first = replyStarts().get(input.row().userMessageID)
+      return !!first && TimelineRow.key(first) === TimelineRow.key(input.row())
+    }
     const anchor = () => {
       const row = input.row()
       return row._tag === "CommentStrip" || (row._tag === "UserMessage" && row.anchor)
@@ -1064,7 +1075,26 @@ export function MessageTimeline(props: {
         }}
       >
         <div data-component="session-turn" class="min-w-0 w-full relative" style={{ height: "auto" }}>
-          {input.children}
+          <Show when={speaker()} fallback={input.children}>
+            <div class="cmcc-chat-message" data-speaker={speaker()}>
+              <div class="cmcc-chat-avatar">
+                <Show when={showAvatar()}>
+                  <img
+                    src={speaker() === "user" ? userAvatar : lingxiAvatar}
+                    alt={speaker() === "user" ? "用户" : "灵犀"}
+                    width="36"
+                    height="36"
+                  />
+                </Show>
+              </div>
+              <div class="cmcc-chat-message-body">
+                <Show when={speaker() === "assistant" && showAvatar()}>
+                  <div class="cmcc-chat-speaker">灵犀</div>
+                </Show>
+                {input.children}
+              </div>
+            </div>
+          </Show>
         </div>
       </div>
     )
@@ -1466,10 +1496,12 @@ export function MessageTimeline(props: {
                       "gap-3": !settings.general.newLayoutDesigns(),
                     }}
                   >
-                    <SessionContextUsage
-                      placement="bottom"
-                      buttonAppearance={settings.general.newLayoutDesigns() ? "v2" : "default"}
-                    />
+                    <Show when={!props.generalChat}>
+                      <SessionContextUsage
+                        placement="bottom"
+                        buttonAppearance={settings.general.newLayoutDesigns() ? "v2" : "default"}
+                      />
+                    </Show>
                     <Show when={!parentID()}>
                       <Show
                         when={settings.general.newLayoutDesigns()}

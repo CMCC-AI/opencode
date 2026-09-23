@@ -2,7 +2,7 @@ import { For, Show, createEffect, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { parseExcelPreview, type ExcelPreviewWorkbook } from "@/pages/session/excel-preview"
 
-export function ExcelPreview(props: { data: ArrayBuffer }) {
+export function ExcelPreview(props: { data: ArrayBuffer; path?: string }) {
   const [state, setState] = createStore({
     loading: true,
     error: undefined as string | undefined,
@@ -12,10 +12,11 @@ export function ExcelPreview(props: { data: ArrayBuffer }) {
 
   createEffect(() => {
     const data = props.data
+    const path = props.path
     let active = true
     setState({ loading: true, error: undefined, workbook: undefined, activeSheet: 0 })
 
-    void parseExcelPreview(data)
+    void parseExcelPreview(data, path)
       .then((workbook) => {
         if (!active) return
         setState({ loading: false, workbook })

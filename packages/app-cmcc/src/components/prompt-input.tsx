@@ -66,6 +66,7 @@ import { PromptContextItems } from "./prompt-input/context-items"
 import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
+import { PromptSendButton } from "./prompt-input/send-button"
 import { HomeActionsPopover, HomeAgentControl, HomeModelControl } from "./prompt-input/home-controls"
 import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
@@ -182,6 +183,7 @@ function createPersistedPromptInputHistory() {
 }
 
 export interface PromptInputProps {
+  hideVariantControl?: boolean
   class?: string
   variant?: "dock" | "new-session"
   state?: PromptInputState
@@ -1446,7 +1448,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const variants = createMemo(() => ["default", ...props.controls.model.selection.variant.list()])
   // Check provider variants directly: `variants` also includes the UI-only default option.
-  const showVariantControl = createMemo(() => props.controls.model.selection.variant.list().length > 0)
+  const showVariantControl = createMemo(
+    () => !props.hideVariantControl && props.controls.model.selection.variant.list().length > 0,
+  )
   const accepting = createMemo(() => {
     const id = props.controls.session.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk().directory)
@@ -2016,18 +2020,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   />
                 </Show>
                 <TooltipV2 placement="top" inactive={!working() && blank()} value={tip()}>
-                  <IconButton
+                  <PromptSendButton
                     data-action="prompt-submit"
                     type="submit"
                     disabled={!working() && blank()}
                     tabIndex={store.mode === "normal" ? undefined : -1}
-                    icon={stopping() ? "stop" : store.mode === "shell" ? "arrow-undo-down" : "arrow-up"}
-                    variant="primary"
-                    class="size-7 rounded-md p-[6px] text-v2-icon-icon-muted shadow-[var(--v2-elevation-button-contrast)] disabled:opacity-50"
-                    style={{
-                      "background-image":
-                        "linear-gradient(180deg,var(--v2-alpha-light-20) 0%,var(--v2-alpha-light-0) 100%),linear-gradient(90deg,var(--v2-background-bg-contrast) 0%,var(--v2-background-bg-contrast) 100%)",
-                    }}
+                    mode={stopping() ? "stop" : store.mode === "shell" ? "shell" : "send"}
                     aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
                   />
                 </TooltipV2>
@@ -2161,14 +2159,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
                 <div class="flex items-center gap-1 pointer-events-auto">
                   <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
-                    <IconButton
+                    <PromptSendButton
                       data-action="prompt-submit"
                       type="submit"
                       disabled={!working() && blank()}
                       tabIndex={store.mode === "normal" ? undefined : -1}
-                      icon={stopping() ? "stop" : store.mode === "shell" ? "arrow-undo-down" : "arrow-up"}
-                      variant="primary"
-                      class="size-8"
+                      mode={stopping() ? "stop" : store.mode === "shell" ? "shell" : "send"}
                       aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
                     />
                   </Tooltip>

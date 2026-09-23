@@ -72,7 +72,7 @@ for (const viewport of [
     expect(metrics.subtitle.y + metrics.subtitle.height).toBeLessThanOrEqual(metrics.composer.y)
     expect(metrics.editor.font).toBe("17px")
     expect(metrics.editor.y).toBeGreaterThanOrEqual(metrics.composer.y)
-    expect(metrics.composer.height).toBe(viewport.width >= 760 ? 160 : 198)
+    expect(metrics.composer.height).toBe(viewport.width >= 760 ? 160 : 200)
     await expect(page.locator(`${home} [data-action="prompt-model"]`)).toHaveCSS("font-size", "15px")
     await expect(page.getByRole("button", { name: "执行", exact: true })).toBeVisible()
     if (viewport.width >= 1440) {

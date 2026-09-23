@@ -45,6 +45,8 @@ import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
 import { PromptInput } from "@/components/prompt-input"
+import { isGeneralConversation } from "./session/general-chat"
+import "./session/general-chat.css"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { type FollowupDraft, sendFollowupDraft } from "@/components/prompt-input/submit"
 import {
@@ -322,6 +324,14 @@ export default function Page() {
   const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || aiScience() || deepInsight() || mstock())
   const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
+  const generalChat = createMemo(() =>
+    settings.general.newLayoutDesigns() && isGeneralConversation({
+      session: info(),
+      agentType: businessAgentType(),
+      initialAgent: initialUserAgent(),
+      dedicated: dedicatedAnalysis(),
+    }),
+  )
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
   const canReview = createMemo(() => !!sync().project)
   const reviewTab = createMemo(() => isDesktop())
@@ -1767,6 +1777,7 @@ export default function Page() {
         promptInput={
           <PromptInput
             controls={inputController()}
+            hideVariantControl={generalChat()}
             ref={(el) => {
               inputRef = el
             }}
@@ -1840,7 +1851,11 @@ export default function Page() {
       <ZhengqiWorkbenchProvider sessionID={() => params.id} active={zhengqi}>
       <ShoppersWorkbenchProvider sessionID={() => params.id} active={shoppers}>
       <AiScienceWorkbenchProvider sessionID={() => params.id} active={aiScience}>
-      <div class="relative size-full overflow-hidden flex flex-col">
+      <div
+        class="relative size-full overflow-hidden flex flex-col"
+        classList={{ "cmcc-general-chat": generalChat() }}
+        data-cmcc-general-chat={generalChat() ? "true" : undefined}
+      >
         {sessionSync() ?? ""}
         <SessionHeader />
           <Show when={cmccLayout() && !dedicatedAnalysis()}>
@@ -2032,6 +2047,7 @@ export default function Page() {
                             </Match>
                             <Match when={true}>
                             <MessageTimeline
+                              generalChat={generalChat()}
                               actions={actions}
                               scroll={ui.scroll}
                               onResumeScroll={resumeScroll}

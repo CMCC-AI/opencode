@@ -28,6 +28,7 @@ function provider(id: string, name: string, modelName: string) {
 
 export async function setupHomePage(page: Page, options: { models?: boolean; history?: boolean; free?: boolean } = {}) {
   await page.addInitScript(() => {
+    if (window !== window.top) return
     localStorage.setItem("dockapi.accessToken", "home-sizing-test-token")
     const observer = new MutationObserver(() => {
       const input = document.querySelector('[data-component="session-new-design"] [data-component="prompt-input"]')

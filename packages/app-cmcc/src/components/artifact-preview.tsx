@@ -5,6 +5,7 @@ import { Match, Show, Switch, createEffect, createMemo, onCleanup } from "solid-
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import { ExcelPreview } from "@/components/excel-preview"
+import { normalizeDocxSymbolBullets } from "@/pages/session/docx-preview"
 import {
   artifactBuffer,
   artifactDataUrl,
@@ -34,18 +35,25 @@ export function ArtifactPreview(props: {
         <OfficePreview kind="docx" data={data()} />
       </Match>
       <Match when={kind() === "excel"}>
-        <ExcelPreview data={data()} />
+        <ExcelPreview data={data()} path={props.path} />
       </Match>
       <Match when={kind() === "pptx"}>
         <OfficePreview kind="pptx" data={data()} />
       </Match>
       <Match when={kind() === "pdf"}>
-        <iframe
-          title={fileName(props.path)}
-          class="size-full border-0 bg-white"
-          src={props.pdfSrc ?? artifactDataUrl(props.content, "application/pdf")}
-          referrerpolicy="no-referrer"
-        />
+        <Show
+          when={props.pdfSrc}
+          fallback={<PreviewEmpty title="PDF 预览地址不可用" description="请使用下载按钮查看原文件。" />}
+        >
+          {(src) => (
+            <iframe
+              title={fileName(props.path)}
+              class="size-full border-0 bg-white"
+              src={src()}
+              referrerpolicy="no-referrer"
+            />
+          )}
+        </Show>
       </Match>
       <Match when={kind() === "image"}>
         <ImagePreview path={props.path} content={props.content} />
@@ -229,13 +237,18 @@ function OfficePreview(props: { kind: Extract<ArtifactPreviewKind, "docx" | "ppt
     const load =
       kind === "docx"
         ? import("docx-preview").then((module) => ({
-            preview: (value: ArrayBuffer) =>
-              module.renderAsync(value, container, container, {
+            preview: async (value: ArrayBuffer) => {
+              const options = {
                 ignoreWidth: false,
                 ignoreHeight: false,
                 renderHeaders: true,
                 renderFooters: true,
-              }),
+              }
+              const document: unknown = await module.parseAsync(value, options)
+              if (!active) return
+              normalizeDocxSymbolBullets(document)
+              return module.renderDocument(document, container, container, options)
+            },
             destroy: () => container.replaceChildren(),
           }))
         : import("pptx-preview").then((module) => {

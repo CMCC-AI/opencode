@@ -2,7 +2,7 @@ import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { Icon } from "@opencode-ai/ui/icon"
 import { For, Match, Show, Switch, createEffect, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
-import { ArtifactPreview } from "@/components/artifact-preview"
+import { SessionArtifactPreview } from "@/components/session-artifact-preview"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
 import { showToast } from "@/utils/toast"
@@ -147,7 +147,7 @@ export function DeepInsightFilesTab() {
               <div class="min-h-0 flex-1 overflow-hidden rounded-[8px] border border-[#e0e4eb] bg-white">
                 <Switch>
                   <Match when={content()?.loaded && content()?.content}>
-                    <ArtifactPreview path={artifact().path} content={content()!.content!} />
+                    <SessionArtifactPreview path={artifact().path} content={content()!.content!} />
                   </Match>
                   <Match when={content()?.error}>
                     {(error) => <ReportEmpty title="文件读取失败" description={error()} />}

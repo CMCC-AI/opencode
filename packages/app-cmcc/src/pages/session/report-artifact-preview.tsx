@@ -9,7 +9,8 @@ import { useServerSDK } from "@/context/server-sdk"
 import { authTokenFromCredentials } from "@/utils/server"
 import { showToast } from "@/utils/toast"
 import { artifactHtmlPreviewUrl } from "./artifact-html-preview"
-import { artifactReportFiles, type ArtifactReportKind } from "./artifact-preview"
+import { artifactPdfPreviewUrl } from "./artifact-pdf-preview"
+import { artifactPreviewKind, artifactReportFiles, type ArtifactReportKind } from "./artifact-preview"
 import type { AgentArtifactSource } from "./agent-workbench/artifact-source"
 import { createSnapshotReportFiles } from "./agent-workbench/snapshot-report-files"
 
@@ -40,11 +41,20 @@ export function ReportArtifactPreview(props: {
   })
   const previewUrl = createMemo(() => {
     const artifact = selected()
-    if (!artifact || props.kind !== "visual") return undefined
+    if (!artifact || (props.kind !== "visual" && artifactPreviewKind(artifact.path) !== "pdf")) return undefined
     if (props.artifactSource) return props.artifactSource.previewUrl(artifact.path)
     if (!sdk || !serverSDK) return undefined
     const sdkContext = sdk()
     const connection = serverSDK().server.http
+    if (artifactPreviewKind(artifact.path) === "pdf")
+      return artifactPdfPreviewUrl({
+        serverUrl: sdkContext.url,
+        directory: sdkContext.directory,
+        path: artifact.path,
+        authToken: connection.password
+          ? authTokenFromCredentials({ username: connection.username, password: connection.password })
+          : undefined,
+      })
     return artifactHtmlPreviewUrl({
       serverUrl: sdkContext.url,
       directory: sdkContext.directory,
@@ -127,11 +137,7 @@ export function ReportArtifactPreview(props: {
               fallback={
                 <Switch>
                   <Match when={content()?.loaded && content()?.content}>
-                    <ArtifactPreview
-                      path={artifact().path}
-                      content={content()!.content!}
-                      pdfSrc={props.artifactSource?.previewUrl(artifact().path)}
-                    />
+                    <ArtifactPreview path={artifact().path} content={content()!.content!} pdfSrc={previewUrl()} />
                   </Match>
                   <Match when={content()?.error}>
                     {(error) => <ReportState title="文字报告读取失败" description={error()} />}
