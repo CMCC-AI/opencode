@@ -5,6 +5,8 @@ import {
   buildAgentNodes,
   extractAssistantMarkdown,
   extractOverviewConversation,
+  extractWorkbenchMessages,
+  completedExpertElapsed,
   extractTaskChildPreferences,
   extractUserQuery,
 } from "./session-adapter"
@@ -54,6 +56,34 @@ const text = (id: string, messageID: string, value: string): Part => ({
 })
 
 describe("agent workbench session adapter", () => {
+  test("keeps each message's timestamp and actual model, without exposing hidden parts", () => {
+    const first = assistant("a1", "root")
+    const second = { ...assistant("a2", "root", false), modelID: "second-model", time: { created: 40 } }
+    const messages = extractWorkbenchMessages([second, first, user("u1", "root")], {
+      u1: [text("p1", "u1", "question")],
+      a1: [text("p2", "a1", "first"), { ...text("hidden", "a1", "ignored"), ignored: true } as Part],
+      a2: [text("p3", "a2", "```ts\n"), text("p4", "a2", "1\n```")],
+    })
+    expect(messages.map((message) => message.id)).toEqual(["u1", "a1", "a2"])
+    expect(messages[0]).toEqual({ id: "u1", role: "user", text: "question", createdAt: 10 })
+    expect(messages[1]).toMatchObject({ text: "first", createdAt: 20, completedAt: 30, modelID: "test" })
+    expect(messages[2]).toMatchObject({
+      text: "```ts\n1\n```",
+      createdAt: 40,
+      completedAt: undefined,
+      modelID: "second-model",
+    })
+  })
+
+  test("shows elapsed time only for a completed execution with valid timestamps", () => {
+    expect(completedExpertElapsed({ status: "completed", startedAt: 1000, completedAt: 61000 })).toBe(60000)
+    expect(completedExpertElapsed({ status: "completed", startedAt: 1000, completedAt: 1000 })).toBe(0)
+    for (const status of ["waiting", "running", "failed"] as const)
+      expect(completedExpertElapsed({ status, startedAt: 1000, completedAt: 61000 })).toBeUndefined()
+    expect(completedExpertElapsed({ status: "completed", startedAt: 1000 })).toBeUndefined()
+    expect(completedExpertElapsed({ status: "completed", startedAt: 1000, completedAt: 0 })).toBeUndefined()
+    expect(completedExpertElapsed({ status: "completed", startedAt: NaN, completedAt: 2000 })).toBeUndefined()
+  })
   test("extracts only ordered assistant text and the original user query", () => {
     const followup = { ...assistant("a2", "root"), agent: "build", mode: "build" }
     const messages = [followup, user("u1", "root"), assistant("a1", "root")]

@@ -112,9 +112,11 @@ function snapshot(input: CaseInput): DockApiCaseSnapshot {
   const root = entry("case-root", input.lead)
   const child = entry("case-child", input.member, "case-root")
   const filenames =
-    input.category === "deep-research" ? ["20-report.md", "30-report.html", "25-visual-report.json"] : input.category === "science"
-      ? ["writing/paper.md", "figures/chart.svg", "reports/view.html"]
-      : ["20-report.md", "25-visual-report.json", "06-consolidated-issues.json"]
+    input.category === "deep-research"
+      ? ["20-report.md", "30-report.html", "25-visual-report.json", "22-references.json"]
+      : input.category === "science"
+        ? ["writing/paper.md", "figures/chart.svg", "reports/view.html"]
+        : ["20-report.md", "25-visual-report.json", "06-consolidated-issues.json"]
   for (const path of filenames) {
     child.messages[1].parts.push({
       id: `write-${path}`,
@@ -222,9 +224,16 @@ async function prepare(
       if (options.fileError)
         return route.fulfill({ status: 404, body: "missing", headers: { "access-control-allow-origin": "*" } })
       let body = reportText
-      if (path.endsWith("30-report.html")) return route.fulfill({
-        contentType: "text/html; charset=utf-8", body: "<!doctype html><html><body>深度研究可视化正文</body></html>",
-      })
+      if (path.endsWith("22-references.json"))
+        body = JSON.stringify([
+          { key: "local:SRC-001", kind: "local" },
+          { key: "https://example.com/source", kind: "web" },
+        ])
+      if (path.endsWith("30-report.html"))
+        return route.fulfill({
+          contentType: "text/html; charset=utf-8",
+          body: "<!doctype html><html><body>深度研究可视化正文</body></html>",
+        })
       if (path.endsWith("report.docx") && wordBuffer)
         return route.fulfill({
           contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -282,12 +291,16 @@ test("finance retains its dedicated layout after lazy loading", async ({ page })
   const state = await prepare(page, {
     type: "deeptrading",
     lead: "deeptrading/deeptrading-team-lead",
-    member: "deeptrading/technical-analyst",
+    member: "deeptrading/dt-intake",
     category: "finance",
     experts: 9,
   })
   await expect(page.getByRole("button", { name: "分析团队", exact: true })).toBeVisible()
   await expect(page.getByText("9 位", { exact: true })).toBeVisible()
+  await expect(page.locator('[data-workbench-message="case-root-a"] time')).toHaveAttribute("datetime", new Date(1500).toISOString())
+  await page.locator('button[data-status="completed"]').first().click()
+  await expect(page.locator('[data-workbench-message="case-child-a"]').getByRole("button", { name: "复制消息" })).toBeVisible()
+  await expect(page.locator('[data-component="expert-duration"]')).toHaveText("用时 2秒")
   await expect(page.locator('[contenteditable="true"]')).toHaveCount(0)
   await expect(page.getByRole("button", { name: "看回放", exact: true })).toBeVisible()
   expect(state.errors).toEqual([])
@@ -299,10 +312,26 @@ for (const input of cases) {
     await page.setViewportSize({ width: 1440, height: 900 })
     const state = await prepare(page, input)
     await expect(page.getByRole("button", { name: "分析团队", exact: true })).toBeVisible()
-    await expect(page.getByText(`${input.experts} 位`, { exact: true })).toBeVisible()
+    if (input.category === "deep-research") {
+      await expect(page.getByText("信息源", { exact: true }).locator("..").locator("strong")).toHaveText("2 篇")
+    } else {
+      await expect(page.getByText(`${input.experts} 位`, { exact: true })).toBeVisible()
+    }
+    await expect(page.locator('[data-workbench-message="case-root-a"] time')).toHaveAttribute(
+      "datetime",
+      new Date(1500).toISOString(),
+    )
+    await expect(
+      page.locator('[data-workbench-message="case-root-a"]').getByRole("button", { name: "复制消息" }),
+    ).toBeVisible()
+    await page.locator('button[data-status="completed"]').first().click()
+    await expect(page.locator('[data-workbench-message="case-child-a"]')).toContainText("专家分析完成")
+    await expect(page.locator('[data-component="expert-duration"]')).toHaveText("用时 2秒")
     if (["government", "inspection"].includes(input.category)) {
       await expect(page.getByText("报告篇幅", { exact: true }).locator("..").locator("strong")).toHaveText("17字")
-      await expect(page.getByText(input.category === "government" ? "公开来源" : "问题线索", { exact: true })).toHaveCount(0)
+      await expect(
+        page.getByText(input.category === "government" ? "公开来源" : "问题线索", { exact: true }),
+      ).toHaveCount(0)
       expect(state.fileRequests.filter((path) => path.endsWith("20-report.md"))).toHaveLength(1)
     }
     if (input.category === "recommendation") {
@@ -414,8 +443,12 @@ test("deep research case creates a research draft without sending it", async ({ 
   await page.getByRole("button", { name: "做同款", exact: true }).click()
   await expect(page).toHaveURL(/\/new-session\?/)
   await expect(page.locator('[contenteditable="true"]')).toContainText("案例原始查询")
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("opencode.global.dat:tabs"))).toContain(`"agent":"${input.lead}"`)
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("opencode.global.dat:tabs"))).toContain('"expertID":"deepinsight"')
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("opencode.global.dat:tabs")))
+    .toContain(`"agent":"${input.lead}"`)
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("opencode.global.dat:tabs")))
+    .toContain('"expertID":"deepinsight"')
   expect(state.apiRequests.filter((value) => value.startsWith("POST /session"))).toEqual([])
 })
 

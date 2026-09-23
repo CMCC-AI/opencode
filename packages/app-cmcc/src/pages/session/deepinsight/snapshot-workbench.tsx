@@ -11,6 +11,8 @@ import {
 } from "../agent-workbench/snapshot"
 import { deepInsightCatalogArtifacts, deepInsightProgress } from "./data"
 import { createDeepInsightRoute } from "./route-context"
+import { createDeepInsightSourceCount } from "./source-count-context"
+import { deepInsightReferenceArtifact } from "./source-count"
 import { DEEPINSIGHT_ARTIFACT_ROLES, DEEPINSIGHT_MEMBERS } from "./config"
 import { DeepInsightWorkbenchValueProvider, type DeepInsightWorkbenchContextValue } from "./workbench-context"
 
@@ -72,6 +74,15 @@ export function DeepInsightSnapshotWorkbenchProvider(
   const value: DeepInsightWorkbenchContextValue = {
     workbench: controller.workbench,
     reportLength,
+    sourceCount: createDeepInsightSourceCount({
+      scope: () => props.snapshot().caseCode,
+      reference: () => deepInsightReferenceArtifact(actualWorkbench().artifacts, actualWorkbench().textReportPath),
+      revision: () => props.snapshot().capturedAt,
+      source: props.artifactSource,
+      visible: () =>
+        !controller.replay.isReplaying() ||
+        controller.workbench().artifacts.some((artifact) => artifact.filename === "22-references.json"),
+    }),
     progressPercent: () =>
       deepInsightProgress(
         controller.workbench().agents,

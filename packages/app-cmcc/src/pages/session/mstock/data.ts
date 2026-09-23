@@ -6,6 +6,7 @@ import {
   deriveSessionStatus,
   extractAssistantMarkdown,
   extractOverviewConversation,
+  extractWorkbenchMessages,
   extractTaskChildPreferences,
   extractUserQuery,
 } from "../agent-workbench/session-adapter"
@@ -129,6 +130,14 @@ export function mstockWorkbench(input: {
         (lead ? extractAssistantMarkdown(lead.messages, lead.parts) : "")
       : "",
     overviewTurns: root ? extractOverviewConversation(root.messages, root.parts) : [],
+    overviewMessages: root
+      ? [
+          ...extractWorkbenchMessages(root.messages, root.parts),
+          ...(!extractAssistantMarkdown(root.messages, root.parts) && lead
+            ? extractWorkbenchMessages(lead.messages, lead.parts).filter((message) => message.role === "assistant")
+            : []),
+        ]
+      : [],
     overviewStatus: input.running ? "running" : root ? deriveSessionStatus(root) : "waiting",
     agents: nodes.nodes,
     nestedAgentSessions: buildNestedAgentSessions({

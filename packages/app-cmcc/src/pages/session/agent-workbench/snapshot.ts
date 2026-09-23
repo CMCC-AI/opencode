@@ -15,6 +15,7 @@ import {
   deriveSessionStatus,
   extractAssistantMarkdown,
   extractOverviewConversation,
+  extractWorkbenchMessages,
   extractTaskChildPreferences,
   extractUserQuery,
   resolveAgentSessions,
@@ -93,6 +94,7 @@ export function buildCaseSnapshotWorkbench(input: {
       query: input.snapshot.query || extractUserQuery(root.messages, root.parts),
       overviewMarkdown: extractAssistantMarkdown(root.messages, root.parts),
       overviewTurns: extractOverviewConversation(root.messages, root.parts),
+      overviewMessages: extractWorkbenchMessages(root.messages, root.parts),
       overviewStatus: deriveSessionStatus({
         session: root.session,
         status: root.status,

@@ -1,7 +1,7 @@
-import { Markdown } from "@opencode-ai/session-ui/markdown"
+import { WorkbenchConversation, WorkbenchQuery, WorkbenchExpertDuration } from "../agent-workbench/conversation"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
-import { For, Index, Show, createEffect, createMemo, on, type JSX } from "solid-js"
-import type { AgentNodeStatus, OverviewConversationTurn } from "../agent-workbench/model"
+import { For, Show, createEffect, createMemo, on, type JSX } from "solid-js"
+
 import { AgentAvatar, StatusBadge } from "../deeptrading/deeptrading-session-view"
 import { aiScienceAvatar, aiScienceTeamAvatar } from "./config"
 import { useAiScienceWorkbench } from "./workbench-context"
@@ -18,6 +18,7 @@ export function AiScienceSessionView() {
         profession: "AI for Science 科研专家团",
         status: data.overviewStatus,
         markdown: data.overviewMarkdown,
+        messages: data.overviewMessages,
         avatar: aiScienceTeamAvatar(),
       }
     }
@@ -56,15 +57,7 @@ export function AiScienceSessionView() {
         onPointerDown={autoScroll.handleInteraction}
       >
         <div ref={autoScroll.contentRef} class="mx-auto w-full max-w-[1040px] px-5 pb-32 pt-5 sm:px-8">
-          <Show when={context.workbench().query}>
-            {(query) => (
-              <div class="mb-5 flex justify-end">
-                <div class="max-w-[78%] whitespace-pre-wrap rounded-[8px] bg-[#e9ecf3] px-4 py-3 text-[14px] leading-6 text-[#323949]">
-                  {query()}
-                </div>
-              </div>
-            )}
-          </Show>
+          <WorkbenchQuery workbench={context.workbench()} overview={context.selectedAgentId() === "overview"} />
 
           <Show
             when={selected()}
@@ -102,45 +95,24 @@ export function AiScienceSessionView() {
                   </Show>
                 </header>
 
-                <Show
-                  when={
-                    item().id === "overview" &&
-                    !context.replay.isReplaying() &&
-                    context.workbench().overviewTurns.length
-                      ? context.workbench().overviewTurns
-                      : undefined
-                  }
-                  fallback={
-                    <Show
-                      when={item().markdown}
-                      fallback={
-                        <EmptyPanel
-                          title={item().status === "waiting" ? "等待该专家开始研究" : "该节点暂未返回正文"}
-                          description={
-                            item().status === "failed"
-                              ? "当前节点执行或加载异常，请查看节点状态。"
-                              : "内容返回后会在这里逐步显示。"
-                          }
-                        />
+                <WorkbenchConversation
+                  messages={item().messages}
+                  markdown={item().markdown}
+                  cacheKey={`${context.workbench().rootSessionId}:${item().id}`}
+                  streaming={item().status === "running"}
+                  empty={
+                    <EmptyPanel
+                      title={item().status === "waiting" ? "等待该专家开始分析" : "该节点暂未返回正文"}
+                      description={
+                        item().status === "failed"
+                          ? "当前节点执行或加载异常，请查看节点状态。"
+                          : "内容返回后会在这里逐步显示。"
                       }
-                    >
-                      {(markdown) => (
-                        <MarkdownPanel
-                          text={markdown()}
-                          cacheKey={`${context.workbench().rootSessionId}:${item().id}`}
-                          streaming={item().status === "running"}
-                        />
-                      )}
-                    </Show>
-                  }
-                >
-                  {(turns) => (
-                    <OverviewConversation
-                      turns={turns()}
-                      rootSessionId={context.workbench().rootSessionId}
-                      status={item().status}
                     />
-                  )}
+                  }
+                />
+                <Show when={item().id !== "overview"}>
+                  <WorkbenchExpertDuration node={item()} />
                 </Show>
               </section>
             )}
@@ -154,63 +126,6 @@ export function AiScienceSessionView() {
       </div>
 
       <AgentStrip />
-    </div>
-  )
-}
-
-function OverviewConversation(props: {
-  turns: OverviewConversationTurn[]
-  rootSessionId: string
-  status: AgentNodeStatus
-}) {
-  const hasReply = createMemo(() => props.turns.some((turn) => !!turn.markdown.trim()))
-  return (
-    <Show
-      when={hasReply()}
-      fallback={
-        <EmptyPanel
-          title={props.status === "waiting" ? "等待科研专家团开始分析" : "总览暂未返回正文"}
-          description="内容返回后会在这里逐步显示。"
-        />
-      }
-    >
-      <div class="space-y-5">
-        <Index each={props.turns}>
-          {(turn, index) => (
-            <>
-              <Show when={index > 0}>
-                <div class="flex justify-end">
-                  <div class="max-w-[78%] whitespace-pre-wrap rounded-[8px] bg-[#e9ecf3] px-4 py-3 text-[14px] leading-6 text-[#323949]">
-                    {turn().query}
-                  </div>
-                </div>
-              </Show>
-              <Show when={turn().markdown}>
-                {(markdown) => (
-                  <MarkdownPanel
-                    text={markdown()}
-                    cacheKey={`${props.rootSessionId}:overview:${turn().id}`}
-                    streaming={props.status === "running" && index === props.turns.length - 1}
-                  />
-                )}
-              </Show>
-            </>
-          )}
-        </Index>
-      </div>
-    </Show>
-  )
-}
-
-function MarkdownPanel(props: { text: string; cacheKey: string; streaming: boolean }) {
-  return (
-    <div class="rounded-[8px] border border-[#e3e6ed] bg-white px-5 py-5 shadow-[0_2px_10px_rgba(36,42,60,0.04)] sm:px-7">
-      <Markdown
-        text={props.text}
-        cacheKey={props.cacheKey}
-        streaming={props.streaming}
-        class="select-text text-[14px] leading-7 text-[#2f3543]"
-      />
     </div>
   )
 }

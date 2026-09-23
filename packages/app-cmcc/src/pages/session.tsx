@@ -1732,6 +1732,7 @@ export default function Page() {
       prompt,
       ready: () => !store.deferRender && messagesReady(),
       centered,
+      hideTodo: dedicatedAnalysis,
       todo: {
         collapsed: () => view().todoCollapsed.get(),
         onToggle: () => view().todoCollapsed.set(!view().todoCollapsed.get()),

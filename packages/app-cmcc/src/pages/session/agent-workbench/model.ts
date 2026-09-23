@@ -19,9 +19,20 @@ export type AgentNodeView = AgentDisplayMember & {
   sessionId?: string
   status: AgentNodeStatus
   markdown: string
+  messages?: WorkbenchMessage[]
   startedAt?: number
   completedAt?: number
   ambiguity?: string
+}
+
+export type WorkbenchMessage = {
+  id: string
+  role: "user" | "assistant"
+  text: string
+  createdAt?: number
+  completedAt?: number
+  providerID?: string
+  modelID?: string
 }
 
 export type NestedAgentSessionView = {
@@ -72,6 +83,7 @@ export type AgentWorkbench = {
   rootSessionId: string
   query: string
   overviewMarkdown: string
+  overviewMessages?: WorkbenchMessage[]
   overviewTurns: OverviewConversationTurn[]
   overviewStatus: AgentNodeStatus
   agents: AgentNodeView[]

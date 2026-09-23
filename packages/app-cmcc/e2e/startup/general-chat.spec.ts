@@ -55,6 +55,20 @@ test("retains native controls outside general chat", async ({ page, baseURL }) =
   await expect(page.locator('[data-action="prompt-submit"]')).toHaveCSS("width", "36px")
 })
 
+test("general chat keeps its task plan dock", async ({ page, baseURL }) => {
+  const data = await setupGeneralChat(page, { running: true, turns: 1 })
+  await page.route("**/session/*/todo*", (route) => route.fulfill({ json: [
+    { content: "通用对话任务计划", status: "in_progress", priority: "high" },
+  ] }))
+  await page.goto(data.href(baseURL!))
+  data.events.push({ type: "todo.updated", properties: { sessionID: data.session.id, todos: [
+    { content: "通用对话任务计划", status: "in_progress", priority: "high" },
+  ] } })
+  await expect(page.locator('[data-component="session-todo-dock"]')).toBeVisible()
+  await expect(page.getByText("通用对话任务计划", { exact: true }).first()).toBeVisible()
+  expect(data.errors).toEqual([])
+})
+
 test("code copy and wide table scrolling keep the conversation within its panel", async ({
   page,
   context,

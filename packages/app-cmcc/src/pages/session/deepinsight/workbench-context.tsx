@@ -25,6 +25,7 @@ import {
   deriveSessionStatus,
   extractAssistantMarkdown,
   extractOverviewConversation,
+  extractWorkbenchMessages,
   extractTaskChildPreferences,
   extractUserQuery,
   resolveAgentSessions,
@@ -51,6 +52,8 @@ import {
   safeDeepInsightArtifacts,
 } from "./data"
 import { createDeepInsightRoute } from "./route-context"
+import { createDeepInsightSourceCount } from "./source-count-context"
+import { deepInsightReferenceArtifact } from "./source-count"
 
 const MESSAGE_PAGE_SIZE = 200
 const MEMBER_IDS = new Set(DEEPINSIGHT_MEMBERS.map((member) => member.id))
@@ -61,6 +64,7 @@ export type DeepInsightWorkbenchContextValue = {
   selectAgent: (agentId: string) => void
   retrySession: (sessionId: string) => Promise<void>
   reportLength: Accessor<number | undefined>
+  sourceCount: Accessor<number | undefined>
   progressPercent: Accessor<number>
   artifactSource?: AgentArtifactSource
   replay: {
@@ -488,6 +492,7 @@ export function DeepInsightWorkbenchProvider(
       query: extractUserQuery(rootData.messages, rootData.parts),
       overviewMarkdown: extractAssistantMarkdown(rootData.messages, rootData.parts),
       overviewTurns: extractOverviewConversation(rootData.messages, rootData.parts),
+      overviewMessages: extractWorkbenchMessages(rootData.messages, rootData.parts),
       overviewStatus: overviewStatus(),
       agents: nodes.agentNodes,
       nestedAgentSessions: nestedAgentSessions(),
@@ -629,9 +634,32 @@ export function DeepInsightWorkbenchProvider(
     clearReplayTimer()
   })
 
+  const sourceCount = createDeepInsightSourceCount({
+    scope: () => rootSession()?.id,
+    reference: () => deepInsightReferenceArtifact(catalogArtifacts(), reports().text?.path),
+    revision: reportRevision,
+    visible: () =>
+      !replayState.playing || workbench().artifacts.some((artifact) => artifact.filename === "22-references.json"),
+    source: {
+      load: (path, force) => file.load(path, { force }),
+      get: (path) => {
+        const current = file.get(path)
+        return {
+          loaded: !!current?.loaded,
+          loading: current?.loading,
+          error: current?.error,
+          text:
+            current?.content?.type === "text"
+              ? artifactText(current.content.content, current.content.encoding)
+              : undefined,
+        }
+      },
+    },
+  })
   const value: DeepInsightWorkbenchContextValue = {
     workbench,
     reportLength,
+    sourceCount,
     progressPercent: () =>
       deepInsightProgress(
         workbench().agents,
