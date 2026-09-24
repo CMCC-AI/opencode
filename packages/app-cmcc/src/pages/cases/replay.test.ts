@@ -3,20 +3,20 @@ import type { DockApiCaseSnapshot } from "@/context/dockapi"
 import { caseReplayFrame, compileCaseReplay } from "./replay"
 
 describe("case replay timeline", () => {
-  test("keeps real session order and includes dynamic DeepCampaign children", () => {
+  test("keeps real session order and includes dynamic DeepGeo children", () => {
     const snapshot = {
       schemaVersion: 1,
       caseCode: "case-one",
       capturedAt: "2026-08-26T00:00:00Z",
       rootSessionId: "root",
-      query: "营销分析",
-      agentType: "deepcampaign",
-      rootAgent: "deepcampaign/deepcampaign-team-lead",
+      query: "选址分析",
+      agentType: "deepgeo",
+      rootAgent: "deepgeo/deepgeo-team-lead",
       artifacts: [],
       sessions: [
-        entry("root", 100, undefined, "deepcampaign/deepcampaign-team-lead", "root-user"),
-        entry("child-late", 300, "root", "deepcampaign/custom-agent-2", "late-user"),
-        entry("child-early", 200, "root", "deepcampaign/custom-agent-1", "early-user"),
+        entry("root", 100, undefined, "deepgeo/deepgeo-team-lead", "root-user"),
+        entry("child-late", 300, "root", "deepgeo/custom-agent-2", "late-user"),
+        entry("child-early", 200, "root", "deepgeo/custom-agent-1", "early-user"),
       ],
     } as DockApiCaseSnapshot
 

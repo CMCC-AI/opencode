@@ -27,7 +27,7 @@ const CASE_CATEGORY_ARTWORK: Record<string, { background: string; title?: string
   finance: { background: "finance", title: "finance", viewBox: "0 0 420 206" },
   recommendation: { background: "recommendation", title: "recommendation", viewBox: "0 0 420 206" },
   science: { background: "science", title: "science", viewBox: "0 0 420 206" },
-  marketing: { background: "marketing", title: "marketing", viewBox: "0 0 420 206" },
+  location: { background: "location", title: "location", viewBox: "0 0 420 206" },
 }
 
 export function CmccCasesRoute() {

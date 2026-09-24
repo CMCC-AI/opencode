@@ -11,7 +11,7 @@ describe("CMCC history product labels", () => {
       ["shoppers-pro", "AI+推荐"],
       ["ai-for-science-team", "AI+科研"],
       ["ai-scientist", "AI+科研"],
-      ["deepcampaign", "AI+营销"],
+      ["deepgeo", "AI+位置"],
     ] as const
 
     for (const [agentType, label] of cases) {
@@ -33,7 +33,7 @@ describe("CMCC history product labels", () => {
       "deeptrading",
       "shoppers-pro",
       "ai-for-science-team",
-      "deepcampaign",
+      "deepgeo",
     ]
     const products = agentTypes.map((agentType) => cmccHistoryProduct(agentType))
 

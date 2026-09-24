@@ -48,8 +48,8 @@ const products: Record<string, CmccHistoryProduct> = {
   },
   "ai-for-science-team": aiScience,
   "ai-scientist": aiScience,
-  deepcampaign: {
-    label: "AI+营销",
+  deepgeo: {
+    label: "AI+位置",
     backgroundColor: "#fdebf4",
     borderColor: "#f4d5e5",
     textColor: "#b64f7b",

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DeepGeo Release Decision",
+  "type": "object",
+  "required": ["decision", "p0_count", "data_mode", "blocking_findings"],
+  "properties": {
+    "decision": {"enum": ["pass", "draft_with_gaps", "blocked"]},
+    "p0_count": {"type": "integer", "minimum": 0},
+    "data_mode": {"enum": ["simulated", "real", "mixed"]},
+    "blocking_findings": {"type": "array"},
+    "verified_metrics": {"type": "array"},
+    "limitations": {"type": "array"}
+  }
+}

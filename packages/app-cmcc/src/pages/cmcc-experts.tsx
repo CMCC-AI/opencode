@@ -11,7 +11,7 @@ import expertFinance from "@/assets/experts/scene-13.png"
 import expertGeneral from "@/assets/experts/scene-15.png"
 import expertIndustry from "@/assets/experts/scene-06.png"
 import expertZhengqi from "@/assets/experts/scene-08.png"
-import expertMarketing from "@/assets/experts/scene-14.png"
+import expertLocation from "@/assets/experts/scene-14.png"
 import expertResearch from "@/assets/experts/scene-17.png"
 import expertHero from "@/assets/experts/scene-05.png"
 import bannerBg from "@/assets/experts/banner.png"
@@ -71,10 +71,10 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     summary: "融合内部门户数据与公开情报，交付可溯源的谈参高拜决策报告",
     image: expertZhengqi,
   },
-  deepcampaign: {
-    eyebrow: "AI + 营销",
-    summary: "洞察人群，生成营销方案与报告",
-    image: expertMarketing,
+  deepgeo: {
+    eyebrow: "AI + 位置",
+    summary: "把客流、客群、商业生态与财务数据转化为可复算的位置决策报告",
+    image: expertLocation,
   },
   "ai-for-science-team": {
     eyebrow: "AI + 科研",
@@ -84,8 +84,8 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
 }
 
 const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
-// 3 列网格的固定排序：财经/政企/科研 + 推荐/营销/巡查
-const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "ai-for-science-team", "shoppers-pro", "deepcampaign", "deepinspect"]
+// 3 列网格的固定排序：财经/政企/科研 + 推荐/位置/巡查
+const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "ai-for-science-team", "shoppers-pro", "deepgeo", "deepinspect"]
 const INDUSTRY_EXPERTS = [
   ...INDUSTRY_ORDER.flatMap((id) => {
     const expert = CMCC_EXPERTS.find((item) => item.id === id)

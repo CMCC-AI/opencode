@@ -42,10 +42,10 @@ export const CMCC_CASE_CATEGORIES = [
     tone: "#eef8ff",
   },
   {
-    code: "marketing",
-    label: "AI+营销",
-    agentType: "deepcampaign",
-    description: "人群洞察与营销方案生成",
+    code: "location",
+    label: "AI+位置",
+    agentType: "deepgeo",
+    description: "商业选址与位置决策分析",
     tone: "#f7f1ff",
   },
 ] as const
@@ -55,6 +55,7 @@ export const CMCC_CASES_UPDATED_EVENT = "cmcc:cases-updated"
 const CMCC_CASE_AGENT_TYPE_ALIASES: Record<string, string> = {
   mstock: "deeptrading",
   "ai-for-science-team": "ai-scientist",
+  deepcampaign: "deepgeo",
 }
 
 export type CmccCaseCategoryCode = (typeof CMCC_CASE_CATEGORIES)[number]["code"]

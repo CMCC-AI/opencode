@@ -10,7 +10,8 @@ import {
 describe("CMCC case categories", () => {
   test("contains all seven case agents", () => {
     expect(CMCC_CASE_CATEGORIES).toHaveLength(7)
-    expect(cmccCaseCategoryByAgentType("deepcampaign")?.label).toBe("AI+营销")
+    expect(cmccCaseCategoryByAgentType("deepgeo")?.label).toBe("AI+位置")
+    expect(cmccCaseCategoryByAgentType("deepcampaign")?.label).toBe("AI+位置")
     expect(cmccCaseCategoryByAgentType("deeptrading")?.code).toBe("finance")
     expect(cmccCaseCategoryByAgentType("ai-for-science-team")?.code).toBe("science")
   })

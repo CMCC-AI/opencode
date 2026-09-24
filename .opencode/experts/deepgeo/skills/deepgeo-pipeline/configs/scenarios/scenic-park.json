@@ -1,0 +1,34 @@
+{
+  "scenario": "scenic_park",
+  "display_name": "景区客流与商铺布局优化",
+  "required_tables": [
+    "park_zones.csv",
+    "park_hourly_footfall.csv",
+    "park_zone_od.csv",
+    "park_segments.csv",
+    "park_shops.csv",
+    "park_transactions.csv",
+    "park_events.csv",
+    "park_feedback.csv",
+    "park_pilot_daily.csv"
+  ],
+  "default_enabled_nodes": [
+    "location_analysis",
+    "audience_analysis",
+    "commercial_analysis",
+    "decision_model",
+    "business_strategy",
+    "decision_synthesis",
+    "report_editing",
+    "independent_review"
+  ],
+  "conditional_nodes": ["market_research"],
+  "required_gates": ["G1", "G4"],
+  "business_strategy_mode": "layout_and_pilot",
+  "analysis_budget": {
+    "recipes_per_domain": 4,
+    "publication_charts_per_domain": 3,
+    "cpu_concurrency": 2,
+    "recipe_timeout_seconds": 180
+  }
+}
