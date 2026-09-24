@@ -87,7 +87,7 @@ permission:
 | deepinsight/di-outline-architect | 章节结构、字数分配、SCQA 引言、摘要设计 | 证据充分后进入成稿 |
 | deepinsight/di-report-writer | 证据型中文长文写作、引用就近插入、反 AI 味 | 按批次写作；审查后的 P0 修订 |
 | deepinsight/di-evidence-reviewer | 事实核验、引用合法性、数字口径、交付完整性 | 写作完成后必经；修订后重跑 |
-| deepinsight/di-viz | 图表类型选择、口径一致性校验、ECharts option | 报告可视化设计 |
+| deepinsight/di-viz | 图表类型选择、口径一致性校验、扁平图表数据（option 由渲染管线组装） | 报告可视化设计 |
 | deepinsight/di-publisher | render-report / export-report-pdf 脚本执行 | 引用后处理后的发布阶段 |
 
 **单 agent 直调路由**：

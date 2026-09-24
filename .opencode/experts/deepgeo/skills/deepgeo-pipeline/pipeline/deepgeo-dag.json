@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "pipeline": "deepgeo",
+  "orchestrator": "deepgeo",
+  "execution_policy": {
+    "mode": "fixed_capability_graph_dynamic_run_subgraph",
+    "max_total_task_starts": 14,
+    "max_attempts_per_round": 2,
+    "max_remediation_rounds": 1,
+    "max_post_review_task_starts": 2,
+    "quality_strategy": "validate_at_source_then_single_deterministic_preflight",
+    "non_blocking_findings_trigger_remediation": false,
+    "max_recipes_per_work_package": 4,
+    "max_core_findings_per_domain": 3,
+    "max_publication_charts_per_domain": 3,
+    "max_parallel_domain_agents": 4,
+    "max_parallel_cpu_analyses": 2,
+    "default_recipe_timeout_seconds": 180,
+    "release_requires_zero_p0": true,
+    "workspace_policy": "compact_then_prune",
+    "max_persisted_intermediate_files": 24,
+    "temporary_directory": ".scratch",
+    "clean_delivery_visible_entries": ["report.md", "report.html", "report.pdf", "assets"]
+  },
+  "gates": [
+    {"gate": "G1", "name": "决策范围", "before": "data_readiness", "blocking_when_required": true},
+    {"gate": "G2", "name": "数据与权限", "before": "domain_analysis", "blocking_when_required": true},
+    {"gate": "G3", "name": "权重与假设", "before": "business_strategy", "blocking_when_required": true},
+    {"gate": "G4", "name": "对外发布", "before": "publication", "blocking_when_required": true}
+  ],
+  "nodes": [
+    {
+      "order": 10,
+      "node": "task_governance",
+      "agent": "dg-task-governor",
+      "condition": "always",
+      "parallel_group": null,
+      "depends_on": [],
+      "artifact_patterns": ["^01-brief/decision-brief\\.json$"],
+      "max_rounds": 1
+    },
+    {
+      "order": 20,
+      "node": "data_readiness",
+      "agent": "dg-data-steward",
+      "condition": "always_after_G1",
+      "parallel_group": null,
+      "depends_on": ["task_governance"],
+      "artifact_patterns": ["^02-data/data-contract\\.json$", "^02-data/data-mode\\.json$", "^02-data/quality-report\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 30,
+      "node": "location_analysis",
+      "agent": "dg-location-analyst",
+      "condition": "run_plan.location_analysis",
+      "parallel_group": "domain_analysis",
+      "depends_on": ["data_readiness"],
+      "artifact_patterns": ["^03-analysis/location/analysis-result\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 30,
+      "node": "audience_analysis",
+      "agent": "dg-audience-analyst",
+      "condition": "run_plan.audience_analysis",
+      "parallel_group": "domain_analysis",
+      "depends_on": ["data_readiness"],
+      "artifact_patterns": ["^03-analysis/audience/analysis-result\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 30,
+      "node": "commercial_analysis",
+      "agent": "dg-commercial-ecology",
+      "condition": "run_plan.commercial_analysis",
+      "parallel_group": "domain_analysis",
+      "depends_on": ["data_readiness"],
+      "artifact_patterns": ["^03-analysis/commercial/analysis-result\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 30,
+      "node": "market_research",
+      "agent": "dg-market-researcher",
+      "condition": "run_plan.market_research_and_network_authorized",
+      "parallel_group": "domain_analysis",
+      "depends_on": ["data_readiness"],
+      "artifact_patterns": ["^03-analysis/market/analysis-result\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 40,
+      "node": "decision_model",
+      "agent": "dg-decision-modeler",
+      "condition": "always_after_enabled_domain_nodes",
+      "parallel_group": null,
+      "depends_on": ["domain_analysis"],
+      "artifact_patterns": ["^04-models/model-run\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 50,
+      "node": "business_strategy",
+      "agent": "dg-business-strategist",
+      "condition": "always_after_G3_when_required",
+      "parallel_group": null,
+      "depends_on": ["decision_model"],
+      "artifact_patterns": ["^05-decisions/business-options\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 60,
+      "node": "decision_synthesis",
+      "agent": "dg-decision-synthesizer",
+      "condition": "always",
+      "parallel_group": null,
+      "depends_on": ["business_strategy"],
+      "artifact_patterns": ["^05-decisions/option-matrix\\.json$", "^05-decisions/claim-ledger\\.json$", "^05-decisions/story-outline\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 70,
+      "node": "report_editing",
+      "agent": "dg-report-editor",
+      "condition": "always",
+      "parallel_group": null,
+      "depends_on": ["decision_synthesis"],
+      "artifact_patterns": ["^07-report/report\\.md$", "^07-report/preflight-quality\\.json$", "^06-visuals/chart-manifest\\.json$"],
+      "max_rounds": 2
+    },
+    {
+      "order": 80,
+      "node": "independent_review",
+      "agent": "dg-independent-reviewer",
+      "condition": "after_each_report_attempt",
+      "parallel_group": null,
+      "depends_on": ["report_editing"],
+      "artifact_patterns": ["^08-review/independent-review\\.json$", "^08-review/release-decision\\.json$"],
+      "max_rounds": 2
+    }
+  ]
+}

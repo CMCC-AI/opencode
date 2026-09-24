@@ -1,0 +1,34 @@
+{
+  "scenario": "xr_cinema",
+  "display_name": "XR 影院选址",
+  "required_tables": [
+    "xr_sites.csv",
+    "xr_hourly_footfall.csv",
+    "xr_audience_mix.csv",
+    "xr_origin_od.csv",
+    "xr_poi.csv",
+    "xr_competitors.csv",
+    "xr_property_costs.csv",
+    "xr_finance_assumptions.csv",
+    "xr_online_presence.csv"
+  ],
+  "default_enabled_nodes": [
+    "location_analysis",
+    "audience_analysis",
+    "commercial_analysis",
+    "decision_model",
+    "business_strategy",
+    "decision_synthesis",
+    "report_editing",
+    "independent_review"
+  ],
+  "conditional_nodes": ["market_research"],
+  "required_gates": ["G1", "G3", "G4"],
+  "business_strategy_mode": "finance",
+  "analysis_budget": {
+    "recipes_per_domain": 4,
+    "publication_charts_per_domain": 3,
+    "cpu_concurrency": 2,
+    "recipe_timeout_seconds": 180
+  }
+}

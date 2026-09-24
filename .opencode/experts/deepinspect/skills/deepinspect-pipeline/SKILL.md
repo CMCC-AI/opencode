@@ -15,7 +15,7 @@ description: AI+巡查 后处理脚本集（引用后处理、HTML 渲染、PDF 
 node <BASE>/scripts/render-report.mjs <WORKSPACE_DIR>
 ```
 
-依次：读取 `20-report.md` + `25-visual-report.json` + `22-references.json` → 填充 `<BASE>/templates/report.html.tpl` 的占位符 → 写出 `30-report.html`。成功输出 `HTML 报告完成：填充 N 个正文块...`。
+依次：读取 `20-report.md` + `25-visual-report.json` + `22-references.json` → 填充正文占位符（章号识别中文序号「一、二、…」与数字；无子节的章按段落切分；占位符与章内块数不一致时剩余正文并入最后一个占位符，失配只警告不失败，正文永不丢失）与 after 锚点归位 → **图表闸门**（chart block 携带 viz-specialist 的扁平 `data`，委托仓库级 `chart-builder` 技能校验并组装 ECharts option，蓝灰色系色板：通过则注入 option，不合格则整块丢弃并在输出日志报出标题与原因，渲染不中断；仍自带 `option` 的旧格式 block 原样保留）→ 填充 `<BASE>/templates/report.html.tpl` 的占位符 → 写出 `30-report.html`（并把注入 option 后的可视化 JSON 写回 `25-visual-report.json`）。成功输出 `正文回填：N 个占位符…`、`图表校验：N/M 张通过`、`HTML 报告完成：填充 N 个正文块...`；出现丢弃或未覆盖警告时主理人应退回 viz-specialist 重做对应部分后重渲染。
 
 ### 2. `<BASE>/scripts/export-report-pdf.mjs` — 导出 A4 PDF
 

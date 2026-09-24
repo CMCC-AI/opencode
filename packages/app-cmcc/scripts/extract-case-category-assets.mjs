@@ -42,7 +42,7 @@ const output = `<svg xmlns="http://www.w3.org/2000/svg">
       <stop stop-color="#E4F3FF" stop-opacity="0.8"/>
       <stop offset="1" stop-color="#E4F3FF" stop-opacity="0.3"/>
     </linearGradient>
-    <linearGradient id="gradient-background-marketing" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="gradient-background-location" x1="0" y1="0" x2="0" y2="1">
       <stop stop-color="#F7F1FF" stop-opacity="0.8"/>
       <stop offset="1" stop-color="#F7F1FF" stop-opacity="0.3"/>
     </linearGradient>
@@ -67,7 +67,7 @@ const output = `<svg xmlns="http://www.w3.org/2000/svg">
       <stop stop-color="#0099F1"/>
       <stop offset="1" stop-color="#0059E9"/>
     </linearGradient>
-    <linearGradient id="title-marketing-gradient" x1="0" y1="0" x2="1" y2="0">
+    <linearGradient id="title-location-gradient" x1="0" y1="0" x2="1" y2="0">
       <stop stop-color="#8800FF"/>
       <stop offset="1" stop-color="#A64AA0"/>
     </linearGradient>
@@ -90,8 +90,8 @@ const output = `<svg xmlns="http://www.w3.org/2000/svg">
     <symbol id="background-science" viewBox="0 0 420 206">
       <rect width="420" height="206" rx="16" fill="url(#gradient-background-science)"/>
     </symbol>
-    <symbol id="background-marketing" viewBox="0 0 420 206">
-      <rect width="420" height="206" rx="16" fill="url(#gradient-background-marketing)"/>
+    <symbol id="background-location" viewBox="0 0 420 206">
+      <rect width="420" height="206" rx="16" fill="url(#gradient-background-location)"/>
     </symbol>
 
     <symbol id="title-government" viewBox="416 585 64 18">${titlePath("paint17_linear_786_13459")}</symbol>
@@ -99,8 +99,8 @@ const output = `<svg xmlns="http://www.w3.org/2000/svg">
     <symbol id="title-finance" viewBox="416 839 64 18">${titlePath("paint25_linear_786_13459")}</symbol>
     <symbol id="title-recommendation" viewBox="884 839 64 18">${titlePath("paint29_linear_786_13459")}</symbol>
     <symbol id="title-science" viewBox="416 1093 64 18">${titlePath("paint33_linear_786_13459")}</symbol>
-    <symbol id="title-marketing" viewBox="0 0 64 18">
-      <text x="0" y="14" fill="url(#title-marketing-gradient)" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="600">AI+营销</text>
+    <symbol id="title-location" viewBox="0 0 64 18">
+      <text x="0" y="14" fill="url(#title-location-gradient)" font-family="Microsoft YaHei, sans-serif" font-size="16" font-weight="600">AI+位置</text>
     </symbol>
   </defs>
 </svg>

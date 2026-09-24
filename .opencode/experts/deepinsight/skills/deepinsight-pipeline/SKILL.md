@@ -103,7 +103,7 @@ node "$SKILL_DIR/scripts/report-batches.mjs" plan <WS>                     # 生
 node "$SKILL_DIR/scripts/report-batches.mjs" assemble <WS>                 # 合并 19-report-part-*.md
 node "$SKILL_DIR/scripts/build-evidence-review-packet.mjs" <WS> <round>    # 生成审查包
 node "$SKILL_DIR/scripts/postprocess-report.mjs" <WS>                      # 引用编号+参考文献
-node "$SKILL_DIR/scripts/render-report.mjs" <WS>                           # 生成 30-report.html
+node "$SKILL_DIR/scripts/render-report.mjs" <WS>                           # 生成 30-report.html（渲染前图表闸门：chart block 的扁平 data 委托仓库级 chart-builder 校验并组装 option，不合格整块丢弃并报出原因）
 node "$SKILL_DIR/scripts/export-report-pdf.mjs" <WS>/30-report.html <WS>/35-report.pdf
 node "$SKILL_DIR/scripts/validate-run.mjs" <WS>                            # 最终验证
 ```

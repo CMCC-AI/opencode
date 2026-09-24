@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const workspace = resolve(process.argv[2] || '');
 if (!process.argv[2]) throw new Error('用法：node render-report.mjs <workspace_dir>');
@@ -15,45 +15,70 @@ const exists = async (file) => stat(file).then(() => true, () => false);
 const reportPath = resolve(workspace, '20-report.md');
 const visualPath = resolve(workspace, '25-visual-report.json');
 if (!(await exists(reportPath)) || !(await exists(visualPath))) throw new Error('缺少 20-report.md 或 25-visual-report.json');
-
 const markdown = await readText(reportPath);
 const visual = await readJson(visualPath);
 const input = await readJson(resolve(workspace, '00-input.json'));
 const references = await readJson(resolve(workspace, '22-references.json'));
 const body = markdown.split(/^## 参考文献\s*$/m)[0].trim();
-const h2Matches = [...body.matchAll(/^##\s+(.+)$/gm)];
-const contentMap = new Map();
 
+// ---------- 章节切分（章号识别中文序号「一、二、…」与 ASCII 数字） ----------
+// 代理按章标题的中文序号编占位符；未编号 H2（通报引言、摘要等）在序号被显式编号占用时不参与
+// CH 匹配（摘要走 __ABSTRACT__；空引言只会产生未覆盖警告，不阻塞渲染）。
+const CHINESE_DIGITS = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+const headingNumber = (heading) => {
+  const ascii = heading.match(/^(\d+)[、.．\s]/)?.[1];
+  if (ascii) return ascii;
+  const chinese = heading.match(/^([一二三四五六七八九十]{1,3})[、.．\s]/)?.[1];
+  if (!chinese) return null;
+  if (chinese === '十') return '10';
+  if (chinese.length === 2 && chinese[0] === '十') return String(10 + (CHINESE_DIGITS[chinese[1]] || 0));
+  if (chinese.length === 2 && chinese[1] === '十') return String((CHINESE_DIGITS[chinese[0]] || 0) * 10);
+  if (chinese.length === 3 && chinese[1] === '十') return String((CHINESE_DIGITS[chinese[0]] || 0) * 10 + (CHINESE_DIGITS[chinese[2]] || 0));
+  return CHINESE_DIGITS[chinese] != null ? String(CHINESE_DIGITS[chinese]) : null;
+};
+const h2Matches = [...body.matchAll(/^##\s+(.+)$/gm)];
+const explicitNumbers = new Set(h2Matches.map((match) => headingNumber(match[1].trim())).filter(Boolean));
+const chapters = [];
 for (let chapterIndex = 0; chapterIndex < h2Matches.length; chapterIndex += 1) {
   const heading = h2Matches[chapterIndex][1].trim();
   const start = h2Matches[chapterIndex].index + h2Matches[chapterIndex][0].length;
   const end = h2Matches[chapterIndex + 1]?.index ?? body.length;
   const chapterBody = body.slice(start, end).trim();
-  const explicitNumber = heading.match(/^(\d+)/)?.[1];
-  const chapterNumber = explicitNumber || String(chapterIndex + 1);
-  if (heading === '摘要') contentMap.set('__ABSTRACT__', chapterBody);
+  const explicit = headingNumber(heading);
+  const number = explicit || (explicitNumbers.has(String(chapterIndex + 1)) ? `x${chapterIndex + 1}` : String(chapterIndex + 1));
   const h3Matches = [...chapterBody.matchAll(/^###\s+(.+)$/gm)];
+  const isSeparator = (segment) => /^-{3,}$|^\*{3,}$|^_{3,}$/.test(segment.trim());
+  const pieces = [];
   if (!h3Matches.length) {
-    contentMap.set(`__CH${chapterNumber}_1__`, chapterBody);
-    continue;
+    // 无子节：按段落切分（跳过分隔线），代理发出的多个占位符可分段承载
+    for (const paragraph of chapterBody.split(/\n{2,}/).map((segment) => segment.trim()).filter(Boolean)) {
+      if (!isSeparator(paragraph)) pieces.push(paragraph);
+    }
+  } else {
+    const intro = chapterBody.slice(0, h3Matches[0].index).trim();
+    for (let sub = 0; sub < h3Matches.length; sub += 1) {
+      const piece = chapterBody.slice(h3Matches[sub].index, h3Matches[sub + 1]?.index ?? chapterBody.length).trim();
+      pieces.push(sub === 0 && intro ? `${intro}\n\n${piece}` : piece);
+    }
   }
-  const intro = chapterBody.slice(0, h3Matches[0].index).trim();
-  for (let subIndex = 0; subIndex < h3Matches.length; subIndex += 1) {
-    const subStart = h3Matches[subIndex].index;
-    const subEnd = h3Matches[subIndex + 1]?.index ?? chapterBody.length;
-    const subsection = chapterBody.slice(subStart, subEnd).trim();
-    contentMap.set(`__CH${chapterNumber}_${subIndex + 1}__`, subIndex === 0 && intro ? `${intro}\n\n${subsection}` : subsection);
-  }
+  chapters.push({ number, heading, body: chapterBody, pieces });
 }
+const abstractChapter = chapters.find((chapter) => chapter.heading === '摘要');
 
 let replacements = 0;
-const unresolved = [];
+let mergedPieces = 0;
 const hasAnchors = (visual.sections || []).some((section) =>
   (section.blocks || []).some((block) => block.type !== 'markdown' && block.after));
 const normalizeAnchor = (value) => String(value || '').trim().replace(/^__|__$/g, '');
-const anchorByFilledContent = new Map([...contentMap.entries()].map(([key, value]) => [value, normalizeAnchor(key)]));
+const anchorByFilledContent = new Map();
+for (const chapter of chapters) {
+  anchorByFilledContent.set(chapter.body, `CH${chapter.number}_1`);
+  for (const [i, piece] of chapter.pieces.entries()) anchorByFilledContent.set(piece, `CH${chapter.number}_${i + 1}`);
+}
+if (abstractChapter) anchorByFilledContent.set(abstractChapter.body, 'ABSTRACT');
 const markdownAnchor = (block) => normalizeAnchor(block.anchor || (/^__(?:ABSTRACT|CH\d+_\d+)__$/.test(String(block.content || '').trim())
-  ? block.content : anchorByFilledContent.get(String(block.content || ''))));
+  ? block.content
+  : anchorByFilledContent.get(String(block.content || ''))));
 
 for (const section of visual.sections || []) {
   const blocks = section.blocks || [];
@@ -84,17 +109,62 @@ for (const section of visual.sections || []) {
   });
 }
 
+// 宽松回填：按章号匹配占位符。占位符多于章内块数时多余的填空；少于时剩余块并入最后一个占位符，
+// 正文永不丢失；未匹配章节的占位符置空并警告。渲染不因占位符失配而失败（此前 18 个失配占位符
+// 曾导致整个 HTML/PDF 降级交付）。
+const abstractBlocks = [];
+const slotsByChapter = new Map();
 for (const section of visual.sections || []) {
-  for (const block of section.blocks || []) {
+  for (const block of Array.isArray(section.blocks) ? section.blocks : []) {
     if (block.type !== 'markdown') continue;
-    const key = normalizeAnchor(block.anchor || block.content);
-    if (!/^(?:ABSTRACT|CH\d+_\d+)$/.test(key)) continue;
-    const placeholder = `__${key}__`;
-    if (!contentMap.has(placeholder)) unresolved.push(placeholder);
-    else { block.anchor = key; block.content = contentMap.get(placeholder); replacements += 1; }
+    const text = String(block.content || '').trim();
+    if (text === '__ABSTRACT__') { abstractBlocks.push(block); continue; }
+    const match = text.match(/^__CH(\d+)_(\d+)__$/);
+    if (match) {
+      if (!slotsByChapter.has(match[1])) slotsByChapter.set(match[1], []);
+      slotsByChapter.get(match[1]).push({ block, m: Number(match[2]) });
+    }
   }
 }
-if (unresolved.length) throw new Error(`无法填充正文占位符：${[...new Set(unresolved)].join(', ')}`);
+// 旧格式产物（markdown 直接带正文原文）不走回填与覆盖检查，保持旧行为
+const placeholderMode = abstractBlocks.length > 0 || [...slotsByChapter.values()].some((slots) => slots.length > 0);
+if (placeholderMode) {
+  const backfillWarnings = [];
+  for (const block of abstractBlocks) {
+    if (abstractChapter) {
+      block.content = abstractChapter.body;
+      replacements += 1;
+    } else {
+      block.content = '';
+      backfillWarnings.push('__ABSTRACT__ 未匹配到「摘要」章节，已置空');
+    }
+  }
+  const coveredNumbers = new Set(abstractChapter && abstractBlocks.length ? [abstractChapter.number] : []);
+  for (const chapter of chapters) {
+    const slots = (slotsByChapter.get(chapter.number) || []).sort((a, b) => a.m - b.m);
+    slotsByChapter.delete(chapter.number);
+    if (!slots.length) continue;
+    coveredNumbers.add(chapter.number);
+    for (const slot of slots) slot.block.content = '';
+    for (const [i, piece] of chapter.pieces.entries()) {
+      const slot = slots[Math.min(i, slots.length - 1)];
+      slot.block.content = slot.block.content ? `${slot.block.content}\n\n${piece}` : piece;
+    }
+    if (chapter.pieces.length > slots.length) mergedPieces += chapter.pieces.length - slots.length;
+    replacements += slots.length;
+  }
+  for (const chapter of chapters) {
+    if (!coveredNumbers.has(chapter.number) && chapter.pieces.length > 0) {
+      backfillWarnings.push(`第 ${chapter.number} 章「${chapter.heading}」未被占位符覆盖，该章正文未进入 HTML`);
+    }
+  }
+  for (const [key, slots] of slotsByChapter) {
+    for (const slot of slots) slot.block.content = '';
+    backfillWarnings.push(`占位符 __CH${key}_M__ 未匹配到任何章节（报告章号：${[...coveredNumbers].join('、')}），已置空`);
+  }
+  if (backfillWarnings.length) process.stdout.write(`警告：${backfillWarnings.join('；')}\n`);
+  process.stdout.write(`正文回填：${replacements} 个占位符，并入 ${mergedPieces} 块\n`);
+}
 
 let removedCards = 0;
 let deduplicatedTables = 0;
@@ -145,6 +215,30 @@ const promptValues = [input.topic, input.prompt, input.user_prompt, input.raw_pr
   .filter((value) => typeof value === 'string' && value.trim().length >= 20);
 const visibleVisual = JSON.stringify(visual);
 if (promptValues.some((value) => visibleVisual.includes(value.trim()))) throw new Error('可视化结构中残留用户原始 query/prompt');
+
+// 图表闸门：chart block 由 viz-specialist 提供扁平 data，统一委托仓库级 chart-builder 技能校验并组装 ECharts option
+// （色板用正式报告蓝灰色系）。校验失败的图表整块丢弃（日志报出标题与原因，渲染不中断）；
+// 仍自带 option 的旧格式 block 原样保留，兼容历史产物。
+const chartBuilderCandidates = [
+  resolve(scriptDir, '../../../../../skills/chart-builder/scripts/build-charts.mjs'),
+  resolve(scriptDir, '../../chart-builder/scripts/build-charts.mjs'),
+];
+const chartBuilderPath = (await Promise.all(chartBuilderCandidates.map((candidate) => access(candidate).then(() => candidate, () => null)))).find(Boolean);
+if (!chartBuilderPath) throw new Error('缺少共享 chart-builder 脚本，请确认仓库级技能已部署');
+const { injectChartOptions } = await import(pathToFileURL(chartBuilderPath).href);
+const chartSummary = injectChartOptions(visual.sections || [], {
+  palette: ['#4b6685', '#6485b3', '#8fa8c7', '#b3c5dc', '#d3deeb'],
+});
+process.stdout.write(`图表校验：${chartSummary.kept}/${chartSummary.total} 张通过`);
+if (chartSummary.dropped.length) {
+  process.stdout.write(`，已丢弃 ${chartSummary.dropped.length} 张：\n`);
+  for (const dropped of chartSummary.dropped) process.stdout.write(`  - 「${dropped.title}」：${dropped.errors.join('；')}\n`);
+} else {
+  process.stdout.write('\n');
+}
+if (chartSummary.total && !chartSummary.kept) {
+  process.stdout.write('警告：全部图表被丢弃，应退回 viz-specialist 按契约重做图表数据\n');
+}
 
 const template = await readText(resolve(opencodeRoot, 'templates/report.html.tpl'));
 const printCss = await readText(resolve(opencodeRoot, 'templates/report-print.css'));

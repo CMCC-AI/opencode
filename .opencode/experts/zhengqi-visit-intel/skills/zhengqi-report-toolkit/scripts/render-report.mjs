@@ -2,7 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const workspaceArg = process.argv[2];
 if (!workspaceArg) {
@@ -103,6 +103,17 @@ const input = fs.existsSync(inputPath) ? readJson(inputPath) : {};
 const references = fs.existsSync(referencesPath)
   ? readJson(referencesPath)
   : (Array.isArray(visual.references) ? visual.references : []);
+// 自动包装：设计代理输出顶层平铺结构（旧格式）时归一为 report 结构
+if (!visual.report && Array.isArray(visual.sections)) {
+  visual.report = {
+    title: visual.title,
+    subtitle: visual.subtitle,
+    topic: visual.topic,
+    current_date: visual.current_date,
+    hero_stats: visual.hero_stats,
+    sections: visual.sections,
+  };
+}
 if (!visual.report || !Array.isArray(visual.report.sections)) {
   throw new Error("25-visual-report.json 必须包含 report.sections");
 }
@@ -112,6 +123,83 @@ report.title = input.report_title || report.title || "谈参高拜报告";
 report.subtitle = `谈参高拜报告 · ${input.analyst_company_name || "中国移动"}`;
 report.current_date = input.current_date || report.current_date || "";
 for (const key of ["prompt", "user_prompt", "raw_prompt", "query", "brief", "input", "topic"]) delete report[key];
+
+// ---------- 正文占位符回填（设计代理不抄正文，防超长截断） ----------
+// markdown block 只放 `__CH{N}_{M}__`（N=二级章节序号，M=章内第 M 个正文块）。
+// 脚本按 `## ` 切章（参考文献章节自动剥离）、按 `### ` 子节切块（章引言并入首块，
+// 三级标题保留在内容块内），表格段剥离（由 table block 承载）；块数多于占位符时并入最后一个。
+// 旧产物（markdown block 直接带正文原文）原样兼容。
+const reportMdPath = path.join(workspace, "20-report.md");
+const reportMd = fs.existsSync(reportMdPath) ? readUtf8(reportMdPath) : "";
+const placeholderPattern = /^__CH(\d+)_(\d+)__$/;
+const allMarkdownBlocks = report.sections.flatMap((section) => (Array.isArray(section.blocks) ? section.blocks : [])).filter((block) => block && block.type === "markdown");
+const placeholderBlocks = allMarkdownBlocks.filter((block) => placeholderPattern.test(String(block.content || "").trim()));
+const rawTextBlocks = allMarkdownBlocks.filter((block) => String(block.content || "").trim() && !placeholderPattern.test(String(block.content || "").trim()));
+if (placeholderBlocks.length && rawTextBlocks.length) {
+  throw new Error("markdown block 混用了占位符与正文原文：report-visual-designer 只能输出 __CH{N}_{M}__ 占位符，正文由渲染脚本从 20-report.md 回填");
+}
+
+if (placeholderBlocks.length) {
+  if (!reportMd) throw new Error("占位符回填需要 20-report.md");
+  const body = reportMd.split(/^##\s*参考文献\s*$/m)[0];
+  const h2Matches = [...body.matchAll(/^##[ \t]+(.+)$/gm)];
+  if (!h2Matches.length) throw new Error("20-report.md 没有二级章节标题，无法回填占位符");
+  const chapters = [];
+  for (let index = 0; index < h2Matches.length; index += 1) {
+    const heading = h2Matches[index][1].trim();
+    const start = h2Matches[index].index + h2Matches[index][0].length;
+    const end = h2Matches[index + 1]?.index ?? body.length;
+    const chapterBody = body.slice(start, end).trim();
+    const explicitNumber = heading.match(/^(\d+)[、.．\s]/)?.[1];
+    const h3Matches = [...chapterBody.matchAll(/^###[ \t]+(.+)$/gm)];
+    const rawPieces = [];
+    if (!h3Matches.length) {
+      rawPieces.push(chapterBody);
+    } else {
+      const intro = chapterBody.slice(0, h3Matches[0].index).trim();
+      for (let sub = 0; sub < h3Matches.length; sub += 1) {
+        const pieceStart = h3Matches[sub].index;
+        const pieceEnd = h3Matches[sub + 1]?.index ?? chapterBody.length;
+        const piece = chapterBody.slice(pieceStart, pieceEnd).trim();
+        rawPieces.push(sub === 0 && intro ? `${intro}\n\n${piece}` : piece);
+      }
+    }
+    const segmentsOf = (piece) => piece.split(/\n{2,}/).map((segment) => segment.trim()).filter(Boolean);
+    const tableSegments = rawPieces.flatMap((piece) => segmentsOf(piece)).filter((segment) => /^\|/m.test(segment));
+    const pieces = rawPieces
+      .map((piece) => segmentsOf(piece).filter((segment) => !/^\|/m.test(segment)).join("\n\n"))
+      .filter((piece) => piece.trim());
+    chapters.push({ number: String(explicitNumber || chapters.length + 1), heading, pieces, tablesStripped: tableSegments.length });
+  }
+  const chapterNumbers = new Set(chapters.map((chapter) => chapter.number));
+
+  const slotsByChapter = new Map();
+  for (const block of placeholderBlocks) {
+    const match = String(block.content || "").trim().match(placeholderPattern);
+    const key = match[1];
+    if (!slotsByChapter.has(key)) slotsByChapter.set(key, []);
+    slotsByChapter.get(key).push({ block, m: Number(match[2]) });
+  }
+  for (const key of slotsByChapter.keys()) {
+    if (!chapterNumbers.has(key)) throw new Error(`占位符 __CH${key}_M__ 引用了不存在的章节（报告共 ${chapters.length} 章）`);
+  }
+  let filledSlots = 0;
+  let mergedPieces = 0;
+  let strippedTables = 0;
+  for (const chapter of chapters) {
+    const slots = (slotsByChapter.get(chapter.number) || []).sort((a, b) => a.m - b.m);
+    if (!slots.length) throw new Error(`第 ${chapter.number} 章「${chapter.heading}」没有 markdown 占位符：每章至少 1 个，正文不能被组件替代`);
+    for (const slot of slots) slot.block.content = "";
+    for (const [i, piece] of chapter.pieces.entries()) {
+      const slot = slots[Math.min(i, slots.length - 1)];
+      slot.block.content = slot.block.content ? `${slot.block.content}\n\n${piece}` : piece;
+    }
+    if (chapter.pieces.length > slots.length) mergedPieces += chapter.pieces.length - slots.length;
+    filledSlots += slots.length;
+    strippedTables += chapter.tablesStripped;
+  }
+  console.log(`正文回填：${filledSlots} 个占位符，并入 ${mergedPieces} 块，剥离 ${strippedTables} 个表格段（表格由 table block 承载）`);
+}
 
 let markdownTableRepairs = 0;
 for (const section of report.sections) {
@@ -147,6 +235,33 @@ const visualArtifactProblems = visualArtifactRules
   .map(([name]) => name);
 if (visualArtifactProblems.length) {
   throw new Error(`可视化结构含不适合正式交付的内容：${visualArtifactProblems.join("、")}`);
+}
+
+// 图表闸门：chart block 由 report-visual-designer 提供扁平 data，统一委托仓库级 chart-builder 技能校验并组装
+// ECharts option（色板固定为中国移动蓝系）。校验失败的图表整块丢弃（日志报出标题与原因，渲染不中断）；
+// 仍自带 option 的旧格式 block 原样保留，兼容历史产物。
+const chartScriptDir = path.dirname(fileURLToPath(import.meta.url));
+const chartBuilderCandidates = [
+  path.resolve(chartScriptDir, "../../../../../skills/chart-builder/scripts/build-charts.mjs"),
+  path.resolve(chartScriptDir, "../../chart-builder/scripts/build-charts.mjs"),
+];
+const chartBuilderPath = chartBuilderCandidates.find((candidate) => fs.existsSync(candidate));
+if (!chartBuilderPath) throw new Error("缺少共享 chart-builder 脚本，请确认仓库级技能已部署");
+const { injectChartOptions } = await import(pathToFileURL(chartBuilderPath).href);
+const chartSummary = injectChartOptions(report.sections, {
+  palette: ["#0066CC", "#2F8FE5", "#66B3F2", "#91A9C6", "#4F8055", "#B8873B", "#A33A32"],
+});
+let chartSummaryText = `图表校验：${chartSummary.kept}/${chartSummary.total} 张通过`;
+if (chartSummary.dropped.length) {
+  chartSummaryText += `，已丢弃 ${chartSummary.dropped.length} 张：\n` + chartSummary.dropped
+    .map((dropped) => `  - 「${dropped.title}」：${dropped.errors.join("；")}`)
+    .join("\n");
+  console.log(chartSummaryText);
+} else {
+  console.log(chartSummaryText);
+}
+if (chartSummary.total && !chartSummary.kept) {
+  console.log("警告：全部图表被丢弃，应退回 report-visual-designer 按契约重做图表数据");
 }
 
 const title = report.title;

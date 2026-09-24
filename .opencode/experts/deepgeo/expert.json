@@ -1,0 +1,215 @@
+{
+  "id": "deepgeo",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "deepgeo/deepgeo-team-lead",
+  "teamInfo": {
+    "leadAgent": "deepgeo/deepgeo-team-lead",
+    "memberAgents": [
+      "deepgeo/dg-task-governor",
+      "deepgeo/dg-data-steward",
+      "deepgeo/dg-location-analyst",
+      "deepgeo/dg-audience-analyst",
+      "deepgeo/dg-commercial-ecology",
+      "deepgeo/dg-market-researcher",
+      "deepgeo/dg-decision-modeler",
+      "deepgeo/dg-business-strategist",
+      "deepgeo/dg-decision-synthesizer",
+      "deepgeo/dg-report-editor",
+      "deepgeo/dg-independent-reviewer"
+    ]
+  },
+  "displayName": {
+    "en": "DeepGeo",
+    "zh": "DeepGeo 位置决策专家团"
+  },
+  "profession": {
+    "en": "DeepGeo",
+    "zh": "DeepGeo 位置决策专家团"
+  },
+  "displayDescription": {
+    "en": "AI-powered location decision team transforming footfall, audience, commercial and financial data into auditable site selection reports with 12 specialized experts.",
+    "zh": "把位置、客流、客群、商业和经营数据转化为可复算、可审查的位置决策报告，十二位专家协同交付。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "12-IndustryConsultant",
+  "defaultInitPrompt": {
+    "zh": "我需要评估几个候选位置的选址可行性，请帮我分析客流、客群、商业环境和投资回报",
+    "en": "I need to evaluate candidate locations for site selection, please analyze footfall, audience, commercial environment and investment returns"
+  },
+  "members": [
+    {
+      "id": "deepgeo/deepgeo-team-lead",
+      "name": {
+        "en": "A Jiu",
+        "zh": "阿久"
+      },
+      "profession": {
+        "en": "Chief Location Decision Expert",
+        "zh": "首席位置决策专家"
+      },
+      "avatar": "avatars/deepgeo-team-lead.png",
+      "role": "lead",
+      "originalId": "deepgeo-team-lead"
+    },
+    {
+      "id": "deepgeo/dg-task-governor",
+      "name": {
+        "en": "A Gan",
+        "zh": "阿甘"
+      },
+      "profession": {
+        "en": "Task & Governance Specialist",
+        "zh": "任务与治理专家"
+      },
+      "avatar": "avatars/dg-task-governor.png",
+      "role": "member",
+      "originalId": "dg-task-governor"
+    },
+    {
+      "id": "deepgeo/dg-data-steward",
+      "name": {
+        "en": "A Shi",
+        "zh": "阿实"
+      },
+      "profession": {
+        "en": "Data Quality & Lineage Specialist",
+        "zh": "数据治理与质量专家"
+      },
+      "avatar": "avatars/dg-data-steward.png",
+      "role": "member",
+      "originalId": "dg-data-steward"
+    },
+    {
+      "id": "deepgeo/dg-location-analyst",
+      "name": {
+        "en": "A Liu",
+        "zh": "阿流"
+      },
+      "profession": {
+        "en": "Footfall & Mobility Analyst",
+        "zh": "位置流动与可达性专家"
+      },
+      "avatar": "avatars/dg-location-analyst.png",
+      "role": "member",
+      "originalId": "dg-location-analyst"
+    },
+    {
+      "id": "deepgeo/dg-audience-analyst",
+      "name": {
+        "en": "A Zhi",
+        "zh": "阿知"
+      },
+      "profession": {
+        "en": "Audience & Demand Insight Analyst",
+        "zh": "客群与需求洞察专家"
+      },
+      "avatar": "avatars/dg-audience-analyst.png",
+      "role": "member",
+      "originalId": "dg-audience-analyst"
+    },
+    {
+      "id": "deepgeo/dg-commercial-ecology",
+      "name": {
+        "en": "A Tai",
+        "zh": "阿态"
+      },
+      "profession": {
+        "en": "Spatial Commercial Ecology Analyst",
+        "zh": "空间商业生态专家"
+      },
+      "avatar": "avatars/dg-commercial-ecology.png",
+      "role": "member",
+      "originalId": "dg-commercial-ecology"
+    },
+    {
+      "id": "deepgeo/dg-market-researcher",
+      "name": {
+        "en": "A Yan",
+        "zh": "阿研"
+      },
+      "profession": {
+        "en": "Industry & Competitor Researcher",
+        "zh": "行业与竞品研究专家"
+      },
+      "avatar": "avatars/dg-market-researcher.png",
+      "role": "member",
+      "originalId": "dg-market-researcher"
+    },
+    {
+      "id": "deepgeo/dg-decision-modeler",
+      "name": {
+        "en": "A Heng",
+        "zh": "阿衡"
+      },
+      "profession": {
+        "en": "Cross-domain Decision Modeler",
+        "zh": "跨领域决策模型专家"
+      },
+      "avatar": "avatars/dg-decision-modeler.png",
+      "role": "member",
+      "originalId": "dg-decision-modeler"
+    },
+    {
+      "id": "deepgeo/dg-business-strategist",
+      "name": {
+        "en": "A Suan",
+        "zh": "阿算"
+      },
+      "profession": {
+        "en": "Scenario Business Strategist",
+        "zh": "场景经营决策专家"
+      },
+      "avatar": "avatars/dg-business-strategist.png",
+      "role": "member",
+      "originalId": "dg-business-strategist"
+    },
+    {
+      "id": "deepgeo/dg-decision-synthesizer",
+      "name": {
+        "en": "A Zong",
+        "zh": "阿综"
+      },
+      "profession": {
+        "en": "Decision Synthesis Expert",
+        "zh": "综合决策专家"
+      },
+      "avatar": "avatars/dg-decision-synthesizer.png",
+      "role": "member",
+      "originalId": "dg-decision-synthesizer"
+    },
+    {
+      "id": "deepgeo/dg-report-editor",
+      "name": {
+        "en": "A Du",
+        "zh": "阿读"
+      },
+      "profession": {
+        "en": "Report & Visualization Editor",
+        "zh": "报告与可视化总编"
+      },
+      "avatar": "avatars/dg-report-editor.png",
+      "role": "member",
+      "originalId": "dg-report-editor"
+    },
+    {
+      "id": "deepgeo/dg-independent-reviewer",
+      "name": {
+        "en": "A Shen",
+        "zh": "阿审"
+      },
+      "profession": {
+        "en": "Independent Quality Reviewer",
+        "zh": "独立质量审查专家"
+      },
+      "avatar": "avatars/dg-independent-reviewer.png",
+      "role": "member",
+      "originalId": "dg-independent-reviewer"
+    }
+  ],
+  "original": {
+    "name": "deepgeo",
+    "version": "1.0.0",
+    "description": "AI-powered location decision team for commercial site selection, footfall analysis and spatial business strategy"
+  }
+}

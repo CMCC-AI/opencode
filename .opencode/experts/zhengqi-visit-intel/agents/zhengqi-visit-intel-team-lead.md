@@ -146,7 +146,7 @@ permission:
 
 ### Phase 6: 引用后处理、可视化与交付
 - 核验通过后运行 `finalize-citations.mjs` 确定性编号（`<cite>` → `[N]` + 参考文献章节），未知来源会导致脚本失败，不会修改报告。
-- 调度 `zhengqi-visit-intel/report-visual-designer`：读取最终报告与结构化数值，产出 `25-visual-report.json`（图表数字必须来自结构化数据，不从长文猜数字）。
+- 调度 `zhengqi-visit-intel/report-visual-designer`：读取最终报告与结构化数值，产出 `25-visual-report.json`（图表数字必须来自结构化数据，不从长文猜数字）。**task prompt 里不要另行发明或改写图表块/顶层 JSON 结构**，只传达 workspace 路径与必读文件；结构契约以 `report-visual-designer.md` 为准——顶层为 `{report: {title, subtitle, topic, current_date, hero_stats, sections}, references: [...]}`；markdown block 只放 `__CH{N}_{M}__` 占位符（正文由渲染脚本从 20-report.md 回填，不抄写）；chart block 为 `{type: "chart", chart: {id, title, type, description, data: {unit, categories, series}}}`（`type` 限 bar/line/pie/radar，不写 ECharts option）。渲染脚本会回填正文、逐图校验并组装 option，不合格的图表整块丢弃并在日志报出标题与原因；渲染输出出现丢弃时只责令重做图表数据。
 - 主理人依次运行 `render-report.mjs`（生成 HTML）→ `export-report-pdf.mjs`（生成 PDF）→ `validate-run.mjs`（结构验收）。PDF 全部页面渲染为图片逐页视觉检查后方可交付。
 
 ### 最终交付

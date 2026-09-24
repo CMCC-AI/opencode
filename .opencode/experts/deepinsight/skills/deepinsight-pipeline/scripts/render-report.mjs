@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { access, readFile, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assertPostprocessedReferences, assertVisualPlaceholders, sha256File } from './publication-guards.mjs';
 
 const workspace = resolve(process.argv[2] || '');
@@ -27,6 +27,29 @@ const markdown = publication.report;
 const visual = await readJson(visualPath);
 const input = await readJson(resolve(workspace, '00-input.json'));
 const refs = await readJson(resolve(workspace, '22-references.json'));
+
+// 图表闸门：chart block 由 di-viz 提供扁平 data，统一委托仓库级 chart-builder 技能校验并组装 ECharts option。
+// 结构与证据校验已在 pipeline-state.mjs 注册时 fail-fast，这里做渲染前兜底：不合格的图表整块丢弃
+// （日志报出标题与原因，渲染不中断）；仍自带 option 的旧格式 block 原样保留，兼容历史产物。
+const chartScriptDir = resolve(fileURLToPath(new URL('.', import.meta.url)));
+const chartBuilderCandidates = [
+  resolve(chartScriptDir, '../../../../../skills/chart-builder/scripts/build-charts.mjs'),
+  resolve(chartScriptDir, '../../chart-builder/scripts/build-charts.mjs'),
+];
+const chartBuilderPath = (await Promise.all(chartBuilderCandidates.map((candidate) => access(candidate).then(() => candidate, () => null)))).find(Boolean);
+if (!chartBuilderPath) throw new Error('缺少共享 chart-builder 脚本，请确认仓库级技能已部署');
+const { injectChartOptions } = await import(pathToFileURL(chartBuilderPath).href);
+const chartSummary = injectChartOptions(visual.sections || []);
+process.stdout.write(`图表校验：${chartSummary.kept}/${chartSummary.total} 张通过`);
+if (chartSummary.dropped.length) {
+  process.stdout.write(`，已丢弃 ${chartSummary.dropped.length} 张：\n`);
+  for (const dropped of chartSummary.dropped) process.stdout.write(`  - 「${dropped.title}」：${dropped.errors.join('；')}\n`);
+} else {
+  process.stdout.write('\n');
+}
+if (chartSummary.total && !chartSummary.kept) {
+  process.stdout.write('警告：全部图表被丢弃，应退回 di-viz 按契约重做图表数据\n');
+}
 
 const bodyWithoutRefs = stripReferenceAppendix(markdown).replace(/\n---\s*$/m, '').trim();
 const h2Matches = [...bodyWithoutRefs.matchAll(/^##\s+(.+)$/gm)];
