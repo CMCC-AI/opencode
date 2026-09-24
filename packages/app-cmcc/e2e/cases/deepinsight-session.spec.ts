@@ -9,14 +9,24 @@ test.use({ channel: process.env.PLAYWRIGHT_CHANNEL, video: "off" })
 async function prepare(
   page: Page,
   repeated: boolean,
-  options: { running?: boolean; followup?: boolean; nested?: boolean } = {},
+  options: {
+    running?: boolean
+    runningAgent?: string
+    followup?: boolean
+    nested?: boolean
+    references?: string
+    missingReferences?: boolean
+  } = {},
 ) {
   const data = deepInsightFixture(repeated, !options.nested, options.nested)
+  if (options.missingReferences) data.filenames.splice(data.filenames.indexOf("22-references.json"), 1)
   let running = options.running ?? false
   const events: unknown[] = []
   const messageReads: string[] = []
   const root = data.transcripts[0]
-  const last = data.transcripts.at(-1)!
+  const last = options.runningAgent
+    ? data.transcripts.find((item) => item.session.agent === options.runningAgent)!
+    : data.transcripts.at(-1)!
   const rootAnswer = root.messages.at(-1)!
   const lastAnswer = last.messages.at(-1)!
   const task = root.parts[rootAnswer.id].find(
@@ -44,6 +54,7 @@ async function prepare(
       id: "followup-answer",
       parentID: question.id,
       agent: "build",
+      modelID: "followup-model",
       time: { created: 9001, completed: 9010 },
     }
     root.messages.push(question, answer)
@@ -82,6 +93,9 @@ async function prepare(
         : {},
     }),
   )
+  await page.route("**/session/*/todo*", (route) => {
+    return route.fulfill({ json: [{ content: "不应重复显示的任务计划", status: "in_progress", priority: "high" }] })
+  })
   await page.addInitScript(() => {
     if (window === window.top) localStorage.setItem("dockapi.accessToken", "deepinsight-test")
   })
@@ -163,7 +177,15 @@ async function prepare(
           type: "text",
           content: path.endsWith("00-execution-trace.json")
             ? JSON.stringify({ route: { local_research_required: false, web_research_required: true } })
-            : "# 研究报告\n\n最终研究正文",
+            : path.endsWith("22-references.json")
+              ? (options.references ??
+                JSON.stringify([
+                  { key: "local:SRC-001", kind: "local", usage: "cited_in_report" },
+                  { key: "https://example.com/a", kind: "web", usage: "cited_in_report" },
+                  { key: "https://example.com/a", kind: "web", usage: "verified_reference_not_cited" },
+                  { key: "https://example.com/b", kind: "web", usage: "extended_reference" },
+                ]))
+              : "# 研究报告\n\n最终研究正文",
           mimeType: "text/plain",
         },
       })
@@ -172,7 +194,7 @@ async function prepare(
   const started = Date.now()
   await page.goto(`/server/${base64Encode(process.env.PLAYWRIGHT_BASE_URL!)}/session/${data.root.id}`)
   await expect(page.getByRole("button", { name: "分析团队", exact: true })).toBeVisible()
-  await expect(page.getByText("10 位", { exact: true })).toBeVisible()
+  await expect(page.getByText("信息源", { exact: true })).toBeVisible()
   await expect(page.getByText("消耗 token", { exact: true }).locator("..").locator("strong")).toHaveText(
     String(data.transcripts.length * 33),
   )
@@ -190,6 +212,13 @@ async function prepare(
     data,
     errors,
     requests,
+    updateTodo: () => {
+      const part = root.parts[rootAnswer.id].find((part) => part.type === "text")!
+      events.push(
+        { type: "todo.updated", properties: { sessionID: data.root.id, todos: [{ content: "不应重复显示的任务计划", status: "in_progress", priority: "high" }] } },
+        { type: "message.part.updated", properties: { part: { ...part, text: "研究总结，计划已同步" } } },
+      )
+    },
     finish: () => {
       running = false
       task.state = taskState
@@ -209,6 +238,7 @@ for (const repeated of [false, true])
     await page.setViewportSize({ width: 1440, height: 1000 })
     const state = await prepare(page, repeated)
     await expect(page.getByText("报告篇幅", { exact: true })).toBeVisible()
+    await expect(page.getByText("信息源", { exact: true }).locator("..").locator("strong")).toHaveText("3 篇")
     await expect(page.locator('[contenteditable="true"]')).toBeVisible()
     await page.screenshot({
       path: `e2e/test-results/deepinsight-${repeated ? "retry" : "single"}-desktop.png`,
@@ -256,6 +286,80 @@ test("a followup keeps the research workbench and shows both the question and re
   ).toHaveCount(2)
   await page.reload()
   await expect(page.getByRole("button", { name: "分析团队", exact: true })).toBeVisible()
+  expect(state.errors).toEqual([])
+})
+
+test("expert messages have copy, actual metadata and completed duration without the todo dock", async ({
+  page,
+  context,
+}, info) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"])
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  const state = await prepare(page, true, { followup: true })
+  const answer = page.locator('[data-workbench-message="followup-answer"]')
+  await expect(answer.locator("time")).toHaveAttribute("datetime", new Date(9001).toISOString())
+  await expect(answer.getByText("followup-model", { exact: true })).toBeVisible()
+  await answer.getByRole("button", { name: "复制消息", exact: true }).click()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("这是追问回复")
+  const question = page.locator('[data-workbench-message="followup-user"]')
+  await question.getByRole("button", { name: "复制消息", exact: true }).click()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("补充说明研究结论")
+  await expect(page.locator('[data-component="session-todo-dock"]')).toHaveCount(0)
+  const dag = page.getByRole("region", { name: "DeepInsight DAG" })
+  await dag.getByRole("button", { name: /安全与需求分析师/ }).click()
+  await expect(page.locator('[data-component="expert-duration"]')).toHaveText("用时 0秒")
+  // The latest completed intent execution is child-1, not child-0.
+  const expert = page.locator('[data-workbench-message="child-1-assistant"]')
+  await expect(expert).toContainText("专家输出 1")
+  await expect(expert.locator("time")).toHaveAttribute("datetime", new Date(1201).toISOString())
+  await expert.getByRole("button", { name: "复制消息", exact: true }).click()
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("专家输出 1")
+  await page.screenshot({ path: info.outputPath("expert-desktop.png") })
+  await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+  await expect.poll(() => page.locator('aside[aria-label="CMCC conversations"]').evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByRole("tab", { name: "分析内容", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(expert).toBeVisible()
+  await expect(page.locator('[data-component="expert-duration"]')).toBeVisible()
+  await page.screenshot({ path: info.outputPath("expert-mobile.png") })
+  expect(state.errors).toEqual([])
+})
+
+for (const mode of ["missing", "invalid", "empty"] as const)
+  test(`source count handles ${mode} references without inventing a count`, async ({ page }) => {
+    const state = await prepare(page, false, {
+      missingReferences: mode === "missing",
+      references: mode === "empty" ? "[]" : "{",
+    })
+    await expect(page.getByText("信息源", { exact: true }).locator("..").locator("strong")).toHaveText(
+      mode === "empty" ? "0 篇" : "--",
+    )
+    expect(state.errors).toEqual([])
+  })
+
+test("running and replaying experts do not expose final duration or future followups", async ({ page }) => {
+  const state = await prepare(page, false, { running: true, runningAgent: "deepinsight/di-query-planner", followup: true })
+  state.updateTodo()
+  await expect(page.getByText("研究总结，计划已同步", { exact: true })).toBeVisible()
+  await expect(page.locator('[data-component="session-todo-dock"]')).toHaveCount(0)
+  await page
+    .getByRole("region", { name: "DeepInsight DAG" })
+    .getByRole("button", { name: /研究规划专家/ })
+    .click()
+  await expect(page.locator('[data-component="expert-duration"]')).toHaveCount(0)
+  state.finish()
+  await expect(page.locator('[data-component="expert-duration"]')).toBeVisible()
+  await page.getByRole("button", { name: "看回放", exact: true }).click()
+  await expect(page.locator('[data-workbench-message="followup-answer"]')).toHaveCount(0)
+  await expect(page.getByText("信息源", { exact: true }).locator("..").locator("strong")).toHaveText("--")
+  await page
+    .getByRole("region", { name: "DeepInsight DAG" })
+    .getByRole("button", { name: /研究规划专家/ })
+    .click()
+  await expect(page.locator('[data-component="expert-duration"]')).toHaveCount(0)
+  await page.getByRole("button", { name: "停止回放", exact: true }).click()
+  await expect(page.locator('[data-component="expert-duration"]')).toBeVisible()
+  await expect(page.getByText("信息源", { exact: true }).locator("..").locator("strong")).toHaveText("3 篇")
   expect(state.errors).toEqual([])
 })
 

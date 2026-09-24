@@ -15,9 +15,7 @@ const workbench = (): AgentWorkbench => ({
   rootSessionId: "root",
   query: "研究目标公司",
   overviewMarkdown: "# 总览\n总览正文\n\n## 结论\n结论正文",
-  overviewTurns: [
-    { id: "user-1", query: "研究目标公司", markdown: "# 总览\n总览正文\n\n## 结论\n结论正文" },
-  ],
+  overviewTurns: [{ id: "user-1", query: "研究目标公司", markdown: "# 总览\n总览正文\n\n## 结论\n结论正文" }],
   overviewStatus: "completed",
   agents: [
     {
@@ -80,6 +78,36 @@ const searchEvents: SearchUrlEvent[] = [
 ]
 
 describe("DeepTrading replay timeline", () => {
+  test("releases message metadata and followups in order without leaking future replies", () => {
+    const source = workbench()
+    source.overviewMessages = [
+      { id: "q1", role: "user", text: "first question", createdAt: 100 },
+      { id: "a1", role: "assistant", text: "first reply", createdAt: 150, completedAt: 200, modelID: "first-model" },
+      { id: "q2", role: "user", text: "followup", createdAt: 400 },
+      { id: "a2", role: "assistant", text: "second reply", createdAt: 450, completedAt: 500, modelID: "second-model" },
+    ]
+    source.agents[0].messages = [
+      {
+        id: "expert",
+        role: "assistant",
+        text: "expert reply",
+        createdAt: 110,
+        completedAt: 300,
+        modelID: "expert-model",
+      },
+    ]
+    const timeline = compileDeepTradingReplay({ workbench: source, searchUrlEvents: [], textReportMarkdown: "" })
+    const start = createDeepTradingReplayFrame(timeline)
+    expect(start.workbench.overviewMessages).toEqual([])
+    expect(start.workbench.agents[0].messages).toEqual([])
+    const middle = advanceDeepTradingReplay({ timeline, frame: start, nextCueIndex: 0, progress: 0.3 }).frame.workbench
+    expect(middle.overviewMessages?.map((message) => message.id)).toEqual(["q1", "a1"])
+    expect(middle.overviewMessages?.[1].modelID).toBe("first-model")
+    expect(middle.agents[0].status).toBe("running")
+    const finished = advanceDeepTradingReplay({ timeline, frame: start, nextCueIndex: 0, progress: 1 }).frame.workbench
+    expect(finished.overviewMessages).toEqual(source.overviewMessages)
+    expect(finished.agents[0].messages).toEqual(source.agents[0].messages)
+  })
   test("replays supplementary files without adding them to report candidates", () => {
     const source = workbench()
     const extra = {

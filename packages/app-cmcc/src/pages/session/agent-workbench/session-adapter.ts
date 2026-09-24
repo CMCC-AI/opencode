@@ -6,6 +6,7 @@ import type {
   NestedAgentSessionView,
   OverviewConversationTurn,
   SessionTranscript,
+  WorkbenchMessage,
 } from "./model"
 
 const compareMessage = (left: Message, right: Message) =>
@@ -31,6 +32,38 @@ export function extractAssistantMarkdown(messages: readonly Message[], parts: Se
       return text.trim() ? [text] : []
     })
     .join("\n\n")
+}
+
+export function extractWorkbenchMessages(
+  messages: readonly Message[],
+  parts: SessionTranscript["parts"],
+): WorkbenchMessage[] {
+  return [...messages].sort(compareMessage).flatMap((message) => {
+    const text = joinTextParts(parts[message.id] ?? [])
+    if (!text.trim()) return []
+    return [
+      {
+        id: message.id,
+        role: message.role,
+        text,
+        createdAt: message.time.created,
+        ...(message.role === "assistant"
+          ? {
+              completedAt: message.time.completed,
+              providerID: message.providerID,
+              modelID: message.modelID,
+            }
+          : {}),
+      },
+    ]
+  })
+}
+
+export function completedExpertElapsed(node: Pick<AgentNodeView, "status" | "startedAt" | "completedAt">) {
+  if (node.status !== "completed") return undefined
+  if (node.startedAt === undefined || node.completedAt === undefined) return undefined
+  const elapsed = node.completedAt - node.startedAt
+  return Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : undefined
 }
 
 export function extractOverviewConversation(messages: readonly Message[], parts: SessionTranscript["parts"]) {
@@ -119,6 +152,11 @@ export function buildAgentNodes(input: {
         parts: transcript?.parts ?? {},
       }),
       markdown: transcript ? extractAssistantMarkdown(transcript.messages, transcript.parts) : "",
+      messages: transcript
+        ? extractWorkbenchMessages(transcript.messages, transcript.parts).filter(
+            (message) => message.role === "assistant",
+          )
+        : [],
       startedAt: session?.time.created,
       completedAt: transcript ? sessionCompletedAt(transcript) : undefined,
     }

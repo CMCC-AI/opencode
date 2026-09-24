@@ -28,6 +28,7 @@ export function createSessionComposerRegionController(input: {
   prompt: PromptInputState
   ready: Accessor<boolean>
   centered: Accessor<boolean>
+  hideTodo?: Accessor<boolean>
   todo: {
     collapsed: Accessor<boolean>
     onToggle: () => void
@@ -106,13 +107,13 @@ export function createSessionComposerRegionController(input: {
     const id = input.sessionID()
     return id ? sync().session.get(id)?.parentID : undefined
   })
-  const open = createMemo(() => store.ready && input.state.dock() && !input.state.closing())
+  const open = createMemo(() => !input.hideTodo?.() && store.ready && input.state.dock() && !input.state.closing())
   const progress = useSpring(
     () => (open() ? 1 : 0),
     { visualDuration: 0.3, bounce: 0 },
     () => `${input.sessionKey()}\0${store.ready}`,
   )
-  const value = createMemo(() => Math.max(0, Math.min(1, progress())))
+  const value = createMemo(() => (input.hideTodo?.() ? 0 : Math.max(0, Math.min(1, progress()))))
   const ready = Promise.resolve()
   const [promptReady] = createResource(
     () => input.prompt.ready.promise ?? ready,
@@ -134,7 +135,7 @@ export function createSessionComposerRegionController(input: {
     showComposer: () => !input.state.blocked() || !!parentID(),
     handoffPrompt: () => getSessionHandoff(input.sessionKey())?.prompt,
     promptReady: () => input.prompt.ready() || promptReady(),
-    dock: () => (store.ready && input.state.dock()) || value() > 0.001,
+    dock: () => !input.hideTodo?.() && ((store.ready && input.state.dock()) || value() > 0.001),
     dockProgress: value,
     dockHeight: () => Math.max(78, store.height),
     lift: () => (input.revert()?.items.length ? 18 : 36 * value()),

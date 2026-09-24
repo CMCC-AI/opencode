@@ -1,0 +1,298 @@
+.cmcc-general-chat {
+  --v2-background-bg-base: #fbfdff;
+  --v2-background-bg-layer-02: #edf4ff;
+  --v2-border-border-base: #dbe6f5;
+  --v2-border-border-active: #4e80d9;
+  --v2-icon-icon-muted: #6a83a7;
+  --text-interactive-base: #2563b9;
+  background: #f6f9ff;
+  color: #243551;
+}
+
+.cmcc-general-chat [data-session-title] {
+  background: #f5f9ff;
+  box-shadow: inset 0 -1px #e2ebf7;
+}
+
+.cmcc-general-chat [data-slot="session-title-child"] {
+  color: #244b7c;
+}
+
+.cmcc-general-chat [data-component="tabs"] > [data-slot="tabs-list"] {
+  background: #f5f9ff;
+  border-color: #dbe6f5;
+}
+
+.cmcc-general-chat [data-slot="tabs-trigger"][data-selected] {
+  color: #2563b9;
+  background: #eaf2ff;
+}
+
+.cmcc-chat-message {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  column-gap: 12px;
+  padding: 12px 20px 4px;
+  align-items: start;
+}
+
+.cmcc-chat-message[data-speaker="user"] {
+  grid-template-columns: minmax(0, 1fr) 36px;
+  padding-top: 16px;
+}
+
+.cmcc-chat-message[data-speaker="user"] .cmcc-chat-avatar {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.cmcc-chat-message[data-speaker="user"] .cmcc-chat-message-body {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.cmcc-chat-avatar {
+  width: 36px;
+  min-height: 1px;
+}
+
+.cmcc-chat-avatar img {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.cmcc-chat-speaker {
+  margin-bottom: 8px;
+  color: #285a92;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.cmcc-chat-message-body {
+  min-width: 0;
+}
+
+.cmcc-chat-message-body > [data-slot="session-turn-message-container"] {
+  padding: 0;
+}
+
+.cmcc-general-chat [data-slot="user-message-text"] {
+  padding: 12px 16px;
+  border-radius: 12px 12px 4px 12px;
+  background: #4475cf;
+  color: white;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.cmcc-general-chat [data-slot="user-message-text"] [data-highlight] {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cmcc-general-chat [data-component="text-part"] {
+  margin-top: 0;
+}
+
+.cmcc-general-chat [data-component="markdown"] {
+  color: #2d3d53;
+  font-size: 16px;
+  line-height: 1.8;
+  --markdown-shell-code-background: #f0f5fc;
+  --markdown-shell-code-border: #dce7f6;
+  --markdown-shell-code-color: #274d7a;
+}
+
+.cmcc-general-chat [data-component="markdown"] :is(h1, h2, h3, h4, h5, h6) {
+  margin: 22px 0 10px;
+  color: #224d80;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.cmcc-general-chat [data-component="markdown"] h1 {
+  font-size: 22px;
+}
+.cmcc-general-chat [data-component="markdown"] h2 {
+  font-size: 20px;
+}
+.cmcc-general-chat [data-component="markdown"] :is(h3, h4, h5, h6) {
+  font-size: 17px;
+}
+.cmcc-general-chat [data-component="markdown"] p {
+  margin: 10px 0;
+}
+.cmcc-general-chat [data-component="markdown"] :is(ul, ol) {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+.cmcc-general-chat [data-component="markdown"] li {
+  margin-bottom: 6px;
+}
+
+.cmcc-general-chat [data-component="markdown"] blockquote {
+  margin: 16px 0;
+  padding: 10px 14px;
+  border-left: 3px solid #7da8e9;
+  border-radius: 0 6px 6px 0;
+  background: #eef5ff;
+  color: #4b6381;
+}
+
+.cmcc-general-chat [data-component="markdown"] :not(pre) > code {
+  border-radius: 4px;
+  background: #eaf1fb;
+  color: #315f97;
+  font-size: 13px;
+}
+
+.cmcc-general-chat [data-component="markdown-code"] {
+  margin: 16px 0;
+  overflow: hidden;
+  border: 1px solid #dce6f4;
+  border-radius: 8px;
+  background: #f2f6fc;
+}
+
+.cmcc-general-chat [data-component="markdown-code"][data-language]::before {
+  content: attr(data-language);
+  display: block;
+  padding: 7px 12px;
+  border-bottom: 1px solid #dce6f4;
+  color: #5078a8;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.cmcc-general-chat [data-component="markdown"] pre {
+  margin: 0;
+  padding: 18px 16px;
+  border: 0;
+  border-radius: 0;
+  background: #f2f6fc;
+  font-size: 13px;
+  line-height: 1.7;
+  scrollbar-width: thin;
+}
+
+.cmcc-general-chat [data-markdown-block]:has(> table) {
+  /* Markdown's block wrapper is display:contents until a table needs its own scroll area. */
+  display: block !important;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 18px 0;
+  scrollbar-width: thin;
+}
+
+.cmcc-general-chat [data-component="markdown"] table {
+  display: table;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  border: 1px solid #dce6f4;
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  font-size: 14px;
+  scrollbar-width: thin;
+}
+
+.cmcc-general-chat [data-component="markdown"] :is(th, td) {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e3ebf7;
+  border-right: 1px solid #e3ebf7;
+}
+
+.cmcc-general-chat [data-component="markdown"] th {
+  background: #eaf2ff;
+  color: #315b91;
+  font-weight: 600;
+}
+
+.cmcc-general-chat [data-component="markdown"] tbody tr:nth-child(even) {
+  background: #f7faff;
+}
+.cmcc-general-chat [data-component="markdown"] tr:last-child td {
+  border-bottom: 0;
+}
+.cmcc-general-chat [data-component="markdown"] :is(th, td):last-child {
+  border-right: 0;
+}
+
+.cmcc-general-chat [data-component="tool-part-wrapper"] .tool-collapsible,
+.cmcc-general-chat [data-component="context-tool-group"] {
+  overflow: hidden;
+  border: 1px solid #dbe6f5;
+  border-radius: 8px;
+  background: #f3f7fe;
+}
+
+.cmcc-general-chat [data-component="tool-trigger"] {
+  min-height: 40px;
+  padding: 10px 12px;
+}
+
+.cmcc-general-chat [data-slot="basic-tool-tool-title"] {
+  color: #3566a3;
+}
+.cmcc-general-chat [data-slot="basic-tool-tool-subtitle"] {
+  color: #6b809c;
+}
+.cmcc-general-chat [data-component="bash-output"] {
+  margin: 0 10px 10px;
+  border-radius: 6px;
+}
+.cmcc-general-chat [data-slot="bash-pre"] {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.cmcc-general-chat [data-component="reasoning-part"] {
+  padding: 12px;
+  border-left: 2px solid #b4ccef;
+  background: #f1f6fd;
+}
+
+.cmcc-general-chat [data-component="session-composer"] {
+  border-color: #94b4e5;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 3px 14px rgb(46 97 167 / 9%);
+}
+
+.cmcc-general-chat [data-component="session-composer"]:focus-within {
+  border-color: #4c85d5;
+  box-shadow: 0 0 0 2px rgb(76 133 213 / 10%);
+}
+
+.cmcc-general-chat [data-component="prompt-input"],
+.cmcc-general-chat [data-component="session-composer-text"] {
+  font-size: 16px;
+  line-height: 26px;
+}
+
+@media (max-width: 640px) {
+  .cmcc-chat-message {
+    grid-template-columns: 32px minmax(0, 1fr);
+    column-gap: 10px;
+    padding-inline: 12px;
+  }
+  .cmcc-chat-message[data-speaker="user"] {
+    grid-template-columns: minmax(0, 1fr) 32px;
+  }
+  .cmcc-chat-avatar,
+  .cmcc-chat-avatar img {
+    width: 32px;
+  }
+  .cmcc-chat-avatar img {
+    height: 32px;
+  }
+  .cmcc-general-chat [data-slot="user-message-body"] {
+    max-width: 100%;
+  }
+}

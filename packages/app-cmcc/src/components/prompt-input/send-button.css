@@ -1,0 +1,43 @@
+.cmcc-send-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: linear-gradient(135deg, #1e3a8a, #5b4fd7, #9b59f0);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease;
+}
+
+.cmcc-send-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgb(91 79 199 / 40%);
+}
+
+.cmcc-send-button:focus-visible {
+  outline: 2px solid #668eff;
+  outline-offset: 3px;
+}
+
+.cmcc-send-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cmcc-send-button [data-component="icon"] {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmcc-send-button {
+    transition: none;
+  }
+}

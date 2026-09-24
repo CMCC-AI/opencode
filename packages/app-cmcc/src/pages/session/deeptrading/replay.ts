@@ -3,6 +3,7 @@ import type {
   AgentWorkbench,
   NestedAgentSessionView,
   SessionArtifact,
+  WorkbenchMessage,
 } from "../agent-workbench/model"
 import type { SearchUrlEvent } from "../agent-workbench/statistics"
 import { workbenchFiles } from "../agent-workbench/artifact-files"
@@ -12,6 +13,7 @@ export const DEEPTRADING_REPLAY_DURATION_MS = 60_000
 export type DeepTradingReplayStage = "idle" | "team" | "files" | "text" | "visual"
 
 type ReplayCuePayload =
+  | { at: number; type: "message"; agentId?: string; message: WorkbenchMessage }
   | { at: number; type: "overview-start" }
   | { at: number; type: "overview-block"; content: string }
   | { at: number; type: "overview-finish" }
@@ -51,6 +53,10 @@ export function compileDeepTradingReplay(input: {
 }) {
   const source = input.workbench
   const observedTimes = [
+    ...(source.overviewMessages ?? []).flatMap((message) => [message.createdAt, message.completedAt]),
+    ...source.agents.flatMap((agent) =>
+      (agent.messages ?? []).flatMap((message) => [message.createdAt, message.completedAt]),
+    ),
     ...source.agents.flatMap((agent) => [agent.startedAt, agent.completedAt]),
     ...input.searchUrlEvents.map((event) => event.completedAt),
   ].filter(isFiniteNumber)
@@ -59,6 +65,31 @@ export function compileDeepTradingReplay(input: {
   const cues: ReplayCue[] = []
   let sequence = 0
   const push = (cue: ReplayCuePayload) => cues.push({ ...cue, sequence: sequence++ } as ReplayCue)
+
+  const addMessages = (messages: WorkbenchMessage[], agentId?: string) => {
+    messages.forEach((message, index) => {
+      const start =
+        progressForTimestamp(sourceStartAt, sourceEndAt, message.createdAt) ??
+        spreadPosition(index, messages.length, 0.08, 0.6)
+      const end = Math.max(start, progressForTimestamp(sourceStartAt, sourceEndAt, message.completedAt) ?? start)
+      if (message.role === "user") {
+        push({ at: start, type: "message", agentId, message })
+        return
+      }
+      const blocks = splitReplayMarkdown(message.text)
+      blocks.forEach((_, block) =>
+        push({
+          at: spreadPosition(block, blocks.length, start, end),
+          type: "message",
+          agentId,
+          message: { ...message, text: blocks.slice(0, block + 1).join("\n\n"), completedAt: undefined },
+        }),
+      )
+      push({ at: end, type: "message", agentId, message })
+    })
+  }
+  addMessages(source.overviewMessages ?? [])
+  source.agents.forEach((agent) => addMessages(agent.messages ?? [], agent.id))
 
   push({ at: 0.001, type: "overview-start" })
   const overviewBlocks = splitReplayMarkdown(source.overviewMarkdown)
@@ -141,8 +172,14 @@ export function createDeepTradingReplayFrame(timeline: DeepTradingReplayTimeline
       ...timeline.source,
       overviewMarkdown: "",
       overviewTurns: [],
+      overviewMessages: timeline.source.overviewMessages ? [] : undefined,
       overviewStatus: "waiting",
-      agents: timeline.source.agents.map((agent) => ({ ...agent, status: "waiting", markdown: "" })),
+      agents: timeline.source.agents.map((agent) => ({
+        ...agent,
+        status: "waiting",
+        markdown: "",
+        messages: agent.messages ? [] : undefined,
+      })),
       nestedAgentSessions: [],
       nestedAgentSessionsLoading: false,
       nestedAgentSessionsError: undefined,
@@ -208,9 +245,7 @@ export function advanceDeepTradingReplay(input: {
         nestedAgentSessionsError: undefined,
       },
       textReportMarkdown: input.timeline.textReportMarkdown,
-      seenSearchUrls: [
-        ...new Set(input.timeline.cues.flatMap((cue) => (cue.type === "search-urls" ? cue.urls : []))),
-      ],
+      seenSearchUrls: [...new Set(input.timeline.cues.flatMap((cue) => (cue.type === "search-urls" ? cue.urls : [])))],
       progress: 1,
     },
     nextCueIndex: input.timeline.cues.length,
@@ -237,7 +272,9 @@ export function replayNestedAgentSessions(
     const completed = session.completedAt
       ? deepTradingReplayProgressForTimestamp(timeline, session.completedAt)
       : undefined
-    return [{ ...session, status: completed !== undefined && value < completed ? ("running" as const) : session.status }]
+    return [
+      { ...session, status: completed !== undefined && value < completed ? ("running" as const) : session.status },
+    ]
   })
 }
 
@@ -278,6 +315,27 @@ function applyReplayCue(
   frame: DeepTradingReplayFrame,
   cue: ReplayCue,
 ): DeepTradingReplayFrame {
+  if (cue.type === "message") {
+    const update = (messages: WorkbenchMessage[] = []) => {
+      const exists = messages.some((message) => message.id === cue.message.id)
+      return exists
+        ? messages.map((message) => (message.id === cue.message.id ? cue.message : message))
+        : [...messages, cue.message]
+    }
+    return {
+      ...frame,
+      workbench: {
+        ...frame.workbench,
+        ...(cue.agentId
+          ? {
+              agents: frame.workbench.agents.map((agent) =>
+                agent.id === cue.agentId ? { ...agent, messages: update(agent.messages) } : agent,
+              ),
+            }
+          : { overviewMessages: update(frame.workbench.overviewMessages) }),
+      },
+    }
+  }
   if (cue.type === "overview-start") return updateOverview(frame, "running")
   if (cue.type === "overview-block") {
     return {
@@ -322,12 +380,7 @@ function updateOverview(frame: DeepTradingReplayFrame, status: AgentNodeStatus) 
   return { ...frame, workbench: { ...frame.workbench, overviewStatus: status } }
 }
 
-function updateAgent(
-  frame: DeepTradingReplayFrame,
-  agentId: string,
-  status?: AgentNodeStatus,
-  content?: string,
-) {
+function updateAgent(frame: DeepTradingReplayFrame, agentId: string, status?: AgentNodeStatus, content?: string) {
   return {
     ...frame,
     workbench: {

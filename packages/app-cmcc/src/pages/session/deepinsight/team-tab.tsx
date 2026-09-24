@@ -36,10 +36,10 @@ export function DeepInsightTeamTab() {
         icon: "file-tree" as const,
       },
       {
-        key: "experts",
-        label: "专家团",
-        value: `${context.workbench().stats.expertCount} 位`,
-        icon: "fork" as const,
+        key: "sources",
+        label: "信息源",
+        value: context.sourceCount() === undefined ? "--" : `${formatNumber(context.sourceCount()!)} 篇`,
+        icon: "magnifying-glass" as const,
       },
     ]
   })
