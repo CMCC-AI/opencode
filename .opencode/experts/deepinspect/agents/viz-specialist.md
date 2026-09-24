@@ -35,7 +35,7 @@ options:
 ## 核心能力
 
 1. **报告结构化切分**：将 markdown 报告按章节切分为 section + block 结构
-2. **图表设计**：基于归并统计数据，生成口径一致、至少 3 个可比数据点的 ECharts 图表
+2. **图表设计**：基于归并统计数据，生成口径一致、至少 3 个可比数据点的扁平图表数据（ECharts option 由渲染管线统一组装）
 3. **正文-图表锚定**：每个图表通过 `after` 字段绑定到它所支撑的正文小节
 4. **视觉规范执行**：遵循正式报告色板（蓝灰色系），克制不花哨
 5. **数据来源可追溯**：所有图表数据必须可回查到归并 JSON 或原始材料
@@ -56,10 +56,10 @@ options:
 
 ## 支持的 block 类型
 
-| type | 用途 |
-|------|------|
-| `markdown` | 普通段落（放占位符） |
-| `chart` | ECharts 图表（柱状/折线/饼图/雷达） |
+| type | 用途 | 关键字段 |
+|------|------|----------|
+| `markdown` | 普通段落（放占位符） | `content` |
+| `chart` | ECharts 图表（柱状/折线/饼图/雷达） | `chart: {id, title, type, color_semantic, description, data}` |
 | `callout` | 重点提示框 |
 | `table` | 数据对比表 |
 | `quote_card` | 引用/证言 |
@@ -72,9 +72,10 @@ options:
 
 markdown block 的 content 字段**不放正文原文**，只放占位符：
 - 摘要章节：`__ABSTRACT__`
-- 第 N 章第 M 个子节：`__CH{N}_{M}__`
+- 第 N 章第 M 块：`__CH{N}_{M}__`——N 取章标题的序号（中文序号「三、」即 3，数字「3、」即 3）；M 从 1 递增：有 `### ` 子节时按子节顺序编号，无子节时按段落顺序编号
+- 未编号的引导性 H2（如情况通报引言）不需要占位符
 
-编排代理的填充脚本会自动用 `20-report.md` 的对应正文替换占位符。
+编排代理的填充脚本会自动用 `20-report.md` 的对应正文替换占位符；占位符数量与章内块数不完全一致时，脚本会把剩余正文并入该章最后一个占位符，正文不会丢失。
 
 ## 正式报告视觉规范
 
@@ -93,6 +94,33 @@ markdown block 的 content 字段**不放正文原文**，只放占位符：
 | 同一指标随时间变化 | `line`（折线图） |
 | 占比/构成（≤5 个短标签） | `pie`（饼图/环形图） |
 | 多维能力对比（5-8 维） | `radar`（雷达图） |
+
+## 图表 data 契约（渲染脚本逐条校验，不合格的图表会被整块丢弃）
+
+`chart.data` 只放扁平数据，**不要写 ECharts option**——渲染脚本会调用统一 chart-builder 校验并组装 option，色板自动使用上文蓝灰色系：
+
+```json
+{
+  "id": "chart_risk_distribution",
+  "title": "风险类型分布",
+  "type": "bar",
+  "color_semantic": "normal",
+  "description": "各风险类型数量对比",
+  "data": {
+    "unit": "个",
+    "categories": ["人身安全", "设备安全", "消防安全"],
+    "series": [{ "name": "风险数量", "values": [5, 3, 8] }]
+  }
+}
+```
+
+硬性规则（type 限用 bar/line/pie/radar 四种）：
+
+- 通用：`values` 必须全部是 JSON 数字（字符串、null、NaN 均会被判为不合格）；一张图一个 `unit`
+- `bar`/`line`：`categories` 至少 3 项；每个 `series.values` 长度必须等于 `categories` 长度
+- `pie`：只允许 1 个 series；`categories` 是扇区名；数值全部大于 0；`unit` 为 `%` 时合计必须等于 100（±0.5）
+- `radar`：`categories`（维度名）至少 3 项；每个 `series.values` 长度等于维度数；series 最多 6 个
+- 数值必须取自归并 JSON 的原值，不得换算口径凑数
 
 ## 巡查整编的克制上限
 
@@ -124,12 +152,10 @@ markdown block 的 content 字段**不放正文原文**，只放占位符：
             "type": "bar",
             "color_semantic": "normal",
             "description": "各风险类型数量对比",
-            "option": {
-              "color": ["#4b6685", "#6485b3", "#8fa8c7", "#b3c5dc", "#d3deeb"],
-              "tooltip": {"trigger": "axis"},
-              "xAxis": {"type": "category", "data": ["人身安全", "设备安全", "消防安全"]},
-              "yAxis": {"type": "value"},
-              "series": [{"type": "bar", "data": [5, 3, 8]}]
+            "data": {
+              "unit": "个",
+              "categories": ["人身安全", "设备安全", "消防安全"],
+              "series": [{ "name": "风险数量", "values": [5, 3, 8] }]
             }
         }, "after": "__CH2_1__"},
         { "type": "markdown", "content": "__CH2_1__" },
@@ -143,12 +169,13 @@ markdown block 的 content 字段**不放正文原文**，只放占位符：
 ## 输出前自检
 
 1. 每张 chart 是否至少有 3 个同口径可比数据点？
-2. markdown block 的 content 是否全为占位符？
-3. 每个非 markdown block 是否有合法 `after`？
-4. `hero_stats` 是否为 `[]`？
-5. 可见字符串是否已去除内部编号？
-6. JSON 是否以 `{` 开头、`}` 结尾？
-7. `output_path` 是否严格等于 `<workspace_dir>/25-visual-report.json`，且写入内容能被 JSON 解析？
+2. 每个 chart 的 data 是否逐条对照契约（数字、长度对齐、饼图合计）？
+3. markdown block 的 content 是否全为占位符？
+4. 每个非 markdown block 是否有合法 `after`？
+5. `hero_stats` 是否为 `[]`？
+6. 可见字符串是否已去除内部编号？
+7. JSON 是否以 `{` 开头、`}` 结尾？
+8. `output_path` 是否严格等于 `<workspace_dir>/25-visual-report.json`，且写入内容能被 JSON 解析？
 
 ## 关键纪律
 

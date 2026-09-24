@@ -327,21 +327,27 @@ const validateVisualReport = async (relativePaths) => {
     if (!Array.isArray(chart.source_refs) || chart.source_refs.length === 0 || chart.source_refs.some((n) => !validReferenceNumbers.has(n))) {
       throw new Error(`图表「${chart.title || '未命名'}」必须提供 22-references.json 中真实存在的 source_refs`);
     }
-    const unit = String(chart.unit || '').trim();
+    // 新契约：图表只产扁平 data，ECharts option 由渲染时的仓库级 chart-builder 统一组装
+    const data = chart.data && typeof chart.data === 'object' && !Array.isArray(chart.data) ? chart.data : null;
+    if (!data) throw new Error(`图表「${chart.title || '未命名'}」缺少扁平 data 契约；不要输出 option`);
+    const unit = String(data.unit || '').trim();
     if (!unit) throw new Error(`图表「${chart.title || '未命名'}」缺少统一 unit；不同单位的数据应改用 stat_grid 或表格`);
-    const categories = chart.option?.xAxis?.data || [];
+    const categories = Array.isArray(data.categories) ? data.categories : [];
     const categoryUnits = new Set(categories.map((item) => String(item).match(/[（(]([^()（）]+)[）)]\s*$/)?.[1]?.trim()).filter(Boolean));
     if (categoryUnits.size > 1) throw new Error(`图表「${chart.title || '未命名'}」把多个单位放进同一坐标轴`);
-    const values = (chart.option?.series || []).flatMap((series) => (series.data || []).flatMap((item) => {
-      const value = typeof item === 'object' && item !== null ? item.value : item;
-      return Array.isArray(value) ? value.filter((part) => typeof part === 'number') : typeof value === 'number' ? [value] : [];
-    }));
+    const values = (Array.isArray(data.series) ? data.series : []).flatMap((series) => {
+      const seriesValues = series && Array.isArray(series.values) ? series.values : [];
+      return seriesValues.flatMap((item) => {
+        if (typeof item === 'number') return [item];
+        if (Array.isArray(item)) return item.filter((part) => typeof part === 'number');
+        return [];
+      });
+    });
     if (!values.length) throw new Error(`图表「${chart.title || '未命名'}」没有可核验的数值数据`);
     if (values.length < 3) throw new Error(`图表「${chart.title || '未命名'}」只有 ${values.length} 个数字；少于 3 个同口径数据点时应改用正文、stat_grid 或表格`);
-    const chartTypes = new Set((chart.option?.series || []).map((series) => series.type).filter(Boolean));
     const allowedChartTypes = new Set(['bar', 'line', 'pie', 'scatter', 'radar']);
-    if ([...chartTypes].some((type) => !allowedChartTypes.has(type))) throw new Error(`图表「${chart.title || '未命名'}」使用了未准入的图形类型`);
-    if (chartTypes.has('pie') && unit === '%' && Math.abs(values.reduce((sum, value) => sum + value, 0) - 100) > 0.5) {
+    if (!allowedChartTypes.has(String(chart.type || '').trim().toLowerCase())) throw new Error(`图表「${chart.title || '未命名'}」使用了未准入的图形类型（限 bar/line/pie/scatter/radar）`);
+    if (String(chart.type).trim().toLowerCase() === 'pie' && unit === '%' && Math.abs(values.reduce((sum, value) => sum + value, 0) - 100) > 0.5) {
       throw new Error(`饼图「${chart.title || '未命名'}」的真实占比之和不是 100%`);
     }
     for (const value of values) {

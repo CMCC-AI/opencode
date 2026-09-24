@@ -31,11 +31,14 @@ function localAlias(source, index) {
 const referenceByKey = new Map();
 const references = [];
 localSources.forEach((source, index) => {
-  const sourceId = String(source.source_id || '');
+  // 兼容两种注册字段命名：source_id（契约）与 id（代理常见漂移）
+  const sourceId = String(source.source_id || source.id || '');
   if (!/^SRC-\d+$/.test(sourceId)) throw new Error(`无效本地来源编号：${sourceId || '(empty)'}`);
   const record = { n: index + 1, key: `local:${sourceId}`, kind: 'local', title: localAlias(source, index), url: '' };
   references.push(record);
   referenceByKey.set(record.key, record);
+  // 方括号标注 `[SRC-N]` 直接用编号索引，避免 key 前缀差异
+  referenceByKey.set(sourceId, record);
 });
 
 const webSources = new Map();
@@ -55,13 +58,17 @@ for (const name of (await readdir(workspace)).filter((item) => /^05-web-findings
 
 let report = await readText(reportPath);
 const priorReferencePath = resolve(workspace, '22-references.json');
-const priorReferenceRecords = await exists(priorReferencePath) ? await readJson(priorReferencePath) : [];
+const priorReferenceRaw = await exists(priorReferencePath) ? await readJson(priorReferencePath) : [];
+const priorReferenceRecords = Array.isArray(priorReferenceRaw) ? priorReferenceRaw : (priorReferenceRaw.references || []);
 const priorReferenceHeading = report.search(/^## 参考文献\s*$/m);
 if (priorReferenceHeading >= 0) report = report.slice(0, priorReferenceHeading).replace(/\s+$/, '');
 
+// 引用标注兼容两种写法：<cite>key</cite>（契约）与 [SRC-N] 方括号（写手代理常见漂移）
 const citePattern = /<cite>([^<]+)<\/cite>/g;
+const bracketPattern = /\[(SRC-\d+)\]/g;
 const citedKeys = [...report.matchAll(citePattern)].map((match) => match[1].trim());
-if (!citedKeys.length) {
+const bracketCitedKeys = [...report.matchAll(bracketPattern)].map((match) => match[1].trim());
+if (!citedKeys.length && !bracketCitedKeys.length) {
   for (const prior of priorReferenceRecords.filter((item) => item?.kind === 'web' && /^https?:\/\//i.test(String(item.url || ''))).sort((a, b) => Number(a.n) - Number(b.n))) {
     if (referenceByKey.has(prior.url)) continue;
     const record = { n: references.length + 1, key: prior.url, kind: 'web', title: prior.title || prior.url, url: prior.url };
@@ -79,9 +86,24 @@ for (const key of citedKeys) {
 }
 
 report = report.replace(citePattern, (_, rawKey) => {
-  const record = referenceByKey.get(rawKey.trim());
+  const record = referenceByKey.get(rawKey.trim()) || referenceByKey.get(rawKey.trim().replace(/^local:/, ''));
+  if (!record) return _;
   return `<sup class="citation"><a class="ref" href="#ref-${record.n}" data-ref="${record.n}" title="参考文献 ${record.n}">[${record.n}]</a></sup>`;
 });
+report = report.replace(bracketPattern, (_, sourceId) => {
+  const record = referenceByKey.get(sourceId);
+  if (!record) return `[${sourceId}]`;
+  return `<sup class="citation"><a class="ref" href="#ref-${record.n}" data-ref="${record.n}" title="参考文献 ${record.n}">[${record.n}]</a></sup>`;
+});
+// 表格“来源”列等场景的裸编号（无方括号无 cite 标签）
+report = report.replace(/\bSRC-(\d+)\b/g, (_, digits) => {
+  const record = referenceByKey.get(`SRC-${digits}`);
+  if (!record) return `SRC-${digits}`;
+  return `<sup class="citation"><a class="ref" href="#ref-${record.n}" data-ref="${record.n}" title="参考文献 ${record.n}">[${record.n}]</a></sup>`;
+});
+// 未注册的标注保留原样后在此显式报错，避免中间格式泄漏进最终 HTML/PDF
+const leftoverCitations = [...new Set([...report.matchAll(/<cite>[^<]*<\/cite>/g), ...report.matchAll(/\bSRC-\d+\b/g)].map((match) => match[0]))];
+if (leftoverCitations.length) throw new Error(`报告存在未注册的引用标注：${leftoverCitations.slice(0, 5).join('、')}（共 ${leftoverCitations.length} 处），请核对 04-sources.json`);
 const existingCitations = [...report.matchAll(/<sup class="citation"><a class="ref" href="#ref-(\d+)"/g)];
 if (!existingCitations.length) throw new Error('报告没有任何可核验引用，禁止生成正式版');
 const maxExisting = Math.max(...existingCitations.map((match) => Number(match[1])));

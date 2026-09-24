@@ -244,7 +244,17 @@ python3 <BASE>/scripts/inject_meta.py <WORKSPACE_DIR>
 
 脚本输出 `Injected topic: <标的列表>` 确认成功。
 
-### 4.2 用模板渲染 HTML
+### 4.2 图表闸门（渲染 HTML 前必须执行）
+
+ms-visualizer 的 chart block 只产扁平 `data`，由统一 chart-builder 校验并组装 ECharts option（多股横评紫色系色板自动固定）。校验失败的图表整块丢弃并在日志报出标题与原因——出现丢弃时责令 ms-visualizer 重做**图表数据**后重跑本步，无需重写正文。
+
+```bash
+node <BASE>/scripts/build-charts.mjs <WORKSPACE_DIR>
+```
+
+脚本输出 `图表校验：N/M 张通过` 确认成功（有丢弃时会列出每张的原因）。
+
+### 4.3 用模板渲染 HTML
 
 HTML 模板在 `.opencode/templates/report.html.tpl`，内嵌 CSS + marked.js + ECharts CDN，含 `__TITLE__`、`__VISUAL_REPORT_JSON__`、`__REFERENCES_JSON__` 三个**模板占位符**。
 
@@ -263,7 +273,7 @@ python3 <BASE>/scripts/render_html.py <WORKSPACE_DIR>
 
 脚本依次完成：读模板（自动定位 `<BASE>/templates/report.html.tpl`）→ 回填正文占位符 → 清扫残留 token → 注入 `__TITLE__` / `__VISUAL_REPORT_JSON__` / `__REFERENCES_JSON__`（对比报告用空数组）→ 写出 `40-comparison-report.html`，输出 `HTML report: <路径> (<大小> bytes)`。
 
-### 4.3 验证
+### 4.4 验证
 
 用 `read` 工具抽查 `40-comparison-report.html`：
 - 开头 `<!DOCTYPE html>`，`<title>` 含"对比"
@@ -271,7 +281,7 @@ python3 <BASE>/scripts/render_html.py <WORKSPACE_DIR>
 - 文件末尾 `</html>`
 - **全文搜索 `__CH` 应 0 命中**（占位符已全部回填为正文；若仍有命中，说明 4.2 回填步骤未执行或 `20-comparison-report.md` 缺失，需重跑渲染）
 
-### 4.4 导出 A4 PDF
+### 4.5 导出 A4 PDF
 
 HTML 验证通过后导出 PDF（与其他专家团统一使用仓库级 `report-pdf` 共享导出器）：
 

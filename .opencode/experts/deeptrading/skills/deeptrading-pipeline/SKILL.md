@@ -23,7 +23,7 @@ node <BASE>/scripts/finalize-report.mjs <WORKSPACE_DIR>
 node <BASE>/scripts/render-report.mjs <WORKSPACE_DIR>
 ```
 
-依次：读取 `35-visual-report.json` → 从 `30-final-report.md` 末尾「## 引用来源」章节解析参考文献 → **引用闸门校验**（每条必须有真实标题且非裸 URL；每个编号必须在正文有 `[N]` 标记；正文不得残留 `<cite>` 中间格式；违反即报错中止）→ 填充 `<BASE>/templates/report.html.tpl` 的占位符（`__TITLE__` / `__VISUAL_REPORT_JSON__` / `__REFERENCES_JSON__`）→ 写出 `40-report.html`。成功输出 `HTML 报告完成：<路径>` 与参考文献条数。
+依次：读取 `35-visual-report.json` 与 `30-final-report.md` → **正文占位符回填**（markdown block 只放 `__CH{N}_{M}__`，脚本按 `## ` 章节切分、段落切分并回填；表格段剥离由 table block 承载；段落数多于占位符时并入最后一个，正文永不丢失，`[N]` 引用标记自动保留；旧格式带正文的产物原样兼容）→ 从 `30-final-report.md` 末尾「## 引用来源」章节解析参考文献 → **引用闸门校验**（每条必须有真实标题且非裸 URL；每个编号必须在正文有 `[N]` 标记；正文不得残留 `<cite>` 中间格式；违反即报错中止）→ **图表闸门**（chart block 携带 dt-viz 的扁平 `data`，委托仓库级 `chart-builder` 技能校验并组装 ECharts option：通过则注入 option，不合格则整块丢弃并在输出日志报出标题与原因，渲染不中断；仍自带 `option` 的旧格式 block 原样保留）→ 填充 `<BASE>/templates/report.html.tpl` 的占位符（`__TITLE__` / `__VISUAL_REPORT_JSON__` / `__REFERENCES_JSON__`）→ 写出 `40-report.html`。成功输出 `正文回填：N 个占位符…`、`图表校验：N/M 张通过`、`HTML 报告完成：<路径>` 与参考文献条数；出现图表丢弃时主理人应责令 dt-viz 按契约重做图表数据后重渲染。
 
 ### 2. `<BASE>/scripts/export-report-pdf.mjs` — 导出 A4 PDF
 

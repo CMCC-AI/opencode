@@ -191,14 +191,15 @@ dt-report-writer 产出的 `30-final-report.md` 里引用是 `<cite>URL</cite>` 
 spawn `deeptrading/dt-viz`，将总报告传入。可视化专家：
 - 读取 `30-final-report.md`
 - 生成结构化可视化 JSON（七章 sections + chart/stat_grid/table 等 block）
-- **每章正文段落必须以 markdown block 原样搬运，`[N]` 引用标记一字不动保留；可视化 block 是正文的补充，不得替代正文**
+- **每章正文不抄写：markdown block 只放 `__CH{N}_{M}__` 占位符（N=章序号），正文由渲染脚本从 md 自动回填，`[N]` 引用标记自动保留；Markdown 原文表格必须转 table block（脚本会剥离正文中的表格段）**
 - 写入 `35-visual-report.json`
 
-主理人验收 `35-visual-report.json`：每章至少 1 个 markdown 块、正文 `[N]` 标记数量与 `30-final-report.md` 一致；不合格则要求 dt-viz 重做，不得自行放行。
+主理人验收 `35-visual-report.json`：markdown block 全部是占位符（无正文原文混入）、每章至少 1 个占位符、报告里的表格都已转 table block；不合格则要求 dt-viz 重做，不得自行放行。
 
 然后用 `deeptrading-pipeline` skill 的渲染脚本生成 HTML（**主理人必须自己执行，不要输出命令给用户**）：
 - 用 `skill` 工具加载 `deeptrading-pipeline` skill，获取 `<BASE>` 路径
 - 用 `bash` 工具执行：`node <BASE>/scripts/render-report.mjs <WORKSPACE_DIR>`
+- 渲染输出含「图表校验：N/M 张通过」：有图表被丢弃时（dt-viz 的图表 data 不符合契约），只责令 dt-viz 重做图表数据后重渲染，正文块无需重做
 - 用 `read` 工具确认 `40-report.html` 存在且非空
 
 ### Phase 7: PDF 导出与交付

@@ -85,14 +85,12 @@ permission:
           "title": "多股估值水平横向对决",
           "type": "bar",
           "description": "并列柱状图展示各标的 PE/PB 估值，清晰呈现性价比",
-          "option": {
-            "tooltip": {"trigger": "axis"},
-            "legend": {"data": ["PE(TTM)", "PB"]},
-            "xAxis": {"type": "category", "data": ["中国移动", "中国电信", "中国联通"]},
-            "yAxis": [{"type": "value", "name": "倍数"}],
+          "data": {
+            "unit": "倍",
+            "categories": ["中国移动", "中国电信", "中国联通"],
             "series": [
-              {"name": "PE(TTM)", "type": "bar", "data": [14.9, 15.8, 17.2], "itemStyle": {"color": "#3b82f6"}},
-              {"name": "PB", "type": "bar", "data": [1.47, 1.32, 1.15], "itemStyle": {"color": "#94a3b8"}}
+              {"name": "PE(TTM)", "values": [14.9, 15.8, 17.2]},
+              {"name": "PB", "values": [1.47, 1.32, 1.15]}
             ]
           }
         }},
@@ -114,7 +112,7 @@ permission:
 | type | 用途 | 关键字段 |
 |------|------|----------|
 | `markdown` | 普通段落（**只放占位符**） | `content` |
-| `chart` | **ECharts 图表，最重要** | `chart: {id, title, type, description, option}` |
+| `chart` | **ECharts 图表，最重要** | `chart: {id, title, type, description, data}` |
 | `stat_grid` | 关键数字卡片网格（2-6 个） | `items: [{label, value, tone, caption}]` |
 | `callout` | 重点提示框 | `tone, title, content` |
 | `table` | 数据对比表 | `title, columns: [...], rows: [[...]]` |
@@ -136,17 +134,17 @@ permission:
 - 资产配置权重 → `pie`（圆环图）
 - 风险评分（1-10）→ `gauge` 或 `progress_bar`
 
-**option 字段约束**：
-- ✅ 可用：`title / tooltip / legend / xAxis / yAxis / series / dataset / color / grid / radar / angleAxis / radiusAxis`
-- ✅ `formatter` 用字符串模板 `"{b}: {c}%"` 或函数字符串
-- ✅ 颜色可用渐变对象
-- ❌ **严禁**：JS 变量引用、`new echarts.graphic` 等运行时代码
-- 必须：`series` 数组每个对象有 `type` 字段、包含 `tooltip`、合理 `legend`
+**图表 data 契约**（编排脚本会调用统一 chart-builder 逐条校验并组装 ECharts option，不合格的图表会被整块丢弃）：
 
-**多股横评配色规范**：
-- 多柱并列：蓝 `#3b82f6`（主标的）、灰 `#94a3b8`（次标的）、绿 `#10b981`（辅助）、橙 `#f59e0b`
-- 雷达图各标的用不同颜色区分
-- 正负（涨跌、风险/安全）用红绿区分
+`chart.data` 只放扁平数据，**不写 ECharts option、不写颜色**（色板由渲染管线固定）：
+
+- 通用：`values` 必须全部是 JSON 数字（字符串、null、NaN 均会被判为不合格）；一张图一个 `unit`，不同单位不得混入同一张图；`id` 全文唯一
+- `bar`/`line`：`categories` 至少 3 项；每个 `series.values` 长度必须等于 `categories` 长度
+- `pie`：只允许 1 个 series；`categories` 是扇区名；数值全部大于 0；`unit` 为 `%` 时合计必须等于 100（±0.5）
+- `radar`：`categories`（维度名）至少 3 项；每个 `series.values` 长度等于维度数；series 最多 6 个（多股横评时每标的一圈，标的多时拆图）
+- `gauge`：恰好 1 个 series、1 个数值；风险评分（1-10）用 `"max": 10` 覆盖默认上限 100
+
+数值必须取自对比报告原值，不得换算口径凑数。
 
 ## tone 取值（严格限定 5 种）
 
@@ -190,27 +188,14 @@ permission:
     "title": "多标的多维综合能力雷达图",
     "type": "radar",
     "description": "六维度雷达对比各标的的综合实力",
-    "option": {
-      "tooltip": {},
-      "legend": {"data": ["中国移动", "中国电信", "中国联通"], "bottom": 0},
-      "radar": {
-        "indicator": [
-          {"name": "盈利能力", "max": 10},
-          {"name": "成长性", "max": 10},
-          {"name": "估值安全", "max": 10},
-          {"name": "技术形态", "max": 10},
-          {"name": "股息回报", "max": 10},
-          {"name": "风险控制", "max": 10}
-        ]
-      },
-      "series": [{
-        "type": "radar",
-        "data": [
-          {"name": "中国移动", "value": [9, 6, 9, 7, 9, 8], "itemStyle": {"color": "#3b82f6"}},
-          {"name": "中国电信", "value": [7, 7, 8, 7, 7, 7], "itemStyle": {"color": "#94a3b8"}},
-          {"name": "中国联通", "value": [6, 8, 6, 6, 5, 6], "itemStyle": {"color": "#10b981"}}
-        ]
-      }]
+    "data": {
+      "max": 10,
+      "categories": ["盈利能力", "成长性", "估值安全", "技术形态", "股息回报", "风险控制"],
+      "series": [
+        {"name": "中国移动", "values": [9, 6, 9, 7, 9, 8]},
+        {"name": "中国电信", "values": [7, 7, 8, 7, 7, 7]},
+        {"name": "中国联通", "values": [6, 8, 6, 6, 5, 6]}
+      ]
     }
   }
 }

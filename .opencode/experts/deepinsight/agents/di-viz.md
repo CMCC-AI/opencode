@@ -31,10 +31,11 @@ maxTurns: 40
 1. 读取 `20-report.md`（按 `##` 切分章节确定每章编号 N，按 `###` 切分子节确定 M）和研究元数据 `05-*-findings-*.meta.json`
 2. **第一遍扫描**：识别所有 `|` 表格、数字密集段、证言段、时间线、警示框和可量化的 quantitative_facts 数据组
 3. **提炼 hero_stats**：最多 6 个来源明确的数据点；没有可靠数字则留空
-4. **图表设计**：只把口径一致、来源明确的数据设计成 chart block（ECharts option，纯数据无 JS 函数；`formatter` 可用字符串模板或函数字符串）
+4. **图表设计**：只把口径一致、来源明确的数据设计成 chart block（只产扁平 data，不写 ECharts option——option 由渲染管线统一组装）
 5. **组装 sections**：每章以 `markdown(__CH{N}_1__)` 开始，可视化组件紧跟所属子节
 6. **输出前自检**（必做）：
    - 每个图表数据在正文/证据中真实存在且口径一致？
+   - 每个图表 data 是否逐条对照契约（数字、长度对齐、饼图合计）？
    - markdown block 是否**全部是占位符**？（混入正文原文立刻删除——这是防止截断的关键）
    - 每个数值图 ≥3 个同单位数据点？只有两个数字时改成正文/表格？
    - 每章以正文开始、组件不堆在章节开头、标题后不紧接组件？
@@ -72,8 +73,11 @@ maxTurns: 40
           "type": "bar | line | pie | scatter | radar",
           "description": "1-2 句解读",
           "source_refs": [1, 2],
-          "unit": "同一坐标轴唯一单位",
-          "option": { "xAxis": { "type": "category", "data": ["A","B","C"] }, "yAxis": { "type": "value" }, "series": [{ "type": "bar", "data": [1,2,3] }] }
+          "data": {
+            "unit": "同一坐标轴唯一单位",
+            "categories": ["A", "B", "C"],
+            "series": [{ "name": "系列名", "values": [1, 2, 3] }]
+          }
         }},
         { "type": "markdown", "content": "__CH3_2__" }
       ]
@@ -86,7 +90,14 @@ maxTurns: 40
 
 **tone 取值（严格 5 种）**：`neutral` / `info` / `positive` / `warning` / `negative`。
 
-**chart option 约束**：可用 title/tooltip/legend/xAxis/yAxis/series/dataset/color/grid/radar/visualMap/markPoint；`formatter` 可用字符串模板 `"{b}: {c}%"` 或函数字符串 `"function(p){return '$'+p.value}"`；❌ 严禁 JS 变量引用、反引号、`new echarts.graphic`；每个 series 必须有 `type` 字段。
+**chart data 契约**（渲染管线逐条校验，不合格的图表会被整块丢弃）：`chart.data` 只放扁平数据——`unit`（全图统一单位）、`categories`（维度/扇区名）、`series`（每个含 `name` 与数字数组 `values`）。按类型规则：
+
+- 通用：`values` 必须全部是 JSON 数字（字符串/null/NaN 均不合格）；series 数值必须以原值出现在正文（不得换算口径）
+- `bar`/`line`：`categories` ≥3 项；每个 `series.values` 长度必须等于 `categories` 长度
+- `pie`：只允许 1 个 series；数值全部大于 0；`unit` 为 `%` 时合计必须等于 100（±0.5）
+- `scatter`：`series[].values` 为 `[x, y]` 数对数组（每对两个数字），至少 2 对
+- `radar`：`categories`（维度名）≥3 项；每个 `series.values` 长度等于维度数；series 最多 6 个
+- 饼图比例必须是来源明确的真实占比（正文只列三个场景时不得自行分配 45%/35%/20%）
 
 ## 注意事项
 

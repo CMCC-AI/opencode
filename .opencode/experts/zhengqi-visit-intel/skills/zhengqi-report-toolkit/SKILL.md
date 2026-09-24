@@ -33,6 +33,10 @@ node scripts/finalize-citations.mjs <workspace_dir>
 # 3. HTML 渲染（可视化 JSON 就绪后运行）
 node scripts/render-report.mjs <workspace_dir>
 # 用 templates/report.html.tpl + report-print.css 生成 30-report.html
+# 渲染前依次：正文占位符回填（markdown block 只放 __CH{N}_{M}__，脚本按 ## 章节与 ### 子节
+#   切分 20-report.md 回填、剥离表格段、自动剥离参考文献章节；平铺旧结构自动包装为 report）
+#   与图表闸门（chart block 的扁平 data 委托仓库级 chart-builder 技能校验并组装 ECharts option，
+#   中国移动蓝系配色；不合格的图表整块丢弃并在日志报出原因，渲染不中断，出现丢弃应退回重做图表数据）
 
 # 4. PDF 导出（统一使用 report-pdf 渲染器，并强制校验中文字体）
 node scripts/export-report-pdf.mjs <workspace_dir>/30-report.html <workspace_dir>/35-report.pdf
