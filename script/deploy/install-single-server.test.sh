@@ -107,6 +107,7 @@ deployer_source=$(<"$deployer")
 assert_contains "$installer_source" "systemctl enable opencode-cmcc.service opencode-cmcc-deepxiv.service"
 assert_contains "$installer_source" "systemctl restart opencode-cmcc.service opencode-cmcc-deepxiv.service"
 assert_contains "$installer_source" "DASHSCOPE_API_KEY"
+assert_contains "$(<"$script_dir/opencode-cmcc.jsonc")" '"enabled_providers": ["alibaba-cn"]'
 assert_not_contains "$installer_source" "systemctl enable --now"
 assert_not_contains "$installer_source" "health-auth"
 assert_not_contains "$deployer_source" "health-auth"

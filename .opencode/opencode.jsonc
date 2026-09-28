@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "enabled_providers": ["alibaba-cn"],
   "provider": {
     "alibaba-cn": {
       "name": "阿里云百炼",

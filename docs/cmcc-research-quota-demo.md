@@ -33,6 +33,8 @@ VITE_CMCC_RESEARCH_DEMO=false
 
 演示模式下 API Key 只允许由部署管理员通过服务器环境变量或配置文件提供。用户侧 Provider 页面为只读清单，模型选择器只显示这些已部署凭据对应的可用模型；连接 Provider、自定义 Provider、OAuth、API Key 写入/删除和 Provider 配置更新在页面与服务端同时关闭。
 
+演示配置通过 `enabled_providers: ["alibaba-cn"]` 固定使用中国区阿里云百炼。模型目录中的 `alibaba` 指向国际站；它虽然复用 `DASHSCOPE_API_KEY` 这个环境变量名，但中国区 Key 不能据此视为国际站已部署凭据，因此不会向用户展示。
+
 生产环境仍需保持 OpenCode 端口不对公网暴露，并由 Nginx 清除外部伪造的可信身份头。
 
 ## 注册用户与 Token 限额
