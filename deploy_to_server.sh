@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-remote=${DEPLOY_HOST:-ubuntu@81.70.49.200}
+remote=${DEPLOY_HOST:-ubuntu@152.136.106.161}
 port=${OPENCODE_PORT:-4096}
 bind_host=${OPENCODE_BIND_HOST:-127.0.0.1}
 public_host=${OPENCODE_PUBLIC_HOST:-${remote#*@}}
@@ -18,6 +18,7 @@ deeplit_target=${DEEPLIT_PROXY_TARGET:-http://81.70.174.140:3000/}
 deeplit_public_origin=${DEEPLIT_PROXY_PUBLIC_ORIGIN:-$public_scheme://$public_host:$deepxiv_port}
 deeplit_trust_forwarded_headers=${DEEPLIT_PROXY_TRUST_FORWARD_HEADERS:-false}
 requested_deepxiv_url=${VITE_DEEPXIV_URL:-}
+token_quota=${OPENCODE_TOKEN_QUOTA:-'{"enabled":true,"identityHeader":"x-opencode-user-id","authorizationHeader":"x-dockapi-authorization","identityUrl":"http://127.0.0.1:8081","dailyTokens":200000,"monthlyTokens":3000000,"requestTokens":100000,"reservationTokens":8192,"overage":"reject"}'}
 deploy_dir="$root/.deploy"
 version=${OPENCODE_VERSION:-0.0.0-cmcc-$(date +%Y%m%d%H%M%S)}
 
@@ -218,6 +219,7 @@ if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
       OPENCODE_BUN_EXECUTABLE_PATH="$compile_runtime_path" \
       OPENCODE_WEB_APP_DIR="$root/packages/app-cmcc" \
       MODELS_DEV_API_JSON="$models_snapshot" \
+      VITE_CMCC_RESEARCH_DEMO=true \
       VITE_DEEPXIV_URL="$deepxiv_url" \
       bun run script/build.ts --target="$target"
   )
@@ -265,7 +267,9 @@ for skill_dir in "$root"/.opencode/experts/*/skills/*/; do
   cp -a "${skill_dir%/}" "$stage/.opencode/skills/"
 done
 printf '%s\n' "$version" >"$stage/VERSION"
-printf 'DEEPLIT_PROXY_PUBLIC_ORIGIN=%q\n' "$deeplit_public_origin" >"$stage/opencode.env"
+printf 'DEEPLIT_PROXY_PUBLIC_ORIGIN=%q\nOPENCODE_TOKEN_QUOTA=%q\n' \
+  "$deeplit_public_origin" \
+  "$token_quota" >"$stage/opencode.env"
 chmod 600 "$stage/opencode.env"
 printf 'DEEPXIV_PROXY_HOST=%q\nDEEPXIV_PROXY_PORT=%q\nDEEPLIT_PROXY_TARGET=%q\nDEEPLIT_PROXY_PUBLIC_ORIGIN=%q\nDEEPLIT_PROXY_TRUST_FORWARD_HEADERS=%q\n' \
   "$deepxiv_bind_host" \

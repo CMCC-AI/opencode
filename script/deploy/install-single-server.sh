@@ -19,10 +19,12 @@ Environment=XDG_CONFIG_HOME=$data_root/config
 Environment=XDG_STATE_HOME=$data_root/state
 Environment=XDG_CACHE_HOME=$data_root/cache
 Environment=OPENCODE_DISABLE_AUTOUPDATE=true
+Environment=OPENCODE_DB=$data_root/data/opencode.db
 # OPENCODE_CONFIG_DIR is already a discovered global config root. Setting the
 # same path as OPENCODE_BUNDLED_CONFIG_DIR would rescan experts for local configs.
 Environment=OPENCODE_CONFIG_DIR=$install_root/current/.opencode
 EnvironmentFile=/etc/opencode-cmcc/opencode.env
+EnvironmentFile=-/etc/opencode-cmcc/secrets.env
 ExecStart=$install_root/current/opencode serve --hostname $bind_host --port $port
 Restart=always
 RestartSec=3
@@ -33,6 +35,7 @@ StartLimitIntervalSec=60
 StartLimitBurst=5
 NoNewPrivileges=true
 PrivateTmp=true
+UMask=0077
 LimitNOFILE=65535
 
 [Install]
@@ -64,6 +67,7 @@ StartLimitIntervalSec=60
 StartLimitBurst=5
 NoNewPrivileges=true
 PrivateTmp=true
+UMask=0077
 LimitNOFILE=65535
 
 [Install]

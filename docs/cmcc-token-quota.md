@@ -4,7 +4,7 @@
 
 APP-CMCC 的模型 API Key 仍由服务端统一保管，浏览器和普通用户不会获得 Key。登录网关在认证成功后向 OpenCode 注入稳定且不可复用的用户主键，默认请求头为 `x-opencode-user-id`。OpenCode 将该用户主键写入 `token_quota_session`，一个 Session 只能绑定一个用户；子 Session 会继承父 Session 的绑定。
 
-登录网关必须删除客户端传入的同名请求头，再写入认证结果，并禁止用户绕过网关访问 OpenCode 端口。不要使用昵称、手机号或可修改邮箱作为主键，应使用登录系统内部不可变的用户 ID。
+DockAPI 内部创建 Session 时使用可信 `x-opencode-user-id`；浏览器请求则携带 `x-dockapi-authorization` Bearer Token，OpenCode 通过 `identityUrl` 向 DockAPI 校验后提取不可变用户 ID。反向代理必须删除公网请求中的 `x-opencode-user-id`，并禁止用户绕过代理访问 OpenCode 端口。不要使用昵称、手机号或可修改邮箱作为主键。
 
 每次 Provider 调用会生成一条 `token_quota_usage` 流水，绑定：
 
@@ -34,6 +34,8 @@ APP-CMCC 的模型 API Key 仍由服务端统一保管，浏览器和普通用�
 {
   "enabled": true,
   "identityHeader": "x-opencode-user-id",
+  "authorizationHeader": "x-dockapi-authorization",
+  "identityUrl": "http://127.0.0.1:8081",
   "dailyTokens": 1000000,
   "monthlyTokens": 20000000,
   "requestTokens": 200000,

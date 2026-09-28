@@ -38,7 +38,7 @@ VITE_CMCC_RESEARCH_DEMO=false
 演示环境可使用以下统一默认额度：
 
 ```bash
-OPENCODE_TOKEN_QUOTA='{"enabled":true,"identityHeader":"x-opencode-user-id","dailyTokens":200000,"monthlyTokens":3000000,"requestTokens":100000,"reservationTokens":8192,"overage":"reject"}'
+OPENCODE_TOKEN_QUOTA='{"enabled":true,"identityHeader":"x-opencode-user-id","authorizationHeader":"x-dockapi-authorization","identityUrl":"http://127.0.0.1:8081","dailyTokens":200000,"monthlyTokens":3000000,"requestTokens":100000,"reservationTokens":8192,"overage":"reject"}'
 ```
 
 不需要为每个新注册用户预先创建策略记录：没有个人策略的用户自动继承上述全局额度。需要单独调整时，再向 `token_quota_policy` 写入该用户覆盖值。

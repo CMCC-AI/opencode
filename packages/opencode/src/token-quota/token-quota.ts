@@ -9,6 +9,8 @@ import { NonNegativeInt, PositiveInt } from "@opencode-ai/core/schema"
 const Config = Schema.Struct({
   enabled: Schema.optional(Schema.Boolean),
   identityHeader: Schema.optional(Schema.String),
+  authorizationHeader: Schema.optional(Schema.String),
+  identityUrl: Schema.optional(Schema.String),
   dailyTokens: Schema.optional(NonNegativeInt),
   monthlyTokens: Schema.optional(NonNegativeInt),
   requestTokens: Schema.optional(NonNegativeInt),
@@ -16,6 +18,13 @@ const Config = Schema.Struct({
   overage: Schema.optional(Schema.Literals(["reject", "allow_and_audit"])),
 })
 type Config = typeof Config.Type
+
+const IdentityResponse = Schema.Struct({
+  code: Schema.Number,
+  data: Schema.Struct({
+    user: Schema.Struct({ id: Schema.Number }),
+  }),
+})
 
 type Policy = {
   dailyLimit?: number
@@ -127,6 +136,8 @@ const layer = Layer.effect(
     const config: Config = Option.getOrElse(decoded, () => ({}))
     const enabled = config.enabled === true
     const identityHeader = (config.identityHeader ?? "x-opencode-user-id").toLowerCase()
+    const authorizationHeader = (config.authorizationHeader ?? "x-dockapi-authorization").toLowerCase()
+    const identityUrl = config.identityUrl?.replace(/\/+$/, "")
     const reservationTokens = config.reservationTokens ?? 8192
     const locks = new Map<string, Semaphore.Semaphore>()
     const lock = (userID: string) => {
@@ -141,7 +152,24 @@ const layer = Layer.effect(
       if (!enabled) return Effect.succeed(undefined)
       const userID = headers[identityHeader]?.trim()
       if (userID && userID.length <= 255) return Effect.succeed(userID)
-      return Effect.fail(new IdentityMissing({ message: `Token quota requires trusted header ${identityHeader}` }))
+      const authorization = headers[authorizationHeader]?.trim()
+      if (!identityUrl || !authorization)
+        return Effect.fail(new IdentityMissing({ message: "Token quota requires an authenticated DockAPI user" }))
+      return Effect.tryPromise({
+        try: async () => {
+          const response = await fetch(`${identityUrl}/api/auth/user/profile`, {
+            headers: { Authorization: authorization },
+            signal: AbortSignal.timeout(5_000),
+          })
+          if (!response.ok) throw new Error(`DockAPI identity returned ${response.status}`)
+          return response.json() as Promise<unknown>
+        },
+        catch: () => new IdentityMissing({ message: "DockAPI identity verification failed" }),
+      }).pipe(
+        Effect.flatMap((value) => Schema.decodeUnknownEffect(IdentityResponse)(value)),
+        Effect.map((value) => String(value.data.user.id)),
+        Effect.mapError(() => new IdentityMissing({ message: "DockAPI identity verification failed" })),
+      )
     }
 
     const bindSession: Interface["bindSession"] = Effect.fn("TokenQuota.bindSession")(function* (input) {
