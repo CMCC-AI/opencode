@@ -114,6 +114,9 @@ assert_not_contains "$deployer_source" "OPENCODE_SERVER_PASSWORD"
 assert_not_contains "$deployer_source" "OPENCODE_SERVER_USERNAME"
 assert_not_contains "$deployer_source" "auth_token="
 assert_contains "$deployer_source" 'MODELS_DEV_API_JSON="$models_snapshot"'
+assert_contains "$deployer_source" '"monthlyTokens":10000000'
+assert_not_contains "$deployer_source" '"dailyTokens":'
+assert_not_contains "$deployer_source" '"requestTokens":'
 assert_not_contains "$deployer_source" "NODE_TLS_REJECT_UNAUTHORIZED=0"
 assert_not_contains "$deployer_source" "--insecure"
 

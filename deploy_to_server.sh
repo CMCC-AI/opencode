@@ -18,7 +18,7 @@ deeplit_target=${DEEPLIT_PROXY_TARGET:-http://81.70.174.140:3000/}
 deeplit_public_origin=${DEEPLIT_PROXY_PUBLIC_ORIGIN:-$public_scheme://$public_host:$deepxiv_port}
 deeplit_trust_forwarded_headers=${DEEPLIT_PROXY_TRUST_FORWARD_HEADERS:-false}
 requested_deepxiv_url=${VITE_DEEPXIV_URL:-}
-token_quota=${OPENCODE_TOKEN_QUOTA:-'{"enabled":true,"identityHeader":"x-opencode-user-id","authorizationHeader":"x-dockapi-authorization","identityUrl":"http://127.0.0.1:8081","dailyTokens":200000,"monthlyTokens":3000000,"requestTokens":100000,"reservationTokens":8192,"overage":"reject"}'}
+token_quota=${OPENCODE_TOKEN_QUOTA:-'{"enabled":true,"identityHeader":"x-opencode-user-id","authorizationHeader":"x-dockapi-authorization","identityUrl":"http://127.0.0.1:8081","monthlyTokens":10000000,"reservationTokens":8192,"overage":"reject"}'}
 deploy_dir="$root/.deploy"
 version=${OPENCODE_VERSION:-0.0.0-cmcc-$(date +%Y%m%d%H%M%S)}
 

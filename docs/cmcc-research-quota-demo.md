@@ -42,7 +42,7 @@ VITE_CMCC_RESEARCH_DEMO=false
 演示环境可使用以下统一默认额度：
 
 ```bash
-OPENCODE_TOKEN_QUOTA='{"enabled":true,"identityHeader":"x-opencode-user-id","authorizationHeader":"x-dockapi-authorization","identityUrl":"http://127.0.0.1:8081","dailyTokens":200000,"monthlyTokens":3000000,"requestTokens":100000,"reservationTokens":8192,"overage":"reject"}'
+OPENCODE_TOKEN_QUOTA='{"enabled":true,"identityHeader":"x-opencode-user-id","authorizationHeader":"x-dockapi-authorization","identityUrl":"http://127.0.0.1:8081","monthlyTokens":10000000,"reservationTokens":8192,"overage":"reject"}'
 ```
 
 不需要为每个新注册用户预先创建策略记录：没有个人策略的用户自动继承上述全局额度。需要单独调整时，再向 `token_quota_policy` 写入该用户覆盖值。
@@ -52,8 +52,9 @@ OPENCODE_TOKEN_QUOTA='{"enabled":true,"identityHeader":"x-opencode-user-id","aut
 - Session 首次提交请求时绑定当前登录用户，之后不能被另一用户接管；子 Session 继承父 Session 用户；
 - 每次模型调用先按估算输入和输出预算预占额度，并发请求也会计入，避免额度穿透；
 - 调用结束后以模型供应商返回的实际 usage 结算，统计输入、缓存读写和输出 Token；
-- 日额度按 UTC 自然日、月额度按 UTC 自然月累计；
-- 当日额度、月额度或单次额度不足时，`overage: "reject"` 会在调用 API Key 之前拒绝请求，因此科研专家团和主会话都无法继续消耗后台 Key；额度重置或管理员提高个人策略后恢复。
+- 默认策略不限制每日用量，月额度按 UTC 自然月累计；
+- 默认策略不限制单次请求用量，但仍受模型上下文窗口和最大输出能力约束；
+- 月额度不足时，`overage: "reject"` 会在调用 API Key 之前拒绝请求，因此科研专家团和主会话都无法继续消耗后台 Key；额度重置或管理员提高个人策略后恢复。
 
 DeepXiv 如果只展示和检索论文，不经过 OpenCode Provider，则不会消耗模型额度；若 DeepXiv 自身调用模型，需要让它接入同一配额服务或经 OpenCode 发起调用，才能纳入同一用户账本。
 
