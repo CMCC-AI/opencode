@@ -34,6 +34,12 @@ import { TokenQuota } from "@/token-quota/token-quota"
 
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 
+const CMCC_RESEARCH_DEMO_AGENTS = new Set(["build", "plan", "general", "explore", "compaction", "title", "summary"])
+
+export function cmccResearchDemoAgentAllowed(agent: string) {
+  return CMCC_RESEARCH_DEMO_AGENTS.has(agent) || agent.startsWith("ai-for-science-team/")
+}
+
 export type StreamInput = {
   user: SessionV1.User
   sessionID: string
@@ -87,6 +93,9 @@ const live: Layer.Layer<
     const quota = yield* TokenQuota.Service
 
     const run = Effect.fn("LLM.run")(function* (input: StreamRequest) {
+      if (process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true" && !cmccResearchDemoAgentAllowed(input.agent.name)) {
+        return yield* Effect.fail(new Error(`Agent is unavailable in the CMCC research demo: ${input.agent.name}`))
+      }
       yield* Effect.logInfo("stream", {
         providerID: input.model.providerID,
         modelID: input.model.id,

@@ -267,7 +267,7 @@ for skill_dir in "$root"/.opencode/experts/*/skills/*/; do
   cp -a "${skill_dir%/}" "$stage/.opencode/skills/"
 done
 printf '%s\n' "$version" >"$stage/VERSION"
-printf 'DEEPLIT_PROXY_PUBLIC_ORIGIN=%q\nOPENCODE_TOKEN_QUOTA=%q\n' \
+printf 'DEEPLIT_PROXY_PUBLIC_ORIGIN=%q\nOPENCODE_TOKEN_QUOTA=%q\nOPENCODE_CMCC_RESEARCH_DEMO=true\n' \
   "$deeplit_public_origin" \
   "$token_quota" >"$stage/opencode.env"
 chmod 600 "$stage/opencode.env"
