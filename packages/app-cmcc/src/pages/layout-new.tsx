@@ -41,7 +41,11 @@ import { mstockMention } from "@/pages/session/mstock/page-selection"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
-import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
+import { CMCC_TEAM_EXPERTS, cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
+import {
+  CMCC_RESEARCH_DEMO,
+  cmccResearchDemoSessionVisible,
+} from "@/utils/research-demo"
 
 const SIDEBAR_MIN_WIDTH = 280
 const SIDEBAR_MAX_WIDTH = 420
@@ -149,14 +153,16 @@ export default function NewLayout(props: ParentProps) {
             <Show when={persistentViews.deepXivMounted}>
               <CmccDeepXivFrame active={isDeepXivPath(location.pathname)} />
             </Show>
-            <Show when={persistentViews.deepLensMounted}>
+            <Show when={!CMCC_RESEARCH_DEMO && persistentViews.deepLensMounted}>
               <CmccDeepLensFrame active={isDeepLensPath(location.pathname)} />
             </Show>
           </div>
         </section>
       </main>
       {import.meta.env.DEV && <DebugBar inline />}
-      <HelpButton />
+      <Show when={!CMCC_RESEARCH_DEMO}>
+        <HelpButton />
+      </Show>
       <ToastRegion v2 />
     </div>
   )
@@ -275,6 +281,7 @@ function CmccSidebar() {
   const openSettings = useSettingsDialog()
   const knowledgeNotebooks = createMemo(() => {
     location.pathname
+    if (CMCC_RESEARCH_DEMO) return []
     return cmccKnowledgeNotebooks()
   })
   const [drag, setDrag] = createStore({
@@ -299,6 +306,12 @@ function CmccSidebar() {
       .filter((session) => !session.parentID && !session.time.archived)
       .filter((session) => !ids.has(session.id))
     return [...history, ...knowledge]
+      .filter((session) => {
+        if (!CMCC_RESEARCH_DEMO) return true
+        const binding = dockapi.sessions.findByOpenCodeId(session.id)
+        const expert = cmccTeamExpertByAgent(session.agent)
+        return cmccResearchDemoSessionVisible({ agentType: binding?.agentType, teamExpertID: expert?.id })
+      })
       .sort((a, b) => sessionUpdatedAt(b) - sessionUpdatedAt(a))
       .slice(0, SIDEBAR_SESSION_LIMIT)
   })
@@ -517,51 +530,61 @@ function CmccSidebar() {
           </div>
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-3">
             <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
-            <CmccSidebarAction
-              icon="glasses"
-              label="深度研究"
-              onClick={() => void summonDeepInsight()}
-            />
-            <CmccSidebarAction
-              icon="mcp"
-              label="产业洞察"
-              active={
-                location.pathname === "/expert" ||
-                (location.pathname.startsWith("/expert/") &&
-                  location.pathname !== "/expert/chat" &&
-                  location.pathname !== "/expert/workspace")
+            <Show
+              when={CMCC_RESEARCH_DEMO}
+              fallback={
+                <>
+                  <CmccSidebarAction icon="glasses" label="深度研究" onClick={() => void summonDeepInsight()} />
+                  <CmccSidebarAction
+                    icon="mcp"
+                    label="产业洞察"
+                    active={
+                      location.pathname === "/expert" ||
+                      (location.pathname.startsWith("/expert/") &&
+                        location.pathname !== "/expert/chat" &&
+                        location.pathname !== "/expert/workspace")
+                    }
+                    onClick={() => navigate("/expert")}
+                  />
+                  <CmccSidebarAction
+                    icon="brain"
+                    label="AI Wiki"
+                    active={location.pathname === "/knowledge" || location.pathname.startsWith("/knowledge/")}
+                    onClick={() => navigate("/knowledge")}
+                  />
+                  <CmccSidebarAction
+                    icon="branch"
+                    label="DeepTrack 行业追踪"
+                    active={location.pathname === "/expert/workspace"}
+                    onClick={() => navigate("/expert/workspace")}
+                  />
+                  <CmccSidebarAction
+                    icon="photo"
+                    label="DeepLens 拍照即懂"
+                    active={isDeepLensPath(location.pathname)}
+                    onClick={() => navigate("/deeplens")}
+                  />
+                  <CmccSidebarAction
+                    icon="archive"
+                    label="案例库"
+                    active={location.pathname === "/cases" || location.pathname.startsWith("/cases/")}
+                    onClick={() => navigate("/cases")}
+                  />
+                </>
               }
-              onClick={() => navigate("/expert")}
-            />
-            <CmccSidebarAction
-              icon="brain"
-              label="AI Wiki"
-              active={location.pathname === "/knowledge" || location.pathname.startsWith("/knowledge/")}
-              onClick={() => navigate("/knowledge")}
-            />
-            <CmccSidebarAction
-              icon="branch"
-              label="DeepTrack 行业追踪"
-              active={location.pathname === "/expert/workspace"}
-              onClick={() => navigate("/expert/workspace")}
-            />
+            >
+              <CmccSidebarAction
+                icon="mcp"
+                label="科研专家团"
+                active={location.pathname === "/expert" || location.pathname.startsWith("/expert/")}
+                onClick={() => navigate("/expert")}
+              />
+            </Show>
             <CmccSidebarAction
               icon="review"
               label="DeepXiv 前沿论文"
               active={isDeepXivPath(location.pathname)}
               onClick={() => navigate("/deepxiv")}
-            />
-            <CmccSidebarAction
-              icon="photo"
-              label="DeepLens 拍照即懂"
-              active={isDeepLensPath(location.pathname)}
-              onClick={() => navigate("/deeplens")}
-            />
-            <CmccSidebarAction
-              icon="archive"
-              label="案例库"
-              active={location.pathname === "/cases" || location.pathname.startsWith("/cases/")}
-              onClick={() => navigate("/cases")}
             />
           </nav>
           <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#c7d2fe] [&::-webkit-scrollbar]:w-1">
@@ -591,6 +614,7 @@ function CmccSidebar() {
                   openSession={openSession}
                   deleteSession={deleteSession}
                   publishCase={
+                    !CMCC_RESEARCH_DEMO &&
                     cmccCasePublishingAllowed(
                       dockapi.user?.casePublishAllowed,
                       dockapi.sessions.findByOpenCodeId(session.id)?.agentType,
@@ -639,11 +663,13 @@ function CmccSidebar() {
         class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-transparent hover:before:bg-[#a5b4fc]"
         onPointerDown={startDrag}
       />
-      <CasePublishDialog
-        session={caseDialog.session}
-        onClose={() => setCaseDialog("session", undefined)}
-        onPublished={() => window.dispatchEvent(new Event(CMCC_CASES_UPDATED_EVENT))}
-      />
+      <Show when={!CMCC_RESEARCH_DEMO}>
+        <CasePublishDialog
+          session={caseDialog.session}
+          onClose={() => setCaseDialog("session", undefined)}
+          onPublished={() => window.dispatchEvent(new Event(CMCC_CASES_UPDATED_EVENT))}
+        />
+      </Show>
     </>
   )
 }

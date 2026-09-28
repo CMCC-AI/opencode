@@ -95,6 +95,7 @@ import {
 import { useNavigate, useSearchParams } from "@solidjs/router"
 import { useTabs } from "@/context/tabs"
 import { uuid } from "@/utils/uuid"
+import { CMCC_RESEARCH_DEMO } from "@/utils/research-demo"
 import {
   CMCC_ARTIFACT_DIRECTORY_METADATA,
   cmccArtifactDirectory,
@@ -477,15 +478,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const suggest = createMemo(() => !hasUserPrompt())
 
-  const placeholder = createMemo(() =>
-    promptPlaceholder({
+  const placeholder = createMemo(() => {
+    if (CMCC_RESEARCH_DEMO && store.mode === "normal") return "描述科研问题，或从 + 菜单召唤科研专家团"
+    return promptPlaceholder({
       mode: store.mode,
       commentCount: commentCount(),
       example: suggest() ? (store.mode === "shell" ? "git status" : language.t(EXAMPLES[store.placeholder])) : "",
       suggest: suggest(),
       t: (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
-    }),
-  )
+    })
+  })
 
   const historyComments = () => {
     const byID = new Map(comments.all().map((item) => [`${item.file}\n${item.id}`, item] as const))
@@ -1770,9 +1772,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             pick()
           }}
           onExperts={openExpertCenter}
-          onSkills={openSkillCommands}
-          onKnowledge={newSession() ? openKnowledge : undefined}
-          onProfessionalDatabases={openProfessionalDatabases}
+          expertLabel={CMCC_RESEARCH_DEMO ? "科研专家团" : undefined}
+          onSkills={CMCC_RESEARCH_DEMO ? undefined : openSkillCommands}
+          onKnowledge={!CMCC_RESEARCH_DEMO && newSession() ? openKnowledge : undefined}
+          onProfessionalDatabases={CMCC_RESEARCH_DEMO ? undefined : openProfessionalDatabases}
         />
       </Match>
       <Match when={actions.panel === "database"}>

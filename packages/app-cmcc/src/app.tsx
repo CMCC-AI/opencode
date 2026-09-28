@@ -72,6 +72,7 @@ import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
 import { AppLoading } from "@/components/app-loading"
+import { CMCC_RESEARCH_DEMO } from "@/utils/research-demo"
 
 const LegacyLayout = lazy(() => import("@/pages/layout"))
 const Session = lazy(() => import("@/pages/session"))
@@ -698,18 +699,35 @@ function Routes() {
       <Show when={settings.general.newLayoutDesigns()}>
         <Route path="/app" component={CmccDefaultRoute} />
         <Route path="/expert" component={CmccExpertCenterRoute} />
-        <Route path="/mstock" component={MstockRoute} />
         <Route path="/expert/:id" component={CmccExpertRoute} />
-        <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />
-        <Route path="/knowledge/:id/session/:sessionID" component={KnowledgeNotebookRoute} />
-        <Route path="/knowledge/:id" component={KnowledgeNotebookRoute} />
         <Route path="/deepxiv" component={CmccDeepXivRoute} />
         <Route path="/deepxiv/" component={CmccDeepXivRoute} />
-        <Route path="/deeplens" component={CmccDeepLensRoute} />
-        <Route path="/deeplens/" component={CmccDeepLensRoute} />
-        <Route path="/plugins" component={CmccPluginHubRoute} />
-        <Route path="/cases" component={CmccCasesRoute} />
-        <Route path="/cases/:caseCode" component={CmccCaseDetailRoute} />
+        <Show
+          when={!CMCC_RESEARCH_DEMO}
+          fallback={
+            <>
+              <Route path="/mstock" component={() => <Navigate href="/app" />} />
+              <Route path="/knowledge" component={() => <Navigate href="/app" />} />
+              <Route path="/knowledge/:id/session/:sessionID" component={() => <Navigate href="/app" />} />
+              <Route path="/knowledge/:id" component={() => <Navigate href="/app" />} />
+              <Route path="/deeplens" component={() => <Navigate href="/app" />} />
+              <Route path="/deeplens/" component={() => <Navigate href="/app" />} />
+              <Route path="/plugins" component={() => <Navigate href="/app" />} />
+              <Route path="/cases" component={() => <Navigate href="/app" />} />
+              <Route path="/cases/:caseCode" component={() => <Navigate href="/app" />} />
+            </>
+          }
+        >
+          <Route path="/mstock" component={MstockRoute} />
+          <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />
+          <Route path="/knowledge/:id/session/:sessionID" component={KnowledgeNotebookRoute} />
+          <Route path="/knowledge/:id" component={KnowledgeNotebookRoute} />
+          <Route path="/deeplens" component={CmccDeepLensRoute} />
+          <Route path="/deeplens/" component={CmccDeepLensRoute} />
+          <Route path="/plugins" component={CmccPluginHubRoute} />
+          <Route path="/cases" component={CmccCasesRoute} />
+          <Route path="/cases/:caseCode" component={CmccCaseDetailRoute} />
+        </Show>
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />

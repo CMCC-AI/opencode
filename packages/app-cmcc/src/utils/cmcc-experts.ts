@@ -1,3 +1,5 @@
+import { cmccResearchDemoExpertVisible } from "./research-demo"
+
 export type ExternalExpert = {
   kind: "external"
   id: string
@@ -28,7 +30,7 @@ export type TeamExpert = {
 
 export type CmccExpert = ExternalExpert | TeamExpert
 
-export const CMCC_EXPERTS: CmccExpert[] = [
+export const CMCC_ALL_EXPERTS: CmccExpert[] = [
   {
     kind: "team",
     id: "deepinsight",
@@ -255,7 +257,12 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   },
 ]
 
-export const CMCC_TEAM_EXPERTS = CMCC_EXPERTS.filter((expert): expert is TeamExpert => expert.kind === "team")
+export const CMCC_EXPERTS = CMCC_ALL_EXPERTS.filter((expert) => cmccResearchDemoExpertVisible(expert.id))
+
+export const CMCC_TEAM_EXPERTS = CMCC_ALL_EXPERTS.filter((expert): expert is TeamExpert => expert.kind === "team")
+export const CMCC_VISIBLE_TEAM_EXPERTS = CMCC_EXPERTS.filter(
+  (expert): expert is TeamExpert => expert.kind === "team",
+)
 
 export function cmccExpertHref(expert: CmccExpert) {
   return `/expert/${expert.id}`

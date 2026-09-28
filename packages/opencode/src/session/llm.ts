@@ -29,6 +29,8 @@ import * as OtelTracer from "@effect/opentelemetry/Tracer"
 import { LLMAISDK } from "./llm/ai-sdk"
 import { LLMNativeRuntime } from "./llm/native-runtime"
 import { LLMRequestPrep } from "./llm/request"
+import { Token } from "@/util/token"
+import { TokenQuota } from "@/token-quota/token-quota"
 
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 
@@ -70,6 +72,7 @@ const live: Layer.Layer<
   | EventV2Bridge.Service
   | LLMClientService
   | RuntimeFlags.Service
+  | TokenQuota.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -81,6 +84,7 @@ const live: Layer.Layer<
     const events = yield* EventV2Bridge.Service
     const llmClient = yield* LLMClient.Service
     const flags = yield* RuntimeFlags.Service
+    const quota = yield* TokenQuota.Service
 
     const run = Effect.fn("LLM.run")(function* (input: StreamRequest) {
       yield* Effect.logInfo("stream", {
@@ -111,6 +115,24 @@ const live: Layer.Layer<
         flags,
         isWorkflow,
       })
+      const reservation = yield* quota.reserve({
+        sessionID: input.sessionID,
+        parentSessionID: input.parentSessionID,
+        requestID: input.user.id,
+        providerID: input.model.providerID,
+        modelID: input.model.id,
+        credential:
+          info?.type === "api"
+            ? info.key
+            : info?.type === "oauth"
+              ? info.access
+              : info?.type === "wellknown"
+                ? `${info.key}:${info.token}`
+                : undefined,
+        estimatedInputTokens: Token.estimate(JSON.stringify(prepared.messages)),
+        maxOutputTokens: prepared.params.maxOutputTokens,
+      })
+      const maxOutputTokens = reservation?.maxOutputTokens ?? prepared.params.maxOutputTokens
 
       // Wire up toolExecutor for DWS workflow models so that tool calls
       // from the workflow service are executed via opencode's tool system
@@ -235,7 +257,7 @@ const live: Layer.Layer<
           temperature: prepared.params.temperature,
           topP: prepared.params.topP,
           topK: prepared.params.topK,
-          maxOutputTokens: prepared.params.maxOutputTokens,
+          maxOutputTokens,
           providerOptions: prepared.params.options,
           headers: prepared.headers,
           abort: input.abort,
@@ -249,6 +271,7 @@ const live: Layer.Layer<
           return {
             type: "native" as const,
             stream: native.stream,
+            reservation,
           }
         }
         yield* Effect.logInfo("llm runtime selected", {
@@ -277,6 +300,7 @@ const live: Layer.Layer<
       // LLMAISDK.toLLMEvents below normalizes fullStream parts for the processor.
       return {
         type: "ai-sdk" as const,
+        reservation,
         result: streamText({
           onError(error) {
             bridge.fork(
@@ -317,7 +341,7 @@ const live: Layer.Layer<
           activeTools: Object.keys(prepared.tools).filter((x) => x !== "invalid"),
           tools: prepared.tools,
           toolChoice: input.toolChoice,
-          maxOutputTokens: prepared.params.maxOutputTokens,
+          maxOutputTokens,
           abortSignal: input.abort,
           headers: prepared.headers,
           maxRetries: input.retries ?? 0,
@@ -365,16 +389,28 @@ const live: Layer.Layer<
 
             const result = yield* run({ ...input, abort: ctrl.signal })
 
-            if (result.type === "native") return result.stream
-
-            // Adapter seam: both runtimes expose the same LLMEvent stream. Native
-            // already returns one; AI SDK streams are converted here.
-            const state = LLMAISDK.adapterState()
-            return Stream.fromAsyncIterable(result.result.fullStream, (e) =>
-              e instanceof Error ? e : new Error(String(e)),
-            ).pipe(
-              Stream.mapEffect((event) => LLMAISDK.toLLMEvents(state, event)),
-              Stream.flatMap((events) => Stream.fromIterable(events)),
+            const source = (() => {
+              if (result.type === "native") return result.stream
+              const state = LLMAISDK.adapterState()
+              return Stream.fromAsyncIterable(result.result.fullStream, (e) =>
+                e instanceof Error ? e : new Error(String(e)),
+              ).pipe(
+                Stream.mapEffect((event) => LLMAISDK.toLLMEvents(state, event)),
+                Stream.flatMap((events) => Stream.fromIterable(events)),
+              )
+            })()
+            if (!result.reservation) return source
+            const reservation = result.reservation
+            let usage: ReturnType<typeof TokenQuota.normalizeUsage> | undefined
+            return source.pipe(
+              Stream.tap((event) =>
+                Effect.sync(() => {
+                  if ("usage" in event && event.usage) usage = TokenQuota.normalizeUsage(event.usage)
+                }),
+              ),
+              Stream.ensuring(
+                Effect.suspend(() => (usage ? quota.settle(reservation, usage) : quota.release(reservation))),
+              ),
             )
           }),
         ),
@@ -398,6 +434,7 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     llmClient,
     RuntimeFlags.node,
+    TokenQuota.node,
   ],
 })
 

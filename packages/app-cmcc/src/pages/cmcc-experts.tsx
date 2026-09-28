@@ -27,7 +27,7 @@ import {
 } from "@/utils/cmcc-workspace"
 import {
   CMCC_EXPERTS,
-  CMCC_TEAM_EXPERTS,
+  CMCC_VISIBLE_TEAM_EXPERTS,
   cmccExpertCenterHref,
   cmccExpertHref,
   cmccMemberAvatarUrl,
@@ -36,6 +36,7 @@ import {
   type TeamExpert,
   type TeamMember,
 } from "@/utils/cmcc-experts"
+import { CMCC_RESEARCH_DEMO } from "@/utils/research-demo"
 import { showToast } from "@/utils/toast"
 
 export { CMCC_EXPERTS, cmccExpertCenterHref, cmccExpertHref }
@@ -158,18 +159,27 @@ export function CmccExpertCenterRoute() {
       <div class="relative mx-auto flex w-full max-w-[1320px] flex-col px-6 pb-10 pt-14 max-sm:px-4 max-sm:pt-8">
         <header class="w-full">
           <h1 class="m-0 bg-gradient-to-r from-[#8800ff] to-[#2c5dff] bg-clip-text text-[32px] font-medium leading-10 tracking-[-0.5px] text-transparent max-sm:text-[28px]">
-            产业洞察专家团
+            {CMCC_RESEARCH_DEMO ? "AI for Science 科研专家团" : "产业洞察专家团"}
           </h1>
           <p class="m-0 mt-2 text-[16px] leading-6 text-[#3c4055] max-sm:text-[14px]">
-            让 AI 进入真实产业场景，完成研究、判断与行动
+            {CMCC_RESEARCH_DEMO
+              ? "覆盖文献综述、论文复现、实验设计与科研写作，交付可审计研究包"
+              : "让 AI 进入真实产业场景，完成研究、判断与行动"}
           </p>
         </header>
 
-        <FeaturedCarousel experts={CMCC_TEAM_EXPERTS.filter((e) => e.id !== "deepinsight")} onOpen={(expert) => setActive(expert)} />
+        <FeaturedCarousel
+          experts={CMCC_VISIBLE_TEAM_EXPERTS.filter((expert) => expert.id !== "deepinsight")}
+          onOpen={(expert) => setActive(expert)}
+        />
 
         <section class="mt-7 w-full">
-          <h2 class="m-0 text-[16px] font-medium leading-6 text-[#49386e]">AI + 产业洞察</h2>
-          <p class="m-0 mt-1 text-[14px] leading-5 text-[#49386e]/55">选择一个专家或专家团，进入专属工作台</p>
+          <h2 class="m-0 text-[16px] font-medium leading-6 text-[#49386e]">
+            {CMCC_RESEARCH_DEMO ? "AI + 科研" : "AI + 产业洞察"}
+          </h2>
+          <p class="m-0 mt-1 text-[14px] leading-5 text-[#49386e]/55">
+            {CMCC_RESEARCH_DEMO ? "进入科研专家团专属工作台" : "选择一个专家或专家团，进入专属工作台"}
+          </p>
           <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <For each={INDUSTRY_EXPERTS}>
               {(expert) => <ExpertCard expert={expert} onClick={() => setActive(expert)} />}
