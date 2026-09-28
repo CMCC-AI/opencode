@@ -40,8 +40,8 @@
     {
       "id": "deepinsight/deepinsight-team-lead",
       "name": {
-        "en": "Gu Quanzhi",
-        "zh": "顾全之"
+        "en": "A Quan",
+        "zh": "阿全"
       },
       "profession": {
         "en": "Research Editor",
@@ -54,8 +54,8 @@
     {
       "id": "deepinsight/di-intent-analyst",
       "name": {
-        "en": "Ming Bianqiu",
-        "zh": "明辨秋"
+        "en": "A Bian",
+        "zh": "阿辨"
       },
       "profession": {
         "en": "Safety & Intent Analyst",
@@ -68,8 +68,8 @@
     {
       "id": "deepinsight/di-query-planner",
       "name": {
-        "en": "Mou Dingyuan",
-        "zh": "谋定远"
+        "en": "A Mou",
+        "zh": "阿谋"
       },
       "profession": {
         "en": "Research Planning Expert",
@@ -82,8 +82,8 @@
     {
       "id": "deepinsight/di-local-researcher",
       "name": {
-        "en": "Wen Juejin",
-        "zh": "文掘金"
+        "en": "A Jue",
+        "zh": "阿掘"
       },
       "profession": {
         "en": "Local Materials Research Expert",
@@ -96,8 +96,8 @@
     {
       "id": "deepinsight/di-web-researcher",
       "name": {
-        "en": "Guang Lanchuan",
-        "zh": "广览川"
+        "en": "A Lan",
+        "zh": "阿览"
       },
       "profession": {
         "en": "Public Web Research Expert",
@@ -110,8 +110,8 @@
     {
       "id": "deepinsight/di-reflector",
       "name": {
-        "en": "Sheng Xingwu",
-        "zh": "盛省吾"
+        "en": "A Xing",
+        "zh": "阿省"
       },
       "profession": {
         "en": "Evidence Reflection Expert",
@@ -124,8 +124,8 @@
     {
       "id": "deepinsight/di-outline-architect",
       "name": {
-        "en": "Liang Gouchen",
-        "zh": "梁构辰"
+        "en": "A Gou",
+        "zh": "阿构"
       },
       "profession": {
         "en": "Outline Architecture Expert",
@@ -138,8 +138,8 @@
     {
       "id": "deepinsight/di-report-writer",
       "name": {
-        "en": "Yin Youju",
-        "zh": "殷有据"
+        "en": "A Ju",
+        "zh": "阿据"
       },
       "profession": {
         "en": "Evidence-based Report Writer",
@@ -152,8 +152,8 @@
     {
       "id": "deepinsight/di-evidence-reviewer",
       "name": {
-        "en": "Yan Hezhen",
-        "zh": "严核真"
+        "en": "A He",
+        "zh": "阿核"
       },
       "profession": {
         "en": "Independent Evidence Reviewer",
@@ -166,8 +166,8 @@
     {
       "id": "deepinsight/di-viz",
       "name": {
-        "en": "Tu Zhengxian",
-        "zh": "涂证显"
+        "en": "A Xian",
+        "zh": "阿显"
       },
       "profession": {
         "en": "Evidence-based Visualization Expert",
@@ -180,8 +180,8 @@
     {
       "id": "deepinsight/di-publisher",
       "name": {
-        "en": "Ding Gaoxuan",
-        "zh": "丁稿宣"
+        "en": "A Gao",
+        "zh": "阿稿"
       },
       "profession": {
         "en": "Publication Engineer",

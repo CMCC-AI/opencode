@@ -84,8 +84,8 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
 }
 
 const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
-// 3 列网格的固定排序：财经/政企/科研 + 推荐/位置/巡查
-const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "ai-for-science-team", "shoppers-pro", "deepgeo", "deepinspect"]
+// 3 列网格的固定排序：财经/政企/巡查 + 推荐/位置/科研
+const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "deepinspect", "shoppers-pro", "deepgeo", "ai-for-science-team"]
 const INDUSTRY_EXPERTS = [
   ...INDUSTRY_ORDER.flatMap((id) => {
     const expert = CMCC_EXPERTS.find((item) => item.id === id)

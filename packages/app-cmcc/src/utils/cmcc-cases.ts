@@ -14,11 +14,11 @@ export const CMCC_CASE_CATEGORIES = [
     tone: "#eef8ff",
   },
   {
-    code: "inspection",
-    label: "AI+巡察",
-    agentType: "deepinspect",
-    description: "现场风险识别与巡察报告生成",
-    tone: "#eefafa",
+    code: "science",
+    label: "AI+科研",
+    agentType: "ai-scientist",
+    description: "论文解读、实验复现与科研分析",
+    tone: "#eef8ff",
   },
   {
     code: "finance",
@@ -35,18 +35,18 @@ export const CMCC_CASE_CATEGORIES = [
     tone: "#f1f3ff",
   },
   {
-    code: "science",
-    label: "AI+科研",
-    agentType: "ai-scientist",
-    description: "论文解读、实验复现与科研分析",
-    tone: "#eef8ff",
-  },
-  {
     code: "location",
     label: "AI+位置",
     agentType: "deepgeo",
     description: "商业选址与位置决策分析",
     tone: "#f7f1ff",
+  },
+  {
+    code: "inspection",
+    label: "AI+巡察",
+    agentType: "deepinspect",
+    description: "现场风险识别与巡察报告生成",
+    tone: "#eefafa",
   },
 ] as const
 
