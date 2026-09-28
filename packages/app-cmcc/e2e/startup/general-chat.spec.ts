@@ -19,6 +19,14 @@ for (const width of [1440, 390]) {
         .toBeLessThanOrEqual(1)
     }
     await expect(page.locator('[data-timeline-part-id="answer-0-text"] table')).toBeVisible()
+    if (width >= 760) {
+      const messageWidths = await page.locator('.cmcc-chat-message[data-speaker="user"]').first().evaluate((element) => {
+        const message = element.getBoundingClientRect()
+        const sessionTurn = element.parentElement?.getBoundingClientRect()
+        return { message: message.width, sessionTurn: sessionTurn?.width ?? 0 }
+      })
+      expect(messageWidths.message).toBeCloseTo(messageWidths.sessionTurn, 0)
+    }
     const scroll = page
       .locator(".scroll-view__viewport")
       .filter({ has: page.locator('[data-timeline-part-id="answer-0-text"]') })

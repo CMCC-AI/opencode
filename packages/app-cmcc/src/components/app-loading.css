@@ -15,6 +15,15 @@
   background: url("../assets/auth/startup-loading.webp") center / 100% 100% no-repeat;
 }
 
+.app-loading-logo {
+  position: absolute;
+  top: calc(298 / 941 * 100%);
+  left: calc(776 / 1672 * 100%);
+  display: block;
+  width: calc(130 / 1672 * 100%);
+  aspect-ratio: 6643 / 7487;
+}
+
 /* Anchor the animation to the dots in the reference image at every viewport size. */
 .app-loading-dots {
   position: absolute;
