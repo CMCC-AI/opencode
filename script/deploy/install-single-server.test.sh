@@ -53,6 +53,8 @@ assert_contains "$unit" "Environment=OPENCODE_CONFIG_DIR=/opt/opencode-test/curr
 assert_not_contains "$unit" "Environment=OPENCODE_BUNDLED_CONFIG_DIR="
 assert_contains "$unit" "WorkingDirectory=/srv/opencode-test"
 assert_contains "$unit" "Environment=HOME=/home/opencode-test"
+assert_contains "$unit" "EnvironmentFile=/etc/opencode-cmcc/secrets.env"
+assert_not_contains "$unit" "EnvironmentFile=-/etc/opencode-cmcc/secrets.env"
 
 deepxiv_unit=$(render_deepxiv_service)
 assert_contains "$deepxiv_unit" "PartOf=opencode-cmcc.service"
@@ -104,6 +106,7 @@ installer_source=$(<"$installer")
 deployer_source=$(<"$deployer")
 assert_contains "$installer_source" "systemctl enable opencode-cmcc.service opencode-cmcc-deepxiv.service"
 assert_contains "$installer_source" "systemctl restart opencode-cmcc.service opencode-cmcc-deepxiv.service"
+assert_contains "$installer_source" "DASHSCOPE_API_KEY"
 assert_not_contains "$installer_source" "systemctl enable --now"
 assert_not_contains "$installer_source" "health-auth"
 assert_not_contains "$deployer_source" "health-auth"

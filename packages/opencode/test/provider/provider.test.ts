@@ -87,6 +87,21 @@ const languageBaseURL = (language: unknown) => (language as { config: { baseURL:
 const it = testEffect(LayerNode.compile(LayerNode.group([Provider.node, Env.node, Plugin.node])))
 const experimentalModels = testEffect(providerLayer({ enableExperimentalModels: true }))
 
+test("CMCC research demo only accepts server-deployed provider credentials", () => {
+  expect(Provider.cmccResearchDemoProviderReady({ source: "config", options: {} })).toBeFalse()
+  expect(Provider.cmccResearchDemoProviderReady({ source: "config", key: "server-key", options: {} })).toBeTrue()
+  expect(
+    Provider.cmccResearchDemoProviderReady({ source: "config", options: { apiKey: "server-key" } }),
+  ).toBeTrue()
+  expect(
+    Provider.cmccResearchDemoProviderReady({
+      source: "config",
+      options: { headers: { Authorization: "Bearer server-key" } },
+    }),
+  ).toBeTrue()
+  expect(Provider.cmccResearchDemoProviderReady({ source: "api", key: "user-key", options: {} })).toBeFalse()
+})
+
 const alphaProviderConfig = {
   provider: {
     "custom-provider": {

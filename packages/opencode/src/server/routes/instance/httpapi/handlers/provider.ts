@@ -47,14 +47,14 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
         if ((enabled ? enabled.has(key) : true) && !disabled.has(key)) filtered[key] = value
       }
       const connected = yield* provider.list()
+      const demo = process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true"
       const deployed =
-        process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true"
-          ? Object.fromEntries(Object.entries(connected).filter(([, item]) => item.source === "env" || item.source === "config"))
+        demo
+          ? Object.fromEntries(Object.entries(connected).filter(([, item]) => Provider.cmccResearchDemoProviderReady(item)))
           : connected
-      const providers = Object.assign(
-        mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
-        deployed,
-      )
+      const providers = demo
+        ? deployed
+        : Object.assign(mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)), deployed)
       return {
         all: Object.values(providers).map(Provider.toPublicInfo),
         default: Provider.defaultModelIDs(providers),

@@ -1043,6 +1043,18 @@ export const Info = Schema.Struct({
 }).annotate({ identifier: "Provider" })
 export type Info = Types.DeepMutable<Schema.Schema.Type<typeof Info>>
 
+export function cmccResearchDemoProviderReady(provider: Pick<Info, "source" | "key" | "options">) {
+  if (provider.source === "env") return true
+  if (provider.source !== "config") return false
+  if (provider.key) return true
+  if (typeof provider.options.apiKey === "string" && provider.options.apiKey.trim()) return true
+  const headers = provider.options.headers
+  if (!headers || typeof headers !== "object" || Array.isArray(headers)) return false
+  return Object.entries(headers).some(
+    ([name, value]) => name.toLowerCase() === "authorization" && typeof value === "string" && value.trim(),
+  )
+}
+
 const DefaultModelIDs = Schema.Record(Schema.String, Schema.String)
 
 export const ListResult = Schema.Struct({

@@ -24,7 +24,7 @@ Environment=OPENCODE_DB=$data_root/data/opencode.db
 # same path as OPENCODE_BUNDLED_CONFIG_DIR would rescan experts for local configs.
 Environment=OPENCODE_CONFIG_DIR=$install_root/current/.opencode
 EnvironmentFile=/etc/opencode-cmcc/opencode.env
-EnvironmentFile=-/etc/opencode-cmcc/secrets.env
+EnvironmentFile=/etc/opencode-cmcc/secrets.env
 ExecStart=$install_root/current/opencode serve --hostname $bind_host --port $port
 Restart=always
 RestartSec=3
@@ -157,6 +157,10 @@ if [[ ! -f $release_dir/opencode.env ]]; then
 fi
 if [[ ! -f $release_dir/deepxiv.env ]]; then
   echo "DeepXiv proxy environment is missing: $release_dir/deepxiv.env" >&2
+  exit 1
+fi
+if [[ ! -r /etc/opencode-cmcc/secrets.env ]] || ! grep -Eq '^DASHSCOPE_API_KEY=.+$' /etc/opencode-cmcc/secrets.env; then
+  echo "Server model credential is missing: set DASHSCOPE_API_KEY in /etc/opencode-cmcc/secrets.env" >&2
   exit 1
 fi
 install -d -m 0755 "$install_root/releases" "$target" "$workspace_root"

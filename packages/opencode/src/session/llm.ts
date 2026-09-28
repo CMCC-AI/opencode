@@ -114,6 +114,9 @@ const live: Layer.Layer<
         ],
         { concurrency: "unbounded" },
       )
+      if (process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true" && !Provider.cmccResearchDemoProviderReady(item)) {
+        return yield* Effect.fail(new Error("管理员尚未为当前模型配置服务端 API Key，请联系管理员"))
+      }
 
       const isWorkflow = language instanceof GitLabWorkflowLanguageModel
       const prepared = yield* LLMRequestPrep.prepare({
