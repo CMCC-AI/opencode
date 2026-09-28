@@ -33,6 +33,21 @@ type Policy = {
   overage: "reject" | "allow_and_audit"
 }
 
+export type Status = {
+  enabled: boolean
+  userID: string
+  dailyLimit: number | null
+  dailyUsed: number
+  dailyRemaining: number | null
+  dailyResetAt: number
+  monthlyLimit: number | null
+  monthlyUsed: number
+  monthlyRemaining: number | null
+  monthlyResetAt: number
+  requestLimit: number | null
+  overage: "reject" | "allow_and_audit"
+}
+
 export type Reservation = {
   id: string
   maxOutputTokens?: number
@@ -68,6 +83,7 @@ export interface Interface {
   readonly enabled: boolean
   readonly identity: (headers: Record<string, string | undefined>) => Effect.Effect<string | undefined, IdentityMissing>
   readonly bindSession: (input: { sessionID: string; userID: string }) => Effect.Effect<void, SessionOwnerConflict>
+  readonly status: (headers: Record<string, string | undefined>) => Effect.Effect<Status, IdentityMissing>
   readonly reserve: (input: {
     sessionID: string
     parentSessionID?: string
@@ -157,7 +173,7 @@ const layer = Layer.effect(
         return Effect.fail(new IdentityMissing({ message: "Token quota requires an authenticated DockAPI user" }))
       return Effect.tryPromise({
         try: async () => {
-          const response = await fetch(`${identityUrl}/api/auth/user/profile`, {
+          const response = await fetch(`${identityUrl}/api/user/profile`, {
             headers: { Authorization: authorization },
             signal: AbortSignal.timeout(5_000),
           })
@@ -224,6 +240,52 @@ const layer = Layer.effect(
       } satisfies Policy
     })
 
+    const usage = Effect.fn("TokenQuota.usage")(function* (userID: string, now: number) {
+      const rows = yield* db
+        .select({
+          status: TokenQuotaUsageTable.status,
+          reserved: TokenQuotaUsageTable.reserved_tokens,
+          total: TokenQuotaUsageTable.total_tokens,
+          created: TokenQuotaUsageTable.time_created,
+        })
+        .from(TokenQuotaUsageTable)
+        .where(
+          and(eq(TokenQuotaUsageTable.user_id, userID), gte(TokenQuotaUsageTable.time_created, utcStart(now, true))),
+        )
+        .all()
+        .pipe(Effect.orDie)
+      const consumed = (start: number) =>
+        rows
+          .filter((row) => row.created >= start && row.status !== "released")
+          .reduce((sum, row) => sum + (row.status === "reserved" ? row.reserved : row.total), 0)
+      return {
+        daily: consumed(utcStart(now, false)),
+        monthly: consumed(utcStart(now, true)),
+      }
+    })
+
+    const status: Interface["status"] = Effect.fn("TokenQuota.status")(function* (headers) {
+      const userID = yield* identity(headers)
+      if (!userID) return yield* new IdentityMissing({ message: "Token quota is disabled" })
+      const limits = yield* policy(userID)
+      const now = Date.now()
+      const used = yield* usage(userID, now)
+      return {
+        enabled,
+        userID,
+        dailyLimit: limits.dailyLimit ?? null,
+        dailyUsed: used.daily,
+        dailyRemaining: limits.dailyLimit === undefined ? null : Math.max(0, limits.dailyLimit - used.daily),
+        dailyResetAt: utcReset(now, false),
+        monthlyLimit: limits.monthlyLimit ?? null,
+        monthlyUsed: used.monthly,
+        monthlyRemaining: limits.monthlyLimit === undefined ? null : Math.max(0, limits.monthlyLimit - used.monthly),
+        monthlyResetAt: utcReset(now, true),
+        requestLimit: limits.requestLimit ?? null,
+        overage: limits.overage,
+      }
+    })
+
     const reserve: Interface["reserve"] = Effect.fn("TokenQuota.reserve")(function* (input) {
       if (!enabled) return undefined
       const userID = yield* owner(input.sessionID, input.parentSessionID)
@@ -240,28 +302,9 @@ const layer = Layer.effect(
             })
 
           const now = Date.now()
-          const rows = yield* db
-            .select({
-              status: TokenQuotaUsageTable.status,
-              reserved: TokenQuotaUsageTable.reserved_tokens,
-              total: TokenQuotaUsageTable.total_tokens,
-              created: TokenQuotaUsageTable.time_created,
-            })
-            .from(TokenQuotaUsageTable)
-            .where(
-              and(
-                eq(TokenQuotaUsageTable.user_id, userID),
-                gte(TokenQuotaUsageTable.time_created, utcStart(now, true)),
-              ),
-            )
-            .all()
-            .pipe(Effect.orDie)
-          const consumed = (start: number) =>
-            rows
-              .filter((row) => row.created >= start && row.status !== "released")
-              .reduce((sum, row) => sum + (row.status === "reserved" ? row.reserved : row.total), 0)
-          const dailyUsed = consumed(utcStart(now, false))
-          const monthlyUsed = consumed(utcStart(now, true))
+          const used = yield* usage(userID, now)
+          const dailyUsed = used.daily
+          const monthlyUsed = used.monthly
           const dailyRemaining = limits.dailyLimit === undefined ? Infinity : limits.dailyLimit - dailyUsed
           const monthlyRemaining = limits.monthlyLimit === undefined ? Infinity : limits.monthlyLimit - monthlyUsed
           const remaining = Math.min(dailyRemaining, monthlyRemaining)
@@ -335,7 +378,7 @@ const layer = Layer.effect(
         .pipe(Effect.orDie)
     })
 
-    return Service.of({ enabled, identity, bindSession, reserve, settle, release })
+    return Service.of({ enabled, identity, bindSession, status, reserve, settle, release })
   }),
 )
 

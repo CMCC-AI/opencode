@@ -16,6 +16,7 @@ VITE_CMCC_RESEARCH_DEMO=false
 - `AI for Science 科研专家团`；
 - `DeepXiv 前沿论文`；
 - 登录用户的设置、退出登录和必要的会话删除能力。
+- 用户菜单中的日/月剩余额度摘要，以及设置中的完整 Token 限额、用量、重置时间与超额策略。
 
 以下内容从导航、专家中心、输入框扩展菜单和历史列表中隐藏：
 
@@ -29,6 +30,8 @@ VITE_CMCC_RESEARCH_DEMO=false
 1. `CMCC_EXPERTS` 只暴露科研专家团，专家中心和 `/expert/:id` 因此不能打开其他专家；完整专家表仍保留给内部会话识别，避免旧专家会话被误判为普通主会话。
 2. 隐藏功能的直达路由统一跳回 `/app`。这不只是隐藏菜单，用户手工输入旧 URL 也不会进入被裁剪页面。
 3. OpenCode 设置 `OPENCODE_CMCC_RESEARCH_DEMO=true` 后，在模型调用边界仅放行主对话内置 Agent、科研专家团 Agent 和必要的标题/压缩 Agent；直接调用其他专家团 API 也会被拒绝。
+
+演示模式下 API Key 只允许由部署管理员通过服务器环境变量或配置文件提供。用户侧 Provider 页面为只读清单，模型选择器只显示这些已部署凭据对应的可用模型；连接 Provider、自定义 Provider、OAuth、API Key 写入/删除和 Provider 配置更新在页面与服务端同时关闭。
 
 生产环境仍需保持 OpenCode 端口不对公网暴露，并由 Nginx 清除外部伪造的可信身份头。
 

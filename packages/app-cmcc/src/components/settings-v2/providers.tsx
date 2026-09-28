@@ -13,6 +13,7 @@ import { DialogSelectProvider } from "../dialog-select-provider"
 import { DialogCustomProvider } from "../dialog-custom-provider"
 import { SettingsListV2 } from "./parts/list"
 import "./settings-v2.css"
+import { CMCC_RESEARCH_DEMO } from "@/utils/research-demo"
 
 type ProviderSource = "env" | "api" | "config" | "custom"
 type ProviderItem = ReturnType<ReturnType<typeof useProviders>["connected"]>[number]
@@ -82,6 +83,50 @@ export const SettingsProvidersV2: Component = () => {
     if (provider.npm !== "@ai-sdk/openai-compatible") return false
     if (!provider.models || Object.keys(provider.models).length === 0) return false
     return true
+  }
+
+  if (CMCC_RESEARCH_DEMO) {
+    return (
+      <>
+        <div class="settings-v2-tab-header">
+          <h2 class="settings-v2-tab-title">已部署模型服务</h2>
+        </div>
+        <div class="settings-v2-tab-body settings-v2-providers">
+          <div class="settings-v2-section">
+            <h3 class="settings-v2-section-title">管理员已配置</h3>
+            <p class="text-13-regular text-text-weak">
+              API Key 由系统统一保管并受个人 Token 限额保护。你只能选择管理员已部署且当前可用的模型，无需也不能自行填写或删除 Key。
+            </p>
+            <SettingsListV2>
+              <Show
+                when={connected().length > 0}
+                fallback={<div class="settings-v2-provider-empty">管理员尚未配置可用模型服务</div>}
+              >
+                <For each={connected()}>
+                  {(item) => (
+                    <div class="settings-v2-provider-row">
+                      <div class="settings-v2-provider-lead">
+                        <ProviderIcon
+                          id={item.id}
+                          width={PROVIDER_ICON_SIZE}
+                          height={PROVIDER_ICON_SIZE}
+                          class="settings-v2-provider-icon shrink-0"
+                        />
+                        <div class="settings-v2-provider-main">
+                          <span class="settings-v2-provider-name truncate">{item.name}</span>
+                          <Tag>系统部署</Tag>
+                        </div>
+                      </div>
+                      <span class="settings-v2-provider-env-hint">{Object.keys(item.models).length} 个可用模型</span>
+                    </div>
+                  )}
+                </For>
+              </Show>
+            </SettingsListV2>
+          </div>
+        </div>
+      </>
+    )
   }
 
   const disableProvider = async (providerID: string, name: string) => {

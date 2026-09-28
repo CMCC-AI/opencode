@@ -10,6 +10,7 @@ import { useLanguage } from "@/context/language"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectProvider } from "./dialog-select-provider"
 import { decode64 } from "@/utils/base64"
+import { CMCC_RESEARCH_DEMO } from "@/utils/research-demo"
 
 export const DialogManageModels: Component = () => {
   const local = useLocal()
@@ -35,6 +36,7 @@ export const DialogManageModels: Component = () => {
       title={language.t("dialog.model.manage")}
       description={language.t("dialog.model.manage.description")}
       action={
+        !CMCC_RESEARCH_DEMO &&
         <Button class="h-7 -my-1 text-14-medium" icon="plus-small" tabIndex={-1} onClick={handleConnectProvider}>
           {language.t("command.provider.connect")}
         </Button>

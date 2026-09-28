@@ -8,6 +8,7 @@ import { For, Show, createMemo, type JSX, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { decode64 } from "@/utils/base64"
+import { CMCC_RESEARCH_DEMO } from "@/utils/research-demo"
 import { modelSelectorGroups, modelSelectorItems } from "../model-selector"
 import "./home-controls.css"
 
@@ -187,10 +188,12 @@ export function HomeModelControl(props: {
             <Icon name="sliders" class="size-4" />
             <DropdownMenu.ItemLabel>管理模型</DropdownMenu.ItemLabel>
           </DropdownMenu.Item>
-          <DropdownMenu.Item onSelect={() => void connect()}>
-            <Icon name="plus" class="size-4" />
-            <DropdownMenu.ItemLabel>连接提供商</DropdownMenu.ItemLabel>
-          </DropdownMenu.Item>
+          <Show when={!CMCC_RESEARCH_DEMO}>
+            <DropdownMenu.Item onSelect={() => void connect()}>
+              <Icon name="plus" class="size-4" />
+              <DropdownMenu.ItemLabel>连接提供商</DropdownMenu.ItemLabel>
+            </DropdownMenu.Item>
+          </Show>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu>

@@ -2,7 +2,7 @@ import type { Session } from "@opencode-ai/sdk/v2/client"
 import { ContextMenu } from "@opencode-ai/ui/context-menu"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/icon"
-import { createEffect, createMemo, For, onCleanup, Show, Suspense, untrack, type ParentProps } from "solid-js"
+import { createEffect, createMemo, createResource, For, onCleanup, Show, Suspense, untrack, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { DebugBar } from "@/components/debug-bar"
@@ -291,6 +291,14 @@ function CmccSidebar() {
   })
   const [caseDialog, setCaseDialog] = createStore({ session: undefined as DockApiSession | undefined })
   const directory = createMemo(() => dockapi.workspace?.directoryPath)
+  const [quota] = createResource(
+    () => (CMCC_RESEARCH_DEMO && dockapi.state.accessToken ? dockapi.state.accessToken : undefined),
+    () =>
+      serverSDK()
+        .client.tokenQuota.get({ directory: directory() })
+        .then((response) => response.data)
+        .catch(() => undefined),
+  )
   const conversations = createMemo(() => {
     const current = directory()
     if (!current) return [] as Session[]
@@ -637,6 +645,21 @@ function CmccSidebar() {
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
                 <DropdownMenu.Content class="w-[calc(var(--kb-popper-anchor-width)-8px)] min-w-[220px] rounded-[12px] border border-[rgba(99,102,241,0.14)] bg-white p-1.5 text-[#4a4a6a] shadow-[0_12px_32px_rgba(49,46,129,0.18)] outline-none">
+                  <Show when={quota()}>
+                    {(value) => (
+                      <div class="mb-1 rounded-[8px] bg-[rgba(99,102,241,0.06)] px-3 py-2.5">
+                        <div class="flex items-center justify-between gap-3 text-12-medium">
+                          <span>今日 Token 剩余</span>
+                          <span class="text-[#4f46e5]">
+                            {cmccQuotaTokens(value().dailyRemaining)} / {cmccQuotaTokens(value().dailyLimit)}
+                          </span>
+                        </div>
+                        <div class="mt-1 text-11-regular text-[#7c7fbd]">
+                          本月剩余 {cmccQuotaTokens(value().monthlyRemaining)} · 单次上限 {cmccQuotaTokens(value().requestLimit)}
+                        </div>
+                      </div>
+                    )}
+                  </Show>
                   <DropdownMenu.Item
                     class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)] data-[highlighted]:text-[#4f46e5]"
                     onSelect={openSettings}
@@ -672,6 +695,11 @@ function CmccSidebar() {
       </Show>
     </>
   )
+}
+
+function cmccQuotaTokens(value: number | null) {
+  if (value === null) return "不限"
+  return new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 }).format(value)
 }
 
 function CmccTopControlButton(props: {

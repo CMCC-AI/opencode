@@ -2,7 +2,7 @@ import { Config } from "@/config/config"
 import { Provider } from "@/provider/provider"
 import * as InstanceState from "@/effect/instance-state"
 import { Effect } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
+import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { markInstanceForDisposal } from "../lifecycle"
 
@@ -16,6 +16,13 @@ export const configHandlers = HttpApiBuilder.group(InstanceHttpApi, "config", (h
     })
 
     const update = Effect.fn("ConfigHttpApi.update")(function* (ctx) {
+      if (
+        process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true" &&
+        (ctx.payload.provider !== undefined ||
+          ctx.payload.enabled_providers !== undefined ||
+          ctx.payload.disabled_providers !== undefined)
+      )
+        return yield* new HttpApiError.BadRequest({})
       yield* configSvc.update(ctx.payload)
       yield* markInstanceForDisposal(yield* InstanceState.context)
       return ctx.payload

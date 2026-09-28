@@ -247,6 +247,8 @@ import type {
   SyncStealErrors,
   SyncStealResponses,
   TextPartInput,
+  TokenQuotaGetErrors,
+  TokenQuotaGetResponses,
   ToolIdsErrors,
   ToolIdsResponses,
   ToolListErrors,
@@ -1977,15 +1979,16 @@ export class File extends HeyApiClient {
   }
 
   /**
-   * Preview PDF file
+   * Preview PDF or HTML file
    *
-   * Stream a PDF file inline with support for single byte range requests.
+   * Stream a PDF file with byte range support or render an isolated HTML report from the current workspace.
    */
   public preview<ThrowOnError extends boolean = false>(
     parameters: {
       directory?: string
       workspace?: string
       path: string
+      runtime?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -1997,6 +2000,7 @@ export class File extends HeyApiClient {
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
             { in: "query", key: "path" },
+            { in: "query", key: "runtime" },
           ],
         },
       ],
@@ -2043,45 +2047,6 @@ export class File extends HeyApiClient {
         ...params.headers,
       },
     })
-  }
-
-  /**
-   * Create directory
-   *
-   * Create a local directory recursively.
-   */
-  public createDirectory<ThrowOnError extends boolean = false>(
-    parameters?: {
-      directory?: string
-      workspace?: string
-      path?: string
-    },
-    options?: Options<never, ThrowOnError>,
-  ) {
-    const params = buildClientParams(
-      [parameters],
-      [
-        {
-          args: [
-            { in: "query", key: "directory" },
-            { in: "query", key: "workspace" },
-            { in: "body", key: "path" },
-          ],
-        },
-      ],
-    )
-    return (options?.client ?? this.client).post<FileCreateDirectoryResponses, FileCreateDirectoryErrors, ThrowOnError>(
-      {
-        url: "/file/directory",
-        ...options,
-        ...params,
-        headers: {
-          "Content-Type": "application/json",
-          ...options?.headers,
-          ...params.headers,
-        },
-      },
-    )
   }
 
   /**
@@ -2183,6 +2148,45 @@ export class File extends HeyApiClient {
       ...options,
       ...params,
     })
+  }
+
+  /**
+   * Create directory
+   *
+   * Create a local directory recursively.
+   */
+  public createDirectory<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      path?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "path" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<FileCreateDirectoryResponses, FileCreateDirectoryErrors, ThrowOnError>(
+      {
+        url: "/file/directory",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
   }
 }
 
@@ -2510,6 +2514,38 @@ export class Formatter extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<FormatterStatusResponses, FormatterStatusErrors, ThrowOnError>({
       url: "/formatter",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class TokenQuota extends HeyApiClient {
+  /**
+   * Get token quota
+   *
+   * Get the authenticated user's token limits, usage, remaining balance, and reset times.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<TokenQuotaGetResponses, TokenQuotaGetErrors, ThrowOnError>({
+      url: "/token-quota",
       ...options,
       ...params,
     })
@@ -7424,6 +7460,11 @@ export class OpencodeClient extends HeyApiClient {
   private _formatter?: Formatter
   get formatter(): Formatter {
     return (this._formatter ??= new Formatter({ client: this.client }))
+  }
+
+  private _tokenQuota?: TokenQuota
+  get tokenQuota(): TokenQuota {
+    return (this._tokenQuota ??= new TokenQuota({ client: this.client }))
   }
 
   private _mcp?: Mcp

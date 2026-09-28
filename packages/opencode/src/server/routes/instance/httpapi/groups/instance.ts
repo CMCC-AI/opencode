@@ -5,8 +5,9 @@ import { LSP } from "@/lsp/lsp"
 import { Vcs } from "@/project/vcs"
 import { Skill } from "@/skill"
 import { Schema } from "effect"
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
+import { HttpApi, HttpApiEndpoint, HttpApiError, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Authorization } from "../middleware/authorization"
+import { NonNegativeInt, PositiveInt } from "@opencode-ai/core/schema"
 import { InstanceContextMiddleware } from "../middleware/instance-context"
 import {
   WorkspaceRoutingMiddleware,
@@ -22,6 +23,21 @@ const PathInfo = Schema.Struct({
   worktree: Schema.String,
   directory: Schema.String,
 }).annotate({ identifier: "Path" })
+
+export const TokenQuotaStatus = Schema.Struct({
+  enabled: Schema.Boolean,
+  userID: Schema.String,
+  dailyLimit: Schema.NullOr(NonNegativeInt),
+  dailyUsed: NonNegativeInt,
+  dailyRemaining: Schema.NullOr(NonNegativeInt),
+  dailyResetAt: PositiveInt,
+  monthlyLimit: Schema.NullOr(NonNegativeInt),
+  monthlyUsed: NonNegativeInt,
+  monthlyRemaining: Schema.NullOr(NonNegativeInt),
+  monthlyResetAt: PositiveInt,
+  requestLimit: Schema.NullOr(NonNegativeInt),
+  overage: Schema.Literals(["reject", "allow_and_audit"]),
+}).annotate({ identifier: "TokenQuotaStatus" })
 
 export const VcsDiffQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
@@ -53,6 +69,7 @@ export const InstancePaths = {
   skill: "/skill",
   lsp: "/lsp",
   formatter: "/formatter",
+  tokenQuota: "/token-quota",
 } as const
 
 export const InstanceApi = HttpApi.make("instance")
@@ -184,6 +201,17 @@ export const InstanceApi = HttpApi.make("instance")
             identifier: "formatter.status",
             summary: "Get formatter status",
             description: "Get formatter status",
+          }),
+        ),
+        HttpApiEndpoint.get("tokenQuota", InstancePaths.tokenQuota, {
+          query: WorkspaceRoutingQuery,
+          success: described(TokenQuotaStatus, "Authenticated user's token quota and usage"),
+          error: HttpApiError.BadRequest,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "tokenQuota.get",
+            summary: "Get token quota",
+            description: "Get the authenticated user's token limits, usage, remaining balance, and reset times.",
           }),
         ),
       )

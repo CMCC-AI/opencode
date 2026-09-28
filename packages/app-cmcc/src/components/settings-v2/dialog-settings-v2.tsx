@@ -10,6 +10,8 @@ import { SettingsProvidersV2 } from "./providers"
 import { SettingsModelsV2 } from "./models"
 import "./settings-v2.css"
 import { SettingsServersV2 } from "./servers"
+import { SettingsQuotaV2 } from "./quota"
+import { CMCC_RESEARCH_DEMO } from "@/utils/research-demo"
 
 export const DialogSettings: Component<{
   sessionID?: string
@@ -53,6 +55,12 @@ export const DialogSettings: Component<{
                       <Icon name="models" />
                       {language.t("settings.models.title")}
                     </TabsV2.Trigger>
+                    {CMCC_RESEARCH_DEMO && (
+                      <TabsV2.Trigger value="quota">
+                        <Icon name="sliders" />
+                        Token 限额
+                      </TabsV2.Trigger>
+                    )}
                   </div>
                 </div>
               </div>
@@ -78,6 +86,11 @@ export const DialogSettings: Component<{
         <TabsV2.Content value="models" class="settings-v2-panel">
           <SettingsModelsV2 />
         </TabsV2.Content>
+        {CMCC_RESEARCH_DEMO && (
+          <TabsV2.Content value="quota" class="settings-v2-panel">
+            <SettingsQuotaV2 />
+          </TabsV2.Content>
+        )}
       </TabsV2>
     </Dialog>
   )

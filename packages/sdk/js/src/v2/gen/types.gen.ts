@@ -2395,6 +2395,21 @@ export type FormatterStatus = {
   enabled: boolean
 }
 
+export type TokenQuotaStatus = {
+  enabled: boolean
+  userID: string
+  dailyLimit: number
+  dailyUsed: number
+  dailyRemaining: number
+  dailyResetAt: number
+  monthlyLimit: number
+  monthlyUsed: number
+  monthlyRemaining: number
+  monthlyResetAt: number
+  requestLimit: number
+  overage: "reject" | "allow_and_audit"
+}
+
 export type McpStatusConnected = {
   status: "connected"
 }
@@ -8135,6 +8150,7 @@ export type FilePreviewData = {
     directory?: string
     workspace?: string
     path: string
+    runtime?: string
   }
   url: "/file/preview"
 }
@@ -8194,34 +8210,6 @@ export type FileArchiveResponses = {
 }
 
 export type FileArchiveResponse = FileArchiveResponses[keyof FileArchiveResponses]
-
-export type FileCreateDirectoryData = {
-  body?: {
-    path: string
-  }
-  path?: never
-  query?: {
-    directory?: string
-    workspace?: string
-  }
-  url: "/file/directory"
-}
-
-export type FileCreateDirectoryErrors = {
-  /**
-   * BadRequest | InvalidRequestError
-   */
-  400: EffectHttpApiErrorBadRequest | InvalidRequestError
-}
-
-export type FileCreateDirectoryError = FileCreateDirectoryErrors[keyof FileCreateDirectoryErrors]
-
-export type FileCreateDirectoryResponses = {
-  /**
-   * Created directory
-   */
-  200: unknown
-}
 
 export type FileUploadData = {
   body?: {
@@ -8312,6 +8300,34 @@ export type FileStatusResponses = {
 }
 
 export type FileStatusResponse = FileStatusResponses[keyof FileStatusResponses]
+
+export type FileCreateDirectoryData = {
+  body?: {
+    path: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/file/directory"
+}
+
+export type FileCreateDirectoryErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type FileCreateDirectoryError = FileCreateDirectoryErrors[keyof FileCreateDirectoryErrors]
+
+export type FileCreateDirectoryResponses = {
+  /**
+   * Created directory
+   */
+  200: unknown
+}
 
 export type InstanceDisposeData = {
   body?: never
@@ -8659,6 +8675,34 @@ export type FormatterStatusResponses = {
 }
 
 export type FormatterStatusResponse = FormatterStatusResponses[keyof FormatterStatusResponses]
+
+export type TokenQuotaGetData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/token-quota"
+}
+
+export type TokenQuotaGetErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+}
+
+export type TokenQuotaGetError = TokenQuotaGetErrors[keyof TokenQuotaGetErrors]
+
+export type TokenQuotaGetResponses = {
+  /**
+   * Authenticated user's token quota and usage
+   */
+  200: TokenQuotaStatus
+}
+
+export type TokenQuotaGetResponse = TokenQuotaGetResponses[keyof TokenQuotaGetResponses]
 
 export type McpStatusData = {
   body?: never

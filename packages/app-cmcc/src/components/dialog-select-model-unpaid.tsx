@@ -11,6 +11,7 @@ import { popularProviders, useProviders } from "@/hooks/use-providers"
 import { ModelTooltip } from "./model-tooltip"
 import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
+import { CMCC_RESEARCH_DEMO } from "@/utils/research-demo"
 
 type ModelState = ReturnType<typeof useLocal>["model"]
 
@@ -87,6 +88,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
           )}
         </List>
       </div>
+      <Show when={!CMCC_RESEARCH_DEMO}>
       <div class="px-1.5 pb-1.5">
         <div class="w-full rounded-sm border border-border-weak-base bg-surface-raised-base">
           <div class="w-full flex flex-col items-start gap-4 px-1.5 pt-4 pb-4">
@@ -143,6 +145,7 @@ export const DialogSelectModelUnpaid: Component<{ model?: ModelState }> = (props
           </div>
         </div>
       </div>
+      </Show>
     </Dialog>
   )
 }

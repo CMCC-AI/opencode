@@ -47,18 +47,23 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
         if ((enabled ? enabled.has(key) : true) && !disabled.has(key)) filtered[key] = value
       }
       const connected = yield* provider.list()
+      const deployed =
+        process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true"
+          ? Object.fromEntries(Object.entries(connected).filter(([, item]) => item.source === "env" || item.source === "config"))
+          : connected
       const providers = Object.assign(
         mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
-        connected,
+        deployed,
       )
       return {
         all: Object.values(providers).map(Provider.toPublicInfo),
         default: Provider.defaultModelIDs(providers),
-        connected: Object.keys(connected),
+        connected: Object.keys(deployed),
       }
     })
 
     const auth = Effect.fn("ProviderHttpApi.auth")(function* () {
+      if (process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true") return {}
       return yield* svc.methods()
     })
 
@@ -66,6 +71,8 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       params: { providerID: ProviderV2.ID }
       payload: ProviderAuth.AuthorizeInput
     }) {
+      if (process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true")
+        return yield* new ProviderAuthApiError({ name: "BadRequest", data: {} })
       return yield* mapProviderAuthError(
         svc.authorize({
           providerID: ctx.params.providerID,
@@ -94,6 +101,8 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       params: { providerID: ProviderV2.ID }
       payload: ProviderAuth.CallbackInput
     }) {
+      if (process.env.OPENCODE_CMCC_RESEARCH_DEMO === "true")
+        return yield* new ProviderAuthApiError({ name: "BadRequest", data: {} })
       yield* mapProviderAuthError(
         svc.callback({
           providerID: ctx.params.providerID,
