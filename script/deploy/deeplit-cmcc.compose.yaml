@@ -1,0 +1,39 @@
+name: deeplit-cmcc
+
+services:
+  web:
+    image: ${DEEPLIT_IMAGE:-deeplit:local}
+    pull_policy: never
+    env_file:
+      - ${DEEPLIT_CMCC_ENV_FILE:-/home/ubuntu/deeplit/shared/.env.cmcc}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgresql://deeplit:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/deeplit
+      DATABASE_POOL_SIZE: 5
+      PAPER_STORAGE_DIR: /data/papers
+      PIPELINE_TIME_ZONE: ${PIPELINE_TIME_ZONE:-Asia/Shanghai}
+      PIPELINE_SOURCE_TIME_ZONE: ${PIPELINE_SOURCE_TIME_ZONE:-UTC}
+    ports:
+      - "${DEEPLIT_CMCC_PORT:-3004}:3000"
+    volumes:
+      - ${PAPER_STORAGE_HOST_DIR:-/home/ubuntu/deeplit/shared/papers}:/data/papers
+    networks:
+      - deeplit
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 5m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/papers?limit=1').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+networks:
+  deeplit:
+    external: true
+    name: ${DEEPLIT_NETWORK:-deeplit_default}

@@ -20,6 +20,17 @@ DeepLiterature 部署需要设置：
 
 DeepLiterature 的服务端 `DEEPLIT_DOCKAPI_URL` 应指向各自 APP-CMCC/DockAPI 入口；不要把浏览器 iframe 地址和服务端 DockAPI 地址混用。两套环境都应通过对应的 `3100` 同站代理加载 iframe，不要直接把浏览器指向 `81.70.174.140:3000` 或 `:3004`。
 
+新实例的可复现模板位于 `script/deploy/deeplit-cmcc.compose.yaml`，环境变量示例位于 `script/deploy/deeplit-cmcc.env.example`。部署时从现有 DeepLiterature 生产环境复制模型和流水线配置，再替换新 DockAPI 对应的四个 SSO 变量；真实环境文件必须置于仓库外并设为 `0600`。在 DeepLiterature 主机执行：
+
+```sh
+docker compose \
+  --env-file /home/ubuntu/deeplit/shared/.env.cmcc \
+  -f /home/ubuntu/deeplit/shared/compose.cmcc-sso.yaml \
+  up -d
+```
+
+`3004` 是 APP-CMCC 代理访问的内部上游端口，应在云安全组或主机 `DOCKER-USER` 链中仅允许 `152.136.106.161`，不应作为用户入口公开。
+
 桥接校验来源 origin、iframe window、随机 requestId。首次加载、重载和身份变化会重新握手；父应用/iframe 均通过 DockAPI 统一退出。退出请求失败会提示重试，不会假装服务端已注销。跨标签页用 storage 事件同步，HTTPS/localhost 下使用 Web Locks 串行刷新 token；生产请使用 HTTPS。
 
 现有 deepxiv-proxy 删除 Authorization 和 auth_token 的行为保持不变。票据走 iframe 内同源 POST，不需要放宽代理或 CORS。
