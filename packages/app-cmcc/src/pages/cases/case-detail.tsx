@@ -41,6 +41,7 @@ const dedicatedViews: Record<string, ReturnType<typeof lazy<Component<DedicatedC
   inspection: lazy(() => import("./views/inspection")),
   government: lazy(() => import("./views/government")),
   recommendation: lazy(() => import("./views/recommendation")),
+  location: lazy(() => import("./views/location")),
   science: lazy(() => import("./views/science")),
 }
 

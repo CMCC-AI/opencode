@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { Context, Effect } from "effect"
 import path from "path"
-import { symlink } from "node:fs/promises"
+import { mkdir, symlink } from "node:fs/promises"
 import { homedir } from "node:os"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
 import { FileApi, FilePaths } from "../../src/server/routes/instance/httpapi/groups/file"
@@ -167,6 +167,11 @@ describe("file HttpApi", () => {
       <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js" integrity="stale"></script>
       </head><body><div id="chart"></div><script>window.chartReady = typeof echarts !== "undefined"</script></body></html>`
     await Bun.write(path.join(tmp.path, "report.html"), report)
+    await mkdir(path.join(tmp.path, "assets"), { recursive: true })
+    await Bun.write(
+      path.join(tmp.path, "assets", "chart.svg"),
+      '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" /></svg>',
+    )
     await Bun.write(path.join(outside.path, "outside.html"), report)
     const runtime = "http://app.local:3000/assets/echarts.min-TestHash.js"
 
@@ -186,6 +191,19 @@ describe("file HttpApi", () => {
     expect(html).toContain(`src="${runtime}"`)
     expect(html).toContain('data-deeptrading-echarts="local"')
     expect(html).toContain("window.chartReady")
+
+    await Bun.write(
+      path.join(tmp.path, "svg-report.html"),
+      '<!DOCTYPE html><html><body><img src="assets/chart.svg" alt="chart"></body></html>',
+    )
+    const svgResponse = await request(
+      FilePaths.preview,
+      tmp.path,
+      { path: "svg-report.html", runtime },
+      { headers: { Referer: "http://app.local:3000/session/report" } },
+    )
+    expect(svgResponse.status).toBe(200)
+    expect(await svgResponse.text()).toContain("data:image/svg+xml")
 
     await Bun.write(
       path.join(tmp.path, "report-without-runtime.html"),

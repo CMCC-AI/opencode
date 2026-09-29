@@ -9,6 +9,7 @@ import { AbsolutePath, RelativePath } from "@opencode-ai/core/schema"
 import { Effect, Encoding, Layer, Option } from "effect"
 import ignore from "ignore"
 import { mkdir, rm } from "node:fs/promises"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "path"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
@@ -169,7 +170,7 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
         if (!runtime) return yield* new HttpApiError.BadRequest({})
         const content = yield* fs.readFileString(target).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
         if (!content.trim()) return yield* new HttpApiError.BadRequest({})
-        return HttpServerResponse.text(prepareHtmlPreview(content, runtime.href), {
+        return HttpServerResponse.text(prepareHtmlPreview(content, runtime.href, directory, ctx.query.path), {
           contentType: "text/html; charset=utf-8",
           headers: {
             "Cache-Control": "private, no-cache",
@@ -367,8 +368,17 @@ function htmlPreviewRuntime(input: string | undefined, request: string, referer:
   return runtime
 }
 
-function prepareHtmlPreview(content: string, runtime: string) {
+function prepareHtmlPreview(content: string, runtime: string, directory: string, htmlPath: string) {
   const document = parseDocument(content)
+  const htmlDirectory = path.resolve(directory, path.dirname(htmlPath))
+  for (const image of DomUtils.getElementsByTagName("img", document.children)) {
+    const source = image.attribs.src
+    if (!source || /^(?:data:|https?:|blob:|\/|#)/i.test(source)) continue
+    const assetPath = path.resolve(htmlDirectory, source.split(/[?#]/, 1)[0] ?? "")
+    if (!FSUtil.contains(directory, assetPath) || !/\.svg$/i.test(assetPath)) continue
+    if (!existsSync(assetPath) || !statSync(assetPath).isFile()) continue
+    image.attribs.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(readFileSync(assetPath, "utf8"))}`
+  }
   const scripts = DomUtils.getElementsByTagName("script", document.children).filter((script) =>
     script.attribs.src?.toLowerCase().includes("echarts"),
   )

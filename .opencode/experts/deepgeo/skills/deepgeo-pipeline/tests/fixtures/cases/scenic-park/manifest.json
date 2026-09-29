@@ -1,0 +1,73 @@
+{
+  "scenario": "scenic_park",
+  "dataset_version": "park-1.0.0",
+  "generator_version": "1.0.0",
+  "seed": 42,
+  "data_mode": "simulated",
+  "contains_personal_trajectories": false,
+  "files": [
+    {
+      "path": "park_events.csv",
+      "bytes": 14370,
+      "sha256": "9af18475c76d4337181e1140a40b6d96d928bbde2c347fe18d2258eff4b7ceee",
+      "rows": 365,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "park_feedback.csv",
+      "bytes": 8097,
+      "sha256": "c8e70d5983f83c55d16c23cd34c6b4bf8fcde74765496e075205acc5858bff0e",
+      "rows": 144,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "park_hourly_footfall.csv",
+      "bytes": 7779844,
+      "sha256": "9169d48a10cac1adf1810d3a443d8c99449e70493f58486fcd28a753627231dd",
+      "rows": 105120,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "park_pilot_daily.csv",
+      "bytes": 11024,
+      "sha256": "7c1fdb64d9c0a74ec0475a95d7f2a3ed5b41e8939c3607e2af8028e838b6642e",
+      "rows": 112,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "park_segments.csv",
+      "bytes": 2417688,
+      "sha256": "dbe7b7a7143550df13db05f2560e4855ade5fc830458230a53eed133d520e4e6",
+      "rows": 35040,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "park_shops.csv",
+      "bytes": 2641,
+      "sha256": "cfb31e696a308eaa4f249aea81762d4ee40b524378df679e602f975939ad00f0",
+      "rows": 30,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "park_transactions.csv",
+      "bytes": 18363609,
+      "sha256": "e9211362f5c7de7fc02c2725441130d6c302634dcde56f549156ced3237c3b4e",
+      "rows": 200000,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "park_zone_od.csv",
+      "bytes": 2602498,
+      "sha256": "1950b24f5f71b4a50e401a59a5e3cf885f15292c6386981594f36ac98345a38a",
+      "rows": 48180,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "park_zones.csv",
+      "bytes": 1021,
+      "sha256": "17d2fc9e8896e92ddf46d5b139c6603568a79800f3f3fee90193d8247a7555c3",
+      "rows": 12,
+      "data_mode": "simulated"
+    }
+  ]
+}

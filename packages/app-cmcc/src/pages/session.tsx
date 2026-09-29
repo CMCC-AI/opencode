@@ -81,6 +81,10 @@ import { AiScienceResultsPanel } from "@/pages/session/ai-science/ai-science-res
 import { AiScienceSessionView } from "@/pages/session/ai-science/ai-science-session-view"
 import { shouldUseAiSciencePage } from "@/pages/session/ai-science/page-selection"
 import { AiScienceWorkbenchProvider } from "@/pages/session/ai-science/workbench-context"
+import { shouldUseDeepGeoPage } from "@/pages/session/deepgeo/page-selection"
+import { DeepGeoWorkbenchProvider } from "@/pages/session/deepgeo/workbench-context"
+import { DeepGeoResultsPanel } from "@/pages/session/deepgeo/deepgeo-results-panel"
+import { DeepGeoSessionView } from "@/pages/session/deepgeo/deepgeo-session-view"
 import { DeepInspectResultsPanel } from "@/pages/session/deepinspect/deepinspect-results-panel"
 import { DeepInspectSessionView } from "@/pages/session/deepinspect/deepinspect-session-view"
 import { shouldUseDeepInspectPage } from "@/pages/session/deepinspect/page-selection"
@@ -318,10 +322,11 @@ export default function Page() {
   const deepInspect = createMemo(() => shouldUseDeepInspectPage(info(), businessAgentType(), initialUserAgent()))
   const zhengqi = createMemo(() => shouldUseZhengqiPage(info(), businessAgentType(), initialUserAgent()))
   const shoppers = createMemo(() => shouldUseShoppersPage(info(), businessAgentType(), initialUserAgent()))
+  const deepGeo = createMemo(() => shouldUseDeepGeoPage(info(), businessAgentType(), initialUserAgent()))
   const aiScience = createMemo(() => shouldUseAiSciencePage(info(), businessAgentType(), initialUserAgent()))
   const deepInsight = createMemo(() => shouldUseDeepInsightPage(info(), initialUserAgent()))
   const mstock = createMemo(() => shouldUseMstockPage(info(), businessAgentType(), mstockMention(sync().data.message[params.id ?? ""] ?? [], sync().data.part)))
-  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || aiScience() || deepInsight() || mstock())
+  const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || deepGeo() || aiScience() || deepInsight() || mstock())
   const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const generalChat = createMemo(() =>
@@ -1851,6 +1856,7 @@ export default function Page() {
       <DeepInspectWorkbenchProvider sessionID={() => params.id} active={deepInspect}>
       <ZhengqiWorkbenchProvider sessionID={() => params.id} active={zhengqi}>
       <ShoppersWorkbenchProvider sessionID={() => params.id} active={shoppers}>
+      <DeepGeoWorkbenchProvider sessionID={() => params.id} active={deepGeo}>
       <AiScienceWorkbenchProvider sessionID={() => params.id} active={aiScience}>
       <div
         class="relative size-full overflow-hidden flex flex-col"
@@ -1926,6 +1932,9 @@ export default function Page() {
                         </Match>
                         <Match when={shoppers()}>
                           <ShoppersResultsPanel />
+                        </Match>
+                        <Match when={deepGeo()}>
+                          <DeepGeoResultsPanel />
                         </Match>
                         <Match when={aiScience()}>
                           <AiScienceResultsPanel />
@@ -2026,6 +2035,23 @@ export default function Page() {
                                     </>
                                   }
                                   right={<ShoppersResultsPanel />}
+                                />
+                              </Show>
+                            </Match>
+                            <Match when={deepGeo()}>
+                              <Show when={isDesktop()} fallback={<DeepGeoSessionView />}>
+                                <DeepTradingSplitLayout
+                                  persistKey="deepgeo-panels"
+                                  label="AI+位置"
+                                  left={
+                                    <>
+                                      <div class="min-h-0 flex-1 overflow-hidden">
+                                        <DeepGeoSessionView />
+                                      </div>
+                                      {composerRegion()}
+                                    </>
+                                  }
+                                  right={<DeepGeoResultsPanel />}
                                 />
                               </Show>
                             </Match>
@@ -2156,6 +2182,7 @@ export default function Page() {
         <TerminalPanel />
       </div>
       </AiScienceWorkbenchProvider>
+      </DeepGeoWorkbenchProvider>
       </ShoppersWorkbenchProvider>
       </ZhengqiWorkbenchProvider>
       </DeepInspectWorkbenchProvider>

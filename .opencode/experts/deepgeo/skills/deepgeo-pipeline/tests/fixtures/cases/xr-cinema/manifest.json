@@ -1,0 +1,73 @@
+{
+  "scenario": "xr_cinema",
+  "dataset_version": "xr-1.1.0",
+  "generator_version": "1.0.0",
+  "seed": 42,
+  "data_mode": "simulated",
+  "contains_personal_trajectories": false,
+  "files": [
+    {
+      "path": "xr_audience_mix.csv",
+      "bytes": 572127,
+      "sha256": "b9ecbae2402c74ccfd6171b262f8ffd4d49e30a1ebcedf20689891ff17c8b9f7",
+      "rows": 8640,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "xr_competitors.csv",
+      "bytes": 1462,
+      "sha256": "9fb567c2e3cd83c0b84711c0c1bc9b532fd63fa9bb47ae844a3667062123e347",
+      "rows": 20,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "xr_finance_assumptions.csv",
+      "bytes": 1586,
+      "sha256": "211df58f6c23e2783f9c0cbd8054b3adb719834887b1c4326a2ddd3c05489dc4",
+      "rows": 24,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "xr_hourly_footfall.csv",
+      "bytes": 2476664,
+      "sha256": "5bc73f1e0d91bc9a84aca75ea2dec02d19cb5273781f8272c0d643c924a7604b",
+      "rows": 34560,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "xr_online_presence.csv",
+      "bytes": 2096,
+      "sha256": "bda38cc138f0442715f06a3db2c4feedb1b843d9422ce7864b624e0c2735bf44",
+      "rows": 48,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "xr_origin_od.csv",
+      "bytes": 56820,
+      "sha256": "15afae5b199b14fe43bc4576de4dd418f4b03a85793654786e07044510a03210",
+      "rows": 960,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "xr_poi.csv",
+      "bytes": 44450,
+      "sha256": "83418c2e2bb8eb358324dd6c4927b69ff9b23cb33d03cfe0dc18091bcdbda56f",
+      "rows": 600,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "xr_property_costs.csv",
+      "bytes": 690,
+      "sha256": "b51a40b9c5946989d764d38c4fbe438fcce2fa5a37e5e21c8bd9863af4572471",
+      "rows": 8,
+      "data_mode": "simulated"
+    },
+    {
+      "path": "xr_sites.csv",
+      "bytes": 784,
+      "sha256": "e31a752a2c6ff76ad5ec29271ad8d31c51e0a19e688446fd77181f79f0c24b52",
+      "rows": 8,
+      "data_mode": "simulated"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "scenario": "xr_cinema",
+  "not_for_agent_input": true,
+  "expected_patterns": [
+    {
+      "id": "XR-T1",
+      "pattern": "SITE-A 总客流高但租金压力和竞争压力显著，不应机械列为最优"
+    },
+    {
+      "id": "XR-T2",
+      "pattern": "SITE-B 在目标客群、娱乐协同和成本之间最均衡，是风险调整后的预设优选"
+    },
+    {
+      "id": "XR-T3",
+      "pattern": "SITE-C 可达性强但通勤经过型客流比例高，有效停留不足"
+    },
+    {
+      "id": "XR-T4",
+      "pattern": "SITE-D 周末亲子客群突出，适合作为亲子主题备选"
+    },
+    {
+      "id": "XR-T5",
+      "pattern": "SITE-A 第 93 天异常峰值来自沉浸节活动，不能外推为稳定需求"
+    },
+    {
+      "id": "XR-T6",
+      "pattern": "SITE-F 存在连续三天传感器采集断点"
+    },
+    {
+      "id": "XR-T7",
+      "pattern": "SITE-H 公众号阅读量与小程序月活为八个候选中最低，线上运营投入不足，签约前需验证商场线上导流与配合能力"
+    }
+  ],
+  "preferred_site": "SITE-B",
+  "conditional_alternative": "SITE-D"
+}

@@ -1,0 +1,38 @@
+{
+  "scenario": "scenic_park",
+  "not_for_agent_input": true,
+  "expected_patterns": [
+    {
+      "id": "PARK-T1",
+      "pattern": "ZONE-03 核心景点持续高客流，但快速饮品和补给供给不足"
+    },
+    {
+      "id": "PARK-T2",
+      "pattern": "ZONE-01 纪念品商铺过度集中且同质化"
+    },
+    {
+      "id": "PARK-T3",
+      "pattern": "ZONE-05 家庭游客停留长，但缺少简餐与休息配套"
+    },
+    {
+      "id": "PARK-T4",
+      "pattern": "ZONE-11 离园高峰晚于现有商铺关门时间，存在营业时段错配"
+    },
+    {
+      "id": "PARK-T5",
+      "pattern": "ZONE-04 长停留主要受演出排队驱动，不能解释成高消费意愿"
+    },
+    {
+      "id": "PARK-T6",
+      "pattern": "偏好标签与高客单文创只有弱关联，不支持整体换店"
+    },
+    {
+      "id": "PARK-T7",
+      "pattern": "模拟试点中处理组后期转化改善，但只能用于展示 DID 流程"
+    },
+    {
+      "id": "PARK-T8",
+      "pattern": "ZONE-07 存在连续三天采集断点"
+    }
+  ]
+}
