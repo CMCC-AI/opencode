@@ -11,7 +11,14 @@ DeepLiterature 部署需要设置：
 
 部署新版 DockAPI（sid主会话及SSO接口）、执行 DeepLiterature 的010迁移后再启用。旧 DockAPI JWT 会要求重新登录。完整说明位于 DeepLiterature 仓库 `docs/DOCKAPI_SSO.md`。
 
-当前远程 HTTP 拓扑为：APP-CMCC `http://81.70.49.200:3002`，iframe 代理 `http://81.70.49.200:3100`，DeepLiterature 上游 `http://81.70.174.140:3000`。DeepLiterature 的服务端 `DEEPLIT_DOCKAPI_URL` 使用 `http://81.70.49.200:3002`，由既有 Nginx `/api/` 转发到 DockAPI `8081`；不要把浏览器 iframe 地址和服务端 DockAPI 地址混用。
+当前同时保留两套远程 HTTP 环境：
+
+- 旧环境：APP-CMCC `http://81.70.49.200:3002`，iframe 代理 `http://81.70.49.200:3100`，DeepLiterature 上游 `http://81.70.174.140:3000`。
+- 新环境：APP-CMCC `http://152.136.106.161:3002`，iframe 代理 `http://152.136.106.161:3100`，DeepLiterature 上游 `http://81.70.174.140:3004`。
+
+两个 DeepLiterature Web 实例共享 PostgreSQL 和论文文件存储，但分别持有对应环境的 `DEEPLIT_DOCKAPI_URL`、`DEEPLIT_PARENT_ORIGIN`、`DEEPLIT_PUBLIC_ORIGIN` 和 `DEEPLIT_SSO_CLIENT_SECRET`。不能让同一 Web 实例复用两套 SSO 配置，否则父页面来源校验、Cookie 和客户端密钥会互相覆盖。旧环境继续使用既有 `3000` 实例，新环境固定使用独立 `3004` 实例；仓库根目录 `deploy_to_server.sh` 的生产默认值已与此拓扑一致。
+
+DeepLiterature 的服务端 `DEEPLIT_DOCKAPI_URL` 应指向各自 APP-CMCC/DockAPI 入口；不要把浏览器 iframe 地址和服务端 DockAPI 地址混用。两套环境都应通过对应的 `3100` 同站代理加载 iframe，不要直接把浏览器指向 `81.70.174.140:3000` 或 `:3004`。
 
 桥接校验来源 origin、iframe window、随机 requestId。首次加载、重载和身份变化会重新握手；父应用/iframe 均通过 DockAPI 统一退出。退出请求失败会提示重试，不会假装服务端已注销。跨标签页用 storage 事件同步，HTTPS/localhost 下使用 Web Locks 串行刷新 token；生产请使用 HTTPS。
 

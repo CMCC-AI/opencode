@@ -28,7 +28,8 @@ session Cookie survives internal navigation. The iframe is also kept mounted
 after its first visit so switching APP-CMCC menus does not discard its runtime
 state.
 
-The proxy defaults to `http://81.70.174.140:3000`. Override it when needed:
+The development proxy defaults to the legacy DeepXiv instance at
+`http://81.70.174.140:3000`. Override it when needed:
 
 ```bash
 DEEPLIT_PROXY_TARGET=http://deep-lit-server:3000 bun dev
@@ -50,7 +51,9 @@ gateway-provided address.
 The repository-level `deploy_to_server.sh` packages the proxy as a standalone
 executable, installs it as `opencode-cmcc-deepxiv.service`, sets the iframe URL
 at build time, and adds its validated public origin to the server CSP. Its
-production defaults can be overridden with `DEEPXIV_PROXY_PORT`,
+CMCC production default points at the isolated SSO instance on
+`http://81.70.174.140:3004`; this keeps the legacy `3000` instance and its SSO
+configuration intact. Production defaults can be overridden with `DEEPXIV_PROXY_PORT`,
 `DEEPLIT_PROXY_TARGET`, `DEEPLIT_PROXY_PUBLIC_ORIGIN`, and
 `DEEPLIT_PROXY_TRUST_FORWARD_HEADERS`. Use `OPENCODE_PUBLIC_SCHEME=https` only
 when a trusted gateway terminates TLS for both APP-CMCC and the proxy. The
