@@ -8,7 +8,7 @@ bind_host=${OPENCODE_BIND_HOST:-127.0.0.1}
 public_host=${OPENCODE_PUBLIC_HOST:-${remote#*@}}
 public_scheme=${OPENCODE_PUBLIC_SCHEME:-http}
 public_port=${OPENCODE_PUBLIC_PORT:-3002}
-service_user=${OPENCODE_SERVICE_USER:-${remote%@*}}
+service_user=${OPENCODE_SERVICE_USER:-opencode}
 keep_releases=${OPENCODE_KEEP_RELEASES:-3}
 install_root=${OPENCODE_INSTALL_ROOT:-/opt/opencode-cmcc}
 upload_mode=${DEPLOY_UPLOAD_MODE:-delta}
@@ -212,6 +212,10 @@ if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
   prepare_compile_runtime
   prepare_models_snapshot
   echo "Building APP-CMCC and OpenCode for $target"
+  build_args=("--target=$target")
+  if [[ ${DEPLOY_SKIP_INSTALL:-0} == 1 ]]; then
+    build_args+=(--skip-install)
+  fi
   (
     cd "$root/packages/opencode"
     OPENCODE_VERSION="$version" \
@@ -221,7 +225,7 @@ if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
       MODELS_DEV_API_JSON="$models_snapshot" \
       VITE_CMCC_RESEARCH_DEMO=true \
       VITE_DEEPXIV_URL="$deepxiv_url" \
-      bun run script/build.ts --target="$target"
+      bun run script/build.ts "${build_args[@]}"
   )
   echo "Building DeepXiv proxy for $proxy_target"
   bun build --compile \

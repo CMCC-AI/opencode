@@ -1080,6 +1080,18 @@ export function toPublicInfo(provider: Info): Info {
   )
 }
 
+export function toClientInfo(provider: Info): Info {
+  return JSON.parse(
+    JSON.stringify(provider, (name, value) => {
+      if (/^(key|api[-_]?key|authorization|token|secret|password|access[-_]?key(?:id)?|secret[-_]?access[-_]?key)$/i.test(name))
+        return undefined
+      if (typeof value === "function" || typeof value === "symbol" || value === undefined) return undefined
+      if (typeof value === "bigint") return value.toString()
+      return value
+    }),
+  )
+}
+
 export function defaultModelIDs<T extends { models: Record<string, { id: string }> }>(providers: Record<string, T>) {
   return mapValues(providers, (item) => sort(Object.values(item.models))[0].id)
 }

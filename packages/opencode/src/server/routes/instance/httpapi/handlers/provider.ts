@@ -56,7 +56,7 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
         ? deployed
         : Object.assign(mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)), deployed)
       return {
-        all: Object.values(providers).map(Provider.toPublicInfo),
+        all: Object.values(providers).map(Provider.toClientInfo),
         default: Provider.defaultModelIDs(providers),
         connected: Object.keys(deployed),
       }

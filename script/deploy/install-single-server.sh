@@ -7,6 +7,8 @@ render_opencode_service() {
 Description=OpenCode CMCC
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -31,8 +33,6 @@ RestartSec=3
 TimeoutStopSec=15
 MemoryHigh=3G
 MemoryMax=3584M
-StartLimitIntervalSec=60
-StartLimitBurst=5
 NoNewPrivileges=true
 PrivateTmp=true
 UMask=0077
@@ -50,6 +50,8 @@ Description=OpenCode CMCC DeepXiv Proxy
 After=network-online.target opencode-cmcc.service
 Wants=network-online.target
 PartOf=opencode-cmcc.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -63,8 +65,6 @@ RestartSec=3
 TimeoutStopSec=15
 MemoryHigh=512M
 MemoryMax=768M
-StartLimitIntervalSec=60
-StartLimitBurst=5
 NoNewPrivileges=true
 PrivateTmp=true
 UMask=0077
