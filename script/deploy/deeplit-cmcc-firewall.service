@@ -1,0 +1,17 @@
+[Unit]
+Description=Restrict DeepXiv CMCC upstream to the APP-CMCC server
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -ec '/usr/sbin/iptables -C DOCKER-USER -s 152.136.106.161/32 -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j ACCEPT || /usr/sbin/iptables -I DOCKER-USER 1 -s 152.136.106.161/32 -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j ACCEPT'
+ExecStart=/bin/sh -ec '/usr/sbin/iptables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j DROP || /usr/sbin/iptables -I DOCKER-USER 2 -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j DROP'
+ExecStart=/bin/sh -ec '/usr/sbin/ip6tables -C DOCKER-USER -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j DROP || /usr/sbin/ip6tables -I DOCKER-USER 1 -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j DROP'
+ExecStop=/bin/sh -c '/usr/sbin/ip6tables -D DOCKER-USER -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j DROP 2>/dev/null || true'
+ExecStop=/bin/sh -c '/usr/sbin/iptables -D DOCKER-USER -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j DROP 2>/dev/null || true'
+ExecStop=/bin/sh -c '/usr/sbin/iptables -D DOCKER-USER -s 152.136.106.161/32 -p tcp -m conntrack --ctorigdstport 3004 --ctdir ORIGINAL -j ACCEPT 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target

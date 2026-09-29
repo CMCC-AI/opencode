@@ -29,7 +29,7 @@ docker compose \
   up -d
 ```
 
-`3004` 是 APP-CMCC 代理访问的内部上游端口，应在云安全组或主机 `DOCKER-USER` 链中仅允许 `152.136.106.161`，不应作为用户入口公开。
+`3004` 是 APP-CMCC 代理访问的内部上游端口，不应作为用户入口公开。当前部署使用 `script/deploy/deeplit-cmcc-firewall.service` 在 Docker 的 `DOCKER-USER` 链中仅放行 `152.136.106.161`；规则通过 `--ctdir ORIGINAL` 只过滤连接入站方向，避免误丢弃容器返回流量。将该文件安装到 `/etc/systemd/system/` 并启用后，服务器重启会自动恢复规则。若服务器地址或端口变化，必须同步更新此服务并先验证允许链路，再启用拒绝规则。
 
 桥接校验来源 origin、iframe window、随机 requestId。首次加载、重载和身份变化会重新握手；父应用/iframe 均通过 DockAPI 统一退出。退出请求失败会提示重试，不会假装服务端已注销。跨标签页用 storage 事件同步，HTTPS/localhost 下使用 Web Locks 串行刷新 token；生产请使用 HTTPS。
 
