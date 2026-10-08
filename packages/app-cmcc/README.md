@@ -1,3 +1,8 @@
+## APP-CMCC local deployment
+
+完整的本地安装、配置、一键启动、测试与排障步骤见
+[本地安装部署指南](../../docs/本地安装部署指南.md)。
+
 ## Usage
 
 Dependencies for these templates are managed with [pnpm](https://pnpm.io) using `pnpm up -Lri`.
