@@ -38,6 +38,7 @@ import {
 } from "@/utils/cmcc-cases"
 import { cmccHistoryProduct, type CmccHistoryProduct } from "@/utils/cmcc-history-product"
 import { mstockMention } from "@/pages/session/mstock/page-selection"
+import { ResearchHistory } from "@/pages/general-deepinsight/history"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
@@ -523,6 +524,12 @@ function CmccSidebar() {
               onClick={() => void summonDeepInsight()}
             />
             <CmccSidebarAction
+              icon="glasses"
+              label="通用深度洞察"
+              active={location.pathname === "/general-deepinsight" || location.pathname.startsWith("/general-deepinsight/")}
+              onClick={() => navigate("/general-deepinsight")}
+            />
+            <CmccSidebarAction
               icon="mcp"
               label="产业洞察"
               active={
@@ -571,11 +578,7 @@ function CmccSidebar() {
               action={() => void openNewSession()}
               actionIcon="new-session"
             />
-            <For
-              each={conversations()}
-              fallback={<div class="px-2 py-5 text-center text-[13px] text-[#9294ad]">暂无历史任务</div>}
-            >
-              {(session) => (
+            <ResearchHistory sessions={conversations()} renderOpenCode={(session) => (
                 <CmccSessionRow
                   session={session}
                   active={activeSession(session)}
@@ -599,8 +602,7 @@ function CmccSidebar() {
                       : undefined
                   }
                 />
-              )}
-            </For>
+              )} />
           </div>
           <div class="shrink-0 border-t border-[rgba(99,102,241,0.10)] px-3 py-3.5">
             <DropdownMenu gutter={8} placement="top-start">

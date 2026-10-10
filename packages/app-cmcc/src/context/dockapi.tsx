@@ -481,6 +481,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           }
         },
       },
+      research: { request, fetch: authorizedFetch },
       sessions: {
         list: loadSessions,
         get(id: string) {

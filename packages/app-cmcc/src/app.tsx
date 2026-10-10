@@ -84,6 +84,7 @@ const CmccExpertRoute = lazy(() =>
   import("@/pages/cmcc-experts").then((module) => ({ default: module.CmccExpertRoute })),
 )
 const MstockForm = lazy(() => import("@/pages/mstock/form"))
+const GeneralDeepInsightRoute = lazy(() => import("@/pages/general-deepinsight/page"))
 function MstockRoute() {
   const dockapi = useDockApi()
   const server = useServer()
@@ -699,6 +700,9 @@ function Routes() {
         <Route path="/app" component={CmccDefaultRoute} />
         <Route path="/expert" component={CmccExpertCenterRoute} />
         <Route path="/mstock" component={MstockRoute} />
+        <Route path="/general-deepinsight" component={GeneralDeepInsightRoute} />
+        <Route path="/general-deepinsight/session/:id" component={GeneralDeepInsightRoute} />
+        <Route path="/general-deepinsight/cases/:caseCode" component={GeneralDeepInsightRoute} />
         <Route path="/expert/:id" component={CmccExpertRoute} />
         <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />
         <Route path="/knowledge/:id/session/:sessionID" component={KnowledgeNotebookRoute} />
