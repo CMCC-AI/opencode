@@ -1,0 +1,20 @@
+.gd-citation-markdown [data-component="markdown"] sup.gd-report-citation {
+  font-size: 0.72em;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 0;
+  vertical-align: super;
+  white-space: nowrap;
+  margin-left: 0.12em;
+}
+.gd-citation-markdown [data-component="markdown"] sup.gd-report-citation > a {
+  padding: 0 0.15em;
+  color: #2563eb;
+  background: transparent;
+  font-size: inherit;
+  font-style: normal;
+  text-decoration: none;
+}
+.gd-citation-markdown [data-component="markdown"] sup.gd-report-citation > a:hover {
+  text-decoration: underline;
+}

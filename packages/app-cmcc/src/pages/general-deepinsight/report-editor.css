@@ -1,0 +1,253 @@
+.gd-report-editing-shell {
+  position: relative;
+}
+.gd-report-editor {
+  padding: 20px 24px 80px;
+  color: #000;
+  font-size: 16px;
+}
+.gd-report-editor .editor-toolbar {
+  margin-bottom: 18px;
+  padding-right: 90px;
+}
+.gd-report-editor .editor-title {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+}
+.gd-report-editor .chapter-section {
+  position: relative;
+  margin-bottom: 18px;
+}
+.gd-report-editor .chapter-heading {
+  margin-bottom: 8px;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.gd-report-editor .chapter-heading.level-1 {
+  font-size: 22px;
+}
+.gd-report-editor .chapter-heading.level-2 {
+  font-size: 18px;
+}
+.gd-report-editor .chapter-heading.level-3,
+.gd-report-editor .chapter-heading.level-4,
+.gd-report-editor .chapter-heading.level-5,
+.gd-report-editor .chapter-heading.level-6 {
+  font-size: 15px;
+}
+.gd-report-editor .chapter-card {
+  position: relative;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(31, 41, 55, 0.05);
+}
+.gd-report-editor .chapter-preview-card {
+  min-height: 100px;
+  padding: 16px 18px 46px;
+  cursor: text;
+}
+.gd-report-editor .chapter-preview {
+  color: #374151;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.general-research .gd-report-editor button.chapter-edit-button {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  color: #4f46e5;
+  background: transparent;
+  font-size: 12px;
+}
+.gd-report-editor .editor-textarea-wrap {
+  position: relative;
+}
+.general-research .gd-report-editor textarea.chapter-textarea {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  box-sizing: border-box;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  resize: vertical;
+  padding: 16px 18px;
+  border-radius: 10px;
+  color: #1f2937;
+  background: #fff;
+  font-family: Consolas, "Microsoft YaHei", monospace;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.gd-report-editor .selection-highlight-viewport {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.general-research .gd-report-editor .selection-highlight-content {
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 16px 18px;
+  color: transparent;
+  background: transparent;
+  font-family: Consolas, "Microsoft YaHei", monospace;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.general-research .gd-report-editor .selection-highlight-content mark {
+  padding: 0;
+  border-radius: 2px;
+  color: transparent;
+  background: rgba(59, 130, 246, 0.3);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.gd-report-selection-toolbar {
+  position: fixed;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: min(430px, calc(100vw - 24px));
+  box-sizing: border-box;
+  padding: 7px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+}
+.gd-report-selection-toolbar .ai-instruction-input {
+  min-width: 0;
+  flex: 1;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  outline: 0;
+  color: #374151;
+  font:
+    12px "Microsoft YaHei",
+    sans-serif;
+}
+.gd-report-selection-toolbar .ai-instruction-input:focus {
+  border-color: #93c5fd;
+}
+.gd-report-selection-toolbar button.ai-polish-button,
+.general-research .gd-report-editor button.primary-button,
+.general-research .gd-report-editor button.secondary-button {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.gd-report-selection-toolbar button.ai-polish-button,
+.general-research .gd-report-editor button.primary-button {
+  border: 1px solid #818cf8;
+  color: #fff;
+  background: #6366f1;
+}
+.general-research .gd-report-editor button.primary-button:disabled {
+  opacity: 1;
+  border-color: #c7d2fe;
+  color: #a5b4fc;
+  background: #eef2ff;
+  cursor: not-allowed;
+}
+.general-research .gd-report-editor button.secondary-button {
+  border: 1px solid #d1d5db;
+  color: #4b5563;
+  background: #fff;
+}
+.general-research .gd-report-editor button.secondary-button:hover:not(:disabled) {
+  border-color: #a5b4fc;
+  color: #4f46e5;
+}
+.gd-report-editor .chapter-actions,
+.gd-report-editor .revision-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+.gd-report-editor .ai-revision-panel {
+  padding: 16px 18px;
+}
+.gd-report-editor .revision-title {
+  margin-bottom: 10px;
+  color: #4f46e5;
+  font-size: 13px;
+  font-weight: 700;
+}
+.gd-report-editor .revision-document {
+  color: #374151;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.gd-report-editor .revision-original {
+  color: #dc2626;
+  text-decoration: line-through;
+  text-decoration-color: #dc2626;
+  text-decoration-thickness: 2px;
+}
+.general-research .gd-report-editor textarea.revision-generated {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+  margin: 10px 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  resize: none;
+  color: #166534;
+  background: transparent;
+  font-family: "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow: hidden;
+}
+.gd-report-editor .revision-status {
+  margin-left: 8px;
+  color: #6366f1;
+  font-size: 12px;
+}
+.gd-report-editor .revision-error,
+.gd-report-editor .editor-error {
+  margin: 9px 18px;
+  color: #dc2626;
+  font-size: 12px;
+}
+@media (max-width: 767px) {
+  .gd-report-editor {
+    padding: 20px 12px 80px;
+  }
+  .gd-report-editor .chapter-actions {
+    flex-wrap: wrap;
+  }
+}

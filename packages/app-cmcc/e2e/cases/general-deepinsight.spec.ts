@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
+import JSZip from "jszip"
+import { RESEARCH_UPDATED } from "../../src/pages/general-deepinsight/model"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { prepareReferenceDeepInsight, prepareReferenceFeaturedCases } from "./reference-deepinsight"
@@ -9,8 +11,12 @@ test.use({ channel: process.env.PLAYWRIGHT_CHANNEL, video: "off" })
 const id = "a1cce3d1-eaa2-4f6c-8432-37a2ccbc25df"
 const code = "c1cce3d1-eaa2-4f6c-8432-37a2ccbc25df"
 
+const citedReport =
+  "# 引用样式验收报告\n\n## 第一章\n\n产业集群<cite>http://www.jinan.gov.cn/</cite>，企业情况<cite>http://www.jngi.gov.cn/</cite>。\n\n{{chart:1}}\n\n## 第二章\n\n重复引用<cite>http://www.jinan.gov.cn/</cite>。普通 [说明链接](https://example.org/plain) 不转换。\n\n`<cite>https://example.org/code</cite>`\n\n```html\n<cite>https://example.org/fence</cite>\n```"
+
 async function prepare(page: Page, initial = "completed", allowed = true, caseCount = 1) {
   let status = initial
+  let reportContent = "# 研究报告\n\n这是中文正文。\n\n|主题|结论|\n|---|---|\n|治理|可验证|"
   const requests: { method: string; path: string; body: unknown }[] = []
   const errors: string[] = []
   page.on("pageerror", (error) => errors.push(error.message))
@@ -52,7 +58,7 @@ async function prepare(page: Page, initial = "completed", allowed = true, caseCo
   let currentCases = cases
   const detail = (caseMode = false) => ({
     session: { ...info(), ...(caseMode ? { status: "completed" } : {}) },
-    reportContent: "# 研究报告\n\n这是中文正文。\n\n|主题|结论|\n|---|---|\n|治理|可验证|",
+    reportContent,
     dataVersion: "1",
     ...(caseMode ? { readOnly: true, caseInfo } : {}),
     conversationData: {
@@ -147,16 +153,349 @@ async function prepare(page: Page, initial = "completed", allowed = true, caseCo
         body: 'event: updates\ndata: {"finalize_answer":{"final_report":"# 完成报告\\n\\n研究完成。"}}\n\nevent: done\ndata: {"status":"completed"}\n\n',
       })
     }
-    if (path.endsWith("/report")) return json(null)
+    if (path.endsWith("/report") && request.method() === "PUT") {
+      reportContent = body.reportContent
+      return json(null)
+    }
+    if (path.endsWith("/report/rewrite")) return json({ status: "success", rewritten_text: "AI 润色后的新文" })
     return json([])
   })
-  return { requests, errors, detail: detail(), cases }
+  return {
+    requests,
+    errors,
+    detail: detail(),
+    cases,
+    setReport: (content: string) => {
+      reportContent = content
+    },
+  }
 }
 
 async function freezeConfirmationClock(page: Page) {
   await page.clock.install({ time: new Date("2026-10-09T04:00:00Z") })
   await page.clock.pauseAt(new Date("2026-10-09T04:00:01Z"))
 }
+
+for (const width of [1920, 390]) {
+  test(`final report citations reuse numbers across chapters and Word without changing data at ${width}px`, async ({
+    page,
+  }) => {
+    const data = await prepare(page)
+    const detail = { ...data.detail, session: { ...data.detail.session, sourcesCount: 0 }, reportContent: citedReport }
+    await page.route(`**/api/dockapi/general-deepinsight/sessions/${id}`, (route) =>
+      route.fulfill({ json: { code: 200, data: detail } }),
+    )
+    await page.setViewportSize({ width, height: 1080 })
+    await page.goto(`/general-deepinsight/session/${id}`)
+    if (width < 768) await page.getByRole("button", { name: "研究结果", exact: true }).click()
+    await page.getByRole("tab", { name: "文字报告", exact: true }).click()
+    const citations = page.locator(".report-view sup.gd-report-citation > a")
+    await expect(citations).toHaveText(["1", "2", "1"])
+    await expect(citations.first()).toHaveAttribute("href", "http://www.jinan.gov.cn/")
+    await expect(citations.first()).toHaveAttribute("target", "_blank")
+    await expect(citations.first()).toHaveAttribute("rel", "noopener noreferrer")
+    await expect(page.locator(".stats-row .stat-value").nth(2)).toHaveText("0个信息源")
+    await expect(page.locator('.report-view a[href="https://example.org/plain"]')).toHaveText("说明链接")
+    await expect(page.locator(".report-view pre")).toContainText("<cite>https://example.org/fence</cite>")
+    expect(await citations.first().evaluate((link) => getComputedStyle(link.parentElement!).verticalAlign)).toBe(
+      "super",
+    )
+    await page.screenshot({ path: test.info().outputPath("report-citations.png") })
+    const pending = page.waitForEvent("download")
+    await page.getByRole("button", { name: "导出 Word", exact: true }).click()
+    const download = await pending
+    await download.saveAs(test.info().outputPath("citation-report.docx"))
+    const fs = await import("node:fs/promises")
+    const zip = await JSZip.loadAsync(await fs.readFile((await download.path())!))
+    const documentXml = await zip.file("word/document.xml")!.async("string")
+    const links = await zip.file("word/_rels/document.xml.rels")!.async("string")
+    const superscripts = await page.evaluate((xml) => {
+      const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+      const doc = new DOMParser().parseFromString(xml, "application/xml")
+      return Array.from(doc.getElementsByTagNameNS(ns, "r"))
+        .filter((run) => run.getElementsByTagNameNS(ns, "vertAlign")[0]?.getAttributeNS(ns, "val") === "superscript")
+        .map((run) => run.textContent)
+    }, documentXml)
+    expect(superscripts).toEqual(["1", "2", "1"])
+    expect(links).toContain("http://www.jinan.gov.cn/")
+    expect(links).toContain("http://www.jngi.gov.cn/")
+    expect(data.requests.some((request) => request.method === "PUT")).toBe(false)
+    await page.getByRole("button", { name: "修改文章", exact: true }).click()
+    await expect(page.locator(".gd-report-editor sup.gd-report-citation > a")).toHaveText(["1", "2", "1"])
+    await page.getByRole("button", { name: "编辑本章", exact: true }).first().click()
+    await expect(page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true })).toHaveValue(
+      /<cite>http:\/\/www\.jinan\.gov\.cn\/<\/cite>/,
+    )
+    expect(data.errors).toEqual([])
+  })
+}
+
+test("case citations render from the existing snapshot and survive async refresh", async ({ page }) => {
+  const data = await prepare(page)
+  data.setReport(citedReport)
+  await page.goto(`/general-deepinsight/cases/${code}`)
+  await page.getByRole("tab", { name: "文字报告", exact: true }).click()
+  await expect(page.locator(".report-view sup.gd-report-citation > a")).toHaveText(["1", "2", "1"])
+  await expect(page.getByRole("button", { name: "修改文章", exact: true })).toHaveCount(0)
+  await page.goto(`/general-deepinsight/session/${id}`)
+  await page.getByRole("tab", { name: "文字报告", exact: true }).click()
+  await expect(page.locator(".report-view sup.gd-report-citation > a")).toHaveText(["1", "2", "1"])
+  data.setReport("# 新的引用顺序\n\n<cite>https://example.org/new</cite>\n\n" + citedReport)
+  await page.evaluate((event) => window.dispatchEvent(new CustomEvent(event, { detail: "mutation" })), RESEARCH_UPDATED)
+  await expect(page.locator(".report-view sup.gd-report-citation > a")).toHaveText(["1", "2", "3", "2"])
+  expect(data.requests.some((request) => request.method === "PUT")).toBe(false)
+  expect(data.errors).toEqual([])
+})
+
+const chapterReport =
+  "# 研究报告\n\n## 摘要\n相同文字，前文。相同文字，后文。\n\n## 1.1 分析\n保留正文。\n\n|主题|结论|\n|---|---|\n|治理|可验证|\n"
+
+async function openChapterEditor(page: Page, width = 1920) {
+  const data = await prepare(page)
+  data.setReport(chapterReport)
+  await page.setViewportSize({ width, height: 1080 })
+  await page.goto(`/general-deepinsight/session/${id}`)
+  if (width < 768) await page.getByRole("button", { name: "研究结果", exact: true }).click()
+  await page.getByRole("tab", { name: "文字报告", exact: true }).click()
+  await page.getByRole("button", { name: "修改文章", exact: true }).click()
+  await expect(page.locator(".gd-report-editor .chapter-heading")).toHaveText(["研究报告", "摘要", "1.1 分析"])
+  await page
+    .locator(".chapter-section")
+    .filter({ has: page.locator(".chapter-heading", { hasText: /^摘要$/ }) })
+    .getByRole("button", { name: "编辑本章" })
+    .click()
+  return data
+}
+
+async function selectChapterText(page: Page, text = "相同文字") {
+  const editor = page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true })
+  await editor.evaluate((element: HTMLTextAreaElement, text) => {
+    element.focus()
+    const start = element.value.lastIndexOf(text)
+    element.setSelectionRange(start, start + text.length)
+    element.dispatchEvent(new Event("select", { bubbles: true }))
+  }, text)
+  await expect(page.getByRole("textbox", { name: "AI 修改需求", exact: true })).toBeVisible()
+}
+
+for (const width of [1920, 390]) {
+  test(`chapter selection polishing previews differences and only confirmation persists at ${width}px`, async ({
+    page,
+  }) => {
+    const data = await openChapterEditor(page, width)
+    const editor = page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true })
+    await selectChapterText(page)
+    const toolbar = page.locator(".gd-report-selection-toolbar")
+    const rect = await toolbar.boundingBox()
+    expect(rect!.x).toBeGreaterThanOrEqual(0)
+    expect(rect!.x + rect!.width).toBeLessThanOrEqual(width)
+    await page.getByRole("textbox", { name: "AI 修改需求", exact: true }).fill("改得更简练")
+    await expect(page.locator(".selection-highlight-content mark")).toHaveText("相同文字")
+    expect(
+      await page
+        .locator(".selection-highlight-content")
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+    ).toBe("rgba(0, 0, 0, 0)")
+    await page.screenshot({ path: test.info().outputPath("chapter-selection.png") })
+    await page.getByRole("button", { name: "AI 润色", exact: true }).click()
+    await expect(page.locator("del.revision-original")).toHaveText("相同文字")
+    await expect(page.getByRole("textbox", { name: "AI 生成内容", exact: true })).toHaveValue("AI 润色后的新文")
+    expect(
+      await page.locator("del.revision-original").evaluate((element) => ({
+        color: getComputedStyle(element).color,
+        decoration: getComputedStyle(element).textDecorationLine,
+      })),
+    ).toEqual({ color: "rgb(220, 38, 38)", decoration: "line-through" })
+    expect(
+      await page
+        .getByRole("textbox", { name: "AI 生成内容", exact: true })
+        .evaluate((element) => getComputedStyle(element).color),
+    ).toBe("rgb(22, 101, 52)")
+    await expect(page.getByRole("button", { name: "确认本章修改", exact: true })).toBeDisabled()
+    expect(data.requests.filter((request) => request.method === "PUT")).toHaveLength(0)
+    await page.screenshot({ path: test.info().outputPath("chapter-ai-preview.png") })
+    await page.getByRole("textbox", { name: "AI 生成内容", exact: true }).fill("人工校正的新文")
+    await page.getByRole("button", { name: "应用 AI 修改", exact: true }).click()
+    await expect(editor).toHaveValue("相同文字，前文。人工校正的新文，后文。\n\n")
+    expect(data.requests.filter((request) => request.method === "PUT")).toHaveLength(0)
+    page.once("dialog", (dialog) => dialog.accept())
+    await page.getByRole("button", { name: "确认本章修改", exact: true }).click()
+    await expect(editor).toHaveCount(0)
+    expect(data.requests.filter((request) => request.method === "PUT").map((request) => request.body)).toEqual([
+      { reportContent: chapterReport.replace("相同文字，后文", "人工校正的新文，后文") },
+    ])
+    await page.getByRole("button", { name: "退出修改", exact: true }).click()
+    await expect(page.locator(".report-view")).toContainText("人工校正的新文")
+    await expect(page.locator(".report-view table")).toContainText("可验证")
+    await page.reload()
+    if (width < 768) await page.getByRole("button", { name: "研究结果", exact: true }).click()
+    await page.getByRole("tab", { name: "文字报告", exact: true }).click()
+    await expect(page.locator(".report-view")).toContainText("人工校正的新文")
+    expect(data.errors).toEqual([])
+  })
+}
+
+test("chapter manual edits keep titles immutable and save failure retains the draft for retry", async ({ page }) => {
+  const data = await openChapterEditor(page)
+  const editor = page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true })
+  await editor.fill("## 不允许新增的标题\n正文")
+  await page.getByRole("button", { name: "确认本章修改", exact: true }).click()
+  await expect(page.getByRole("alert")).toContainText("章节标题不可修改")
+  expect(data.requests.filter((request) => request.method === "PUT")).toHaveLength(0)
+  await editor.fill("手动修改但尚未保存的正文\n\n")
+  await selectChapterText(page, "手动修改但尚未保存的正文")
+  await page.getByRole("textbox", { name: "AI 修改需求", exact: true }).fill("润色")
+  await page.getByRole("button", { name: "AI 润色", exact: true }).click()
+  await expect(page.getByRole("textbox", { name: "AI 生成内容", exact: true })).toBeVisible()
+  expect(data.requests.find((request) => request.path.endsWith("/report/rewrite"))!.body).toEqual({
+    text: "手动修改但尚未保存的正文",
+    requirements: "润色",
+  })
+  await page.getByRole("textbox", { name: "AI 生成内容", exact: true }).fill("## AI 不允许改标题")
+  await page.getByRole("button", { name: "应用 AI 修改", exact: true }).click()
+  await expect(page.getByRole("alert")).toContainText("包含 Markdown 标题")
+  await page.getByRole("button", { name: "取消 AI 修改", exact: true }).click()
+  await expect(editor).toHaveValue("手动修改但尚未保存的正文\n\n")
+  let fail = true
+  await page.route(`**/sessions/${id}/report`, (route) =>
+    fail ? route.fulfill({ status: 502, json: { code: 502, message: "测试保存失败", data: null } }) : route.fallback(),
+  )
+  page.once("dialog", (dialog) => dialog.accept())
+  await page.getByRole("button", { name: "确认本章修改", exact: true }).click()
+  await expect(page.getByRole("alert")).toContainText("测试保存失败")
+  await expect(editor).toHaveValue("手动修改但尚未保存的正文\n\n")
+  fail = false
+  page.once("dialog", (dialog) => dialog.accept())
+  await page.getByRole("button", { name: "确认本章修改", exact: true }).click()
+  await expect(editor).toHaveCount(0)
+  expect(data.errors).toEqual([])
+})
+
+test("unsaved chapter changes are guarded when switching, exiting and navigating", async ({ page }) => {
+  const data = await openChapterEditor(page)
+  const editor = page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true })
+  await editor.fill("尚未保存的草稿")
+  const second = page
+    .locator(".chapter-section")
+    .filter({ has: page.locator(".chapter-heading", { hasText: "1.1 分析" }) })
+  page.once("dialog", (dialog) => dialog.dismiss())
+  await second.getByRole("button", { name: "编辑本章" }).click()
+  await expect(editor).toHaveValue("尚未保存的草稿")
+  page.once("dialog", (dialog) => dialog.dismiss())
+  await page.getByRole("button", { name: "退出修改", exact: true }).click()
+  await expect(editor).toHaveValue("尚未保存的草稿")
+  page.once("dialog", (dialog) => dialog.dismiss())
+  await page.getByRole("navigation").getByRole("button", { name: "通用深度洞察", exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`/session/${id}$`))
+  page.once("dialog", (dialog) => dialog.accept())
+  await second.getByRole("button", { name: "编辑本章" }).click()
+  await expect(editor).toHaveValue(/保留正文/)
+  await page.getByRole("button", { name: "取消", exact: true }).click()
+  await page.getByRole("button", { name: "退出修改", exact: true }).click()
+  expect(data.requests.filter((request) => request.method === "PUT")).toHaveLength(0)
+  expect(data.errors).toEqual([])
+})
+
+test("AI rewrite failures keep the original chapter and a canceled late response never applies", async ({ page }) => {
+  const data = await openChapterEditor(page)
+  let fail = true
+  let release!: () => void
+  await page.route("**/report/rewrite", async (route) => {
+    if (fail) return route.fulfill({ status: 502, json: { code: 502, message: "测试润色失败", data: null } })
+    await new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await route.fulfill({ json: { code: 200, data: { rewritten_text: "取消后不应应用的结果" } } }).catch(() => {})
+  })
+  await selectChapterText(page)
+  await page.getByRole("textbox", { name: "AI 修改需求", exact: true }).fill("润色")
+  await page.getByRole("button", { name: "AI 润色", exact: true }).click()
+  await expect(page.getByRole("alert")).toContainText("测试润色失败")
+  await expect(page.getByRole("button", { name: "应用 AI 修改", exact: true })).toBeDisabled()
+  await page.getByRole("button", { name: "取消 AI 修改", exact: true }).click()
+  fail = false
+  await selectChapterText(page)
+  await page.getByRole("textbox", { name: "AI 修改需求", exact: true }).fill("润色")
+  await page.getByRole("button", { name: "AI 润色", exact: true }).click()
+  await expect(page.getByText("AI 正在生成...", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "取消 AI 修改", exact: true }).click()
+  release()
+  await expect(page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true })).toHaveValue(
+    "相同文字，前文。相同文字，后文。\n\n",
+  )
+  await expect(page.locator(".ai-revision-panel")).toHaveCount(0)
+  expect(data.requests.filter((request) => request.method === "PUT")).toHaveLength(0)
+  expect(data.errors).toEqual([])
+})
+
+test("chapter editor materials and revision colors match the original Vue editor", async ({ page, browser }) => {
+  test.skip(!process.env.CMCC_REFERENCE_BASE_URL, "Reference project preview is required for visual comparison")
+  const data = await openChapterEditor(page)
+  const reference = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
+  await prepareReferenceDeepInsight(reference, { ...data.detail, reportContent: chapterReport })
+  const actualBox = (await page.locator(".general-research-result").boundingBox())!
+  const referenceBox = (await reference.locator(".chat-container").boundingBox())!
+  await reference.setViewportSize({ width: Math.round(referenceBox.x + actualBox.width), height: 1080 })
+  await reference.getByRole("button", { name: "文字报告", exact: true }).click()
+  await reference.getByRole("button", { name: "修改文章", exact: true }).click()
+  await reference
+    .locator(".chapter-section")
+    .filter({ has: reference.locator(".chapter-heading", { hasText: /^摘要$/ }) })
+    .getByRole("button", { name: "编辑本章" })
+    .click()
+  const materials = (editor: ReturnType<Page["locator"]>) =>
+    editor.evaluate((root) => {
+      const result: Record<string, string[]> = {}
+      for (const selector of [
+        ".chapter-heading.level-2",
+        ".chapter-card",
+        ".chapter-textarea",
+        ".chapter-actions .primary-button",
+      ]) {
+        const style = getComputedStyle(root.querySelector(selector)!)
+        result[selector] = [
+          style.fontSize,
+          style.lineHeight,
+          style.padding,
+          style.borderRadius,
+          style.borderTopWidth,
+          style.color,
+          style.backgroundColor,
+        ]
+      }
+      return result
+    })
+  expect(await materials(page.locator(".gd-report-editor"))).toEqual(
+    await materials(reference.locator(".report-editor")),
+  )
+  await page.locator(".gd-report-editor").screenshot({ path: test.info().outputPath("implemented-editor.png") })
+  await reference.locator(".report-editor").screenshot({ path: test.info().outputPath("reference-editor.png") })
+  await reference.close()
+  expect(data.errors).toEqual([])
+})
+
+test("saving a chapter blocks duplicate submissions and accidental exit", async ({ page }) => {
+  const data = await openChapterEditor(page)
+  await page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true }).fill("确认中的新内容\n\n")
+  let release!: () => void
+  let saves = 0
+  await page.route(`**/sessions/${id}/report`, async (route) => {
+    saves++
+    await new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await route.fallback()
+  })
+  page.once("dialog", (dialog) => dialog.accept())
+  await page.getByRole("button", { name: "确认本章修改", exact: true }).click()
+  await expect(page.getByRole("button", { name: "保存中...", exact: true })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "退出修改", exact: true })).toBeDisabled()
+  await expect(page.getByRole("button", { name: "取消", exact: true })).toBeDisabled()
+  release()
+  await expect(page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true })).toHaveCount(0)
+  expect(saves).toBe(1)
+  expect(data.errors).toEqual([])
+})
 
 for (const width of [1920, 390]) {
   test(`outline is structured while report and visual delivery remain completion-only at ${width}px`, async ({
@@ -829,6 +1168,11 @@ test("completed history renders text, tables and real ECharts with stable time",
       dom: await page.locator("*").count(),
     }),
   )
+  expect(
+    await page.evaluate(() =>
+      performance.getEntriesByType("resource").some((entry) => entry.name.includes("/report-editor-view-")),
+    ),
+  ).toBe(false)
   await page.getByRole("tab", { name: "文字报告", exact: true }).click()
   await expect(page.locator(".report-view").getByRole("heading", { name: "研究报告", exact: true })).toBeVisible()
   await expect(page.locator(".report-view table")).toContainText("可验证")
@@ -1210,9 +1554,10 @@ test("replay stops without changing source and Word export contains real report 
   const download = page.waitForEvent("download")
   await page.getByRole("button", { name: "导出 Word", exact: true }).click()
   const artifact = await download
-  expect(artifact.suggestedFilename()).toBe("research-report.doc")
+  expect(artifact.suggestedFilename()).toBe("research-report.docx")
   const fs = await import("node:fs/promises")
-  const word = await fs.readFile((await artifact.path())!, "utf8")
+  const zip = await JSZip.loadAsync(await fs.readFile((await artifact.path())!))
+  const word = await zip.file("word/document.xml")!.async("string")
   expect(word).toContain("这是中文正文")
   expect(word).toContain("可验证")
   await page.getByRole("button", { name: "看回放", exact: true }).click()
@@ -1222,3 +1567,95 @@ test("replay stops without changing source and Word export contains real report 
   await expect(page.locator(".report-view")).toContainText("这是中文正文")
   await expect(page.locator(".general-research-result")).toHaveAttribute("data-status", "completed")
 })
+
+for (const width of [1920, 390]) {
+  test(`Word exports native fixed-template chapters, lists, tables and images at ${width}px`, async ({ page }) => {
+    const data = await prepare(page)
+    const content = `# Word 模板验收报告\n\n## 一、研究概述\n\n这是用于验证模板的中文正文，不代表实际研究数据。${"报告内容需要保持字体、行距和段落缩进的一致性。".repeat(8)}\n\n### （一）信息来源\n\n参考[公开资料](https://example.org/source)，保留 **重点内容**。\n\n#### 1. 研究边界\n\n本段用于验证三级标题。\n\n- 第一项资料\n- 第二项资料\n  - 嵌套说明\n\n3. 第三项\n4. 第四项\n\n|项目|结论|\n|---|---|\n|中文表格|保持可编辑|\n\n![示例图片](/test-report-image.svg)\n\n{{chart:1}}\n\n## 二、后续研究\n\n${"这是跨页排版测试段落，内容仅用于导出验收。\n\n".repeat(12)}`
+    data.setReport(content)
+    const detail = {
+      ...data.detail,
+      reportContent: content,
+      conversationData: {
+        ...data.detail.conversationData,
+        visualizationsMap: {
+          "1": {
+            title: "图表导出测试",
+            option: {
+              animation: false,
+              xAxis: { type: "category", data: ["甲", "乙"] },
+              yAxis: { type: "value" },
+              series: [{ type: "bar", data: [3, 7] }],
+            },
+          },
+        },
+      },
+    }
+    await page.route(`**/api/dockapi/general-deepinsight/sessions/${id}`, (route) =>
+      route.fulfill({ json: { code: 200, data: detail } }),
+    )
+    await page.route("**/test-report-image.svg", (route) =>
+      route.fulfill({
+        contentType: "image/svg+xml",
+        body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="100"><rect width="320" height="100" fill="#d9e9ff"/><rect x="20" y="20" width="280" height="60" fill="#447ac7"/></svg>',
+      }),
+    )
+    await page.setViewportSize({ width, height: 1080 })
+    await page.goto(`/general-deepinsight/session/${id}`)
+    if (width < 768) await page.getByRole("button", { name: "研究结果", exact: true }).click()
+    await page.getByRole("tab", { name: "文字报告", exact: true }).click()
+    expect(
+      await page.evaluate(() =>
+        performance.getEntriesByType("resource").some((entry) => /\/(export-word|word-document)-/.test(entry.name)),
+      ),
+    ).toBe(false)
+    const pending = page.waitForEvent("download")
+    await page.getByRole("button", { name: "导出 Word", exact: true }).click()
+    const download = await pending
+    expect(download.suggestedFilename()).toBe("research-report.docx")
+    await download.saveAs(test.info().outputPath("word-template.docx"))
+    const fs = await import("node:fs/promises")
+    const zip = await JSZip.loadAsync(await fs.readFile((await download.path())!))
+    const documentXml = await zip.file("word/document.xml")!.async("string")
+    const stylesXml = await zip.file("word/styles.xml")!.async("string")
+    const properties = await page.evaluate(
+      ({ documentXml, stylesXml }) => {
+        const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        const doc = new DOMParser().parseFromString(documentXml, "application/xml")
+        const styles = new DOMParser().parseFromString(stylesXml, "application/xml")
+        const body = Array.from(styles.getElementsByTagNameNS(ns, "style")).find(
+          (node) => node.getAttributeNS(ns, "styleId") === "ResearchBody",
+        )!
+        const defaults = styles.getElementsByTagNameNS(ns, "docDefaults")[0]!
+        return {
+          parseErrors:
+            doc.getElementsByTagName("parsererror").length + styles.getElementsByTagName("parsererror").length,
+          title: doc.getElementsByTagNameNS(ns, "t")[0]!.textContent,
+          firstLineChars: body.getElementsByTagNameNS(ns, "ind")[0]!.getAttributeNS(ns, "firstLineChars"),
+          spacing: defaults.getElementsByTagNameNS(ns, "spacing")[0]!.getAttributeNS(ns, "line"),
+          lineRule: defaults.getElementsByTagNameNS(ns, "spacing")[0]!.getAttributeNS(ns, "lineRule"),
+          tableCount: doc.getElementsByTagNameNS(ns, "tbl").length,
+          pictureCount: doc.getElementsByTagNameNS(ns, "drawing").length,
+          numbered: doc.getElementsByTagNameNS(ns, "numPr").length,
+        }
+      },
+      { documentXml, stylesXml },
+    )
+    expect(properties).toEqual({
+      parseErrors: 0,
+      title: "Word 模板验收报告",
+      firstLineChars: "200",
+      spacing: "560",
+      lineRule: "exact",
+      tableCount: 1,
+      pictureCount: 2,
+      numbered: 5,
+    })
+    expect(Object.keys(zip.files).filter((name) => /^word\/media\/.+\.png$/.test(name))).toHaveLength(2)
+    expect(Object.keys(zip.files).some((name) => name.endsWith(".odttf"))).toBe(false)
+    await expect(page.locator(".gd-word-export")).toHaveCount(0)
+    await expect(page.locator(".report-view")).toContainText("中文表格")
+    await page.screenshot({ path: test.info().outputPath("word-export-source.png") })
+    expect(data.errors).toEqual([])
+  })
+}

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, For, onCleanup, Show, untrack } from "solid-js"
+import { createEffect, createMemo, For, lazy, onCleanup, Show, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -24,6 +24,8 @@ import { prepareResearchCase, prepareResearchDraft, takeResearchCase, takeResear
 import "./research.css"
 import "./home-composer.css"
 
+const ResearchReportEditor = lazy(() => import("./report-editor-view"))
+
 export default function ResearchPage() {
   const dockapi = useDockApi()
   const layout = useLayout()
@@ -48,11 +50,6 @@ export default function ResearchPage() {
     planEditing: false,
     countdown: 60,
     edit: false,
-    reportDraft: "",
-    rewrite: false,
-    rewriteText: "",
-    requirements: "",
-    rewritten: "",
     publish: false,
     caseName: "",
     caseDescription: "",
@@ -178,7 +175,6 @@ export default function ResearchPage() {
       error: "",
       busy: false,
       edit: false,
-      rewrite: false,
       publish: false,
       resume: "",
       plan: "",
@@ -328,33 +324,23 @@ export default function ResearchPage() {
       abort = undefined
       await refresh(generation)
     })
-  const saveReport = () =>
-    action(async () => {
-      await request(`/sessions/${params.id}/report`, {
-        method: "PUT",
-        body: JSON.stringify({ reportContent: state.reportDraft }),
-      })
-      setState("edit", false)
-      await refresh(generation)
+  const saveReport = async (content: string) => {
+    await request(`/sessions/${params.id}/report`, {
+      method: "PUT",
+      body: JSON.stringify({ reportContent: content }),
     })
-  const rewrite = () =>
-    action(async () => {
-      const result = await request<{ rewritten_text: string }>(`/sessions/${params.id}/report/rewrite`, {
-        method: "POST",
-        body: JSON.stringify({ text: state.rewriteText, requirements: state.requirements }),
-      })
-      setState("rewritten", result.rewritten_text)
+    await refresh(generation)
+    announce()
+    return state.detail?.reportContent ?? content
+  }
+  const rewrite = async (selected: string, requirements: string, signal: AbortSignal) => {
+    const result = await request<{ rewritten_text: string }>(`/sessions/${params.id}/report/rewrite`, {
+      method: "POST",
+      body: JSON.stringify({ text: selected, requirements }),
+      signal,
     })
-  const applyRewrite = () =>
-    action(async () => {
-      if (!state.detail || !state.rewritten) return
-      await request(`/sessions/${params.id}/report`, {
-        method: "PUT",
-        body: JSON.stringify({ reportContent: state.detail.reportContent.replace(state.rewriteText, state.rewritten) }),
-      })
-      setState("rewrite", false)
-      await refresh(generation)
-    })
+    return result.rewritten_text
+  }
   const download = async (path: string, filename: string, init?: RequestInit) => {
     const response = await dockapi.research.fetch(`${RESEARCH_API}${path}`, init)
     if (!response.ok) throw new Error(`下载失败（HTTP ${response.status}）`)
@@ -408,22 +394,6 @@ export default function ResearchPage() {
       }
     })
 
-  const editor = () => (
-    <>
-      <textarea
-        class="research-report-editor"
-        aria-label="编辑文字报告"
-        value={state.reportDraft}
-        onInput={(event) => setState("reportDraft", event.currentTarget.value)}
-      />
-      <div class="research-actions">
-        <button onClick={() => setState("edit", false)}>退出修改</button>
-        <button disabled={state.busy} onClick={() => void saveReport()}>
-          保存报告
-        </button>
-      </div>
-    </>
-  )
   const interrupt = () => (
     <div class="chat-input-container plan-card-host">
       <div class="interrupt-card plan-confirmation-card">
@@ -551,7 +521,16 @@ export default function ResearchPage() {
           readOnly={readOnly()}
           small={state.small}
           editing={state.edit}
-          editor={editor()}
+          editor={
+            <Show when={state.edit && state.detail}>
+              <ResearchReportEditor
+                content={state.detail!.reportContent}
+                onSave={saveReport}
+                onRewrite={rewrite}
+                onExit={() => setState("edit", false)}
+              />
+            </Show>
+          }
           interrupt={interrupt()}
           onNew={() => navigate("/general-deepinsight")}
           onSame={() => {
@@ -559,10 +538,7 @@ export default function ResearchPage() {
             navigate("/general-deepinsight")
           }}
           onStop={() => void stop()}
-          onEdit={() => setState({ edit: true, reportDraft: state.detail?.reportContent ?? "" })}
-          onRewrite={() =>
-            setState({ rewrite: true, rewriteText: window.getSelection()?.toString() ?? "", rewritten: "" })
-          }
+          onEdit={() => setState("edit", true)}
           onMarkdown={markdown}
           onPdf={() =>
             void action(() =>
@@ -656,99 +632,48 @@ export default function ResearchPage() {
           </section>
         </NewSessionDesignView>
       </Show>
-      <Show when={state.publish || state.rewrite}>
+      <Show when={state.publish}>
         <div class="research-modal-backdrop">
-          <section
-            class="research-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={state.publish ? "发布研究案例" : "文字重写"}
-          >
+          <section class="research-modal" role="dialog" aria-modal="true" aria-label="发布研究案例">
             <header>
-              <h2>{state.publish ? "添加至案例库" : "文字重写"}</h2>
-              <button title="关闭" disabled={state.busy} onClick={() => setState({ publish: false, rewrite: false })}>
+              <h2>添加至案例库</h2>
+              <button title="关闭" disabled={state.busy} onClick={() => setState("publish", false)}>
                 <Icon name="close" />
               </button>
             </header>
-            <Show
-              when={state.publish}
-              fallback={
-                <>
-                  <label>
-                    待修改文本
-                    <textarea
-                      value={state.rewriteText}
-                      onInput={(event) => setState("rewriteText", event.currentTarget.value)}
-                    />
-                  </label>
-                  <label>
-                    修改要求
-                    <textarea
-                      value={state.requirements}
-                      onInput={(event) => setState("requirements", event.currentTarget.value)}
-                    />
-                  </label>
-                  <Show when={state.rewritten}>
-                    <label>
-                      重写结果
-                      <textarea
-                        value={state.rewritten}
-                        onInput={(event) => setState("rewritten", event.currentTarget.value)}
-                      />
-                    </label>
-                  </Show>
-                  <div class="research-actions">
-                    <button
-                      disabled={state.busy || !state.rewriteText.trim() || !state.requirements.trim()}
-                      onClick={() => void rewrite()}
-                    >
-                      生成修改
-                    </button>
-                    <button
-                      class="primary"
-                      disabled={state.busy || !state.rewritten}
-                      onClick={() => void applyRewrite()}
-                    >
-                      应用并保存
-                    </button>
-                  </div>
-                </>
-              }
-            >
-              <label>
-                案例名称
-                <input
-                  value={state.caseName}
-                  maxLength={255}
-                  onInput={(event) => setState("caseName", event.currentTarget.value)}
-                />
-              </label>
-              <label>
-                案例说明
-                <textarea
-                  value={state.caseDescription}
-                  maxLength={255}
-                  onInput={(event) => setState("caseDescription", event.currentTarget.value)}
-                />
-              </label>
-              <label>
-                案例封面
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  onChange={(event) => setState("cover", event.currentTarget.files?.[0])}
-                />
-              </label>
-              <div class="research-actions">
-                <button
-                  class="primary"
-                  disabled={state.busy || !state.cover || !state.caseName.trim()}
-                  onClick={() => void publish()}
-                >
-                  确认发布
-                </button>
-              </div>
-            </Show>
+            <label>
+              案例名称
+              <input
+                value={state.caseName}
+                maxLength={255}
+                onInput={(event) => setState("caseName", event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              案例说明
+              <textarea
+                value={state.caseDescription}
+                maxLength={255}
+                onInput={(event) => setState("caseDescription", event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              案例封面
+              <input
+                type="file"
+                accept="image/png,image/jpeg"
+                onChange={(event) => setState("cover", event.currentTarget.files?.[0])}
+              />
+            </label>
+            <div class="research-actions">
+              <button
+                class="primary"
+                disabled={state.busy || !state.cover || !state.caseName.trim()}
+                onClick={() => void publish()}
+              >
+                确认发布
+              </button>
+            </div>
           </section>
         </div>
       </Show>

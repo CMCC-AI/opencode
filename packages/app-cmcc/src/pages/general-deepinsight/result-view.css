@@ -146,28 +146,6 @@
   font-size: 12px;
   color: #6b7280;
 }
-.general-research-result .right-panel .gd-rewrite-control {
-  position: absolute;
-  top: 14px;
-  right: 98px;
-  z-index: 2;
-  padding: 7px 12px;
-  border: 1px solid #dbeafe;
-  border-radius: 999px;
-  color: #3b82f6;
-  background: #eff6ff;
-  font-size: 12px;
-}
-.general-research-result .right-panel .research-report-editor {
-  min-height: 480px;
-  width: 100%;
-  padding: 16px;
-  font-size: 13px;
-  line-height: 1.7;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
-  background: white;
-}
 .general-research-result .right-panel .research-actions button {
   padding: 7px 12px;
   border: 1px solid #dbeafe;

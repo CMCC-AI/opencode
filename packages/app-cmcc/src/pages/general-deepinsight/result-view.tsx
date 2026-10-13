@@ -19,7 +19,6 @@ import {
   referenceTime,
 } from "./presentation"
 import { ReportBody, VisualReport } from "./visual"
-import { exportResearchWord } from "./export-word"
 import { ThinkingTimeline } from "./thinking-view"
 import { showToast } from "@/utils/toast"
 import sendIcon from "@/assets/chat/send.svg"
@@ -39,7 +38,6 @@ export function ResearchResultView(props: {
   onSame: () => void
   onStop: () => void
   onEdit: () => void
-  onRewrite: () => void
   onMarkdown: () => void
   onPdf: () => void
   onHtml: () => void
@@ -170,7 +168,8 @@ export function ResearchResultView(props: {
     setView("wordExporting", true)
     try {
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-      if (wordContent) exportResearchWord(wordContent, "research-report.doc")
+      const { exportResearchWord } = await import("./export-word")
+      if (wordContent) await exportResearchWord(wordContent, "research-report.docx")
     } catch (error) {
       showToast({ variant: "error", title: "Word 导出失败", description: String(error) })
     } finally {
@@ -772,7 +771,7 @@ export function ResearchResultView(props: {
                   </Show>
                   <button
                     class="view-btn"
-                    disabled={props.busy}
+                    disabled={props.busy || view.wordExporting}
                     onClick={() => {
                       void exportWord()
                     }}
@@ -780,7 +779,7 @@ export function ResearchResultView(props: {
                     导出 Word
                   </button>
                 </Show>
-                <button class="view-btn secondary" onClick={() => setView("mode", "thinking")}>
+                <button class="view-btn secondary" disabled={props.editing} onClick={() => setView("mode", "thinking")}>
                   查看思考过程
                 </button>
               </>
@@ -853,9 +852,6 @@ export function ResearchResultView(props: {
                     <Show when={completed() && !props.readOnly && !view.replaying}>
                       <button class="report-edit-control" onClick={props.onEdit}>
                         修改文章
-                      </button>
-                      <button class="gd-rewrite-control" onClick={props.onRewrite}>
-                        文字重写
                       </button>
                     </Show>
                     <Show
@@ -940,7 +936,11 @@ export function ResearchResultView(props: {
       </Show>
       <Show when={props.small}>
         <div class="gd-mobile-tabs">
-          <button aria-pressed={view.mobile === "content"} onClick={() => setView("mobile", "content")}>
+          <button
+            aria-pressed={view.mobile === "content"}
+            disabled={props.editing}
+            onClick={() => setView("mobile", "content")}
+          >
             研究内容
           </button>
           <button aria-pressed={view.mobile === "results"} onClick={() => setView("mobile", "results")}>

@@ -1,7 +1,9 @@
-import { createEffect, For, Index, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createMemo, For, Index, onCleanup, onMount, Show } from "solid-js"
 import type { ECharts, EChartsOption } from "echarts"
 import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { array, object, text, type JsonObject, type ResearchData } from "./model"
+import { citationNumbers } from "./report-citations"
+import { ReportMarkdown } from "./report-markdown"
 
 function Chart(props: { option: JsonObject }) {
   let container!: HTMLDivElement
@@ -82,6 +84,7 @@ function Figure(props: { figure: JsonObject; table?: JsonObject }) {
 }
 
 export function ReportBody(props: { content: string; data: ResearchData; streaming?: boolean }) {
+  const numbers = createMemo(() => (props.streaming ? undefined : citationNumbers(props.content)))
   const chunks = () => props.content.split(/(\{\{?chart:[^}]+\}\}?)/g)
   const figure = (key: string, map?: Record<string, JsonObject>) => {
     const id = key.replace(/^VIZ-/i, "").replace(/^0+(?!$)/, "")
@@ -93,7 +96,10 @@ export function ReportBody(props: { content: string; data: ResearchData; streami
         {(chunk) => {
           const key = () => /^\{\{?chart:([^}]+)\}\}?$/.exec(chunk())?.[1]?.trim()
           return (
-            <Show when={key()} fallback={<Markdown text={chunk()} streaming={props.streaming} />}>
+            <Show
+              when={key()}
+              fallback={<ReportMarkdown text={chunk()} streaming={props.streaming} numbers={numbers()} />}
+            >
               {(key) => {
                 const chart = () => figure(key(), props.data.visualizationsMap)
                 const table = () => figure(key(), props.data.vizTablesMap)
