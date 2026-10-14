@@ -101,7 +101,8 @@ function embeddedUIResponse(key: string, asset: EmbeddedUIAsset, ifNoneMatch?: s
     ?.split(",")
     .some((candidate) => candidate.trim() === "*" || candidate.trim().replace(/^W\//i, "") === etag)
   if (notModified) return HttpServerResponse.empty({ status: 304, headers })
-  return HttpServerResponse.raw(asset.body, { headers })
+  // Raw bodies bypass the shared compression middleware.
+  return HttpServerResponse.uint8Array(asset.body, { contentType: asset.contentType, headers })
 }
 
 export function serveEmbeddedUIEffect(

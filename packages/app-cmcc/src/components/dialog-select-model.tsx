@@ -3,18 +3,12 @@ import { Component, ComponentProps, createMemo, JSX, Show, ValidComponent } from
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { Button } from "@opencode-ai/ui/button"
-import { IconButton } from "@opencode-ai/ui/icon-button"
+import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Tag } from "@opencode-ai/ui/tag"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useLanguage } from "@/context/language"
-import { decode64 } from "@/utils/base64"
-import { modelSelectorItems } from "./model-selector"
-
-const isFree = (provider: string, cost: { input: number } | undefined) =>
-  provider === "opencode" && (!cost || cost.input === 0)
+import { modelSelectorCategory, modelSelectorItems, modelSelectorKey } from "./model-selector"
 
 type ModelState = ReturnType<typeof useLocal>["model"]
 
@@ -22,7 +16,6 @@ const ModelList: Component<{
   provider?: string
   class?: string
   onSelect: () => void
-  action?: JSX.Element
   model?: ModelState
 }> = (props) => {
   const model = props.model ?? useLocal().model
@@ -40,12 +33,22 @@ const ModelList: Component<{
   return (
     <List
       class={`flex-1 px-3 min-h-0 [&_[data-slot=list-scroll]]:flex-1 [&_[data-slot=list-scroll]]:min-h-0 ${props.class ?? ""}`}
-      search={{ placeholder: language.t("dialog.model.search.placeholder"), autofocus: true, action: props.action }}
+      search={{ placeholder: language.t("dialog.model.search.placeholder"), autofocus: true }}
       emptyMessage={language.t("dialog.model.empty")}
-      key={(x) => `${x.provider.id}:${x.id}`}
+      key={modelSelectorKey}
       items={models}
       current={model.current()}
-      filterKeys={["name", "id"]}
+      filterKeys={["name", "id", "family"]}
+      groupBy={(item) => modelSelectorCategory(item).name}
+      sortGroupsBy={(a, b) =>
+        Number(a.category === "其他") - Number(b.category === "其他") || a.category.localeCompare(b.category)
+      }
+      groupHeader={(group) => (
+        <span class="flex items-center gap-2">
+          <ProviderIcon id={modelSelectorCategory(group.items[0]).icon} class="size-4 shrink-0" />
+          {group.category}
+        </span>
+      )}
       sortBy={(a, b) => a.name.localeCompare(b.name)}
       onSelect={(x) => {
         model.set(x ? { modelID: x.id, providerID: x.provider.id } : undefined, {
@@ -56,8 +59,13 @@ const ModelList: Component<{
     >
       {(i) => (
         <div class="w-full flex items-center gap-x-2 text-13-regular">
-          <span class="truncate">{i.name}</span>
-          <Show when={isFree(i.provider.id, i.cost)}>
+          <span class="min-w-0 flex-1 truncate">
+            {i.name}
+            <Show when={models().some((item) => item !== i && item.name === i.name)}>
+              <span class="block text-[11px] text-v2-text-text-muted">{i.provider.name || i.provider.id}</span>
+            </Show>
+          </span>
+          <Show when={modelSelectorCategory(i).id === "free"}>
             <Tag>{language.t("model.tag.free")}</Tag>
           </Show>
           <Show when={i.latest}>
@@ -70,7 +78,7 @@ const ModelList: Component<{
 }
 
 type ModelSelectorTriggerProps = Omit<ComponentProps<typeof Kobalte.Trigger>, "as" | "ref">
-type Dismiss = "escape" | "outside" | "select" | "manage" | "provider"
+type Dismiss = "escape" | "outside" | "select"
 
 export function ModelSelectorPopover(props: {
   provider?: string
@@ -87,28 +95,11 @@ export function ModelSelectorPopover(props: {
     open: false,
     dismiss: null,
   })
-  const dialog = useDialog()
-  const local = useLocal()
-  const directory = () => decode64(local.slug())
-
   const close = (dismiss: Dismiss) => {
     setStore("dismiss", dismiss)
     setStore("open", false)
   }
 
-  const handleManage = () => {
-    close("manage")
-    void import("./dialog-manage-models").then((x) => {
-      dialog.show(() => <x.DialogManageModels />)
-    })
-  }
-
-  const handleConnectProvider = () => {
-    close("provider")
-    void import("./dialog-select-provider").then((x) => {
-      dialog.show(() => <x.DialogSelectProvider directory={directory} />)
-    })
-  }
   const language = useLanguage()
 
   return (
@@ -146,36 +137,7 @@ export function ModelSelectorPopover(props: {
           }}
         >
           <Kobalte.Title class="sr-only">{language.t("dialog.model.select.title")}</Kobalte.Title>
-          <ModelList
-            provider={props.provider}
-            model={props.model}
-            onSelect={() => close("select")}
-            class="p-1"
-            action={
-              <div class="flex items-center gap-1">
-                <Tooltip placement="top" value={language.t("command.provider.connect")}>
-                  <IconButton
-                    icon="plus-small"
-                    variant="ghost"
-                    iconSize="normal"
-                    class="size-6"
-                    aria-label={language.t("command.provider.connect")}
-                    onClick={handleConnectProvider}
-                  />
-                </Tooltip>
-                <Tooltip placement="top" value={language.t("dialog.model.manage")}>
-                  <IconButton
-                    icon="sliders"
-                    variant="ghost"
-                    iconSize="normal"
-                    class="size-6"
-                    aria-label={language.t("dialog.model.manage")}
-                    onClick={handleManage}
-                  />
-                </Tooltip>
-              </div>
-            }
-          />
+          <ModelList provider={props.provider} model={props.model} onSelect={() => close("select")} class="p-1" />
         </Kobalte.Content>
       </Kobalte.Portal>
     </Kobalte>
@@ -185,34 +147,10 @@ export function ModelSelectorPopover(props: {
 export const DialogSelectModel: Component<{ provider?: string; model?: ModelState }> = (props) => {
   const dialog = useDialog()
   const language = useLanguage()
-  const local = useLocal()
-  const directory = () => decode64(local.slug())
-
-  const provider = () => {
-    void import("./dialog-select-provider").then((x) => {
-      dialog.show(() => <x.DialogSelectProvider directory={directory} />)
-    })
-  }
-
-  const manage = () => {
-    void import("./dialog-manage-models").then((x) => {
-      dialog.show(() => <x.DialogManageModels />)
-    })
-  }
 
   return (
-    <Dialog
-      title={language.t("dialog.model.select.title")}
-      action={
-        <Button class="h-7 -my-1 text-14-medium" icon="plus-small" tabIndex={-1} onClick={provider}>
-          {language.t("command.provider.connect")}
-        </Button>
-      }
-    >
+    <Dialog title={language.t("dialog.model.select.title")}>
       <ModelList provider={props.provider} model={props.model} onSelect={() => dialog.close()} />
-      <Button variant="ghost" class="ml-3 mt-5 mb-6 text-text-base self-start" onClick={manage}>
-        {language.t("dialog.model.manage")}
-      </Button>
     </Dialog>
   )
 }

@@ -70,13 +70,18 @@ for (const width of [1440, 390, 320]) {
   })
 }
 
-test("provider menus select models, search, preserve drafts and switch real modes", async ({ page }, info) => {
+test("model family menus select models, search, preserve drafts and switch real modes", async ({ page }, info) => {
   await openHome(page)
   const editor = page.locator(`${composer} [data-component="prompt-input"]`)
   await editor.fill("这段草稿不能丢失")
   const before = await page.locator(composer).boundingBox()
   await page.locator(modelTrigger).click()
   await expect(page.getByRole("menu", { name: "选择模型", exact: true })).toBeVisible()
+  for (const name of ["Qwen", "DeepSeek", "Kimi", "GLM", "其他"])
+    await expect(page.getByRole("menuitem", { name, exact: true })).toBeVisible()
+  await expect(page.getByRole("menuitem", { name: "公司网关", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("menuitem", { name: "管理模型", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("menuitem", { name: "连接提供商", exact: true })).toHaveCount(0)
   const deepseek = page.getByRole("menuitem", { name: "DeepSeek", exact: true })
   await expect(deepseek.locator('[data-component="provider-icon"]')).toBeVisible()
   await deepseek.hover()
@@ -86,6 +91,7 @@ test("provider menus select models, search, preserve drafts and switch real mode
   await page.getByRole("menuitemradio", { name: "DeepSeek 测试模型" }).click()
   await expect(page.locator(modelTrigger)).toContainText("DeepSeek 测试模型")
   await expect(editor).toHaveText("这段草稿不能丢失")
+  await expect(editor).toBeFocused()
   expect(await page.locator(composer).boundingBox()).toEqual(before)
   await page.getByRole("button", { name: "计划", exact: true }).click()
   await expect(page.getByRole("button", { name: "计划", exact: true })).toHaveAttribute("aria-pressed", "true")
@@ -93,33 +99,54 @@ test("provider menus select models, search, preserve drafts and switch real mode
   await page.getByRole("button", { name: "执行", exact: true }).click()
   await expect(page.getByRole("button", { name: "执行", exact: true })).toHaveAttribute("aria-pressed", "true")
   await expect(editor).toHaveText("这段草稿不能丢失")
+  await expect(editor).toBeFocused()
   await page.locator(modelTrigger).click()
   await page.getByRole("searchbox", { name: "搜索模型" }).fill("网关测试")
-  await expect(page.getByRole("menuitem", { name: "公司网关", exact: true })).toBeVisible()
+  await expect(page.getByRole("menuitem", { name: "其他", exact: true })).toBeVisible()
   await expect(deepseek).toHaveCount(0)
   await page.keyboard.press("Escape")
   await expect(page.getByRole("menu", { name: "选择模型", exact: true })).toHaveCount(0)
-  await page.locator(modelTrigger).click()
-  await page.getByRole("menuitem", { name: "管理模型", exact: true }).click()
-  await expect(page.getByRole("dialog")).toBeVisible()
 })
 
 test("models work with only free providers", async ({ page }) => {
   await setupHomePage(page, { models: true, free: true })
   await page.goto("/app")
   await page.locator(modelTrigger).click()
-  await page.getByRole("menuitem", { name: "DeepInsight", exact: true }).hover()
+  await page.getByRole("menuitem", { name: "Free", exact: true }).hover()
   await page.getByRole("menuitemradio", { name: "测试免费模型" }).click()
   await expect(page.locator(modelTrigger)).toContainText("测试免费模型")
 })
 
-test("empty model lists retain the setup entries", async ({ page }) => {
+test("empty model lists hide the model setup entries", async ({ page }) => {
   await setupHomePage(page)
   await page.goto("/app")
   await page.locator(modelTrigger).click()
   await expect(page.getByText("暂无可选模型", { exact: true })).toBeVisible()
-  await expect(page.getByRole("menuitem", { name: "管理模型", exact: true })).toBeVisible()
-  await expect(page.getByRole("menuitem", { name: "连接提供商", exact: true })).toBeVisible()
+  await expect(page.getByRole("menuitem", { name: "管理模型", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("menuitem", { name: "连接提供商", exact: true })).toHaveCount(0)
+})
+
+test("same-ID models in one family retain their actual provider selection", async ({ page }, info) => {
+  await setupHomePage(page, { models: true, duplicateModels: true })
+  await page.goto("/app")
+  await page.locator(modelTrigger).click()
+  await page.getByRole("menuitem", { name: "Qwen", exact: true }).hover()
+  const direct = page.getByRole("menuitemradio", { name: "Qwen 测试模型 Qwen", exact: true })
+  const gateway = page.getByRole("menuitemradio", { name: "Qwen 测试模型 公司网关", exact: true })
+  await expect(direct).toBeVisible()
+  await expect(gateway).toBeVisible()
+  await expect(page.locator(".home-model-submenu")).toHaveCSS("opacity", "1")
+  await page.screenshot({ path: info.outputPath("duplicate-models.png") })
+  await gateway.click()
+  await page.locator(modelTrigger).click()
+  await page.getByRole("menuitem", { name: "Qwen", exact: true }).hover()
+  await expect(gateway).toHaveAttribute("aria-checked", "true")
+  await expect(direct).toHaveAttribute("aria-checked", "false")
+  await direct.click()
+  await page.locator(modelTrigger).click()
+  await page.getByRole("menuitem", { name: "Qwen", exact: true }).hover()
+  await expect(direct).toHaveAttribute("aria-checked", "true")
+  await expect(gateway).toHaveAttribute("aria-checked", "false")
 })
 
 test("touch-sized model menus stay inside the viewport", async ({ page }, info) => {
@@ -136,6 +163,25 @@ test("touch-sized model menus stay inside the viewport", async ({ page }, info) 
   await option.click()
   await expect(page.locator(modelTrigger)).toContainText("DeepSeek 测试模型")
 })
+
+for (const free of [false, true]) {
+  test(`history model menus show family groups without setup actions (free=${free})`, async ({
+    page,
+    baseURL,
+  }, info) => {
+    await setupHomePage(page, { models: true, history: true, free })
+    await page.goto(`/server/${base64Encode(baseURL!)}/session/${homeSession.id}`)
+    await expect(page.locator('[data-component="session-composer"]')).toBeVisible()
+    await page.locator(modelTrigger).click()
+    await expect(page.getByText(free ? "Free" : "Kimi", { exact: true })).toBeVisible()
+    await expect(page.getByRole("button", { name: "管理模型", exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "连接提供商", exact: true })).toHaveCount(0)
+    await expect(page.getByText("公司网关", { exact: true })).toHaveCount(0)
+    await page.screenshot({ path: info.outputPath("history-models.png") })
+    await page.getByRole("button", { name: free ? "测试免费模型 免费" : "Kimi 测试模型", exact: true }).click()
+    await expect(page.locator(modelTrigger)).toContainText(free ? "测试免费模型" : "Kimi 测试模型")
+  })
+}
 
 test("history sessions retain their existing model and agent controls", async ({ page, baseURL }) => {
   await setupHomePage(page, { models: true, history: true })

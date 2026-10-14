@@ -26,7 +26,10 @@ function provider(id: string, name: string, modelName: string) {
   }
 }
 
-export async function setupHomePage(page: Page, options: { models?: boolean; history?: boolean; free?: boolean } = {}) {
+export async function setupHomePage(
+  page: Page,
+  options: { models?: boolean; history?: boolean; free?: boolean; duplicateModels?: boolean } = {},
+) {
   await page.addInitScript(() => {
     if (window !== window.top) return
     localStorage.setItem("dockapi.accessToken", "home-sizing-test-token")
@@ -47,6 +50,27 @@ export async function setupHomePage(page: Page, options: { models?: boolean; his
           provider("deepseek", "DeepSeek", "DeepSeek 测试模型"),
           provider("custom-gateway", "公司网关", "网关测试模型"),
         ]
+  if (options.models && !options.free) {
+    providers[0].models["kimi-k2.6"] = {
+      id: "kimi-k2.6",
+      name: "Kimi 测试模型",
+      limit: { context: 200000 },
+      cost: { input: 0, output: 0 },
+    }
+    providers[0].models["glm-5.2"] = {
+      id: "glm-5.2",
+      name: "GLM 测试模型",
+      limit: { context: 200000 },
+      cost: { input: 0, output: 0 },
+    }
+    if (options.duplicateModels)
+      providers[2].models["alibaba-cn-test"] = {
+        id: "alibaba-cn-test",
+        name: "Qwen 测试模型",
+        limit: { context: 200000 },
+        cost: { input: 0, output: 0 },
+      }
+  }
   await mockOpenCodeServer(page, {
     directory: homeDirectory,
     project: { id: "home-sizing-test", worktree: homeDirectory, time: { created: 1 } },

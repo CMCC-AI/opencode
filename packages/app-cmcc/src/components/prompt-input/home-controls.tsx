@@ -3,12 +3,10 @@ import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/icon"
 import { ProviderIcon } from "@opencode-ai/ui/provider-icon"
 import { Tag } from "@opencode-ai/ui/tag"
-import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { For, Show, createMemo, type JSX, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
-import { decode64 } from "@/utils/base64"
-import { modelSelectorGroups, modelSelectorItems } from "../model-selector"
+import { modelSelectorCategory, modelSelectorGroups, modelSelectorItems, modelSelectorKey } from "../model-selector"
 import "./home-controls.css"
 
 export function HomeActionsPopover(
@@ -53,8 +51,6 @@ export function HomeModelControl(props: {
   onOpen: () => void
   onClose: () => void
 }) {
-  const local = useLocal()
-  const dialog = useDialog()
   const [state, setState] = createStore({ open: false, query: "", focusEditor: false })
   const groups = createMemo(() =>
     modelSelectorGroups(
@@ -63,22 +59,16 @@ export function HomeModelControl(props: {
         current: props.model.current(),
         visible: (item) => props.model.visible(item),
       }).filter((item) =>
-        `${item.provider.name} ${item.name} ${item.id}`
+        `${modelSelectorCategory(item).name} ${item.provider.name} ${item.name} ${item.id}`
           .toLocaleLowerCase()
           .includes(state.query.trim().toLocaleLowerCase()),
       ),
     ),
   )
 
-  const manage = async () => {
-    setState("open", false)
-    const { DialogManageModels } = await import("../dialog-manage-models")
-    dialog.show(() => <DialogManageModels />)
-  }
-  const connect = async () => {
-    setState("open", false)
-    const { DialogSelectProvider } = await import("../dialog-select-provider")
-    dialog.show(() => <DialogSelectProvider directory={() => decode64(local.slug())} />)
+  const currentKey = () => {
+    const current = props.model.current()
+    return current ? modelSelectorKey(current) : ""
   }
 
   return (
@@ -105,14 +95,17 @@ export function HomeModelControl(props: {
         style={props.style}
         title={props.model.current()?.name ?? "选择模型"}
       >
-        <ProviderIcon id={props.model.current()?.provider.id ?? "synthetic"} class="size-4 shrink-0" />
+        <ProviderIcon
+          id={props.model.current() ? modelSelectorCategory(props.model.current()!).icon : "synthetic"}
+          class="size-4 shrink-0"
+        />
         <span class="min-w-0 truncate">{props.model.current()?.name ?? (props.loading ? "加载中" : "选择模型")}</span>
         <Icon name="chevron-down" class="size-3 shrink-0" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           class="home-model-menu"
-          aria-label="模型提供商"
+          aria-label="选择模型"
           onEscapeKeyDown={() => setState("focusEditor", true)}
           onCloseAutoFocus={(event) => {
             event.preventDefault()
@@ -138,29 +131,37 @@ export function HomeModelControl(props: {
                 <DropdownMenu.Sub gutter={6} overflowPadding={12} overlap>
                   <DropdownMenu.SubTrigger
                     class="home-model-provider"
-                    data-current={props.model.current()?.provider.id === group.id ? "" : undefined}
+                    data-current={
+                      group.models.some((model) => modelSelectorKey(model) === currentKey()) ? "" : undefined
+                    }
                   >
-                    <ProviderIcon id={group.id} class="size-[18px] shrink-0" />
+                    <ProviderIcon id={group.icon} class="size-[18px] shrink-0" />
                     <span class="min-w-0 flex-1 truncate">{group.name}</span>
                     <Icon name="chevron-right" class="size-3.5 shrink-0" />
                   </DropdownMenu.SubTrigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.SubContent class="home-model-submenu" aria-label={`${group.name}模型`}>
                       <DropdownMenu.RadioGroup
-                        value={props.model.current()?.provider.id === group.id ? props.model.current()?.id : ""}
-                        onChange={(modelID) => {
-                          if (typeof modelID !== "string") return
-                          props.model.set({ providerID: group.id, modelID }, { recent: true })
+                        value={currentKey()}
+                        onChange={(key) => {
+                          const selected = group.models.find((model) => modelSelectorKey(model) === key)
+                          if (!selected) return
+                          props.model.set({ providerID: selected.provider.id, modelID: selected.id }, { recent: true })
                           setState({ focusEditor: true, open: false })
                         }}
                       >
                         <For each={group.models.toSorted((a, b) => a.name.localeCompare(b.name))}>
                           {(model) => (
-                            <DropdownMenu.RadioItem value={model.id} class="home-model-option">
+                            <DropdownMenu.RadioItem value={modelSelectorKey(model)} class="home-model-option">
                               <DropdownMenu.ItemLabel class="min-w-0 flex-1 break-words">
                                 {model.name}
+                                <Show when={group.models.some((item) => item !== model && item.name === model.name)}>
+                                  <span class="block text-[11px] text-v2-text-text-muted">
+                                    {model.provider.name || model.provider.id}
+                                  </span>
+                                </Show>
                               </DropdownMenu.ItemLabel>
-                              <Show when={group.id === "opencode" && (!model.cost || model.cost.input === 0)}>
+                              <Show when={group.id === "free"}>
                                 <Tag>免费</Tag>
                               </Show>
                               <Show when={model.latest}>
@@ -182,15 +183,6 @@ export function HomeModelControl(props: {
               <p class="home-model-empty">暂无可选模型</p>
             </Show>
           </div>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item onSelect={() => void manage()}>
-            <Icon name="sliders" class="size-4" />
-            <DropdownMenu.ItemLabel>管理模型</DropdownMenu.ItemLabel>
-          </DropdownMenu.Item>
-          <DropdownMenu.Item onSelect={() => void connect()}>
-            <Icon name="plus" class="size-4" />
-            <DropdownMenu.ItemLabel>连接提供商</DropdownMenu.ItemLabel>
-          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu>

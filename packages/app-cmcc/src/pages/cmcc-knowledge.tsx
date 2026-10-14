@@ -276,6 +276,11 @@ export function CmccKnowledgeHomeRoute() {
       <img
         src={wikiHeroArtwork}
         alt=""
+        width={1160}
+        height={432}
+        loading="eager"
+        fetchpriority="high"
+        decoding="async"
         class="pointer-events-none absolute inset-x-0 top-0 h-[432px] w-full object-cover object-center mix-blend-multiply max-md:opacity-75 max-sm:h-[360px] max-sm:opacity-35"
       />
       <div class="relative mx-auto flex min-h-full w-full max-w-[1320px] flex-col px-6 pb-12 max-sm:px-4">
@@ -319,7 +324,15 @@ export function CmccKnowledgeHomeRoute() {
               onClick={() => setDialog("open", true)}
               disabled={discovering()}
             >
-              <img src={createNotebookCardArtwork} alt="" class="pointer-events-none size-full object-contain" />
+              <img
+                src={createNotebookCardArtwork}
+                alt=""
+                width={196}
+                height={160}
+                loading="eager"
+                decoding="async"
+                class="pointer-events-none size-full object-contain"
+              />
               <span class="sr-only">创建笔记</span>
             </button>
             <For each={displayedNotebooks()}>
@@ -1919,6 +1932,10 @@ function NotebookCard(props: {
           <img
             src={notebookSpecCardArtwork}
             alt=""
+            width={196}
+            height={160}
+            loading={props.index < 4 ? "eager" : "lazy"}
+            decoding="async"
             class="pointer-events-none absolute inset-0 size-full object-contain"
           />
         </Show>
@@ -1926,6 +1943,8 @@ function NotebookCard(props: {
           <img
             src={notebookQaArtwork}
             alt=""
+            loading={props.index < 4 ? "eager" : "lazy"}
+            decoding="async"
             class="pointer-events-none absolute inset-x-0 top-[57px] h-[82px] w-full object-cover opacity-95 transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </Show>
