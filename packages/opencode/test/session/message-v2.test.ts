@@ -9,6 +9,9 @@ import { SessionID, MessageID, PartID } from "../../src/session/schema"
 import { Question } from "../../src/question"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { attachmentReferenceUrl } from "@opencode-ai/core/util/attachment-reference"
+import { pathToFileURL } from "url"
+import path from "path"
 
 const sessionID = SessionID.make("session")
 const providerID = ProviderV2.ID.make("test")
@@ -112,6 +115,36 @@ function basePart(messageID: string, id: string) {
 }
 
 describe("session.message-v2.toModelMessage", () => {
+  test("sends new attachment paths to the model without binary media or injected document bodies", async () => {
+    const input: SessionV1.WithParts[] = [
+      {
+        info: userInfo("m-reference"),
+        parts: [
+          { ...basePart("m-reference", "question"), type: "text", text: "分析这些巡查附件" },
+          ...["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/png", "text/plain"].map(
+            (mime, index) => ({
+              ...basePart("m-reference", `file-${index}`),
+              type: "file" as const,
+              filename: `附件${index}`,
+              mime,
+              url: attachmentReferenceUrl(
+                pathToFileURL(path.join(process.cwd(), "runs/one/attachments", `file-${index}`)).href,
+              ),
+            }),
+          ),
+        ],
+      },
+    ]
+    const result = await MessageV2.toModelMessages(input, model)
+    expect(result).toHaveLength(1)
+    expect(result[0].content).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "text", text: "分析这些巡查附件" })]),
+    )
+    expect(JSON.stringify(result)).toContain("Read")
+    expect(JSON.stringify(result)).toContain("attachments")
+    expect(JSON.stringify(result)).not.toContain('"type":"file"')
+    expect(JSON.stringify(result)).not.toContain("data:")
+  })
   test("filters out messages with no parts", async () => {
     const input: SessionV1.WithParts[] = [
       {

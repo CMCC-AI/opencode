@@ -9,6 +9,8 @@ import { InstanceState } from "@/effect/instance-state"
 import { assertExternalDirectoryEffect } from "./external-directory"
 import { Instruction } from "../session/instruction"
 import { isPdfAttachment, sniffAttachmentMime } from "@/util/media"
+import { isWordPath, readWordDocument } from "@/util/word-document"
+import { ATTACHMENT_UPLOAD_LIMIT } from "@opencode-ai/core/util/attachment-reference"
 
 const DEFAULT_READ_LIMIT = 2000
 const MAX_LINE_LENGTH = 2000
@@ -298,6 +300,54 @@ export const ReadTool = Tool.define<
       }
 
       const loaded = yield* instruction.resolve(ctx.messages, filepath, ctx.messageID)
+      if (isWordPath(filepath)) {
+        if (Number(stat.size) > ATTACHMENT_UPLOAD_LIMIT) return yield* Effect.fail(new Error("Word 文件不能超过 30 MB"))
+        const bytes = yield* fs.readFile(filepath)
+        const text = yield* Effect.tryPromise({ try: () => readWordDocument(bytes), catch: (error) => error })
+        // Long Word paragraphs become readable chunks rather than losing their tails to line truncation.
+        const all = text.split("\n").flatMap((line) => line.match(/[\s\S]{1,2000}/gu) ?? [""])
+        const offset = params.offset || 1
+        if (offset > all.length)
+          return yield* Effect.fail(new Error(`Offset ${offset} is out of range for this file (${all.length} lines)`))
+        const raw: string[] = []
+        let size = 0
+        for (const line of all.slice(offset - 1, offset - 1 + (params.limit ?? DEFAULT_READ_LIMIT))) {
+          const value = line
+          const length = Buffer.byteLength(value, "utf8") + 1
+          if (size + length > MAX_BYTES) break
+          raw.push(value)
+          size += length
+        }
+        const truncated = offset - 1 + raw.length < all.length
+        return {
+          title,
+          output: [
+            `<path>${filepath}</path>`,
+            "<type>file</type>",
+            "<format>Word extracted text</format>",
+            "<content>",
+            ...raw.map((line, index) => `${offset + index}: ${line}`),
+            "</content>",
+            truncated
+              ? `Output capped. Use offset=${offset + raw.length} to continue reading.`
+              : `(End of file - ${all.length} lines)`,
+          ].join("\n"),
+          metadata: {
+            preview: raw.slice(0, 20).join("\n"),
+            truncated,
+            loaded: loaded.map((item) => item.filepath),
+            display: {
+              type: "file" as const,
+              path: filepath,
+              text: raw.join("\n"),
+              lineStart: offset,
+              lineEnd: offset + raw.length - 1,
+              totalLines: all.length,
+              truncated,
+            },
+          },
+        }
+      }
       const sample = yield* readSample(filepath, Number(stat.size), SAMPLE_BYTES)
 
       const mime = sniffAttachmentMime(sample, FSUtil.mimeType(filepath))

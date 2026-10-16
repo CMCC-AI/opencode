@@ -1,4 +1,5 @@
 import { onMount } from "solid-js"
+import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { showToast } from "@/utils/toast"
 import { type ContentPart, type ImageAttachmentPart, type usePrompt } from "@/context/prompt"
@@ -7,6 +8,12 @@ import { uuid } from "@/utils/uuid"
 import { getCursorPosition } from "./editor-dom"
 import { attachmentMime } from "./files"
 import { normalizePaste, pasteMode } from "./paste"
+import { folderUploadFiles } from "./folder-upload"
+
+export type AttachmentStorage = {
+  store: (file: File, mime: string, relativePath?: string) => Promise<{ path: string; url: string }>
+  rollback: () => Promise<void>
+}
 
 function dataUrl(file: File, mime: string) {
   return new Promise<string>((resolve) => {
@@ -26,7 +33,7 @@ function dataUrl(file: File, mime: string) {
 }
 
 type PromptTarget = Pick<ReturnType<ReturnType<typeof usePrompt>["capture"]>, "current" | "cursor" | "set">
-type AttachmentTarget = { prompt: PromptTarget; cursor: number | undefined }
+type AttachmentTarget = { prompt: PromptTarget; cursor: number | undefined; storage?: AttachmentStorage }
 
 type PromptAttachmentsCoreInput = {
   capture: () => PromptTarget
@@ -36,7 +43,7 @@ type PromptAttachmentsCoreInput = {
   warn?: () => void
   readClipboardImage?: () => Promise<File | null>
   getPathForFile?: (file: File) => string
-  storeFile?: (file: File, mime: string) => Promise<{ path: string; content: string } | undefined>
+  storage?: () => AttachmentStorage
   onStoreError?: (error: unknown) => void
 }
 
@@ -49,69 +56,100 @@ type PromptAttachmentsInput = {
   addPart: (part: ContentPart) => boolean
   readClipboardImage?: () => Promise<File | null>
   getPathForFile?: (file: File) => string
-  storeFile?: (file: File, mime: string) => Promise<{ path: string; content: string } | undefined>
+  storage?: () => AttachmentStorage
   onStoreError?: (error: unknown) => void
 }
 
 export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
+  const [uploadStatus, setUploadStatus] = createStore({ pending: 0, completed: 0, total: 0 })
   const capture = (): AttachmentTarget | undefined => {
     const prompt = input.capture()
     const editor = input.editor()
     if (!editor) return
-    return { prompt, cursor: prompt.cursor() ?? getCursorPosition(editor) }
+    return { prompt, cursor: prompt.cursor() ?? getCursorPosition(editor), storage: input.storage?.() }
+  }
+
+  const read = async (file: File, target: AttachmentTarget, relativePath?: string, knownMime?: string) => {
+    const mime = knownMime ?? (await attachmentMime(file))
+    if (!mime) return
+    const stored = await target.storage?.store(file, mime, relativePath)
+    const url = stored && !mime.startsWith("image/") ? "" : await dataUrl(file, mime)
+    if (!stored && !url) return
+    return {
+      type: "image",
+      id: uuid(),
+      filename: relativePath ?? file.name,
+      sourcePath: stored?.path ?? (input.getPathForFile?.(file) || undefined),
+      mime,
+      dataUrl: url,
+      ...(stored ? { referenceUrl: stored.url } : {}),
+    } satisfies ImageAttachmentPart
+  }
+
+  const track = async (total: number, work: () => Promise<boolean>) => {
+    if (!uploadStatus.pending) setUploadStatus({ completed: 0, total: 0 })
+    setUploadStatus({ pending: uploadStatus.pending + 1, total: uploadStatus.total + total })
+    try {
+      return await work()
+    } catch (error) {
+      input.onStoreError?.(error)
+      return false
+    } finally {
+      setUploadStatus("pending", (count) => count - 1)
+    }
   }
 
   const add = async (file: File, toast = true, target = capture()) => {
     if (!target) return false
-    const mime = await attachmentMime(file)
-    if (!mime) {
+    const attachment = await read(file, target)
+    setUploadStatus("completed", (count) => count + 1)
+    if (!attachment) {
       if (toast) input.warn?.()
       return false
-    }
-
-    const stored = await input.storeFile?.(file, mime).catch((error) => {
-      input.onStoreError?.(error)
-      return null
-    })
-    if (stored === null) {
-      return false
-    }
-    const resolvedMime = stored ? "text/plain" : mime
-    const url = stored
-      ? `data:text/plain;charset=utf-8,${encodeURIComponent(stored.content)}`
-      : await dataUrl(file, resolvedMime)
-    if (!url) return false
-
-    const attachment: ImageAttachmentPart = {
-      type: "image",
-      id: uuid(),
-      filename: file.name,
-      sourcePath: stored?.path ?? (input.getPathForFile?.(file) || undefined),
-      mime: resolvedMime,
-      dataUrl: url,
     }
     target.prompt.set([...target.prompt.current(), attachment], target.cursor)
     return true
   }
 
-  const addAttachment = (file: File) => add(file)
+  const addAttachment = (file: File) => track(1, () => add(file))
 
-  const addAttachments = async (files: File[], toast = true, target = capture()) => {
-    let found = false
+  const addAttachments = (files: File[], toast = true, target = capture()) =>
+    track(files.length, async () => {
+      let found = false
 
-    for (const file of files) {
-      const ok = await add(file, false, target)
-      if (ok) found = true
-    }
+      for (const file of files) {
+        const ok = await add(file, false, target)
+        if (ok) found = true
+      }
 
-    if (!found && files.length > 0 && toast) input.warn?.()
-    return found
-  }
+      if (!found && files.length > 0 && toast) input.warn?.()
+      return found
+    })
+
+  const addFolder = (files: File[], target = capture()) =>
+    track(files.length, async () => {
+      if (!target?.storage) throw new Error("当前对话尚未分配上传目录")
+      const selected = await folderUploadFiles(files)
+      const attachments: ImageAttachmentPart[] = []
+      try {
+        for (const item of selected) {
+          const attachment = await read(item.file, target, item.path, item.mime)
+          if (!attachment) throw new Error(`上传失败：${item.path}`)
+          attachments.push(attachment)
+          setUploadStatus("completed", (count) => count + 1)
+        }
+      } catch (error) {
+        await target.storage.rollback()
+        throw error
+      }
+      target.prompt.set([...target.prompt.current(), ...attachments], target.cursor)
+      return true
+    })
 
   const addClipboardAttachment = async (pending: Promise<File | null>, target = capture()) => {
     const file = await pending
     if (!file) return false
-    return add(file, true, target)
+    return track(1, () => add(file, true, target))
   }
 
   const removeAttachment = (id: string) => {
@@ -172,6 +210,8 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
   return {
     addAttachment,
     addAttachments,
+    addFolder,
+    uploadStatus,
     addClipboardAttachment,
     removeAttachment,
     handlePaste,

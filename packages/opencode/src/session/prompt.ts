@@ -41,6 +41,7 @@ import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Truncate } from "@/tool/truncate"
 import { Image } from "@/image/image"
 import { decodeDataUrl } from "@/util/data-url"
+import { attachmentReferenceUrl, isAttachmentReference } from "@opencode-ai/core/util/attachment-reference"
 import { Process } from "@/util/process"
 import { Cause, Effect, Exit, Latch, Layer, Option, Scope, Context, Schema, Types } from "effect"
 import { InstanceState } from "@/effect/instance-state"
@@ -783,6 +784,32 @@ const layer = Layer.effect(
             return pieces
           }
           const url = new URL(part.url)
+          if (isAttachmentReference(part.url)) {
+            const directory = (yield* InstanceState.context).directory
+            const requested = fileURLToPath(url)
+            if (!FSUtil.contains(directory, requested)) throw new Error("附件路径不属于当前工作区")
+            const artifact = current.metadata?.cmccArtifactDirectory
+            if (typeof artifact === "string" && (!FSUtil.contains(directory, artifact) || !FSUtil.contains(artifact, requested)))
+              throw new Error("附件路径不属于当前会话")
+            const root = yield* fsys.realPath(directory).pipe(Effect.orDie)
+            const filepath = yield* fsys.realPath(requested).pipe(Effect.orDie)
+            if (!FSUtil.contains(root, filepath)) throw new Error("附件路径不属于当前工作区")
+            if (typeof artifact === "string") {
+              const boundary = yield* fsys.realPath(artifact).pipe(Effect.orDie)
+              if (!FSUtil.contains(root, boundary) || !FSUtil.contains(boundary, filepath))
+                throw new Error("附件路径不属于当前会话")
+            }
+            if ((yield* fsys.stat(filepath).pipe(Effect.orDie)).type !== "File")
+              throw new Error("附件必须是已经上传的文件")
+            return [
+              {
+                ...part,
+                url: attachmentReferenceUrl(pathToFileURL(filepath).href),
+                messageID: info.id,
+                sessionID: input.sessionID,
+              },
+            ]
+          }
           switch (url.protocol) {
             case "data:":
               if (part.mime === "text/plain") {

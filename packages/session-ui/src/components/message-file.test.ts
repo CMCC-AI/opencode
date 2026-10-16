@@ -52,4 +52,11 @@ describe("message-file", () => {
     expect(kind(file({ mime: "image/png" }))).toBe("image")
     expect(kind(file({ mime: "application/pdf" }))).toBe("file")
   })
+
+  test("shows new disk references as file cards rather than browser-inaccessible images", () => {
+    const reference = file({ mime: "image/png", url: "file:///workspace/图片.png?opencode-attachment=reference" })
+    expect(attached(reference)).toBe(true)
+    expect(inline(reference)).toBe(false)
+    expect(kind(reference)).toBe("file")
+  })
 })

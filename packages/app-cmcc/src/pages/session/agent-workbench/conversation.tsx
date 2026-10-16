@@ -1,7 +1,8 @@
 import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { Icon } from "@opencode-ai/ui/icon"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { Index, Show, createEffect, createMemo, on, onCleanup, type JSX } from "solid-js"
+import { For, Index, Show, createEffect, createMemo, on, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { showToast } from "@/utils/toast"
 import type { AgentNodeView, AgentWorkbench, WorkbenchMessage } from "./model"
@@ -101,6 +102,21 @@ function WorkbenchMessagePanel(props: { message: WorkbenchMessage; cacheKey: str
       >
         <div class="max-w-[85%] whitespace-pre-wrap break-words rounded-[8px] bg-[#e9ecf3] px-4 py-3 text-[14px] leading-6 text-[#323949]">
           {props.message.text}
+        </div>
+      </Show>
+      <Show when={props.message.attachments?.length}>
+        <div class="mt-2 flex max-w-[85%] flex-wrap justify-end gap-2" data-component="workbench-attachments">
+          <For each={props.message.attachments}>
+            {(file) => (
+              <div
+                class="flex min-w-0 max-w-full items-center gap-2 rounded-[6px] border border-[#dce3f1] bg-white px-3 py-2 text-[12px] text-[#536078]"
+                title={file.filename}
+              >
+                <Icon name="folder" class="size-4 shrink-0" />
+                <span class="truncate">{file.filename}</span>
+              </div>
+            )}
+          </For>
         </div>
       </Show>
       <footer class="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-[#7a8292]">

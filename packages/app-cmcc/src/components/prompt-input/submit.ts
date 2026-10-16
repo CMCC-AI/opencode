@@ -106,7 +106,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
           id: Identifier.ascending("part"),
           type: "file" as const,
           mime: attachment.mime,
-          url: attachment.dataUrl,
+          url: attachment.referenceUrl ?? attachment.dataUrl,
           filename: attachment.filename,
         })),
       })
@@ -558,7 +558,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
               id: Identifier.ascending("part"),
               type: "file" as const,
               mime: attachment.mime,
-              url: attachment.dataUrl,
+              url: attachment.referenceUrl ?? attachment.dataUrl,
               filename: attachment.filename,
             })),
           })

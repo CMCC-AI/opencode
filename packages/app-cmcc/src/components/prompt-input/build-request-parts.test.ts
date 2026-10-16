@@ -3,6 +3,38 @@ import type { Prompt } from "@/context/prompt"
 import { buildRequestParts } from "./build-request-parts"
 
 describe("buildRequestParts", () => {
+  test("sends uploaded Word as a real path reference with no extracted body", () => {
+    const referenceUrl = "file:///repo/runs/one/attachments/report.docx?opencode-attachment=reference"
+    const result = buildRequestParts({
+      prompt: [],
+      context: [],
+      text: "分析附件",
+      sessionID: "ses_reference",
+      messageID: "msg_reference",
+      sessionDirectory: "/repo",
+      images: [
+        {
+          type: "image",
+          id: "word",
+          filename: "report.docx",
+          mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          sourcePath: "/repo/runs/one/attachments/report.docx",
+          referenceUrl,
+          dataUrl: "",
+        },
+      ],
+    })
+    expect(result.requestParts).toEqual([
+      expect.objectContaining({ type: "text", text: "分析附件" }),
+      expect.objectContaining({
+        type: "file",
+        filename: "report.docx",
+        url: referenceUrl,
+        mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      }),
+    ])
+    expect(JSON.stringify(result)).not.toContain("data:")
+  })
   test("builds typed request and optimistic parts without cast path", () => {
     const prompt: Prompt = [
       { type: "text", content: "hello", start: 0, end: 5 },

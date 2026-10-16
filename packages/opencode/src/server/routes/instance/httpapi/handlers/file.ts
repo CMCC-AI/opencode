@@ -17,6 +17,8 @@ import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
 import { DomUtils, parseDocument } from "htmlparser2"
 import { InstanceHttpApi } from "../api"
 import { scanKnowledgeGraph } from "@/knowledge/graph"
+import { attachmentUploadGroup } from "@opencode-ai/core/util/attachment-reference"
+import { writeAttachmentUpload } from "@/util/attachment-upload"
 import { WorkspaceRouteContext } from "../middleware/workspace-routing"
 
 const ARCHIVE_FILE_LIMIT = 200
@@ -282,6 +284,12 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
       const content = yield* Effect.fromResult(Encoding.decodeBase64(ctx.payload.content)).pipe(
         Effect.mapError(() => new HttpApiError.BadRequest({})),
       )
+      if (attachmentUploadGroup(ctx.payload.path)) {
+        yield* writeAttachmentUpload(fs, directory, ctx.payload.path, content).pipe(
+          Effect.mapError(() => new HttpApiError.BadRequest({})),
+        )
+        return { path: ctx.payload.path }
+      }
       if (content.byteLength > UPLOAD_BYTE_LIMIT) return yield* new HttpApiError.BadRequest({})
       yield* fs.writeWithDirs(target, content).pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))
       return { path: RelativePath.make(path.relative(directory, target).replaceAll("\\", "/")) }

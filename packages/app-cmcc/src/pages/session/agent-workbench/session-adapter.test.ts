@@ -56,6 +56,29 @@ const text = (id: string, messageID: string, value: string): Part => ({
 })
 
 describe("agent workbench session adapter", () => {
+  test("shows new upload cards without adding attachment text or changing historical messages", () => {
+    const reference = "file:///repo/runs/one/attachments/report.docx?opencode-attachment=reference"
+    const messages = extractWorkbenchMessages([user("new", "root"), user("old", "root")], {
+      new: [
+        text("question", "new", "分析附件"),
+        {
+          id: "file",
+          messageID: "new",
+          sessionID: "root",
+          type: "file",
+          mime: "application/msword",
+          filename: "report.docx",
+          url: reference,
+        },
+      ],
+      old: [text("old-body", "old", "历史资料正文保持原样")],
+    })
+    expect(messages.find((item) => item.id === "new")).toMatchObject({
+      text: "分析附件",
+      attachments: [{ filename: "report.docx", mime: "application/msword", url: reference }],
+    })
+    expect(messages.find((item) => item.id === "old")).toMatchObject({ text: "历史资料正文保持原样" })
+  })
   test("keeps each message's timestamp and actual model, without exposing hidden parts", () => {
     const first = assistant("a1", "root")
     const second = { ...assistant("a2", "root", false), modelID: "second-model", time: { created: 40 } }

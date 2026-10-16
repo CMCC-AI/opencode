@@ -1,4 +1,5 @@
 import type { Message, Part, Session, SessionStatus } from "@opencode-ai/sdk/v2"
+import { isAttachmentReference } from "@opencode-ai/core/util/attachment-reference"
 import type {
   AgentDisplayMember,
   AgentNodeStatus,
@@ -40,13 +41,19 @@ export function extractWorkbenchMessages(
 ): WorkbenchMessage[] {
   return [...messages].sort(compareMessage).flatMap((message) => {
     const text = joinTextParts(parts[message.id] ?? [])
-    if (!text.trim()) return []
+    const attachments = (parts[message.id] ?? []).flatMap((part) =>
+      part.type === "file" && isAttachmentReference(part.url)
+        ? [{ filename: part.filename ?? "附件", mime: part.mime, url: part.url }]
+        : [],
+    )
+    if (!text.trim() && !attachments.length) return []
     return [
       {
         id: message.id,
         role: message.role,
         text,
         createdAt: message.time.created,
+        ...(attachments.length ? { attachments } : {}),
         ...(message.role === "assistant"
           ? {
               completedAt: message.time.completed,

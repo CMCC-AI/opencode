@@ -15,12 +15,9 @@ import { DialogSelectModel } from "@/components/dialog-select-model"
 import { CmccPageBackground } from "@/components/cmcc-page-background"
 import { ACCEPTED_FILE_TYPES } from "@/constants/file-picker"
 import { attachmentMime } from "@/components/prompt-input/files"
-import {
-  fileBase64,
-  isWordDocument,
-  safeUploadedFilename,
-  wordAttachmentText,
-} from "@/components/prompt-input/word-documents"
+import { fileBase64, isWordDocument, safeUploadedFilename } from "@/components/prompt-input/word-documents"
+import { attachmentReferenceUrl } from "@opencode-ai/core/util/attachment-reference"
+import { encodeFilePath } from "@/context/file/path"
 import { sendFollowupDraft } from "@/components/prompt-input/submit"
 import { cmccArtifactWorkspace, cmccEnsureWorkspace, cmccArtifactSystemPrompt } from "@/utils/cmcc-workspace"
 import { cmccWorkspaceRelativePath } from "@/utils/cmcc-artifact-paths"
@@ -257,20 +254,12 @@ export default function MstockForm() {
           setState("uploads", (item) => item.id === upload.id, "path", path)
           remember()
         }
-        if (isWordDocument(new File([], upload.name), upload.mime)) {
-          const original =
-            upload.file ??
-            new File([(await sdk().client.file.download({ path: relative })).data as Blob], upload.name, {
-              type: upload.mime,
-            })
-          const content = await wordAttachmentText(original, upload.mime, path)
-          references.push({
-            path,
-            title: upload.name,
-            mime: "text/plain",
-            url: `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`,
-          })
-        } else references.push({ path, title: upload.name, mime: upload.mime, url: undefined })
+        references.push({
+          path,
+          title: upload.name,
+          mime: upload.mime,
+          url: attachmentReferenceUrl(`file://${encodeFilePath(path)}`),
+        })
       }
       if (!current()) return
       const result = await sendFollowupDraft({

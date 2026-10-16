@@ -37,6 +37,19 @@ afterEach(async () => {
 })
 
 describe("file HttpApi", () => {
+  test("uploads path-referenced attachment groups through the existing file endpoint", async () => {
+    await using tmp = await tmpdir()
+    const target = "runs/run-1/attachments/upload-00000000-0000-4000-8000-000000000001/资料/材料.docx"
+    const upload = () => request(FilePaths.upload, tmp.path, undefined, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: target, content: Buffer.from("original word bytes").toString("base64"), encoding: "base64" }),
+    })
+    const response = await upload()
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ path: target })
+    expect(await Bun.file(path.join(tmp.path, target)).text()).toBe("original word bytes")
+    expect((await upload()).status).toBe(400)
+  })
   test("creates only routed runtime descendants without instance middleware", async () => {
     const endpoints = FileApi.groups.file.endpoints
     const createMiddleware: ReadonlySet<unknown> = endpoints.createDirectory.middlewares

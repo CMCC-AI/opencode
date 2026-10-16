@@ -26,6 +26,7 @@ import {
   tmpdirScoped,
 } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
+import { wordFixture } from "../fixture/word"
 
 const FIXTURES_DIR = path.join(import.meta.dir, "fixtures")
 
@@ -147,6 +148,74 @@ const asks = () => {
     },
   }
 }
+
+describe("tool.read Word attachments", () => {
+  it.instance("reads uploaded DOCX body, table, headers and footnotes without modifying the original", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const bytes = yield* Effect.promise(() => wordFixture())
+      const filepath = path.join(test.directory, "runs", "one", "attachments", "巡查.docx")
+      yield* put(filepath, bytes)
+      const result = yield* run({ filePath: filepath })
+      for (const value of ["第一段：巡查材料内容。", "安全出口", "巡查附件页眉", "脚注补充说明"])
+        expect(result.output).toContain(value)
+      expect(result.metadata.truncated).toBe(false)
+      expect(yield* FSUtil.Service.use((fs) => fs.readFile(filepath))).toEqual(bytes)
+    }),
+  )
+
+  it.instance("reads a real legacy DOC including Unicode characters", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const bytes = yield* FSUtil.Service.use((fs) => fs.readFile(path.join(FIXTURES_DIR, "word-reference.doc")))
+      const filepath = path.join(test.directory, "legacy.doc")
+      yield* put(filepath, bytes)
+      const result = yield* run({ filePath: filepath })
+      expect(result.output).toContain("Unicode characters")
+      expect(result.output).toContain("😀 ∀")
+      expect(result.output).toContain("This text has been inserted")
+    }),
+  )
+
+  it.instance("paginates long Word documents so later sections remain readable", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const bytes = yield* Effect.promise(() =>
+        wordFixture(
+          Array.from({ length: 2300 }, (_, index) => `段落 ${index + 1}`),
+          false,
+        ),
+      )
+      const filepath = path.join(test.directory, "long.docx")
+      yield* put(filepath, bytes)
+      expect((yield* run({ filePath: filepath })).metadata.truncated).toBe(true)
+      const later = yield* run({ filePath: filepath, offset: 2001, limit: 2 })
+      expect(later.output).toContain("2001: 段落 2001")
+      expect(later.output).toContain("2002: 段落 2002")
+      expect(later.output).not.toContain("段落 2003")
+    }),
+  )
+
+  it.instance("reports corrupt Word files instead of treating upload as readable content", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const filepath = path.join(test.directory, "broken.docx")
+      yield* put(filepath, "broken")
+      expect((yield* fail(test.directory, { filePath: filepath })).message).toContain("Word 文件不完整")
+    }),
+  )
+
+  it.instance("keeps the tail of long Word paragraphs available through pagination", () =>
+    Effect.gen(function* () {
+      const test = yield* TestInstance
+      const bytes = yield* Effect.promise(() => wordFixture(["前".repeat(5000) + "段尾标记"], false))
+      const filepath = path.join(test.directory, "paragraph.docx")
+      yield* put(filepath, bytes)
+      const result = yield* run({ filePath: filepath, offset: 3, limit: 1 })
+      expect(result.output).toContain("段尾标记")
+    }),
+  )
+})
 
 describe("tool.read external_directory permission", () => {
   it.live("allows reading absolute path inside project directory", () =>

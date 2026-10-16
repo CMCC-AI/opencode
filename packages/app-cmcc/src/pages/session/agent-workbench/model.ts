@@ -33,6 +33,7 @@ export type WorkbenchMessage = {
   completedAt?: number
   providerID?: string
   modelID?: string
+  attachments?: Array<{ filename: string; mime: string; url: string }>
 }
 
 export type NestedAgentSessionView = {

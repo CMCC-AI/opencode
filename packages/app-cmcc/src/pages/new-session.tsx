@@ -11,6 +11,7 @@ import { useTabs } from "@/context/tabs"
 import { createPromptInputController } from "@/pages/session/composer"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
+import { cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
 
 /**
  * The `/new-session` draft page. Unlike `session.tsx`, this only renders the prompt
@@ -34,7 +35,7 @@ export default function NewSessionPage() {
   const selectExpertAgent = (agent: string | undefined) => {
     setSelectedExpertAgent(agent)
     if (searchParams.draftId) {
-      tabs.updateDraft(searchParams.draftId, agent ? { agent } : { agent, expertID: undefined })
+      tabs.updateDraft(searchParams.draftId, { agent, expertID: cmccTeamExpertByAgent(agent)?.id })
     }
   }
 

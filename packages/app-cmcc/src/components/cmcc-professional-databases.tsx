@@ -1,6 +1,9 @@
 import { createMemo, createSignal, For, Show, type Component } from "solid-js"
 import { CmccPromptPanel } from "./cmcc-prompt-panel"
 import { Icon } from "@opencode-ai/ui/icon"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
+import { createStore } from "solid-js/store"
+import { CMCC_TEAM_EXPERTS, cmccExpertChineseName, cmccTeamAvatarUrl, type TeamExpert } from "@/utils/cmcc-experts"
 import academicIcon from "../assets/professional-databases/academic.png"
 import bochaIcon from "../assets/professional-databases/bocha.svg"
 import byteSearchIcon from "../assets/professional-databases/byte-search.svg"
@@ -79,7 +82,9 @@ export const CMCC_PROFESSIONAL_DATABASES: CmccProfessionalDatabase[] = [
 
 type CmccPromptActionMenuProps = {
   onAttach: () => void
-  onExperts: () => void
+  onFolder: () => void
+  onExpert: (expert: TeamExpert) => void
+  selectedExpert?: string
   onSkills: () => void
   onKnowledge?: () => void
   onProfessionalDatabases: () => void
@@ -92,8 +97,9 @@ export const CmccPromptActionMenu: Component<CmccPromptActionMenuProps> = (props
     onMouseDown={(event) => event.preventDefault()}
   >
     <PromptActionItem icon="link" label="添加文件和图片" onClick={props.onAttach} />
+    <PromptActionItem icon="folder" label="添加文件夹" onClick={props.onFolder} />
     <PromptActionItem icon="archive" label="专业数据库" active onClick={props.onProfessionalDatabases} />
-    <PromptActionItem icon="mcp" label="专家" arrow onClick={props.onExperts} />
+    <ExpertTeamMenu onSelect={props.onExpert} selected={props.selectedExpert} />
     <PromptActionItem icon="brain" label="技能" arrow onClick={props.onSkills} />
     <Show when={props.onKnowledge}>
       {(onKnowledge) => <PromptActionItem icon="brain" label="知识库" arrow onClick={onKnowledge()} />}
@@ -102,11 +108,69 @@ export const CmccPromptActionMenu: Component<CmccPromptActionMenuProps> = (props
 )
 
 type PromptActionItemProps = {
-  icon: "link" | "brain" | "mcp" | "archive" | "task"
+  icon: "link" | "brain" | "mcp" | "archive" | "task" | "folder"
   label: string
   active?: boolean
   arrow?: boolean
   onClick: () => void
+}
+
+function ExpertTeamMenu(props: { onSelect: (expert: TeamExpert) => void; selected?: string }) {
+  const [state, setState] = createStore({ open: false })
+  return (
+    <DropdownMenu
+      modal={false}
+      placement="right-start"
+      fitViewport
+      flip="left-start bottom-start top-start"
+      gutter={8}
+      overflowPadding={12}
+      open={state.open}
+      onOpenChange={(open) => setState("open", open)}
+    >
+      <DropdownMenu.Trigger
+        type="button"
+        class="flex h-9 w-full items-center gap-2 rounded-[7px] px-3 text-left text-[13px] leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+        onKeyDown={(event) => {
+          if (event.key === "ArrowRight") {
+            event.preventDefault()
+            setState("open", true)
+          }
+        }}
+      >
+        <Icon name="mcp" class="size-4 shrink-0 text-v2-icon-icon-muted" />
+        <span class="min-w-0 flex-1">专家团</span>
+        <Icon name="chevron-right" class="size-3.5 shrink-0 text-v2-icon-icon-muted" />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          aria-label="选择专家团"
+          data-cmcc-expert-menu=""
+          class="z-[70] max-h-[min(380px,65dvh)] w-[264px] max-w-[calc(100vw-24px)] overflow-y-auto rounded-[8px] border border-v2-border-border-base bg-v2-background-bg-base p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]"
+          onCloseAutoFocus={(event) => event.preventDefault()}
+        >
+          <For each={CMCC_TEAM_EXPERTS}>
+            {(expert) => (
+              <DropdownMenu.Item
+                class="flex min-h-10 items-center gap-2 rounded-[6px] px-2 py-2 text-[13px]"
+                onSelect={() => props.onSelect(expert)}
+              >
+                <Show when={cmccTeamAvatarUrl(expert)} fallback={<Icon name="brain" class="size-7 shrink-0" />}>
+                  {(src) => <img src={src()} alt="" class="size-7 shrink-0 rounded-full object-cover" />}
+                </Show>
+                <DropdownMenu.ItemLabel class="min-w-0 flex-1 break-words">
+                  {cmccExpertChineseName(expert)}
+                </DropdownMenu.ItemLabel>
+                <Show when={props.selected === expert.leadAgent}>
+                  <Icon name="check" class="size-4 shrink-0" />
+                </Show>
+              </DropdownMenu.Item>
+            )}
+          </For>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu>
+  )
 }
 
 function PromptActionItem(props: PromptActionItemProps) {

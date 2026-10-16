@@ -12,6 +12,12 @@ import {
 } from "./artifact-preview"
 
 describe("artifact preview", () => {
+  test("does not classify new uploaded inputs as reports while retaining legacy behavior", () => {
+    const prefix = "runs/run-1/attachments/upload-00000000-0000-4000-8000-000000000001/资料"
+    const files = ["runs/run-1/20-report.md", `${prefix}/report.docx`, `${prefix}/report.pdf`, `${prefix}/report.html`, "runs/old/attachments/old.docx"].map((path) => ({ path }))
+    expect(artifactReportFiles(files, "text").map((item) => item.path)).toEqual(["runs/run-1/20-report.md", "runs/old/attachments/old.docx"])
+    expect(artifactReportFiles(files, "visual")).toEqual([])
+  })
   test("classifies supported document formats case-insensitively", () => {
     expect(artifactPreviewKind("reports/brief.DOCX")).toBe("docx")
     expect(artifactPreviewKind("reports/model.xlsx")).toBe("excel")

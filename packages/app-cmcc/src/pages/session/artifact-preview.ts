@@ -1,3 +1,5 @@
+import { attachmentUploadGroup } from "@opencode-ai/core/util/attachment-reference"
+
 export type ArtifactPreviewKind =
   | "html"
   | "docx"
@@ -64,7 +66,7 @@ export function artifactPreviewKind(path: string): ArtifactPreviewKind {
 
 export function artifactReportFiles<T extends { path: string }>(items: readonly T[], kind: ArtifactReportKind) {
   const previewKinds = kind === "text" ? new Set<ArtifactPreviewKind>(["markdown", "docx", "pdf"]) : new Set<ArtifactPreviewKind>(["html"])
-  return items.filter((item) => previewKinds.has(artifactPreviewKind(item.path)))
+  return items.filter((item) => !attachmentUploadGroup(item.path) && previewKinds.has(artifactPreviewKind(item.path)))
 }
 
 export function artifactImageMimeType(path: string, mimeType?: string) {

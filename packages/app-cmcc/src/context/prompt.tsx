@@ -46,6 +46,7 @@ export interface ImageAttachmentPart {
   sourcePath?: string
   mime: string
   dataUrl: string
+  referenceUrl?: string
 }
 
 export type ContentPart = TextPart | FileAttachmentPart | AgentPart | ImageAttachmentPart

@@ -50,7 +50,7 @@ import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES, pickAttachmentFiles } from "./prompt-input/files"
-import { fileBase64, isWordDocument, safeUploadedFilename, wordAttachmentText } from "./prompt-input/word-documents"
+import { createAttachmentStorage } from "./prompt-input/upload-storage"
 import {
   canNavigateHistoryAtCursor,
   navigatePromptHistory,
@@ -77,12 +77,7 @@ import {
   CmccPromptActionMenu,
   type CmccProfessionalDatabase,
 } from "@/components/cmcc-professional-databases"
-import {
-  cmccExpertCenterHref,
-  cmccExpertChineseName,
-  cmccTeamAvatarUrl,
-  cmccTeamExpertByAgent,
-} from "@/utils/cmcc-experts"
+import { cmccExpertChineseName, cmccTeamAvatarUrl, cmccTeamExpertByAgent, type TeamExpert } from "@/utils/cmcc-experts"
 import { CmccPromptPanel } from "@/components/cmcc-prompt-panel"
 import { CmccKnowledgePicker } from "@/components/cmcc-knowledge-picker"
 import {
@@ -251,6 +246,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const tabs = () => props.controls.session.tabs
   let editorRef!: HTMLDivElement
   let fileInputRef: HTMLInputElement | undefined
+  let folderInputRef: HTMLInputElement | undefined
   let scrollRef!: HTMLDivElement
   let slashPopoverRef!: HTMLDivElement
   let cmccPanelRef: HTMLDivElement | undefined
@@ -649,6 +645,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       const target = event.target
       if (!(target instanceof Node)) return
       if (cmccPanelRef?.contains(target)) return
+      if (target instanceof Element && target.closest("[data-cmcc-expert-menu]")) return
       if (target instanceof Element && target.closest('[data-action="prompt-cmcc-actions"]')) return
       // The skills list keeps the editor available for filtering commands.
       if (actions.panel === "skills" && editorRef?.contains(target)) return
@@ -962,9 +959,15 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     requestAnimationFrame(() => editorRef?.focus())
   }
 
-  const openExpertCenter = () => {
+  const selectExpertTeam = (expert: TeamExpert) => {
     setActions("panel", null)
-    navigate(cmccExpertCenterHref())
+    if (props.onSelectedExpertAgentChange) props.onSelectedExpertAgentChange(expert.leadAgent)
+    else {
+      editorRef.focus({ preventScroll: true })
+      setCursorPosition(editorRef, promptLength(prompt.current()))
+      addPart({ type: "agent", name: expert.leadAgent, content: `@${expert.leadAgent}`, start: 0, end: 0 })
+    }
+    requestAnimationFrame(() => editorRef?.focus({ preventScroll: true }))
   }
 
   const tryProfessionalDatabase = (database: CmccProfessionalDatabase) => {
@@ -1386,64 +1389,77 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return true
   }
 
-  const { addAttachment, addAttachments, removeAttachment, handlePaste } = createPromptAttachments({
-    prompt,
-    editor: () => editorRef,
-    isDialogActive: () => !!dialog.active,
-    setDraggingType: (type) => setStore("draggingType", type),
-    focusEditor: () => {
-      editorRef.focus()
-      setCursorPosition(editorRef, promptLength(prompt.current()))
-    },
-    addPart,
-    readClipboardImage: platform.readClipboardImage,
-    getPathForFile: platform.getPathForFile,
-    onStoreError: (error) => {
-      showToast({
-        title: "Word 文件上传失败",
-        description: error instanceof Error ? error.message : language.t("common.requestFailed"),
-        variant: "error",
-      })
-    },
-    storeFile: async (file, mime) => {
-      if (!isWordDocument(file, mime)) return
-      if (file.size > 25 * 1024 * 1024) throw new Error("Word 文件不能超过 25 MB")
-
-      const artifactDirectory = conversationArtifactDirectory()
-      if (!artifactDirectory) throw new Error("当前对话尚未分配产物目录")
-      const artifactRoot = cmccWorkspaceRelativePath(sdk().directory, artifactDirectory)
-      if (!artifactRoot) throw new Error("当前对话产物目录不属于运行工作区")
-
-      await cmccEnsureWorkspace(
-        artifactDirectory,
-        (directory) => sdk().client.file.createDirectory({ path: directory }, { throwOnError: true }),
-        sdk().scope,
-      )
-      const name = `${uuid()}-${safeUploadedFilename(file.name)}`
-      const path = `${artifactRoot}/attachments/${name}`
-      await sdk().client.file.upload(
-        { path, content: await fileBase64(file), encoding: "base64" },
-        { throwOnError: true },
-      )
-
-      const absolutePath = `${artifactDirectory}/attachments/${name}`
-      return { path: absolutePath, content: await wordAttachmentText(file, mime, absolutePath) }
-    },
-  })
+  const { addAttachment, addAttachments, addFolder, uploadStatus, removeAttachment, handlePaste } =
+    createPromptAttachments({
+      prompt,
+      editor: () => editorRef,
+      isDialogActive: () => !!dialog.active,
+      setDraggingType: (type) => setStore("draggingType", type),
+      focusEditor: () => {
+        editorRef.focus()
+        setCursorPosition(editorRef, promptLength(prompt.current()))
+      },
+      addPart,
+      readClipboardImage: platform.readClipboardImage,
+      getPathForFile: platform.getPathForFile,
+      onStoreError: (error) => {
+        showToast({
+          title: "附件上传失败",
+          description: error instanceof Error ? error.message : language.t("common.requestFailed"),
+          variant: "error",
+        })
+      },
+      storage: () => {
+        const notebook = selectedKnowledge()
+        const workspace = notebook?.directory ?? sdk().directory
+        const artifactDirectory = notebook
+          ? `${workspace.replaceAll("\\", "/").replace(/\/+$/, "")}/runs/${props.controls.session.id ?? search.draftId ?? uuid()}`
+          : conversationArtifactDirectory()
+        const client = workspace === sdk().directory ? sdk().client : sdk().createClient({ directory: workspace, throwOnError: true })
+        const scope = sdk().scope
+        return createAttachmentStorage({
+          directory: artifactDirectory,
+          workspace,
+          prepare: () =>
+            cmccEnsureWorkspace(
+              artifactDirectory,
+              (path) => client.file.createDirectory({ path }, { throwOnError: true }),
+              scope,
+            ),
+          upload: (path, content) => client.file.upload({ path, content, encoding: "base64" }, { throwOnError: true }),
+          remove: (path) => client.file.remove({ path, recursive: true }, { throwOnError: true }),
+        })
+      },
+    })
 
   const fileAttachmentInput = () => (
-    <input
-      ref={(el) => (fileInputRef = el)}
-      type="file"
-      multiple
-      accept={ACCEPTED_FILE_TYPES.join(",")}
-      class="hidden"
-      onChange={(e) => {
-        const list = e.currentTarget.files
-        if (list) void addAttachments(Array.from(list))
-        e.currentTarget.value = ""
-      }}
-    />
+    <>
+      <input
+        ref={(el) => (fileInputRef = el)}
+        type="file"
+        multiple
+        accept={ACCEPTED_FILE_TYPES.join(",")}
+        class="hidden"
+        onChange={(e) => {
+          const list = e.currentTarget.files
+          if (list) void addAttachments(Array.from(list))
+          e.currentTarget.value = ""
+        }}
+      />
+      <input
+        ref={(element) => (folderInputRef = element)}
+        type="file"
+        multiple
+        {...{ webkitdirectory: "", directory: "" }}
+        class="hidden"
+        aria-label="添加文件夹"
+        onChange={(event) => {
+          const files = Array.from(event.currentTarget.files ?? [])
+          event.currentTarget.value = ""
+          if (files.length) void addFolder(files)
+        }}
+      />
+    </>
   )
 
   const variants = createMemo(() => ["default", ...props.controls.model.selection.variant.list()])
@@ -1457,7 +1473,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return permission.isAutoAccepting(id, sdk().directory)
   })
 
-  const { abort, handleSubmit } =
+  const submission =
     props.submission ??
     createPromptSubmit({
       prompt,
@@ -1485,6 +1501,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       selectedAgent: () => props.selectedExpertAgent,
       knowledge: selectedKnowledge,
     })
+
+  const abort = submission.abort
+  const handleSubmit = (event: Event) => {
+    if (!uploadStatus.pending) return submission.handleSubmit(event)
+    event.preventDefault()
+  }
 
   const handleKeyDown = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "u") {
@@ -1769,7 +1791,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             setActions("panel", null)
             pick()
           }}
-          onExperts={openExpertCenter}
+          onFolder={() => {
+            setActions("panel", null)
+            folderInputRef?.click()
+          }}
+          onExpert={selectExpertTeam}
+          selectedExpert={props.selectedExpertAgent}
           onSkills={openSkillCommands}
           onKnowledge={newSession() ? openKnowledge : undefined}
           onProfessionalDatabases={openProfessionalDatabases}
@@ -1820,6 +1847,22 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         )}
       </Show>
       <Show when={actions.panel !== "skills"}>{promptPopover()}</Show>
+      <Show when={uploadStatus.pending}>
+        <div
+          role="status"
+          class="mb-2 flex items-center gap-2 text-[12px] text-[#5269ef]"
+          data-component="attachment-upload-progress"
+        >
+          <span>
+            正在上传附件 {uploadStatus.completed}/{uploadStatus.total}
+          </span>
+          <progress
+            class="h-1.5 min-w-0 flex-1 accent-[#5269ef]"
+            value={uploadStatus.completed}
+            max={Math.max(1, uploadStatus.total)}
+          />
+        </div>
+      </Show>
       <Switch>
         <Match when={props.controls.newLayoutDesigns}>
           <div class="flex min-w-0 flex-col">
@@ -2023,7 +2066,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   <PromptSendButton
                     data-action="prompt-submit"
                     type="submit"
-                    disabled={!working() && blank()}
+                    disabled={(uploadStatus.pending > 0 && !stopping()) || (!working() && blank())}
                     tabIndex={store.mode === "normal" ? undefined : -1}
                     mode={stopping() ? "stop" : store.mode === "shell" ? "shell" : "send"}
                     aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
@@ -2162,7 +2205,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     <PromptSendButton
                       data-action="prompt-submit"
                       type="submit"
-                      disabled={!working() && blank()}
+                      disabled={(uploadStatus.pending > 0 && !stopping()) || (!working() && blank())}
                       tabIndex={store.mode === "normal" ? undefined : -1}
                       mode={stopping() ? "stop" : store.mode === "shell" ? "shell" : "send"}
                       aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}

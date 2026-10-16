@@ -54,6 +54,8 @@ import { TestInstance } from "../fixture/fixture"
 import { awaitWithTimeout, pollWithTimeout, testEffect } from "../lib/effect"
 import { reply, TestLLMServer } from "../lib/llm-server"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { attachmentReferenceUrl } from "@opencode-ai/core/util/attachment-reference"
+import { pathToFileURL } from "url"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
@@ -712,6 +714,67 @@ noLLMServer.instance.skip(
       )
     }),
   { config: cfg },
+)
+
+it.instance("new uploaded attachment references do not eagerly read document bodies", () =>
+  Effect.gen(function* () {
+    const { dir } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const artifact = path.join(dir, "runs", "upload-test")
+    const file = path.join(artifact, "attachments", "材料.docx")
+    yield* writeText(file, "BODY_MUST_NOT_BE_INJECTED")
+    const chat = yield* sessions.create({ title: "Attachments", metadata: { cmccArtifactDirectory: artifact } })
+    const result = yield* prompt.prompt({
+      sessionID: chat.id,
+      agent: "build",
+      noReply: true,
+      parts: [
+        { type: "text", text: "分析附件" },
+        {
+          type: "file",
+          mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          filename: "材料.docx",
+          url: attachmentReferenceUrl(pathToFileURL(file).href),
+        },
+      ],
+    })
+    expect(result.parts.filter((part) => part.type === "text").map((part) => part.text)).toEqual(["分析附件"])
+    expect(
+      result.parts.some((part) => part.type === "file" && part.url.includes("opencode-attachment=reference")),
+    ).toBe(true)
+    expect(JSON.stringify(result.parts)).not.toContain("BODY_MUST_NOT_BE_INJECTED")
+  }),
+)
+
+it.instance("rejects new upload references from another conversation directory", () =>
+  Effect.gen(function* () {
+    const { dir } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const artifact = path.join(dir, "runs", "current")
+    yield* writeText(path.join(artifact, "keep.txt"), "current")
+    const other = path.join(dir, "runs", "other", "材料.docx")
+    yield* writeText(other, "private")
+    const chat = yield* sessions.create({ metadata: { cmccArtifactDirectory: artifact } })
+    const result = yield* prompt
+      .prompt({
+        sessionID: chat.id,
+        agent: "build",
+        noReply: true,
+        parts: [
+          {
+            type: "file",
+            mime: "application/msword",
+            filename: "材料.docx",
+            url: attachmentReferenceUrl(pathToFileURL(other).href),
+          },
+        ],
+      })
+      .pipe(Effect.exit)
+    expect(Exit.isFailure(result)).toBe(true)
+    if (Exit.isFailure(result)) expect(String(Cause.squash(result.cause))).toContain("当前会话")
+  }),
 )
 
 it.instance("static loop returns assistant text through local provider", () =>
