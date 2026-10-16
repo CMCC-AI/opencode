@@ -243,7 +243,7 @@ async function prepare(
       if (path.endsWith("inspection.html"))
         return route.fulfill({
           contentType: "text/html; charset=utf-8",
-          body: "<!doctype html><html><body>巡查 HTML 优先预览</body></html>",
+          body: "<!doctype html><html><body>巡察 HTML 优先预览</body></html>",
         })
       if (path.endsWith("view.html"))
         return route.fulfill({
@@ -269,7 +269,7 @@ async function prepare(
         body = JSON.stringify(
           input.category === "government"
             ? { report: { title: "政企图表测试", sections: [{ id: "s", title: "测试图表", blocks }] } }
-            : { layout_version: 2, title: "巡查图表测试", sections: [{ id: "s", heading: "测试图表", blocks }] },
+            : { layout_version: 2, title: "巡察图表测试", sections: [{ id: "s", heading: "测试图表", blocks }] },
         )
       }
       if (path.endsWith(".svg"))
@@ -508,7 +508,7 @@ test("science case switches between Markdown and a real DOCX snapshot", async ({
 test("inspection HTML takes priority over JSON and uses the case preview ticket", async ({ page }) => {
   const state = await prepare(page, cases[0], { inspectionHtml: true })
   await page.getByRole("button", { name: "可视化报告", exact: true }).click()
-  await expect(page.frameLocator('iframe[title="inspection.html"]').getByText("巡查 HTML 优先预览")).toBeVisible()
+  await expect(page.frameLocator('iframe[title="inspection.html"]').getByText("巡察 HTML 优先预览")).toBeVisible()
   await expect(page.locator('iframe[title="inspection.html"]')).toHaveAttribute(
     "src",
     /\/api\/dockapi\/case-preview\/inspection\/artifacts\/reports\/inspection.html/,

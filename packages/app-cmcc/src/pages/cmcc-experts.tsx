@@ -62,8 +62,8 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     image: expertHero,
   },
   deepinspect: {
-    eyebrow: "AI + 巡查",
-    summary: "多智能体协作完成现场风险识别、问题归并与结构化巡查报告交付",
+    eyebrow: "AI + 巡察",
+    summary: "多智能体协作完成现场风险识别、问题归并与结构化巡察报告交付",
     image: expertIndustry,
   },
   "zhengqi-visit-intel": {
@@ -84,7 +84,7 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
 }
 
 const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
-// 3 列网格的固定排序：财经/政企/巡查 + 推荐/位置/科研
+// 3 列网格的固定排序：财经/政企/巡察 + 推荐/位置/科研
 const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "deepinspect", "shoppers-pro", "deepgeo", "ai-for-science-team"]
 const INDUSTRY_EXPERTS = [
   ...INDUSTRY_ORDER.flatMap((id) => {

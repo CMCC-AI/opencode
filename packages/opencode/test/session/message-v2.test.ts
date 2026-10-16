@@ -120,7 +120,7 @@ describe("session.message-v2.toModelMessage", () => {
       {
         info: userInfo("m-reference"),
         parts: [
-          { ...basePart("m-reference", "question"), type: "text", text: "分析这些巡查附件" },
+          { ...basePart("m-reference", "question"), type: "text", text: "分析这些巡察附件" },
           ...["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/png", "text/plain"].map(
             (mime, index) => ({
               ...basePart("m-reference", `file-${index}`),
@@ -138,7 +138,7 @@ describe("session.message-v2.toModelMessage", () => {
     const result = await MessageV2.toModelMessages(input, model)
     expect(result).toHaveLength(1)
     expect(result[0].content).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: "text", text: "分析这些巡查附件" })]),
+      expect.arrayContaining([expect.objectContaining({ type: "text", text: "分析这些巡察附件" })]),
     )
     expect(JSON.stringify(result)).toContain("Read")
     expect(JSON.stringify(result)).toContain("attachments")

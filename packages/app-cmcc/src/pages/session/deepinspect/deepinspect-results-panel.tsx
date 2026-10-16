@@ -152,7 +152,7 @@ export function DeepInspectResultsPanel(props: { onCreateSame?: () => void } = {
               <span class="flex size-[26px] items-center justify-center rounded-[8px] bg-[#eff6ff] text-[14px] font-bold text-[#2563eb] shadow-[inset_0_0_0_1px_#bfdbfe]">
                 巡
               </span>
-              <strong class="hidden font-semibold @min-[340px]:inline">巡查分析</strong>
+              <strong class="hidden font-semibold @min-[340px]:inline">巡察分析</strong>
             </div>
             <Show when={context.replay.isPreparing() || context.replay.isReplaying()}>
               <div class="flex min-w-0 items-center gap-2 whitespace-nowrap text-[11px] text-[#6b7280]">
@@ -197,5 +197,5 @@ function replayStageLabel(stage: DeepTradingReplayStage) {
   if (stage === "files") return "整理文件"
   if (stage === "text") return "撰写报告"
   if (stage === "visual") return "生成可视化"
-  return "巡查分析"
+  return "巡察分析"
 }

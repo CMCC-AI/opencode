@@ -15,7 +15,7 @@ export function DeepInspectSessionView() {
       return {
         id: "overview",
         name: "总览",
-        profession: "DeepInspect 巡查分析专家团",
+        profession: "DeepInspect 巡察分析专家团",
         status: data.overviewStatus,
         markdown: data.overviewMarkdown,
         messages: data.overviewMessages,
@@ -61,7 +61,7 @@ export function DeepInspectSessionView() {
 
           <Show
             when={selected()}
-            fallback={<EmptyPanel title="正在读取巡查团队" description="正在加载当前 DeepInspect 会话。" />}
+            fallback={<EmptyPanel title="正在读取巡察团队" description="正在加载当前 DeepInspect 会话。" />}
           >
             {(item) => (
               <section class="min-w-0">
@@ -146,7 +146,7 @@ function AgentStrip() {
   return (
     <div class="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-4">
       <nav
-        aria-label="DeepInspect 巡查团队"
+        aria-label="DeepInspect 巡察团队"
         class="deeptrading-scrollbar pointer-events-auto flex max-w-full gap-1.5 overflow-x-auto rounded-[8px] border border-[#dfe3eb] bg-[#f7f8fb] p-2 shadow-[0_10px_30px_rgba(29,38,61,0.14)]"
       >
         <For each={items()}>

@@ -263,7 +263,7 @@
     var el = document.getElementById(containerId);
     if (!el) return;
     try {
-      /* SVG 渲染与巡查/政企对齐：文本保持矢量，统一 PDF 导出器的 svg text 字体规则与审计才能覆盖（canvas 位图会把缺字体的豆腐直接烤进图片且审计不可见）。 */
+      /* SVG 渲染与巡察/政企对齐：文本保持矢量，统一 PDF 导出器的 svg text 字体规则与审计才能覆盖（canvas 位图会把缺字体的豆腐直接烤进图片且审计不可见）。 */
       var chart = echarts.init(el, null, { renderer: 'svg' });
       var option = reviveFunctions(chartBlock.option || {});
       if (!option.color && !option.series) option.color = ['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#94a3b8'];

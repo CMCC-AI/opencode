@@ -1,9 +1,9 @@
 ---
 name: deepinspect-pipeline
-description: AI+巡查 后处理脚本集（引用后处理、HTML 渲染、PDF 导出、质量验证）。团长编排流程的 Phase 8b 依赖这些脚本。
+description: AI+巡察 后处理脚本集（引用后处理、HTML 渲染、PDF 导出、质量验证）。团长编排流程的 Phase 8b 依赖这些脚本。
 ---
 
-# AI+巡查 后处理脚本集
+# AI+巡察 后处理脚本集
 
 本 skill 打包 6 个 Node.js 脚本与 HTML 模板。**脚本与模板的绝对路径以 skill 工具加载本 skill 时返回的 Base directory 为准**（下文用 `<BASE>` 表示），不要自行猜测或拼接路径。
 

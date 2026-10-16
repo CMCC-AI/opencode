@@ -44,7 +44,7 @@ export const DEEPINSPECT_DAG_EDGES = [
 ] as const
 
 export const DEEPINSPECT_ARTIFACT_ROLES: ArtifactRoleConfig = {
-  "00-input.json": { role: "supporting", label: "巡查任务输入" },
+  "00-input.json": { role: "supporting", label: "巡察任务输入" },
   "02-intent.json": { role: "supporting", label: "意图分析" },
   "03-plan.json": { role: "supporting", label: "研究方案" },
   "04-sources.json": { role: "supporting", label: "来源清单" },
@@ -52,8 +52,8 @@ export const DEEPINSPECT_ARTIFACT_ROLES: ArtifactRoleConfig = {
   "05-risk-findings.md": { role: "supporting", label: "风险识别结果" },
   "06-consolidated-issues.json": { role: "supporting", label: "问题归并结果" },
   "10-outline.json": { role: "supporting", label: "报告大纲" },
-  "20-report.md": { role: "text-report", label: "巡查文字报告" },
-  "25-visual-report.json": { role: "visual-report", label: "巡查可视化报告" },
+  "20-report.md": { role: "text-report", label: "巡察文字报告" },
+  "25-visual-report.json": { role: "visual-report", label: "巡察可视化报告" },
 }
 
 const memberById = new Map(team.members.map((member) => [member.id, member]))

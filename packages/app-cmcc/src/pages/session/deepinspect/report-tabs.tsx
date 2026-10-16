@@ -30,7 +30,7 @@ export function DeepInspectFilesTab() {
       <SnapshotFilesTab
         artifacts={files}
         source={context.artifactSource}
-        emptyDescription="该案例快照没有保存巡查产物文件。"
+        emptyDescription="该案例快照没有保存巡察产物文件。"
         ownerLabel={(artifact) => ownerLabel(artifact.ownerAgentId)}
       />
     )
@@ -75,7 +75,7 @@ export function DeepInspectFilesTab() {
     <div class="h-full min-h-0 overflow-hidden px-4 py-4">
       <Show
         when={files().length > 0}
-        fallback={<ReportEmpty title="暂无文件产出" description="当前巡查会话确认写入的文件会在这里逐步出现。" />}
+        fallback={<ReportEmpty title="暂无文件产出" description="当前巡察会话确认写入的文件会在这里逐步出现。" />}
       >
         <Show
           when={selected()}

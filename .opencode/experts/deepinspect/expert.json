@@ -21,20 +21,20 @@
   },
   "displayName": {
     "en": "DeepInspect",
-    "zh": "DeepInspect 巡查分析专家团"
+    "zh": "DeepInspect 巡察分析专家团"
   },
   "profession": {
     "en": "DeepInspect",
-    "zh": "DeepInspect 巡查分析专家团"
+    "zh": "DeepInspect 巡察分析专家团"
   },
   "displayDescription": {
     "en": "AI-powered team that identifies on-site risks, consolidates findings, and generates structured inspection and rectification reports.",
-    "zh": "基于AI技术深度识别现场安全风险，自动归并问题线索，生成结构化巡查报告与整改方案的专家协作团队"
+    "zh": "基于AI技术深度识别现场安全风险，自动归并问题线索，生成结构化巡察报告与整改方案的专家协作团队"
   },
   "avatar": "avatars/team.png",
   "categoryId": "10-ProjectQuality",
   "defaultInitPrompt": {
-    "zh": "帮我分析巡查材料，识别现场风险并生成巡查报告",
+    "zh": "帮我分析巡察材料，识别现场风险并生成巡察报告",
     "en": "Help me analyze inspection materials, identify on-site risks and generate an inspection report"
   },
   "members": [
@@ -46,7 +46,7 @@
       },
       "profession": {
         "en": "Inspection Orchestration Director",
-        "zh": "巡查编排总监"
+        "zh": "巡察编排总监"
       },
       "avatar": "avatars/deepinspect-team-lead.png",
       "role": "lead",
@@ -74,7 +74,7 @@
       },
       "profession": {
         "en": "Research Planning Expert",
-        "zh": "巡查规划专家"
+        "zh": "巡察规划专家"
       },
       "avatar": "avatars/query-planner.png",
       "role": "member",

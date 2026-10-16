@@ -154,10 +154,10 @@ describe("tool.read Word attachments", () => {
     Effect.gen(function* () {
       const test = yield* TestInstance
       const bytes = yield* Effect.promise(() => wordFixture())
-      const filepath = path.join(test.directory, "runs", "one", "attachments", "巡查.docx")
+      const filepath = path.join(test.directory, "runs", "one", "attachments", "巡察.docx")
       yield* put(filepath, bytes)
       const result = yield* run({ filePath: filepath })
-      for (const value of ["第一段：巡查材料内容。", "安全出口", "巡查附件页眉", "脚注补充说明"])
+      for (const value of ["第一段：巡察材料内容。", "安全出口", "巡察附件页眉", "脚注补充说明"])
         expect(result.output).toContain(value)
       expect(result.metadata.truncated).toBe(false)
       expect(yield* FSUtil.Service.use((fs) => fs.readFile(filepath))).toEqual(bytes)

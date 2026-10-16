@@ -36,7 +36,7 @@ for (const width of [1440, 390]) {
       "深度研究",
       "财经分析专家团",
       "购买决策专家团",
-      "巡查分析专家团",
+      "巡察分析专家团",
       "谈参高拜专家团",
       "位置决策专家团",
       "科研专家团",
@@ -47,8 +47,8 @@ for (const width of [1440, 390]) {
     expect(box!.x).toBeGreaterThanOrEqual(0)
     expect(box!.x + box!.width).toBeLessThanOrEqual(width)
     await page.screenshot({ path: info.outputPath("expert-teams.png") })
-    await menu.getByRole("menuitem", { name: "巡查分析专家团", exact: true }).click()
-    await expect(page.locator('[data-action="prompt-selected-expert"]')).toContainText("巡查分析专家团")
+    await menu.getByRole("menuitem", { name: "巡察分析专家团", exact: true }).click()
+    await expect(page.locator('[data-action="prompt-selected-expert"]')).toContainText("巡察分析专家团")
     await expect(editor).toHaveText("请分析我的材料")
     expect(page.url()).toBe(url)
     expect(await editor.boundingBox()).toEqual(before)
@@ -56,7 +56,7 @@ for (const width of [1440, 390]) {
       .poll(() => page.evaluate(() => Object.values(localStorage).join("")))
       .toContain("deepinspect/deepinspect-team-lead")
     await page.reload()
-    await expect(page.locator('[data-action="prompt-selected-expert"]')).toContainText("巡查分析专家团")
+    await expect(page.locator('[data-action="prompt-selected-expert"]')).toContainText("巡察分析专家团")
   })
 }
 
@@ -73,18 +73,18 @@ test("uploads a Word original without exposing or sending its extracted body", a
   await page
     .locator('input[type="file"][accept]')
     .setInputFiles({
-      name: "巡查材料.docx",
+      name: "巡察材料.docx",
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       buffer: secret,
     })
   await expect.poll(() => uploads.length).toBe(1)
-  await expect(page.getByText("巡查材料.docx", { exact: true })).toBeVisible()
+  await expect(page.getByText("巡察材料.docx", { exact: true })).toBeVisible()
   expect(Buffer.from(uploads[0].content, "base64")).toEqual(secret)
-  expect(uploads[0].path).toMatch(/^runs\/.+\/attachments\/upload-[\da-f-]+\/巡查材料\.docx$/)
+  expect(uploads[0].path).toMatch(/^runs\/.+\/attachments\/upload-[\da-f-]+\/巡察材料\.docx$/)
   await expect(page.getByText(secret.toString(), { exact: false })).toHaveCount(0)
   await page.getByRole("button", { name: "打开更多操作" }).click()
   await page.getByRole("button", { name: "专家团", exact: true }).click()
-  await page.getByRole("menuitem", { name: "巡查分析专家团", exact: true }).click()
+  await page.getByRole("menuitem", { name: "巡察分析专家团", exact: true }).click()
 
   const editor = page.locator('[data-component="prompt-input"]')
   await editor.fill("分析上传材料")
@@ -128,7 +128,7 @@ test("uploads a Word original without exposing or sending its extracted body", a
   expect(request!.agent).toBe("deepinspect/deepinspect-team-lead")
   expect(request!.parts.filter((part) => part.type === "text").map((part) => part.text)).toEqual(["分析上传材料"])
   expect(request!.parts.find((part) => part.type === "file")).toMatchObject({
-    filename: "巡查材料.docx",
+    filename: "巡察材料.docx",
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     url: expect.stringContaining("opencode-attachment=reference"),
   })
@@ -138,7 +138,7 @@ test("uploads a Word original without exposing or sending its extracted body", a
 test("preserves folder paths and blocks sending until the whole upload completes", async ({ page }, info) => {
   await home(page)
   const temporary = await mkdtemp(path.join(tmpdir(), "opencode-folder-upload-"))
-  const directory = path.join(temporary, "巡查资料")
+  const directory = path.join(temporary, "巡察资料")
   await mkdir(path.join(directory, "一"), { recursive: true })
   await mkdir(path.join(directory, "二"), { recursive: true })
   await writeFile(path.join(directory, "一/report.docx"), "first original")
@@ -165,8 +165,8 @@ test("preserves folder paths and blocks sending until the whole upload completes
     await expect.poll(() => uploads.length).toBe(2)
     await expect(page.locator('[data-component="attachment-upload-progress"]')).toHaveCount(0)
     await expect(page.getByRole("button", { name: "发送", exact: true })).not.toBeDisabled()
-    expect(uploads[0].path.replace(/\/巡查资料\/.+$/, "")).toBe(uploads[1].path.replace(/\/巡查资料\/.+$/, ""))
-    expect(uploads.map((upload) => upload.path.split("/巡查资料/")[1]).sort()).toEqual([
+    expect(uploads[0].path.replace(/\/巡察资料\/.+$/, "")).toBe(uploads[1].path.replace(/\/巡察资料\/.+$/, ""))
+    expect(uploads.map((upload) => upload.path.split("/巡察资料/")[1]).sort()).toEqual([
       "一/report.docx",
       "二/report.docx",
     ])

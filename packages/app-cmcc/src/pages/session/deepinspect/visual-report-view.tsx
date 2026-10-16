@@ -30,7 +30,7 @@ export function DeepInspectVisualReportView(props: {
   return (
     <article class="mx-auto w-full max-w-[980px] space-y-4 pb-8">
       <header class="rounded-[8px] border border-[#dfe5ef] bg-white px-5 py-4">
-        <h2 class="m-0 text-[18px] font-semibold leading-7 text-[#273044]">{props.report.title || "巡查可视化报告"}</h2>
+        <h2 class="m-0 text-[18px] font-semibold leading-7 text-[#273044]">{props.report.title || "巡察可视化报告"}</h2>
         <Show when={props.report.kind === "layout" ? props.report.subtitle : props.report.summary}>
           {(subtitle) => <p class="m-0 mt-1 text-[12px] leading-5 text-[#7c879b]">{subtitle()}</p>}
         </Show>

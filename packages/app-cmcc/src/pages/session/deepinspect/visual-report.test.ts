@@ -12,7 +12,7 @@ describe("DeepInspect visual report", () => {
     const result = parseDeepInspectVisualReport(
       JSON.stringify({
         layout_version: 2,
-        title: "巡查报告",
+        title: "巡察报告",
         sections: [
           {
             id: "ch1",
