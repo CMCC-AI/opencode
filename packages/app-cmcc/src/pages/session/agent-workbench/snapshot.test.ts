@@ -4,6 +4,40 @@ import type { DockApiCaseSnapshot } from "@/context/dockapi"
 import { buildCaseSnapshotWorkbench, findCaseSnapshotArtifact } from "./snapshot"
 
 describe("case snapshot workbench", () => {
+  test("recomputes cumulative elapsed time from historical rounds without counting idle days", () => {
+    const day = 86_400_000
+    const followup = assistantMessage("followup", "root", "追问回复", day + 100, day + 60_000)
+    if (followup.info.role !== "assistant") throw new Error("Invalid fixture")
+    followup.info.parentID = "followup-user"
+    const snapshot: DockApiCaseSnapshot = {
+      schemaVersion: 1,
+      caseCode: "elapsed",
+      capturedAt: "2026-10-20T00:00:00Z",
+      rootSessionId: "root",
+      query: "研究",
+      agentType: "test-agent",
+      rootAgent: "team/lead",
+      artifacts: [],
+      sessions: [
+        sessionEntry({
+          id: "root",
+          agent: "team/lead",
+          created: 0,
+          messages: [
+            userMessage("root-user", "root", "研究", 0),
+            assistantMessage("first", "root", "报告", 100, 600_000),
+            userMessage("followup-user", "root", "追问", day),
+            followup,
+          ],
+        }),
+      ],
+    }
+    snapshot.sessions[0].session.time.updated = 3 * day
+    const result = buildCaseSnapshotWorkbench({ snapshot, members: [], roles: {}, selectedAgentId: "overview" })
+    expect(result.workbench.stats.elapsedMs).toBe(660_000)
+    expect(snapshot.sessions[0].session.time.updated).toBe(3 * day)
+  })
+
   test("builds agent nodes, nested sessions, reports and artifact ownership from a case snapshot", () => {
     const snapshot: DockApiCaseSnapshot = {
       schemaVersion: 1,

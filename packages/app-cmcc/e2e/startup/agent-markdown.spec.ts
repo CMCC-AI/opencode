@@ -435,3 +435,96 @@ test("streamed expert replies keep a single current copy footer", async ({ page,
   expect(await clipboardText(page)).toBe(part.text)
   expect(data.errors).toEqual([])
 })
+
+for (const team of teams) {
+  for (const width of team.id === "deeptrading" ? [1440, 390] : [1440]) {
+    test(`${team.id} accumulates active rounds without overnight idle time at ${width}`, async ({
+      page,
+      baseURL,
+    }, info) => {
+      const day = 86_400_000
+      const today = Date.parse("2026-10-20T09:00:00+08:00")
+      const yesterday = today - day
+      const next = today + day
+      await page.clock.setFixedTime(new Date(next + 10_000))
+      await page.setViewportSize({ width, height: 1000 })
+      const data = await prepare(page, team)
+      for (const [id, entries] of data.transcripts) {
+        const root = id === data.root.id
+        entries[0].info.time = { created: yesterday + (root ? 0 : 120_000) }
+        entries[1].info.time = {
+          created: yesterday + (root ? 60_000 : 180_000),
+          completed: yesterday + (root ? 600_000 : 540_000),
+        }
+        for (const part of entries[1].parts) {
+          if (part.type === "tool" && part.state.status === "completed")
+            part.state.time = { start: yesterday + 120_000, end: yesterday + 180_000 }
+        }
+      }
+      const history = data.transcripts.get(data.root.id)!
+      const originalUser = history[0].info
+      const originalReply = history[1].info
+      if (originalUser.role !== "user" || originalReply.role !== "assistant") throw new Error("Missing elapsed fixture")
+      const question = (id: string, created: number) => ({
+        info: { ...originalUser, id, time: { created } },
+        parts: [
+          { id: `${id}-text`, messageID: id, sessionID: data.root.id, type: "text" as const, text: "补充研究问题" },
+        ],
+      })
+      const answer = (id: string, parentID: string, created: number, completed?: number) => ({
+        info: {
+          ...originalReply,
+          id,
+          parentID,
+          time: { created, completed },
+          finish: completed === undefined ? undefined : "stop",
+        },
+        parts: [
+          { id: `${id}-text`, messageID: id, sessionID: data.root.id, type: "text" as const, text: "补充分析结论" },
+        ],
+      })
+      history.push(
+        question(`${data.root.id}-u2`, today),
+        answer(`${data.root.id}-a2`, `${data.root.id}-u2`, today + 100, today + 60_000),
+      )
+      let running = false
+      await page.route("**/session/status*", (route) =>
+        route.fulfill({ json: running ? { [data.root.id]: { type: "busy" } } : {} }),
+      )
+      await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+      await narrow(page, width)
+      if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+      const elapsed = page.getByText("思考时间", { exact: true }).locator("..").locator("strong")
+      await expect(elapsed).toHaveText("11分0秒")
+      const thirdQuestion = question(`${data.root.id}-u3`, next)
+      const thirdAnswer = answer(`${data.root.id}-a3`, thirdQuestion.info.id, next + 100)
+      history.push(thirdQuestion, thirdAnswer)
+      running = true
+      data.events.push(
+        { type: "message.updated", properties: { info: thirdQuestion.info } },
+        { type: "message.part.updated", properties: { part: thirdQuestion.parts[0] } },
+        { type: "message.updated", properties: { info: thirdAnswer.info } },
+        { type: "message.part.updated", properties: { part: thirdAnswer.parts[0] } },
+        { type: "session.status", properties: { sessionID: data.root.id, status: { type: "busy" } } },
+      )
+      await expect(elapsed).toHaveText("11分10秒")
+      await page.clock.setFixedTime(new Date(next + 30_000))
+      await expect(elapsed).toHaveText("11分30秒")
+      await page.clock.setFixedTime(new Date(next + 60_000))
+      thirdAnswer.info.time.completed = next + 60_000
+      thirdAnswer.info.finish = "stop"
+      running = false
+      data.events.push(
+        { type: "message.updated", properties: { info: thirdAnswer.info } },
+        { type: "session.status", properties: { sessionID: data.root.id, status: { type: "idle" } } },
+      )
+      await expect(elapsed).toHaveText("12分0秒")
+      await page.clock.setFixedTime(new Date(next + day))
+      await page.reload()
+      if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+      await expect(elapsed).toHaveText("12分0秒")
+      await page.screenshot({ path: info.outputPath("elapsed-followup.png") })
+      expect(data.errors).toEqual([])
+    })
+  }
+}

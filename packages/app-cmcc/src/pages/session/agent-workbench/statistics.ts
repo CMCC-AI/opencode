@@ -137,26 +137,78 @@ export function calculateElapsedMs(input: {
   running: boolean
   now: number
 }) {
-  const start = [...input.root.messages]
-    .filter((message) => message.role === "user")
-    .sort((left, right) => left.time.created - right.time.created)[0]?.time.created
-  if (start === undefined) return 0
-  if (input.running) return Math.max(0, input.now - start)
-
-  const completed = input.transcripts.map((transcript) => {
-    const messageTimes = transcript.messages.flatMap((message) =>
-      message.role === "assistant" && message.time.completed !== undefined ? [message.time.completed] : [],
-    )
-    const toolTimes = transcript.messages.flatMap((message) =>
-      (transcript.parts[message.id] ?? []).flatMap((part) =>
-        part.type === "tool" && part.state.status === "completed" ? [part.state.time.end] : [],
+  if (!input.root.messages.some((message) => message.role === "user" && Number.isFinite(message.time.created))) return 0
+  const transcripts = new Map(input.transcripts.map((transcript) => [transcript.session.id, transcript]))
+  transcripts.set(input.root.session.id, input.root)
+  const busy = new Set(
+    [...transcripts.values()]
+      .filter((transcript) => transcript.status?.type === "busy" || transcript.status?.type === "retry")
+      .map((transcript) => transcript.session.id),
+  )
+  const intervals = [...transcripts.values()]
+    .flatMap((transcript) =>
+      executionIntervals(
+        transcript,
+        input.running &&
+          (busy.size ? busy.has(transcript.session.id) : transcript.session.id === input.root.session.id),
+        input.now,
       ),
     )
-    const values = [...messageTimes, ...toolTimes]
-    return values.length ? Math.max(...values) : transcript.session.time.updated
-  })
-  const end = Math.max(start, ...completed)
-  return Math.max(0, end - start)
+    .sort((left, right) => left.start - right.start)
+  let elapsed = 0
+  let end = -Infinity
+  for (const interval of intervals) {
+    elapsed += Math.max(0, interval.end - Math.max(interval.start, end))
+    end = Math.max(end, interval.end)
+  }
+  return elapsed
+}
+
+function executionIntervals(transcript: SessionTranscript, running: boolean, now: number) {
+  const messages = transcript.messages
+    .filter((message) => Number.isFinite(message.time.created))
+    .sort((left, right) => left.time.created - right.time.created || left.id.localeCompare(right.id))
+  const turns = new Map<string, { start: number; end: number; open: boolean }>()
+  for (const message of messages) {
+    if (message.role !== "user") continue
+    turns.set(message.id, { start: message.time.created, end: message.time.created, open: true })
+  }
+  for (const message of messages) {
+    if (message.role !== "assistant") continue
+    const key = message.parentID || message.id
+    const turn = turns.get(key) ?? {
+      start: message.time.created,
+      end: message.time.created,
+      open: true,
+    }
+    const times = [message.time.created, message.time.completed]
+    let pending = false
+    for (const part of transcript.parts[message.id] ?? []) {
+      if (part.type === "tool") {
+        if (part.state.status === "pending" || part.state.status === "running") pending = true
+        if (part.state.status === "pending") continue
+        times.push(part.state.time.start)
+        if (part.state.status === "completed" || part.state.status === "error") times.push(part.state.time.end)
+      }
+      if ((part.type === "text" || part.type === "reasoning") && part.time) {
+        times.push(part.time.start, part.time.end)
+      }
+    }
+    turn.end = Math.max(
+      turn.end,
+      ...times.filter((time): time is number => time !== undefined && Number.isFinite(time)),
+    )
+    turn.open = message.time.completed === undefined || message.finish === "tool-calls" || pending
+    turns.set(key, turn)
+  }
+  const intervals = [...turns.values()]
+  // Only the current execution may keep ticking; completed turns remain frozen.
+  const current = intervals.reduce<(typeof intervals)[number] | undefined>(
+    (latest, turn) => (!latest || turn.start > latest.start ? turn : latest),
+    undefined,
+  )
+  if (running && current?.open && Number.isFinite(now)) current.end = Math.max(current.end, now)
+  return intervals
 }
 
 export function buildWorkbenchStats(input: {
