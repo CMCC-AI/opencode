@@ -6,9 +6,14 @@ import { previewFiles } from "./preview-files.fixture"
 
 test.use({ locale: "zh-CN" })
 
-async function setup(page: Page) {
-  const data = await setupGeneralChat(page, { turns: 1 })
+async function setup(page: Page, agentType?: string) {
+  const data = await setupGeneralChat(page, { turns: 1, agentType })
   const files: Record<string, { mime: string; bytes: Buffer }> = await previewFiles()
+  files["report.md"] = { mime: "text/markdown", bytes: Buffer.from("## Markdown preview fixture\n\nReport content.") }
+  files["report.html"] = {
+    mime: "text/html",
+    bytes: Buffer.from("<!doctype html><html><body><h1>HTML preview fixture</h1></body></html>"),
+  }
   const real = process.env.CMCC_PREVIEW_FIXTURE_DIR
   if (real) {
     files["report.pdf"].bytes = await readFile(`${real}/market_report_20260921.pdf`)
@@ -102,12 +107,16 @@ async function openRight(page: Page) {
   await expect(page.getByRole("button", { name: /^产出/ })).toBeVisible()
 }
 
-test("PDF uses the original file endpoint in both tabs under strict frame CSP", async ({ page, baseURL }, info) => {
+test("PDF uses the original file endpoint from artifacts under strict frame CSP", async ({ page, baseURL }, info) => {
   const data = await setup(page)
   await page.goto(data.href(baseURL!))
   await openRight(page)
-  await page.getByRole("button", { name: /^文字报告/ }).click()
-  await page.getByRole("button", { name: "report.pdf", exact: true }).click()
+  await page.getByRole("button", { name: /^产出/ }).click()
+  await page
+    .getByRole("complementary", { name: "审查和文件" })
+    .getByRole("button", { name: /report.pdf/ })
+    .first()
+    .click()
   const pdf = page.locator('iframe[title="report.pdf"]')
   await expect(pdf).toBeVisible()
   const url = new URL((await pdf.getAttribute("src"))!)
@@ -160,8 +169,12 @@ test("Word bullets use Unicode while numbering and original downloads stay intac
   const data = await setup(page)
   await page.goto(data.href(baseURL!))
   await openRight(page)
-  await page.getByRole("button", { name: /^文字报告/ }).click()
-  await page.getByRole("button", { name: "report.docx", exact: true }).click()
+  await page.getByRole("button", { name: /^产出/ }).click()
+  await page
+    .getByRole("complementary", { name: "审查和文件" })
+    .getByRole("button", { name: /report.docx/ })
+    .first()
+    .click()
   const document = page.locator('[data-cmcc-office-preview="docx"]')
   await expect(document.locator(".docx p").first()).toBeVisible()
   const bullets = await document.locator(".docx p").evaluateAll((paras) =>
@@ -195,3 +208,70 @@ test("Word bullets use Unicode while numbering and original downloads stay intac
   await page.screenshot({ path: info.outputPath("docx.png") })
   expect(data.errors).toEqual([])
 })
+
+for (const width of [1440, 1024]) {
+  test(`general chat only shows four panel tabs with reports at ${width}`, async ({ page, baseURL }, info) => {
+    await page.setViewportSize({ width, height: 900 })
+    const data = await setup(page)
+    await page.goto(data.href(baseURL!))
+    await openRight(page)
+    const panel = page.getByRole("complementary", { name: "审查和文件" })
+    const tabs = panel.locator("button[data-selected]").locator("..")
+    await expect(panel.getByRole("button", { name: /^文字报告|^可视化报告/ })).toHaveCount(0)
+    await expect(tabs.locator("button > span:first-child")).toHaveText(["计划", "产出", "浏览器", "审查"])
+    for (const name of ["产出", "浏览器", "审查", "计划"]) {
+      const tab = panel.getByRole("button", { name: new RegExp(`^${name}`) })
+      await tab.click()
+      await expect(tab).toHaveAttribute("data-selected", "")
+    }
+    await panel.getByRole("button", { name: /^产出/ }).click()
+    await panel
+      .getByRole("button", { name: /report.md/ })
+      .first()
+      .click()
+    await expect(panel.locator('[data-component="markdown"] h2')).toHaveText("Markdown preview fixture")
+    await panel.getByRole("button", { name: "返回", exact: true }).click()
+    await panel
+      .getByRole("button", { name: /report.html/ })
+      .first()
+      .click()
+    await expect(panel.getByRole("button", { name: /^浏览器/ })).toHaveAttribute("data-selected", "")
+    await expect(panel.frameLocator("iframe").getByRole("heading", { name: "HTML preview fixture" })).toBeVisible()
+    await page.screenshot({ path: info.outputPath("four-panel-tabs.png") })
+    await page.reload()
+    await openRight(page)
+    await expect(panel.getByRole("button", { name: /^产出/ })).toHaveText("产出5")
+    await expect(panel.getByRole("button", { name: /^文字报告|^可视化报告/ })).toHaveCount(0)
+    expect(data.errors).toEqual([])
+  })
+}
+
+test("other native agent sessions retain their report tabs", async ({ page, baseURL }) => {
+  const data = await setup(page, "deepcampaign")
+  await page.goto(data.href(baseURL!))
+  await openRight(page)
+  await expect(page.locator('[data-cmcc-general-chat="true"]')).toHaveCount(0)
+  await page.getByRole("button", { name: /^文字报告/ }).click()
+  await page.getByRole("button", { name: "report.md", exact: true }).click()
+  await expect(page.locator('#review-panel [data-component="markdown"] h2')).toHaveText("Markdown preview fixture")
+  await page.getByRole("button", { name: /^可视化报告/ }).click()
+  await expect(page.locator("#review-panel iframe")).toBeVisible()
+  expect(data.errors).toEqual([])
+})
+
+for (const name of ["文字报告", "可视化报告"]) {
+  test(`returning to general chat leaves the selected ${name} tab`, async ({ page, baseURL }) => {
+    const data = await setup(page)
+    data.session.agent = "preview-test-agent"
+    await page.goto(data.href(baseURL!))
+    await openRight(page)
+    await page.getByRole("button", { name: new RegExp(`^${name}`) }).click()
+    data.session.agent = "build"
+    data.events.push({ type: "session.updated", properties: { info: data.session } })
+    await expect(page.locator('[data-cmcc-general-chat="true"]')).toHaveCount(1)
+    await expect(page.getByRole("button", { name: /^文字报告|^可视化报告/ })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: /^产出/ })).toHaveAttribute("data-selected", "")
+    await expect(page.locator("#review-panel").getByRole("button", { name: /report.md/ })).toBeVisible()
+    expect(data.errors).toEqual([])
+  })
+}

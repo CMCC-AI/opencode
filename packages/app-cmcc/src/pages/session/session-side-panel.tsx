@@ -37,7 +37,12 @@ import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { DeepInsightMark } from "@/components/brand"
 import { showToast } from "@/utils/toast"
-import { artifactPreviewKind, artifactReportFiles, artifactText, resolveArtifactPath } from "@/pages/session/artifact-preview"
+import {
+  artifactPreviewKind,
+  artifactReportFiles,
+  artifactText,
+  resolveArtifactPath,
+} from "@/pages/session/artifact-preview"
 import { cmccArtifactDirectory } from "@/utils/cmcc-workspace"
 import {
   cmccScanWorkspaceArtifactPaths,
@@ -123,6 +128,7 @@ function markdownArtifactCandidate(element: HTMLElement) {
 }
 
 export function SessionSidePanel(props: {
+  generalChat?: boolean
   canReview: () => boolean
   diffs: () => (SnapshotFileDiff | VcsFileDiff)[]
   diffsReady: () => boolean
@@ -185,6 +191,11 @@ export function SessionSidePanel(props: {
       revision: 0,
     },
     workspaceArtifactPaths: [] as string[],
+  })
+
+  createEffect(() => {
+    if (!props.generalChat || (cmcc.activeTab !== "text" && cmcc.activeTab !== "visual")) return
+    setCmcc("activeTab", "artifacts")
   })
 
   const sessionInfo = createMemo(() => {
@@ -771,6 +782,7 @@ export function SessionSidePanel(props: {
                   }
                 >
                   <CmccAssistantPanel
+                    generalChat={props.generalChat}
                     active={cmcc.activeTab}
                     setActive={(tab) => setCmcc("activeTab", tab)}
                     todos={todos()}
@@ -906,6 +918,7 @@ export function SessionSidePanel(props: {
 }
 
 function CmccAssistantPanel(props: {
+  generalChat?: boolean
   active: CmccPanelTab
   setActive: (tab: CmccPanelTab) => void
   todos: Todo[]
@@ -943,8 +956,12 @@ function CmccAssistantPanel(props: {
   const tabs = createMemo(() => [
     { id: "plan" as const, label: "计划", count: props.todos.length },
     { id: "artifacts" as const, label: "产出", count: props.artifacts.length },
-    ...(textReportCount() ? [{ id: "text" as const, label: "文字报告", count: textReportCount() }] : []),
-    ...(visualReportCount() ? [{ id: "visual" as const, label: "可视化报告", count: visualReportCount() }] : []),
+    ...(!props.generalChat && textReportCount()
+      ? [{ id: "text" as const, label: "文字报告", count: textReportCount() }]
+      : []),
+    ...(!props.generalChat && visualReportCount()
+      ? [{ id: "visual" as const, label: "可视化报告", count: visualReportCount() }]
+      : []),
     { id: "browser" as const, label: "浏览器" },
     { id: "review" as const, label: "审查", count: props.reviewCount },
   ])
@@ -989,14 +1006,14 @@ function CmccAssistantPanel(props: {
               openArtifact={props.openArtifact}
             />
           </Match>
-          <Match when={props.active === "text"}>
+          <Match when={!props.generalChat && props.active === "text"}>
             <ReportArtifactPreview
               artifacts={reports()}
               kind="text"
               empty={<CmccEmptyPanel title="暂无文字报告" description="MD、DOCX 和 PDF 产物会自动汇总到这里。" />}
             />
           </Match>
-          <Match when={props.active === "visual"}>
+          <Match when={!props.generalChat && props.active === "visual"}>
             <ReportArtifactPreview
               artifacts={reports()}
               kind="visual"

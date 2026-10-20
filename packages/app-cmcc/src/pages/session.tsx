@@ -2161,6 +2161,7 @@ export default function Page() {
 
             <Show when={!dedicatedAnalysis()}>
             <SessionSidePanel
+              generalChat={generalChat()}
               canReview={canReview}
               diffs={reviewDiffs}
               diffsReady={reviewReady}
