@@ -197,7 +197,7 @@ function LiveDeepTradingTextReportTab() {
             text={context.replay.textReportMarkdown()}
             cacheKey={`${context.workbench().rootSessionId}:30-final-report:replay`}
             streaming
-            class="select-text text-[13px] leading-7 text-[#313847]"
+            class="cmcc-markdown select-text"
           />
         </div>
       </div>
@@ -321,7 +321,7 @@ function SnapshotDeepTradingTextReportTab(props: { source: DeepTradingArtifactSo
               text={context.replay.isReplaying() ? context.replay.textReportMarkdown() : content()?.text ?? ""}
               cacheKey={`${context.workbench().rootSessionId}:case-report${context.replay.isReplaying() ? ":replay" : ""}`}
               streaming={context.replay.isReplaying()}
-              class="select-text text-[13px] leading-7 text-[#313847]"
+              class="cmcc-markdown select-text"
             />
           </div>
         </Show>
@@ -352,7 +352,7 @@ function SnapshotArtifactPreview(props: { path: string; source: DeepTradingArtif
     return (
       <Switch>
         <Match when={content()?.loaded && extension() === "md"}>
-          <div class="p-5"><Markdown text={content()?.text ?? ""} cacheKey={`case-artifact:${props.path}`} class="select-text text-[13px] leading-7 text-[#313847]" /></div>
+          <div class="p-5"><Markdown text={content()?.text ?? ""} cacheKey={`case-artifact:${props.path}`} class="cmcc-markdown select-text" /></div>
         </Match>
         <Match when={content()?.loaded}>
           <pre class="m-0 whitespace-pre-wrap break-words p-5 text-[12px] leading-6 text-[#313847]">{content()?.text}</pre>

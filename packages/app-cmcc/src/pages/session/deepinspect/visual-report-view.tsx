@@ -95,7 +95,7 @@ function LayoutBlockView(props: {
         <Markdown
           text={markdown()?.content ?? ""}
           cacheKey={props.cacheKey}
-          class="select-text text-[13px] leading-7 text-[#343c4d]"
+          class="cmcc-markdown select-text"
         />
       </Match>
       <Match when={props.block.type === "chart" ? props.block : undefined}>

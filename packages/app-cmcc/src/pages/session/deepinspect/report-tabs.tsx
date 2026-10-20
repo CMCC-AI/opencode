@@ -192,7 +192,7 @@ export function DeepInspectTextReportTab() {
             text={context.replay.textReportMarkdown()}
             cacheKey={`${context.workbench().rootSessionId}:deepinspect-report:replay`}
             streaming
-            class="select-text text-[13px] leading-7 text-[#313847]"
+            class="cmcc-markdown select-text"
           />
         </div>
       </div>

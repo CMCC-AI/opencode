@@ -69,7 +69,7 @@ function VisualBlockView(props: { block: ZhengqiVisualBlock; cacheKey: string })
           <Markdown
             text={block().content}
             cacheKey={props.cacheKey}
-            class="select-text text-[13px] leading-7 text-[#343c4d]"
+            class="cmcc-markdown select-text"
           />
         )}
       </Match>

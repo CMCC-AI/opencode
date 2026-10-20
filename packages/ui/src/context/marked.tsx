@@ -470,7 +470,7 @@ export type NativeMarkdownParser = (markdown: string) => Promise<string>
 
 export const { use: useMarked, provider: MarkedProvider } = createSimpleContext({
   name: "Marked",
-  init: (props: { nativeParser?: NativeMarkdownParser }) => {
+  init: (props: { nativeParser?: NativeMarkdownParser; transformHtml?: (html: string) => string }) => {
     const jsParser = marked.use(
       {
         renderer: {
@@ -506,17 +506,22 @@ export const { use: useMarked, provider: MarkedProvider } = createSimpleContext(
       }),
     )
 
-    if (props.nativeParser) {
-      const nativeParser = props.nativeParser
-      return {
-        async parse(markdown: string): Promise<string> {
-          const html = await nativeParser(markdown)
-          const withMath = renderMathExpressions(html)
-          return highlightCodeBlocks(withMath)
-        },
-      }
+    const nativeParser = props.nativeParser
+    const parser = nativeParser
+      ? {
+          async parse(markdown: string): Promise<string> {
+            const html = await nativeParser(markdown)
+            const withMath = renderMathExpressions(html)
+            return highlightCodeBlocks(withMath)
+          },
+        }
+      : jsParser
+    const transform = props.transformHtml
+    if (!transform) return parser
+    return {
+      async parse(markdown: string): Promise<string> {
+        return transform(await parser.parse(markdown))
+      },
     }
-
-    return jsParser
   },
 })

@@ -97,7 +97,7 @@ test("code copy and wide table scrolling keep the conversation within its panel"
   await page.goto(data.href(baseURL!))
   const report = page.locator('[data-timeline-part-id="answer-0-text"]')
   await expect(report.locator("table")).toHaveCount(2)
-  const table = report.locator("[data-markdown-block]:has(> table)").last()
+  const table = report.locator("[data-markdown-table]").last()
   await table.scrollIntoViewIfNeeded()
   const sizes = await table.evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth }))
   expect(sizes.scroll).toBeGreaterThan(sizes.client)

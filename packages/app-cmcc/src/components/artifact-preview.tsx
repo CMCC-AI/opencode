@@ -60,7 +60,7 @@ export function ArtifactPreview(props: {
       </Match>
       <Match when={kind() === "markdown"}>
         <div class="size-full overflow-auto px-6 py-5">
-          <Markdown text={text()} cacheKey={props.markdownCacheKey} class="select-text" />
+          <Markdown text={text()} cacheKey={props.markdownCacheKey} class="cmcc-markdown select-text" />
         </div>
       </Match>
       <Match when={kind() === "html"}>

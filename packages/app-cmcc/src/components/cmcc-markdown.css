@@ -1,0 +1,149 @@
+:is(
+  .cmcc-general-chat [data-component="markdown"],
+  .cmcc-markdown-messages [data-component="markdown"],
+  .cmcc-markdown
+) {
+  color: #2d3d53;
+  font-size: 16px;
+  line-height: 1.8;
+  --text-interactive-base: #2563b9;
+  --markdown-shell-code-background: #f0f5fc;
+  --markdown-shell-code-border: #dce7f6;
+  --markdown-shell-code-color: #274d7a;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  :is(h1, h2, h3, h4, h5, h6) {
+  margin: 22px 0 10px;
+  color: #224d80;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  h1 {
+  font-size: 22px;
+}
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  h2 {
+  font-size: 20px;
+}
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  :is(h3, h4, h5, h6) {
+  font-size: 17px;
+}
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  p {
+  margin: 10px 0;
+}
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  :is(ul, ol) {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  li {
+  margin-bottom: 6px;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  blockquote {
+  margin: 16px 0;
+  padding: 10px 14px;
+  border-left: 3px solid #7da8e9;
+  border-radius: 0 6px 6px 0;
+  background: #eef5ff;
+  color: #4b6381;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  :not(pre)
+  > code {
+  border-radius: 4px;
+  background: #eaf1fb;
+  color: #315f97;
+  font-size: 13px;
+}
+
+:is(.cmcc-general-chat, .cmcc-markdown-messages, .cmcc-markdown) [data-component="markdown-code"] {
+  margin: 16px 0;
+  overflow: hidden;
+  border: 1px solid #dce6f4;
+  border-radius: 8px;
+  background: #f2f6fc;
+}
+
+:is(.cmcc-general-chat, .cmcc-markdown-messages, .cmcc-markdown)
+  [data-component="markdown-code"][data-language]::before {
+  content: attr(data-language);
+  display: block;
+  padding: 7px 12px;
+  border-bottom: 1px solid #dce6f4;
+  color: #5078a8;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  pre {
+  margin: 0;
+  padding: 18px 16px;
+  border: 0;
+  border-radius: 0;
+  background: #f2f6fc;
+  font-size: 13px;
+  line-height: 1.7;
+  scrollbar-width: thin;
+}
+
+:is(.cmcc-general-chat, .cmcc-markdown-messages, .cmcc-markdown) [data-markdown-table] {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 18px 0;
+  scrollbar-width: thin;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  table {
+  display: table;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  border: 1px solid #dce6f4;
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  font-size: 14px;
+  scrollbar-width: thin;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  :is(th, td) {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e3ebf7;
+  border-right: 1px solid #e3ebf7;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  th {
+  background: #eaf2ff;
+  color: #315b91;
+  font-weight: 600;
+}
+
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  tbody
+  tr:nth-child(even) {
+  background: #f7faff;
+}
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  tr:last-child
+  td {
+  border-bottom: 0;
+}
+:is(.cmcc-general-chat [data-component="markdown"], .cmcc-markdown-messages [data-component="markdown"], .cmcc-markdown)
+  :is(th, td):last-child {
+  border-right: 0;
+}

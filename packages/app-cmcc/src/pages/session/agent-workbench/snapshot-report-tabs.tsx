@@ -151,7 +151,7 @@ export function SnapshotTextReportTab(props: {
                 text={props.replaying() ? props.replayMarkdown() : (content()?.text ?? "")}
                 cacheKey={props.cacheKey()}
                 streaming={props.replaying()}
-                class="select-text text-[13px] leading-7 text-[#313847]"
+                class="cmcc-markdown select-text"
               />
             </div>
           </Match>
@@ -184,7 +184,7 @@ export function SnapshotArtifactPreview(props: { path: string; source: AgentArti
             <Markdown
               text={content()?.text ?? ""}
               cacheKey={`case-artifact:${props.path}`}
-              class="select-text text-[13px] leading-7 text-[#313847]"
+              class="cmcc-markdown select-text"
             />
           </div>
         </Match>

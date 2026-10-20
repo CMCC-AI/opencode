@@ -95,7 +95,7 @@ function WorkbenchMessagePanel(props: { message: WorkbenchMessage; cacheKey: str
               text={props.message.text}
               cacheKey={props.cacheKey}
               streaming={!!props.streaming}
-              class="select-text text-[14px] leading-7 text-[#2f3543]"
+              class="cmcc-markdown select-text"
             />
           </div>
         }

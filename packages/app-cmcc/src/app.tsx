@@ -4,6 +4,7 @@ import { I18nProvider } from "@opencode-ai/ui/context"
 import { DialogProvider } from "@opencode-ai/ui/context/dialog"
 import { FileComponentProvider } from "@opencode-ai/ui/context/file"
 import { MarkedProvider } from "@opencode-ai/ui/context/marked"
+import { wrapMarkdownTables } from "@/utils/markdown-tables"
 import { File } from "@opencode-ai/session-ui/file"
 import { Font } from "@opencode-ai/ui/font"
 import { ThemeProvider } from "@opencode-ai/ui/theme/context"
@@ -507,7 +508,7 @@ export function AppBaseProviders(props: ParentProps<{ locale?: Locale }>) {
               <QueryProvider>
                 <WslServersProvider>
                   <DialogProvider>
-                    <MarkedProvider>
+                    <MarkedProvider transformHtml={wrapMarkdownTables}>
                       <FileComponentProvider component={File}>{props.children}</FileComponentProvider>
                     </MarkedProvider>
                   </DialogProvider>
