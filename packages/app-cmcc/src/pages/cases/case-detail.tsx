@@ -11,6 +11,7 @@ import type { Message, Part, SessionStatus } from "@opencode-ai/sdk/v2"
 import type { DockApiCaseArtifact, DockApiCaseSnapshot, DockApiLoadedCase } from "@/context/dockapi"
 import { useDockApi } from "@/context/dockapi"
 import { CaseDeleteDialog } from "@/components/case-delete-dialog"
+import { PdfPreview } from "@/components/pdf-preview-lazy"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
 import { useTabs } from "@/context/tabs"
@@ -804,7 +805,12 @@ function GenericArtifactPreview(props: {
         <Match when={text && content()?.loaded && extension === "md"}><div class="p-5"><Markdown text={content()?.text ?? ""} cacheKey={`case:${props.artifact.path}`} class="select-text text-[13px] leading-7" /></div></Match>
         <Match when={text && content()?.loaded}><pre class="m-0 whitespace-pre-wrap break-words p-5 text-[12px] leading-6">{content()?.text}</pre></Match>
         <Match when={["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(extension)}><div class="flex min-h-[480px] items-center justify-center p-4"><img src={props.source.previewUrl(props.artifact.path)} alt="" class="max-h-full max-w-full object-contain" /></div></Match>
-        <Match when={["html", "htm", "pdf"].includes(extension)}><iframe title={props.artifact.path} class="block size-full min-h-[600px] border-0" src={props.source.previewUrl(props.artifact.path)} sandbox={extension === "pdf" ? undefined : "allow-scripts"} /></Match>
+        <Match when={extension === "pdf"}>
+          <Show when={props.source.previewUrl(props.artifact.path)} fallback={<div class="py-24 text-center text-[13px] text-[#929bad]">PDF 预览地址不可用，请下载后查看。</div>}>
+            {(src) => <PdfPreview title={props.artifact.path} src={src()} />}
+          </Show>
+        </Match>
+        <Match when={["html", "htm"].includes(extension)}><iframe title={props.artifact.path} class="block size-full min-h-[600px] border-0" src={props.source.previewUrl(props.artifact.path)} sandbox="allow-scripts" /></Match>
         <Match when={text}><div class="py-24 text-center text-[13px] text-[#929bad]">正在读取文件...</div></Match>
         <Match when={true}><div class="py-24 text-center text-[13px] text-[#929bad]">该文件暂不支持在线预览，请下载后查看</div></Match>
       </Switch>

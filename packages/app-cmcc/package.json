@@ -87,6 +87,7 @@
     "luxon": "catalog:",
     "marked": "catalog:",
     "marked-shiki": "catalog:",
+    "pdfjs-dist": "6.4.299",
     "pptx-preview": "1.0.7",
     "remeda": "catalog:",
     "shiki": "catalog:",

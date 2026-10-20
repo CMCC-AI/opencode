@@ -78,8 +78,29 @@ describe("artifact preview", () => {
     expect(artifactReportFiles(files, "text").map((item) => item.path)).toEqual([
       "report.md",
       "appendix.DOCX",
-      "paper.pdf",
     ])
-    expect(artifactReportFiles(files, "visual").map((item) => item.path)).toEqual(["dashboard.HTML"])
+    expect(artifactReportFiles(files, "visual").map((item) => item.path)).toEqual(["paper.pdf", "dashboard.HTML"])
+  })
+
+  test("deduplicates report paths without merging equal filenames in different directories", () => {
+    const files = [
+      "one/report.md",
+      "one/report.md",
+      "./one/report.md",
+      "one\\report.md",
+      "two/report.md",
+      "one/report.docx",
+      "one/report.docx",
+      "one/report.pdf",
+      "./one/report.pdf",
+      "two/report.pdf",
+      "one/report.html",
+      "one\\report.html",
+      "two/report.html",
+      "one/Report.md",
+    ].map((path, index) => ({ path, index }))
+    expect(artifactReportFiles(files, "text")).toEqual([files[0], files[4], files[5], files[13]])
+    expect(artifactReportFiles(files, "visual")).toEqual([files[7], files[9], files[10], files[12]])
+    expect(files).toHaveLength(14)
   })
 })

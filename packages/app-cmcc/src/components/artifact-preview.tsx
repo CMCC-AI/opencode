@@ -5,6 +5,7 @@ import { Match, Show, Switch, createEffect, createMemo, onCleanup } from "solid-
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
 import { ExcelPreview } from "@/components/excel-preview"
+import { PdfPreview } from "@/components/pdf-preview-lazy"
 import { normalizeDocxSymbolBullets } from "@/pages/session/docx-preview"
 import {
   artifactBuffer,
@@ -45,14 +46,7 @@ export function ArtifactPreview(props: {
           when={props.pdfSrc}
           fallback={<PreviewEmpty title="PDF 预览地址不可用" description="请使用下载按钮查看原文件。" />}
         >
-          {(src) => (
-            <iframe
-              title={fileName(props.path)}
-              class="size-full border-0 bg-white"
-              src={src()}
-              referrerpolicy="no-referrer"
-            />
-          )}
+          {(src) => <PdfPreview title={fileName(props.path)} src={src()} />}
         </Show>
       </Match>
       <Match when={kind() === "image"}>

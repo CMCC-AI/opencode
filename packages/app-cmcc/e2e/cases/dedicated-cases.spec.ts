@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import JSZip from "jszip"
+import { readFile } from "node:fs/promises"
 import type { DockApiCaseSnapshot } from "../../src/context/dockapi"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { fixture } from "../smoke/session-timeline.fixture"
@@ -151,7 +152,7 @@ function snapshot(input: CaseInput): DockApiCaseSnapshot {
 async function prepare(
   page: Page,
   input: CaseInput,
-  options: { fileError?: boolean; inspectionHtml?: boolean; wordReport?: boolean } = {},
+  options: { fileError?: boolean; inspectionHtml?: boolean; wordReport?: boolean; pdfReport?: boolean; duplicateReports?: boolean } = {},
 ) {
   const apiRequests: string[] = []
   const errors: string[] = []
@@ -165,6 +166,8 @@ async function prepare(
     if (window === window.top) localStorage.setItem("dockapi.accessToken", "case-ui-test-token")
   })
   const snap = snapshot(input)
+  const pdfBuffer = options.pdfReport ? await readFile(new URL("../startup/fixtures/preview-chinese-multipage.pdf", import.meta.url)) : undefined
+  if (pdfBuffer) snap.artifacts.push({ path: "preview.pdf", size: pdfBuffer.length, contentType: "application/pdf" })
   const wordArchive = options.wordReport ? new JSZip() : undefined
   wordArchive?.file(
     "[Content_Types].xml",
@@ -188,6 +191,7 @@ async function prepare(
   if (options.inspectionHtml) {
     snap.artifacts.push({ path: "reports/inspection.html", size: 120, contentType: "text/html" })
   }
+  if (options.duplicateReports) snap.artifacts.push(...snap.artifacts.map((artifact) => ({ ...artifact })))
   const metadata = {
     ...snap,
     caseName: `测试案例-${input.category}`,
@@ -221,6 +225,8 @@ async function prepare(
       return route.fulfill({ json: snap, headers: { "access-control-allow-origin": "*" } })
     if (path.includes("/case-preview/")) {
       fileRequests.push(path)
+      if (path.endsWith("preview.pdf") && pdfBuffer)
+        return route.fulfill({ contentType: "application/pdf", body: pdfBuffer, headers: { "access-control-allow-origin": "*" } })
       if (options.fileError)
         return route.fulfill({ status: 404, body: "missing", headers: { "access-control-allow-origin": "*" } })
       let body = reportText
@@ -297,12 +303,101 @@ test("finance retains its dedicated layout after lazy loading", async ({ page })
   })
   await expect(page.getByRole("button", { name: "分析团队", exact: true })).toBeVisible()
   await expect(page.getByText("9 位", { exact: true })).toBeVisible()
-  await expect(page.locator('[data-workbench-message="case-root-a"] time')).toHaveAttribute("datetime", new Date(1500).toISOString())
+  await expect(page.locator('[data-component="workbench-response"]').filter({ has: page.locator('[data-workbench-message="case-root-a"]') }).locator("time")).toHaveAttribute("datetime", new Date(1500).toISOString())
   await page.locator('button[data-status="completed"]').first().click()
-  await expect(page.locator('[data-workbench-message="case-child-a"]').getByRole("button", { name: "复制消息" })).toBeVisible()
+  await expect(page.locator('[data-component="workbench-response"]').filter({ has: page.locator('[data-workbench-message="case-child-a"]') }).getByRole("button", { name: "复制全部回复" })).toBeVisible()
   await expect(page.locator('[data-component="expert-duration"]')).toHaveText("用时 2秒")
   await expect(page.locator('[contenteditable="true"]')).toHaveCount(0)
   await expect(page.getByRole("button", { name: "看回放", exact: true })).toBeVisible()
+  expect(state.errors).toEqual([])
+})
+
+for (const input of [cases[0], cases[4], {
+  type: "deeptrading",
+  lead: "deeptrading/deeptrading-team-lead",
+  member: "deeptrading/dt-intake",
+  category: "finance",
+  experts: 9,
+}]) {
+  test(`${input.category}: case report selectors deduplicate paths and separate formats`, async ({ page }, info) => {
+    const state = await prepare(page, input, { pdfReport: true, wordReport: true, inspectionHtml: true, duplicateReports: true })
+    await page.getByRole("button", { name: "文字报告", exact: true }).click()
+    await expect(page.getByRole("button", { name: "20-report.md", exact: true })).toHaveCount(1)
+    await expect(page.getByRole("button", { name: "report.docx", exact: true })).toHaveCount(1)
+    await expect(page.getByRole("button", { name: "preview.pdf", exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "inspection.html", exact: true })).toHaveCount(0)
+    await page.getByRole("button", { name: "report.docx", exact: true }).click()
+    await expect(page.locator('[data-cmcc-office-preview="docx"]')).toContainText("案例 Word 正文")
+    await page.getByRole("button", { name: "可视化报告", exact: true }).click()
+    await expect(page.getByRole("button", { name: "20-report.md", exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "report.docx", exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "preview.pdf", exact: true })).toHaveCount(1)
+    await expect(page.getByRole("button", { name: "inspection.html", exact: true })).toHaveCount(1)
+    await page.getByRole("button", { name: "inspection.html", exact: true }).click()
+    await expect(page.frameLocator("iframe").getByText("巡察 HTML 优先预览")).toBeVisible()
+    await page.getByRole("button", { name: "preview.pdf", exact: true }).click()
+    await expect(page.locator("[data-cmcc-pdf-preview]")).toHaveAttribute("data-ready", "true")
+    await expect(page.locator("iframe")).toHaveCount(0)
+    const download = page.waitForEvent("download")
+    await page.getByRole("button", { name: "下载", exact: true }).click()
+    expect(await readFile((await (await download).path())!)).toEqual(await readFile(new URL("../startup/fixtures/preview-chinese-multipage.pdf", import.meta.url)))
+    await page.screenshot({ path: info.outputPath("case-visual-report.png") })
+    expect(state.errors).toEqual([])
+  })
+}
+
+for (const category of ["deep-research", "finance"] as const) {
+  test(`${category}: PDF case files show only document pages at desktop and narrow widths`, async ({ page }, info) => {
+    const input = category === "finance"
+      ? { type: "deeptrading", lead: "deeptrading/deeptrading-team-lead", member: "deeptrading/dt-intake", category, experts: 9 }
+      : cases[4]
+    const state = await prepare(page, input, { pdfReport: true })
+    await page.getByRole("button", { name: "文件", exact: true }).click()
+    await page.getByRole("button", { name: /^preview.pdf/ }).click()
+    const pdf = page.locator('[data-cmcc-pdf-preview]')
+    await expect(pdf).toHaveAttribute("data-ready", "true")
+    await expect(pdf.locator(".page")).toHaveCount(2)
+    await expect(pdf.locator(".textLayer").first()).toContainText("中文预览测试")
+    await expect(page.locator("iframe")).toHaveCount(0)
+    await page.screenshot({ path: info.outputPath("pdf-case-desktop.png") })
+    await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.getByRole("button", { name: "分析结果", exact: true }).click()
+    await page.getByRole("button", { name: "文件", exact: true }).click()
+    await page.getByRole("button", { name: /^preview.pdf/ }).click()
+    await expect(pdf).toHaveAttribute("data-ready", "true")
+    await expect.poll(() => pdf.locator(".page").first().evaluate((node) => node.getBoundingClientRect().width <= node.closest(".cmcc-pdf-pages")!.clientWidth + 1)).toBe(true)
+    await expect(pdf.locator("canvas").first()).toBeVisible()
+    await page.screenshot({ path: info.outputPath("pdf-case-narrow.png") })
+    const download = page.waitForEvent("download")
+    await page.getByRole("button", { name: "下载", exact: true }).click()
+    expect(await readFile((await (await download).path())!)).toEqual(await readFile(new URL("../startup/fixtures/preview-chinese-multipage.pdf", import.meta.url)))
+    await page.getByRole("button", { name: "返回", exact: true }).click()
+    await expect(pdf).toHaveCount(0)
+    expect(state.errors).toEqual([])
+  })
+}
+
+test("ordinary case PDF files share the clean preview on desktop and narrow screens", async ({ page }, info) => {
+  const state = await prepare(page, { ...cases[4], lead: "build", member: "build" }, { pdfReport: true })
+  await page.getByRole("button", { name: "文件", exact: true }).click()
+  const panel = page.getByRole("complementary", { name: "案例文件" })
+  await panel.getByRole("button", { name: /^preview.pdf/ }).click()
+  const pdf = panel.locator('[data-cmcc-pdf-preview]')
+  await expect(pdf).toHaveAttribute("data-ready", "true")
+  await expect(pdf.locator(".page")).toHaveCount(2)
+  await expect(pdf.locator(".textLayer").first()).toContainText("中文预览测试")
+  await expect(panel.locator("iframe")).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath("ordinary-pdf-desktop.png") })
+  await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect.poll(() => pdf.locator(".page").first().evaluate((node) => node.getBoundingClientRect().width <= node.closest(".cmcc-pdf-pages")!.clientWidth + 1)).toBe(true)
+  await page.screenshot({ path: info.outputPath("ordinary-pdf-narrow.png") })
+  const download = page.waitForEvent("download")
+  await panel.getByRole("button", { name: "下载文件", exact: true }).click()
+  expect(await readFile((await (await download).path())!)).toEqual(await readFile(new URL("../startup/fixtures/preview-chinese-multipage.pdf", import.meta.url)))
+  await panel.getByRole("button", { name: "返回文件列表", exact: true }).click()
+  await expect(pdf).toHaveCount(0)
   expect(state.errors).toEqual([])
 })
 
@@ -317,12 +412,13 @@ for (const input of cases) {
     } else {
       await expect(page.getByText(`${input.experts} 位`, { exact: true })).toBeVisible()
     }
-    await expect(page.locator('[data-workbench-message="case-root-a"] time')).toHaveAttribute(
+    const response = page.locator('[data-component="workbench-response"]').filter({ has: page.locator('[data-workbench-message="case-root-a"]') })
+    await expect(response.locator("time")).toHaveAttribute(
       "datetime",
       new Date(1500).toISOString(),
     )
     await expect(
-      page.locator('[data-workbench-message="case-root-a"]').getByRole("button", { name: "复制消息" }),
+      response.getByRole("button", { name: "复制全部回复" }),
     ).toBeVisible()
     await page.locator('button[data-status="completed"]').first().click()
     await expect(page.locator('[data-workbench-message="case-child-a"]')).toContainText("专家分析完成")

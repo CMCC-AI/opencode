@@ -1010,14 +1010,14 @@ function CmccAssistantPanel(props: {
             <ReportArtifactPreview
               artifacts={reports()}
               kind="text"
-              empty={<CmccEmptyPanel title="暂无文字报告" description="MD、DOCX 和 PDF 产物会自动汇总到这里。" />}
+              empty={<CmccEmptyPanel title="暂无文字报告" description="MD 和 DOCX 产物会自动汇总到这里。" />}
             />
           </Match>
           <Match when={!props.generalChat && props.active === "visual"}>
             <ReportArtifactPreview
               artifacts={reports()}
               kind="visual"
-              empty={<CmccEmptyPanel title="暂无可视化报告" description="HTML 产物会自动汇总到这里。" />}
+              empty={<CmccEmptyPanel title="暂无可视化报告" description="HTML 和 PDF 产物会自动汇总到这里。" />}
             />
           </Match>
           <Match when={props.active === "browser"}>

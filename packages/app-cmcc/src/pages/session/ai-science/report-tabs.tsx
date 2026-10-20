@@ -292,7 +292,7 @@ export function AiScienceTextReportTab() {
       artifacts={context.workbench().artifacts}
       artifactSource={context.artifactSource}
       kind="text"
-      empty={<ReportEmpty title="文字报告尚未生成" description="等待 MD、DOCX 或 PDF 格式的科研产物生成。" />}
+      empty={<ReportEmpty title="文字报告尚未生成" description="等待 MD 或 DOCX 格式的科研产物生成。" />}
     />
   )
 }
@@ -304,7 +304,7 @@ export function AiScienceVisualReportTab() {
       artifacts={context.workbench().artifacts}
       artifactSource={context.artifactSource}
       kind="visual"
-      empty={<ReportEmpty title="可视化报告尚未生成" description="等待 HTML 格式的科研产物生成。" />}
+      empty={<ReportEmpty title="可视化报告尚未生成" description="等待 HTML 或 PDF 格式的科研产物生成。" />}
     />
   )
 }

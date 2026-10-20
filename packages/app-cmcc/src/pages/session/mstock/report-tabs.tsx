@@ -178,7 +178,7 @@ export function MstockTextReportTab() {
           artifactSource={context.artifactSource}
           kind="text"
           preferredPath={context.workbench().textReportPath}
-          empty={<ReportEmpty title="文字报告尚未生成" description="等待 MD、DOCX 或 PDF 格式的产物生成。" />}
+          empty={<ReportEmpty title="文字报告尚未生成" description="等待 MD 或 DOCX 格式的产物生成。" />}
         />
       }
     >
@@ -206,7 +206,7 @@ export function MstockVisualReportTab() {
       artifactSource={context.artifactSource}
       kind="visual"
       preferredPath={context.workbench().visualReportPath}
-      empty={<ReportEmpty title="可视化报告尚未生成" description="等待 HTML 格式的报告生成。" />}
+      empty={<ReportEmpty title="可视化报告尚未生成" description="等待 HTML 或 PDF 格式的报告生成。" />}
     />
   )
 }

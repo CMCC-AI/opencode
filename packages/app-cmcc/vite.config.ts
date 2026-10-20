@@ -2,6 +2,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { defineConfig } from "vite"
 import desktopPlugin from "./vite"
 import { startDeepXivProxy } from "./scripts/deepxiv-proxy"
+import { pdfAssets } from "./scripts/pdf-assets"
 
 const sentry =
   process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
@@ -38,11 +39,7 @@ const deepXivProxyPlugin = {
 }
 
 export default defineConfig({
-  plugins: [
-    desktopPlugin,
-    deepXivProxyPlugin,
-    sentry,
-  ] as any,
+  plugins: [desktopPlugin, pdfAssets(), deepXivProxyPlugin, sentry] as any,
   server: {
     host: "0.0.0.0",
     allowedHosts: true,

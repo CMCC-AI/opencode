@@ -6,7 +6,7 @@ import { previewFiles } from "./preview-files.fixture"
 
 test.use({ locale: "zh-CN" })
 
-async function setup(page: Page, agentType?: string) {
+async function setup(page: Page, agentType?: string, multiPage = false) {
   const data = await setupGeneralChat(page, { turns: 1, agentType })
   const files: Record<string, { mime: string; bytes: Buffer }> = await previewFiles()
   files["report.md"] = { mime: "text/markdown", bytes: Buffer.from("## Markdown preview fixture\n\nReport content.") }
@@ -14,6 +14,8 @@ async function setup(page: Page, agentType?: string) {
     mime: "text/html",
     bytes: Buffer.from("<!doctype html><html><body><h1>HTML preview fixture</h1></body></html>"),
   }
+  if (multiPage)
+    files["report.pdf"].bytes = await readFile(new URL("./fixtures/preview-chinese-multipage.pdf", import.meta.url))
   const real = process.env.CMCC_PREVIEW_FIXTURE_DIR
   if (real) {
     files["report.pdf"].bytes = await readFile(`${real}/market_report_20260921.pdf`)
@@ -95,7 +97,7 @@ async function setup(page: Page, agentType?: string) {
   })
   await page.route("**/file/download?*", (route) => {
     const file = files[new URL(route.request().url()).searchParams.get("path")?.split("/").at(-1) ?? ""]
-    return route.fulfill({ contentType: file.mime, body: file.bytes })
+    return route.fulfill({ contentType: "application/octet-stream", body: file.bytes })
   })
   return { ...data, files, requests, violations, real }
 }
@@ -107,7 +109,10 @@ async function openRight(page: Page) {
   await expect(page.getByRole("button", { name: /^产出/ })).toBeVisible()
 }
 
-test("PDF uses the original file endpoint from artifacts under strict frame CSP", async ({ page, baseURL }, info) => {
+test("PDF renders original files without native reader chrome under strict frame CSP", async ({
+  page,
+  baseURL,
+}, info) => {
   const data = await setup(page)
   await page.goto(data.href(baseURL!))
   await openRight(page)
@@ -117,25 +122,28 @@ test("PDF uses the original file endpoint from artifacts under strict frame CSP"
     .getByRole("button", { name: /report.pdf/ })
     .first()
     .click()
-  const pdf = page.locator('iframe[title="report.pdf"]')
+  const pdf = page.locator("[data-cmcc-pdf-preview]")
   await expect(pdf).toBeVisible()
-  const url = new URL((await pdf.getAttribute("src"))!)
+  await expect(pdf).toHaveAttribute("data-ready", "true")
+  await expect(pdf.locator("canvas").first()).toBeVisible()
+  await expect(page.locator('iframe[title="report.pdf"]')).toHaveCount(0)
+  await expect.poll(() => data.requests.length).toBeGreaterThan(0)
+  const url = new URL(data.requests[0])
   expect(url.origin).toBe(baseURL)
   expect(url.pathname).toBe("/file/preview")
   expect(url.searchParams.get("directory")).toBe(homeDirectory)
   expect(url.searchParams.get("path")).toBe("runs/preview-check/report.pdf")
-  await expect.poll(() => data.requests.length).toBeGreaterThan(0)
-  await expect
-    .poll(async () => {
-      for (const frame of page.frames().filter((frame) => frame.url() === url.toString())) {
-        if (await frame.locator("#sizer").count()) {
-          const height = await frame.locator("#sizer").evaluate((element) => element.getBoundingClientRect().height)
-          if (height > 0) return true
-        }
-      }
-      return false
-    })
-    .toBe(true)
+  await expect(pdf.locator(".page")).toHaveCSS("border-top-width", "0px")
+  await expect(pdf.locator(".cmcc-pdf-pages")).toHaveCSS("background-color", "rgb(255, 255, 255)")
+  expect(
+    await pdf
+      .locator("canvas")
+      .first()
+      .evaluate((canvas: HTMLCanvasElement) => {
+        const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data
+        return pixels.some((value, index) => index % 4 !== 3 && value < 200)
+      }),
+  ).toBe(true)
   await page.screenshot({ path: info.outputPath("pdf-report.png") })
   await page.getByRole("button", { name: /^产出/ }).click()
   await page
@@ -143,9 +151,135 @@ test("PDF uses the original file endpoint from artifacts under strict frame CSP"
     .getByRole("button", { name: /report.pdf/ })
     .first()
     .click()
-  await expect(pdf).toHaveAttribute("src", url.toString())
+  await expect(pdf).toHaveAttribute("data-ready", "true")
   expect(data.violations).toEqual([])
   expect(data.errors).toEqual([])
+})
+
+test("PDF preserves Chinese text, multi-page scrolling, resizing and original downloads", async ({
+  page,
+  context,
+  baseURL,
+}, info) => {
+  const assets: string[] = []
+  await context.grantPermissions(["clipboard-read", "clipboard-write"])
+  page.on("request", (request) => {
+    if (/\/pdfjs\/|\/assets\/pdf(?!-preview-lazy-)[^/]*\.(?:m?js)(?:\?|$)/i.test(request.url()))
+      assets.push(request.url())
+  })
+  const data = await setup(page, "deepcampaign", true)
+  await page.goto(data.href(baseURL!))
+  await openRight(page)
+  expect(assets).toEqual([])
+  await page.getByRole("button", { name: /^可视化报告/ }).click()
+  await page.getByRole("button", { name: "report.pdf", exact: true }).click()
+  const pdf = page.locator("[data-cmcc-pdf-preview]")
+  await expect(pdf).toHaveAttribute("data-ready", "true")
+  await expect(pdf.locator(".page")).toHaveCount(2)
+  await expect(pdf.locator(".textLayer").first()).toContainText("中文预览测试")
+  await pdf.locator(".cmcc-pdf-pages").focus()
+  const selected = await pdf
+    .locator(".textLayer span")
+    .filter({ hasText: "中文预览测试" })
+    .first()
+    .evaluate((node) => {
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const selection = window.getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+      return selection.toString()
+    })
+  expect(selected).toContain("中文预览测试")
+  await page.keyboard.press("Control+C")
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("中文预览测试")
+  expect(assets.every((url) => new URL(url).origin === baseURL)).toBe(true)
+  expect(assets.some((url) => url.includes("/cmaps/"))).toBe(true)
+  const shellScroll = await page.evaluate(() => window.scrollY)
+  await pdf.locator('.page[data-page-number="2"]').evaluate((node) => {
+    const container = node.closest(".cmcc-pdf-pages")!
+    container.scrollTop += node.getBoundingClientRect().top - container.getBoundingClientRect().top
+  })
+  await expect(pdf.locator('.page[data-page-number="2"] canvas')).toBeVisible()
+  await expect(pdf.locator('.page[data-page-number="2"] .textLayer')).toContainText("第二页")
+  await expect(pdf.locator('.page[data-page-number="2"] .textLayer span').first()).toBeInViewport()
+  await page.screenshot({ path: info.outputPath("pdf-second-page.png") })
+  const container = pdf.locator(".cmcc-pdf-pages")
+  await container.evaluate((node) => {
+    node.scrollTop = node.scrollHeight
+  })
+  await container.hover()
+  await page.mouse.wheel(0, 900)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(shellScroll)
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await expect
+    .poll(() =>
+      pdf
+        .locator(".page")
+        .first()
+        .evaluate((page) => {
+          const container = page.closest(".cmcc-pdf-pages")!
+          return page.getBoundingClientRect().width <= container.clientWidth + 1
+        }),
+    )
+    .toBe(true)
+  const download = page.waitForEvent("download")
+  await page.locator("#review-panel").getByRole("button", { name: "下载", exact: true }).click()
+  expect(await readFile((await (await download).path())!)).toEqual(data.files["report.pdf"].bytes)
+  await page.getByRole("button", { name: /^文字报告/ }).click()
+  await page.getByRole("button", { name: "report.md", exact: true }).click()
+  await expect(pdf).toHaveCount(0)
+  await page.getByRole("button", { name: /^可视化报告/ }).click()
+  await page.getByRole("button", { name: "report.pdf", exact: true }).click()
+  await expect(pdf).toHaveAttribute("data-ready", "true")
+  await expect(pdf.locator(".textLayer").first()).toContainText("中文预览测试")
+  await page.screenshot({ path: info.outputPath("pdf-resized.png") })
+  expect(data.errors).toEqual([])
+})
+
+test("PDF errors remain readable and allow switching back to other reports", async ({ page, baseURL }) => {
+  const data = await setup(page, "deepcampaign")
+  data.files["report.pdf"].bytes = Buffer.from("invalid test PDF")
+  await page.goto(data.href(baseURL!))
+  await openRight(page)
+  await page.getByRole("button", { name: /^可视化报告/ }).click()
+  await page.getByRole("button", { name: "report.pdf", exact: true }).click()
+  await expect(page.getByText("PDF 预览失败，请下载原文件查看。", { exact: true })).toBeVisible()
+  await page.getByRole("button", { name: /^文字报告/ }).click()
+  await page.getByRole("button", { name: "report.md", exact: true }).click()
+  await expect(page.locator('#review-panel [data-component="markdown"] h2')).toHaveText("Markdown preview fixture")
+  expect(data.errors).toEqual([])
+})
+
+test("loading the PDF renderer keeps the file controls and conversation visible", async ({ page, baseURL }) => {
+  const data = await setup(page)
+  let release!: () => void
+  const pending = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route(/\/assets\/pdf-preview-(?!lazy-)[^/]+\.js$/, async (route) => {
+    await pending
+    await route.continue()
+  })
+  try {
+    await page.goto(data.href(baseURL!))
+    await openRight(page)
+    await page.getByRole("button", { name: /^产出/ }).click()
+    await page
+      .getByRole("complementary", { name: "审查和文件" })
+      .getByRole("button", { name: /report.pdf/ })
+      .first()
+      .click()
+    await expect(page.getByRole("status").filter({ hasText: "正在加载 PDF..." })).toBeVisible()
+    await expect(page.getByRole("button", { name: "下载", exact: true })).toBeVisible()
+    await expect(page.getByRole("button", { name: "返回", exact: true })).toBeVisible()
+    await expect(page.locator('[data-component="prompt-input"]')).toBeVisible()
+    release()
+    await expect(page.locator("[data-cmcc-pdf-preview]")).toHaveAttribute("data-ready", "true")
+    expect(data.errors).toEqual([])
+  } finally {
+    release()
+  }
 })
 
 test("CSV previews UTF-8 text without losing leading zeros", async ({ page, baseURL }, info) => {
@@ -255,9 +389,52 @@ test("other native agent sessions retain their report tabs", async ({ page, base
   await page.getByRole("button", { name: "report.md", exact: true }).click()
   await expect(page.locator('#review-panel [data-component="markdown"] h2')).toHaveText("Markdown preview fixture")
   await page.getByRole("button", { name: /^可视化报告/ }).click()
+  await page.getByRole("button", { name: "report.html", exact: true }).click()
   await expect(page.locator("#review-panel iframe")).toBeVisible()
   expect(data.errors).toEqual([])
 })
+
+for (const width of [1440, 1024]) {
+  test(`native report tabs separate text and visual formats at ${width}`, async ({ page, baseURL }, info) => {
+    await page.setViewportSize({ width, height: 900 })
+    const data = await setup(page, "deepcampaign", true)
+    await page.goto(data.href(baseURL!))
+    await openRight(page)
+    const panel = page.locator("#review-panel")
+    const download = async (name: string) => {
+      const pending = page.waitForEvent("download")
+      await panel.getByRole("button", { name: "下载", exact: true }).click()
+      expect(await readFile((await (await pending).path())!)).toEqual(data.files[name].bytes)
+    }
+    await panel.getByRole("button", { name: /^文字报告/ }).click()
+    await expect(panel.getByRole("button", { name: /^文字报告/ })).toHaveText("文字报告2")
+    for (const name of ["report.md", "report.docx"]) {
+      await expect(panel.getByRole("button", { name, exact: true })).toHaveCount(1)
+      await panel.getByRole("button", { name, exact: true }).click()
+      if (name.endsWith("md")) await expect(panel.locator('[data-component="markdown"] h2')).toHaveText("Markdown preview fixture")
+      if (name.endsWith("docx")) await expect(panel.locator('[data-cmcc-office-preview="docx"]')).toBeVisible()
+      await download(name)
+    }
+    for (const name of ["report.pdf", "report.html"]) await expect(panel.getByRole("button", { name, exact: true })).toHaveCount(0)
+    await panel.getByRole("button", { name: /^可视化报告/ }).click()
+    await expect(panel.getByRole("button", { name: /^可视化报告/ })).toHaveText("可视化报告2")
+    for (const name of ["report.md", "report.docx"]) await expect(panel.getByRole("button", { name, exact: true })).toHaveCount(0)
+    await panel.getByRole("button", { name: "report.html", exact: true }).click()
+    await expect(panel.frameLocator("iframe").getByRole("heading", { name: "HTML preview fixture" })).toBeVisible()
+    await download("report.html")
+    await panel.getByRole("button", { name: "report.pdf", exact: true }).click()
+    await expect(panel.locator("[data-cmcc-pdf-preview]")).toHaveAttribute("data-ready", "true")
+    await expect(panel.locator("iframe")).toHaveCount(0)
+    await download("report.pdf")
+    await page.screenshot({ path: info.outputPath("visual-report-formats.png") })
+    await page.reload()
+    await openRight(page)
+    await panel.getByRole("button", { name: /^可视化报告/ }).click()
+    await expect(panel.getByRole("button", { name: "report.pdf", exact: true })).toHaveCount(1)
+    await expect(panel.getByRole("button", { name: "report.html", exact: true })).toHaveCount(1)
+    expect(data.errors).toEqual([])
+  })
+}
 
 for (const name of ["文字报告", "可视化报告"]) {
   test(`returning to general chat leaves the selected ${name} tab`, async ({ page, baseURL }) => {

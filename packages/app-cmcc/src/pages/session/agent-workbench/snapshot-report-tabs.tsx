@@ -2,6 +2,7 @@ import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { Icon } from "@opencode-ai/ui/icon"
 import { For, Match, Show, Switch, createEffect, createMemo, type Accessor } from "solid-js"
 import { createStore } from "solid-js/store"
+import { PdfPreview } from "@/components/pdf-preview-lazy"
 import { showToast } from "@/utils/toast"
 import type { AgentArtifactSource } from "./artifact-source"
 import type { SessionArtifact } from "./model"
@@ -215,13 +216,20 @@ export function SnapshotArtifactPreview(props: { path: string; source: AgentArti
       </div>
     )
   }
-  if (["html", "htm", "pdf"].includes(extension() ?? "")) {
+  if (extension() === "pdf") {
+    return (
+      <Show when={url()} fallback={<SnapshotReportEmpty title="PDF 预览地址不可用" description="请下载后查看。" />}>
+        {(src) => <PdfPreview title={props.path} src={src()} />}
+      </Show>
+    )
+  }
+  if (["html", "htm"].includes(extension() ?? "")) {
     return (
       <iframe
         title={props.path}
         class="block size-full min-h-[480px] border-0"
         src={url()}
-        sandbox={extension() === "pdf" ? undefined : "allow-scripts"}
+        sandbox="allow-scripts"
       />
     )
   }

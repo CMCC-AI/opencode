@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
+import { readFile } from "node:fs/promises"
 import type { Message, Part, Session } from "@opencode-ai/sdk/v2"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { MSTOCK_LEAD_AGENT, MSTOCK_MEMBERS } from "../../src/pages/session/mstock/config"
@@ -6,6 +7,7 @@ import { setupGeneralChat } from "./general-chat.fixture"
 import { setupHomePage, homeDirectory } from "./home-fixture"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
+import { previewFiles } from "./preview-files.fixture"
 
 test.use({ locale: "zh-CN" })
 const baseline = process.env.MARKDOWN_PHASE === "before"
@@ -253,6 +255,56 @@ async function narrow(page: Page, width: number) {
 
 async function clipboardText(page: Page) {
   return page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, "\n"))
+}
+
+for (const team of teams) {
+  test(`${team.id} separates text reports from HTML and PDF reports`, async ({ page, baseURL }, info) => {
+    const data = await prepare(page, team)
+    const answer = data.transcripts.get(data.root.id)![1]
+    const write = answer.parts.find((part) => part.type === "tool")!
+    if (write.type !== "tool" || write.state.status !== "completed") throw new Error("Missing report write fixture")
+    const files: Record<string, { mime: string; bytes: Buffer }> = await previewFiles()
+    files["report.pdf"].bytes = await readFile(new URL("./fixtures/preview-chinese-multipage.pdf", import.meta.url))
+    files["report.html"] = { mime: "text/html", bytes: Buffer.from('<meta charset="utf-8"><h1>分类验收 HTML</h1>') }
+    for (const name of ["report.pdf", "report.html", "report.docx"]) {
+      answer.parts.push({
+        ...write,
+        id: `format-${name}`,
+        callID: `format-${name}`,
+        state: {
+          ...write.state,
+          input: { filePath: `${homeDirectory}/runs/markdown-style/${name}`, content: "" },
+        },
+      })
+    }
+    await page.route("**/file/content?*", (route) => {
+      const path = new URL(route.request().url()).searchParams.get("path") ?? ""
+      const file = files[path.split("/").at(-1) ?? ""]
+      return route.fulfill({ json: file
+        ? { type: "binary", content: file.bytes.toString("base64"), encoding: "base64", mimeType: file.mime }
+        : { type: "text", content: markdown } })
+    })
+    await page.route("**/file/preview?*", (route) => {
+      const file = files[new URL(route.request().url()).searchParams.get("path")?.split("/").at(-1) ?? ""]
+      return route.fulfill({ contentType: file.mime, body: file.bytes })
+    })
+    await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+    await page.getByRole("button", { name: "文字报告", exact: true }).click()
+    const buttons = page.locator("button[title]")
+    await expect(buttons.filter({ hasText: /^report.docx$/ })).toHaveCount(1)
+    await expect(buttons.filter({ hasText: /^report.pdf$|^report.html$/ })).toHaveCount(0)
+    await page.getByRole("button", { name: "report.docx", exact: true }).click()
+    await expect(page.locator('[data-cmcc-office-preview="docx"]')).toBeVisible()
+    await page.getByRole("button", { name: "可视化报告", exact: true }).click()
+    await expect(buttons.filter({ hasText: /\.md$|\.docx$/ })).toHaveCount(0)
+    await page.getByRole("button", { name: "report.html", exact: true }).click()
+    await expect(page.frameLocator("iframe").getByRole("heading", { name: "分类验收 HTML" })).toBeVisible()
+    await page.getByRole("button", { name: "report.pdf", exact: true }).click()
+    await expect(page.locator("[data-cmcc-pdf-preview]")).toHaveAttribute("data-ready", "true")
+    await expect(page.locator("iframe")).toHaveCount(0)
+    await page.screenshot({ path: info.outputPath("visual-report.png") })
+    expect(data.errors).toEqual([])
+  })
 }
 
 for (const width of [1440, 390]) {

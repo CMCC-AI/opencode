@@ -65,8 +65,18 @@ export function artifactPreviewKind(path: string): ArtifactPreviewKind {
 }
 
 export function artifactReportFiles<T extends { path: string }>(items: readonly T[], kind: ArtifactReportKind) {
-  const previewKinds = kind === "text" ? new Set<ArtifactPreviewKind>(["markdown", "docx", "pdf"]) : new Set<ArtifactPreviewKind>(["html"])
-  return items.filter((item) => !attachmentUploadGroup(item.path) && previewKinds.has(artifactPreviewKind(item.path)))
+  const previewKinds =
+    kind === "text"
+      ? new Set<ArtifactPreviewKind>(["markdown", "docx"])
+      : new Set<ArtifactPreviewKind>(["html", "pdf"])
+  const paths = new Set<string>()
+  return items.filter((item) => {
+    if (attachmentUploadGroup(item.path) || !previewKinds.has(artifactPreviewKind(item.path))) return false
+    const path = item.path.replaceAll("\\", "/").replace(/^(?:\.\/)+/, "")
+    if (paths.has(path)) return false
+    paths.add(path)
+    return true
+  })
 }
 
 export function artifactImageMimeType(path: string, mimeType?: string) {

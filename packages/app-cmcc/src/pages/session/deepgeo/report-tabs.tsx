@@ -178,7 +178,7 @@ export function DeepGeoTextReportTab() {
           artifactSource={context.artifactSource}
           kind="text"
           preferredPath={context.workbench().textReportPath}
-          empty={<ReportEmpty title="文字报告尚未生成" description="等待 MD、DOCX 或 PDF 格式的产物生成。" />}
+          empty={<ReportEmpty title="文字报告尚未生成" description="等待 MD 或 DOCX 格式的产物生成。" />}
         />
       }
     >
@@ -208,7 +208,7 @@ export function DeepGeoVisualReportTab() {
         <div class="deeptrading-scrollbar h-full min-h-0 overflow-y-auto bg-[#f7f8fb] px-4 py-4">
           <Show
             when={path()}
-            fallback={<ReportEmpty title="可视化报告尚未生成" description="等待 HTML 格式的产物生成。" />}
+            fallback={<ReportEmpty title="可视化报告尚未生成" description="等待 HTML 或 PDF 格式的产物生成。" />}
           >
             <ReportEmpty
               title="可视化报告格式暂未适配"

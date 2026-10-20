@@ -3,6 +3,7 @@ import { For, Match, Show, Switch, createEffect, createMemo, type JSX } from "so
 import { createStore } from "solid-js/store"
 import echartsRuntimeUrl from "../../../node_modules/echarts/dist/echarts.min.js?url"
 import { ArtifactPreview } from "@/components/artifact-preview"
+import { PdfPreview } from "@/components/pdf-preview-lazy"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
 import { useServerSDK } from "@/context/server-sdk"
@@ -41,7 +42,7 @@ export function ReportArtifactPreview(props: {
   })
   const previewUrl = createMemo(() => {
     const artifact = selected()
-    if (!artifact || (props.kind !== "visual" && artifactPreviewKind(artifact.path) !== "pdf")) return undefined
+    if (!artifact || props.kind !== "visual") return undefined
     if (props.artifactSource) return props.artifactSource.previewUrl(artifact.path)
     if (!sdk || !serverSDK) return undefined
     const sdkContext = sdk()
@@ -137,7 +138,7 @@ export function ReportArtifactPreview(props: {
               fallback={
                 <Switch>
                   <Match when={content()?.loaded && content()?.content}>
-                    <ArtifactPreview path={artifact().path} content={content()!.content!} pdfSrc={previewUrl()} />
+                    <ArtifactPreview path={artifact().path} content={content()!.content!} />
                   </Match>
                   <Match when={content()?.error}>
                     {(error) => <ReportState title="文字报告读取失败" description={error()} />}
@@ -151,16 +152,23 @@ export function ReportArtifactPreview(props: {
               <Show
                 when={previewUrl()}
                 keyed
-                fallback={<ReportState title="可视化报告读取失败" description="无法生成 HTML 预览地址。" />}
+                fallback={<ReportState title="可视化报告读取失败" description="无法生成报告预览地址。" />}
               >
                 {(url) => (
-                  <iframe
-                    title={artifact().filename}
-                    class="block size-full min-h-[400px] border-0 bg-white"
-                    src={url}
-                    sandbox="allow-scripts"
-                    referrerpolicy="origin"
-                  />
+                  <Show
+                    when={artifactPreviewKind(artifact().path) === "pdf"}
+                    fallback={
+                      <iframe
+                        title={artifact().filename}
+                        class="block size-full min-h-[400px] border-0 bg-white"
+                        src={url}
+                        sandbox="allow-scripts"
+                        referrerpolicy="origin"
+                      />
+                    }
+                  >
+                    <PdfPreview title={artifact().filename} src={url} />
+                  </Show>
                 )}
               </Show>
             </Show>

@@ -3,6 +3,7 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { For, Match, Show, Switch, createEffect, createMemo, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { SessionArtifactPreview } from "@/components/session-artifact-preview"
+import { PdfPreview } from "@/components/pdf-preview-lazy"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
 import { artifactText } from "@/pages/session/artifact-preview"
@@ -171,23 +172,15 @@ function LiveDeepTradingFilesTab() {
 export function DeepTradingTextReportTab() {
   const context = useDeepTradingWorkbench()
   return (
-    <Show when={context.artifactSource} keyed fallback={<LiveDeepTradingTextReportTab />}>
-      {(source) => <SnapshotDeepTradingTextReportTab source={source} />}
-    </Show>
-  )
-}
-
-function LiveDeepTradingTextReportTab() {
-  const context = useDeepTradingWorkbench()
-  return (
     <Show
       when={context.replay.isReplaying()}
       fallback={
         <ReportArtifactPreview
           artifacts={context.workbench().artifacts}
+          artifactSource={context.artifactSource}
           kind="text"
           preferredPath={context.workbench().textReportPath}
-          empty={<ReportEmpty title="文字报告尚未生成" description="等待 MD、DOCX 或 PDF 格式的产物生成。" />}
+          empty={<ReportEmpty title="文字报告尚未生成" description="等待 MD 或 DOCX 格式的产物生成。" />}
         />
       }
     >
@@ -208,20 +201,12 @@ function LiveDeepTradingTextReportTab() {
 export function DeepTradingVisualReportTab() {
   const context = useDeepTradingWorkbench()
   return (
-    <Show when={context.artifactSource} keyed fallback={<LiveDeepTradingVisualReportTab />}>
-      {(source) => <SnapshotDeepTradingVisualReportTab source={source} />}
-    </Show>
-  )
-}
-
-function LiveDeepTradingVisualReportTab() {
-  const context = useDeepTradingWorkbench()
-  return (
     <ReportArtifactPreview
       artifacts={context.workbench().artifacts}
+      artifactSource={context.artifactSource}
       kind="visual"
       preferredPath={context.workbench().visualReportPath}
-      empty={<ReportEmpty title="可视化报告尚未生成" description="等待 HTML 格式的产物生成。" />}
+      empty={<ReportEmpty title="可视化报告尚未生成" description="等待 HTML 或 PDF 格式的产物生成。" />}
     />
   )
 }
@@ -301,50 +286,6 @@ function SnapshotDeepTradingFilesTab(props: { source: DeepTradingArtifactSource 
   )
 }
 
-function SnapshotDeepTradingTextReportTab(props: { source: DeepTradingArtifactSource }) {
-  const context = useDeepTradingWorkbench()
-  const path = createMemo(() => context.workbench().textReportPath)
-  createEffect(() => {
-    const value = path()
-    if (value) void props.source.load(value)
-  })
-  const content = createMemo(() => {
-    const value = path()
-    return value ? props.source.get(value) : undefined
-  })
-  return (
-    <div class="deeptrading-scrollbar h-full min-h-0 overflow-y-auto bg-[#f7f8fb] px-4 py-4">
-      <Show when={path()} fallback={<ReportEmpty title="文字报告尚未生成" description="案例快照中没有 30-final-report.md。" />}>
-        <Show when={context.replay.isReplaying() || content()?.loaded} fallback={<ReportEmpty title="正在读取报告" description="请稍候。" />}>
-          <div class="mx-auto w-full max-w-[860px] rounded-[8px] border border-[#e0e4eb] bg-white px-5 py-5 sm:px-7">
-            <Markdown
-              text={context.replay.isReplaying() ? context.replay.textReportMarkdown() : content()?.text ?? ""}
-              cacheKey={`${context.workbench().rootSessionId}:case-report${context.replay.isReplaying() ? ":replay" : ""}`}
-              streaming={context.replay.isReplaying()}
-              class="cmcc-markdown select-text"
-            />
-          </div>
-        </Show>
-      </Show>
-    </div>
-  )
-}
-
-function SnapshotDeepTradingVisualReportTab(props: { source: DeepTradingArtifactSource }) {
-  const context = useDeepTradingWorkbench()
-  const url = createMemo(() => {
-    const path = context.workbench().visualReportPath
-    return path ? props.source.previewUrl(path) : undefined
-  })
-  return (
-    <div class="h-full min-h-0 overflow-hidden bg-[#f7f8fb]">
-      <Show when={url()} keyed fallback={<ReportEmpty title="可视化报告尚未生成" description="案例快照中没有 40-report.html。" />}>
-        {(value) => <iframe title="DeepTrading 案例可视化报告" class="block size-full min-h-[400px] border-0 bg-white" src={value} sandbox="allow-scripts" referrerpolicy="origin" />}
-      </Show>
-    </div>
-  )
-}
-
 function SnapshotArtifactPreview(props: { path: string; source: DeepTradingArtifactSource }) {
   const extension = () => props.path.split(".").at(-1)?.toLowerCase()
   const content = () => props.source.get(props.path)
@@ -366,8 +307,15 @@ function SnapshotArtifactPreview(props: { path: string; source: DeepTradingArtif
   if (["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(extension() ?? "")) {
     return <div class="flex min-h-full items-center justify-center p-4"><img src={url()} alt="" class="max-h-full max-w-full object-contain" /></div>
   }
-  if (["html", "htm", "pdf"].includes(extension() ?? "")) {
-    return <iframe title={props.path} class="block size-full min-h-[480px] border-0" src={url()} sandbox={extension() === "pdf" ? undefined : "allow-scripts"} />
+  if (extension() === "pdf") {
+    return (
+      <Show when={url()} fallback={<ReportEmpty title="PDF 预览地址不可用" description="请下载后查看。" />}>
+        {(src) => <PdfPreview title={props.path} src={src()} />}
+      </Show>
+    )
+  }
+  if (["html", "htm"].includes(extension() ?? "")) {
+    return <iframe title={props.path} class="block size-full min-h-[480px] border-0" src={url()} sandbox="allow-scripts" />
   }
   return <ReportEmpty title="该文件暂不支持在线预览" description="请下载后查看。" />
 }
