@@ -32,7 +32,7 @@ const user = (id: string, sessionID: string): Message => ({
   model: { providerID: "test", modelID: "test" },
 })
 
-const assistant = (id: string, sessionID: string, completed = true): Message => ({
+const assistant = (id: string, sessionID: string, completed = true): Extract<Message, { role: "assistant" }> => ({
   id,
   sessionID,
   role: "assistant",
@@ -89,7 +89,13 @@ describe("agent workbench session adapter", () => {
     })
     expect(messages.map((message) => message.id)).toEqual(["u1", "a1", "a2"])
     expect(messages[0]).toEqual({ id: "u1", role: "user", text: "question", createdAt: 10 })
-    expect(messages[1]).toMatchObject({ text: "first", createdAt: 20, completedAt: 30, modelID: "test" })
+    expect(messages[1]).toMatchObject({
+      text: "first",
+      parentID: first.parentID,
+      createdAt: 20,
+      completedAt: 30,
+      modelID: "test",
+    })
     expect(messages[2]).toMatchObject({
       text: "```ts\n1\n```",
       createdAt: 40,

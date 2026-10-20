@@ -56,6 +56,7 @@ export function extractWorkbenchMessages(
         ...(attachments.length ? { attachments } : {}),
         ...(message.role === "assistant"
           ? {
+              parentID: message.parentID,
               completedAt: message.time.completed,
               providerID: message.providerID,
               modelID: message.modelID,

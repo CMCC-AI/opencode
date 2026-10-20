@@ -7,6 +7,7 @@ import { createStore } from "solid-js/store"
 import { showToast } from "@/utils/toast"
 import type { AgentNodeView, AgentWorkbench, WorkbenchMessage } from "./model"
 import { completedExpertElapsed } from "./session-adapter"
+import { groupWorkbenchMessages } from "./conversation-turns"
 
 export function WorkbenchQuery(props: { workbench: AgentWorkbench; overview: boolean }) {
   const message = createMemo(() => props.workbench.overviewMessages?.find((item) => item.role === "user"))
@@ -30,21 +31,51 @@ export function WorkbenchConversation(props: {
   cacheKey: string
   streaming: boolean
   empty: JSX.Element
+  header: () => JSX.Element
 }) {
   const messages = createMemo(
     () =>
       props.messages ?? (props.markdown ? [{ id: "legacy", role: "assistant" as const, text: props.markdown }] : []),
   )
+  const turns = createMemo(() => groupWorkbenchMessages(messages()))
   return (
-    <Show when={messages().length} fallback={props.empty}>
+    <Show
+      when={turns().length}
+      fallback={
+        <>
+          {props.header()}
+          {props.empty}
+        </>
+      }
+    >
       <div class="space-y-5" data-component="workbench-conversation">
-        <Index each={messages()}>
-          {(message) => (
-            <WorkbenchMessagePanel
-              message={message()}
-              cacheKey={`${props.cacheKey}:${message().id}`}
-              streaming={props.streaming && message().role === "assistant" && message().completedAt === undefined}
-            />
+        <Index each={turns()}>
+          {(turn) => (
+            <div class="min-w-0 space-y-5" data-workbench-turn={turn().id}>
+              <Show when={turn().user}>
+                {(user) => <WorkbenchMessagePanel message={user()} cacheKey={`${props.cacheKey}:${user().id}`} />}
+              </Show>
+              <section class="min-w-0" data-component="workbench-response">
+                <div data-component="workbench-expert-header">{props.header()}</div>
+                <Show when={turn().replies.length} fallback={props.empty}>
+                  <div
+                    data-component="workbench-response-card"
+                    class="w-full min-w-0 space-y-5 rounded-[8px] border border-[#e3e6ed] bg-white px-5 py-5 shadow-[0_2px_10px_rgba(36,42,60,0.04)] sm:px-7"
+                  >
+                    <Index each={turn().replies}>
+                      {(message) => (
+                        <WorkbenchMessagePanel
+                          message={message()}
+                          cacheKey={`${props.cacheKey}:${message().id}`}
+                          streaming={props.streaming && message().completedAt === undefined}
+                        />
+                      )}
+                    </Index>
+                  </div>
+                  <WorkbenchMessageFooter messages={turn().replies} cacheKey={`${props.cacheKey}:${turn().id}`} />
+                </Show>
+              </section>
+            </div>
           )}
         </Index>
       </div>
@@ -53,33 +84,6 @@ export function WorkbenchConversation(props: {
 }
 
 function WorkbenchMessagePanel(props: { message: WorkbenchMessage; cacheKey: string; streaming?: boolean }) {
-  const [state, setState] = createStore({ copied: false })
-  let timer: ReturnType<typeof setTimeout> | undefined
-  onCleanup(() => clearTimeout(timer))
-  createEffect(
-    on(
-      () => props.cacheKey,
-      () => {
-        clearTimeout(timer)
-        setState("copied", false)
-      },
-    ),
-  )
-  const time = createMemo(() => {
-    const value = props.message.createdAt
-    if (value === undefined || !Number.isFinite(value)) return undefined
-    const date = new Date(value)
-    return Number.isFinite(date.getTime()) ? date : undefined
-  })
-  const copy = async () => {
-    if (!(await copyMessage(props.message.text))) {
-      showToast({ variant: "error", title: "复制失败", description: "请选中正文手动复制。" })
-      return
-    }
-    setState("copied", true)
-    clearTimeout(timer)
-    timer = setTimeout(() => setState("copied", false), 2000)
-  }
   return (
     <article
       data-workbench-message={props.message.id}
@@ -90,14 +94,12 @@ function WorkbenchMessagePanel(props: { message: WorkbenchMessage; cacheKey: str
       <Show
         when={props.message.role === "user"}
         fallback={
-          <div class="w-full min-w-0 rounded-[8px] border border-[#e3e6ed] bg-white px-5 py-5 shadow-[0_2px_10px_rgba(36,42,60,0.04)] sm:px-7">
-            <Markdown
-              text={props.message.text}
-              cacheKey={props.cacheKey}
-              streaming={!!props.streaming}
-              class="cmcc-markdown select-text"
-            />
-          </div>
+          <Markdown
+            text={props.message.text}
+            cacheKey={props.cacheKey}
+            streaming={!!props.streaming}
+            class="cmcc-markdown select-text"
+          />
         }
       >
         <div class="max-w-[85%] whitespace-pre-wrap break-words rounded-[8px] bg-[#e9ecf3] px-4 py-3 text-[14px] leading-6 text-[#323949]">
@@ -119,25 +121,83 @@ function WorkbenchMessagePanel(props: { message: WorkbenchMessage; cacheKey: str
           </For>
         </div>
       </Show>
-      <footer class="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-[#7a8292]">
-        <Tooltip value={state.copied ? "已复制" : "复制消息"}>
-          <IconButton
-            type="button"
-            icon={state.copied ? "check" : "copy"}
-            aria-label={state.copied ? "已复制" : "复制消息"}
-            onClick={() => void copy()}
-          />
-        </Tooltip>
-        <Show when={time()} fallback={<span>时间未知</span>}>
-          {(date) => <time dateTime={date().toISOString()}>{date().toLocaleString("zh-CN", { hour12: false })}</time>}
-        </Show>
-        <Show when={props.message.role === "assistant"}>
-          <span class="break-all" title={props.message.providerID}>
-            {props.message.modelID || "模型未知"}
-          </span>
-        </Show>
-      </footer>
+      <Show when={props.message.role === "user"}>
+        <WorkbenchMessageFooter messages={[props.message]} cacheKey={props.cacheKey} />
+      </Show>
     </article>
+  )
+}
+
+function WorkbenchMessageFooter(props: { messages: WorkbenchMessage[]; cacheKey: string }) {
+  const [state, setState] = createStore({ copied: false })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(timer))
+  createEffect(
+    on(
+      () => props.cacheKey,
+      () => {
+        clearTimeout(timer)
+        setState("copied", false)
+      },
+    ),
+  )
+  const time = createMemo(() => {
+    const value = props.messages[0]?.createdAt
+    if (value === undefined || !Number.isFinite(value)) return undefined
+    const date = new Date(value)
+    return Number.isFinite(date.getTime()) ? date : undefined
+  })
+  const models = createMemo(() => [...new Set(props.messages.map((message) => message.modelID || "模型未知"))])
+  const label = () => (props.messages[0]?.role === "user" ? "复制消息" : "复制全部回复")
+  const copy = async () => {
+    const text = props.messages
+      .map((message) => message.text)
+      .filter((value) => value.trim())
+      .join("\n\n")
+    if (!(await copyMessage(text))) {
+      showToast({ variant: "error", title: "复制失败", description: "请选中正文手动复制。" })
+      return
+    }
+    setState("copied", true)
+    clearTimeout(timer)
+    timer = setTimeout(() => setState("copied", false), 2000)
+  }
+  return (
+    <footer
+      data-component="workbench-message-footer"
+      class="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-[#7a8292]"
+    >
+      <Tooltip value={state.copied ? "已复制" : label()}>
+        <IconButton
+          type="button"
+          icon={state.copied ? "check" : "copy"}
+          aria-label={state.copied ? "已复制" : label()}
+          onClick={() => void copy()}
+        />
+      </Tooltip>
+      <Show when={time()} fallback={<span>时间未知</span>}>
+        {(date) => <time dateTime={date().toISOString()}>{date().toLocaleString("zh-CN", { hour12: false })}</time>}
+      </Show>
+      <Show when={props.messages[0]?.role === "assistant"}>
+        <For each={models()}>
+          {(model) => (
+            <span
+              class="break-all"
+              title={[
+                ...new Set(
+                  props.messages
+                    .filter((message) => (message.modelID || "模型未知") === model)
+                    .map((message) => message.providerID)
+                    .filter(Boolean),
+                ),
+              ].join("、")}
+            >
+              {model}
+            </span>
+          )}
+        </For>
+      </Show>
+    </footer>
   )
 }
 

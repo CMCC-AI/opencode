@@ -227,9 +227,9 @@ for (const legacy of [false, true])
     await expect(page.getByText("消耗 token", { exact: true }).locator("..").locator("strong")).toHaveText("165")
     await expect(page.getByText("报告篇幅", { exact: true }).locator("..").locator("strong")).toHaveText("10字")
     await expectVerticalDag(page)
-    await expect(page.locator('[data-workbench-message="mstock-root-a"] time')).toHaveAttribute("datetime", new Date(1001).toISOString())
+    await expect(page.locator('[data-component="workbench-response"]').filter({ has: page.locator('[data-workbench-message="mstock-root-a"]') }).locator("time")).toHaveAttribute("datetime", new Date(1001).toISOString())
     await page.locator('button[data-status="completed"]').first().click()
-    await expect(page.locator('[data-workbench-message="worker-0-a"]').getByRole("button", { name: "复制消息" })).toBeVisible()
+    await expect(page.locator('[data-component="workbench-response"]').filter({ has: page.locator('[data-workbench-message="worker-0-a"]') }).getByRole("button", { name: "复制全部回复" })).toBeVisible()
     await expect(page.locator('[data-component="expert-duration"]')).toBeVisible()
     console.log(
       JSON.stringify({

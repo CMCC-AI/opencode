@@ -28,6 +28,7 @@ export type AgentNodeView = AgentDisplayMember & {
 export type WorkbenchMessage = {
   id: string
   role: "user" | "assistant"
+  parentID?: string
   text: string
   createdAt?: number
   completedAt?: number

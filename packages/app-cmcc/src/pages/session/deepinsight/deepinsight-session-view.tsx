@@ -65,37 +65,38 @@ export function DeepInsightSessionView() {
           >
             {(item) => (
               <section class="min-w-0">
-                <header class="mb-4 flex min-w-0 items-center gap-3 border-b border-[#e4e7ed] pb-4">
-                  <AgentAvatar src={item().avatar} name={item().name} size="large" />
-                  <div class="min-w-0 flex-1">
-                    <div class="flex min-w-0 items-center gap-2">
-                      <h2 class="m-0 truncate text-[16px] font-semibold leading-6 text-[#1f2533]">{item().name}</h2>
-                      <StatusBadge status={item().status} />
-                    </div>
-                    <p class="m-0 mt-0.5 truncate text-[12px] leading-5 text-[#7a8292]">{item().profession}</p>
-                  </div>
-                  <Show
-                    when={
-                      item().id !== "overview" &&
-                      "sessionId" in item() &&
-                      item().sessionId &&
-                      item().status === "failed"
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="h-8 shrink-0 rounded-[6px] border border-[#cad3e8] bg-white px-3 text-[12px] text-[#4f68a8] hover:bg-[#f2f5fb]"
-                      onClick={() => {
-                        const value = item()
-                        if ("sessionId" in value && value.sessionId) void context.retrySession(value.sessionId)
-                      }}
-                    >
-                      重试加载
-                    </button>
-                  </Show>
-                </header>
-
                 <WorkbenchConversation
+                  header={() => (
+                    <header class="mb-4 flex min-w-0 items-center gap-3 border-b border-[#e4e7ed] pb-4">
+                      <AgentAvatar src={item().avatar} name={item().name} size="large" />
+                      <div class="min-w-0 flex-1">
+                        <div class="flex min-w-0 items-center gap-2">
+                          <h2 class="m-0 truncate text-[16px] font-semibold leading-6 text-[#1f2533]">{item().name}</h2>
+                          <StatusBadge status={item().status} />
+                        </div>
+                        <p class="m-0 mt-0.5 truncate text-[12px] leading-5 text-[#7a8292]">{item().profession}</p>
+                      </div>
+                      <Show
+                        when={
+                          item().id !== "overview" &&
+                          "sessionId" in item() &&
+                          item().sessionId &&
+                          item().status === "failed"
+                        }
+                      >
+                        <button
+                          type="button"
+                          class="h-8 shrink-0 rounded-[6px] border border-[#cad3e8] bg-white px-3 text-[12px] text-[#4f68a8] hover:bg-[#f2f5fb]"
+                          onClick={() => {
+                            const value = item()
+                            if ("sessionId" in value && value.sessionId) void context.retrySession(value.sessionId)
+                          }}
+                        >
+                          重试加载
+                        </button>
+                      </Show>
+                    </header>
+                  )}
                   messages={item().messages}
                   markdown={item().markdown}
                   cacheKey={`${context.workbench().rootSessionId}:${item().id}`}
