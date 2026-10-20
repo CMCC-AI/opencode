@@ -115,7 +115,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       }
       yield* requireSession(ctx.params.sessionID)
       if (ctx.query.limit === undefined || ctx.query.limit === 0) {
-        return yield* SessionError.mapStorageNotFound(session.messages({ sessionID: ctx.params.sessionID }))
+        const items = yield* SessionError.mapStorageNotFound(session.messages({ sessionID: ctx.params.sessionID }))
+        return yield* summary.filterMessages({ sessionID: ctx.params.sessionID, messages: items })
       }
 
       const page = yield* SessionError.mapStorageNotFound(
@@ -125,7 +126,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
           before: ctx.query.before,
         }),
       )
-      if (!page.cursor) return page.items
+      const items = yield* summary.filterMessages({ sessionID: ctx.params.sessionID, messages: page.items })
+      if (!page.cursor) return items
 
       const request = yield* HttpServerRequest.HttpServerRequest
       // toURL() honors the Host + x-forwarded-proto headers, so the Link
@@ -133,7 +135,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const url = Option.getOrElse(HttpServerRequest.toURL(request), () => new URL(request.url, "http://localhost"))
       url.searchParams.set("limit", ctx.query.limit.toString())
       url.searchParams.set("before", page.cursor)
-      return HttpServerResponse.jsonUnsafe(page.items, {
+      return HttpServerResponse.jsonUnsafe(items, {
         headers: {
           "Access-Control-Expose-Headers": "Link, X-Next-Cursor",
           Link: `<${url.toString()}>; rel="next"`,
@@ -145,9 +147,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const message = Effect.fn("SessionHttpApi.message")(function* (ctx: {
       params: { sessionID: SessionID; messageID: MessageID }
     }) {
-      return yield* SessionError.mapStorageNotFound(
+      const item = yield* SessionError.mapStorageNotFound(
         MessageV2.get({ sessionID: ctx.params.sessionID, messageID: ctx.params.messageID }),
       )
+      return (yield* summary.filterMessages({ sessionID: ctx.params.sessionID, messages: [item] }))[0]!
     })
 
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload?: Session.CreateInput }) {
@@ -349,12 +352,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       payload: typeof RevertPayload.Type
     }) {
       yield* requireSession(ctx.params.sessionID)
-      return yield* SessionError.mapBusy(revertSvc.revert({ sessionID: ctx.params.sessionID, ...ctx.payload }))
+      return yield* SessionError.mapRevert(revertSvc.revert({ sessionID: ctx.params.sessionID, ...ctx.payload }))
     })
 
     const unrevert = Effect.fn("SessionHttpApi.unrevert")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
-      return yield* SessionError.mapBusy(revertSvc.unrevert({ sessionID: ctx.params.sessionID }))
+      return yield* SessionError.mapRevert(revertSvc.unrevert({ sessionID: ctx.params.sessionID }))
     })
 
     const permissionRespond = Effect.fn("SessionHttpApi.permissionRespond")(function* (ctx: {

@@ -6,6 +6,11 @@ import { Snapshot } from "@/snapshot"
 import { Session } from "./session"
 import { SessionID, MessageID } from "./schema"
 import { Config } from "@/config/config"
+import { InstanceState } from "@/effect/instance-state"
+import { SessionFileScope } from "./file-scope"
+import { Database } from "@opencode-ai/core/database/database"
+import { MessageTable } from "@opencode-ai/core/session/sql"
+import { and, eq, like, sql } from "drizzle-orm"
 
 function unquoteGitPath(input: string) {
   if (!input.startsWith('"')) return input
@@ -66,7 +71,15 @@ function unquoteGitPath(input: string) {
 export interface Interface {
   readonly summarize: (input: { sessionID: SessionID; messageID: MessageID }) => Effect.Effect<void>
   readonly diff: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Snapshot.FileDiff[]>
-  readonly computeDiff: (input: { messages: SessionV1.WithParts[] }) => Effect.Effect<Snapshot.FileDiff[]>
+  readonly computeDiff: (input: {
+    sessionID: SessionID
+    messages: SessionV1.WithParts[]
+  }) => Effect.Effect<Snapshot.FileDiff[]>
+  readonly fileScope: (sessionID: SessionID) => Effect.Effect<SessionFileScope.Scope>
+  readonly filterMessages: (input: {
+    sessionID: SessionID
+    messages: SessionV1.WithParts[]
+  }) => Effect.Effect<SessionV1.WithParts[]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionSummary") {}
@@ -78,8 +91,61 @@ const layer = Layer.effect(
     const snapshot = yield* Snapshot.Service
     const events = yield* EventV2Bridge.Service
     const config = yield* Config.Service
+    const { db } = yield* Database.Service
 
-    const computeDiff = Effect.fn("SessionSummary.computeDiff")(function* (input: { messages: SessionV1.WithParts[] }) {
+    const legacySystems = Effect.fn("SessionSummary.legacySystems")(function* (sessionID: SessionID) {
+      const system = sql<string>`json_extract(${MessageTable.data}, '$.system')`
+      const rows = yield* db
+        .selectDistinct({ system })
+        .from(MessageTable)
+        .where(
+          and(
+            eq(MessageTable.session_id, sessionID),
+            eq(sql<string>`json_extract(${MessageTable.data}, '$.role')`, "user"),
+            like(system, "%本次会话的独立产物目录是 %"),
+          ),
+        )
+        .all()
+        .pipe(Effect.orDie)
+      return rows.map((row) => row.system)
+    })
+
+    const fileScope = (sessionID: SessionID) => SessionFileScope.resolve(sessionID, sessions.get, legacySystems)
+
+    const scopedDiffs = (scope: SessionFileScope.Scope, worktree: string, diffs: Snapshot.FileDiff[]) =>
+      diffs
+        .map((item) => (item.file === undefined ? item : { ...item, file: unquoteGitPath(item.file) }))
+        .filter((item) => SessionFileScope.contains(scope, worktree, item.file))
+
+    const filterMessages = Effect.fn("SessionSummary.filterMessages")(function* (input: {
+      sessionID: SessionID
+      messages: SessionV1.WithParts[]
+    }) {
+      const scope = yield* fileScope(input.sessionID)
+      const { worktree } = yield* InstanceState.context
+      if (scope === undefined) return input.messages
+      return input.messages.map((entry) => ({
+        info:
+          entry.info.role === "user" && entry.info.summary?.diffs
+            ? {
+                ...entry.info,
+                summary: { ...entry.info.summary, diffs: scopedDiffs(scope, worktree, entry.info.summary.diffs) },
+              }
+            : entry.info,
+        parts: entry.parts.map((part) =>
+          part.type === "patch"
+            ? { ...part, files: part.files.filter((file) => SessionFileScope.contains(scope, worktree, file)) }
+            : part,
+        ),
+      }))
+    })
+
+    const computeDiff = Effect.fn("SessionSummary.computeDiff")(function* (input: {
+      sessionID: SessionID
+      messages: SessionV1.WithParts[]
+    }) {
+      const scope = yield* fileScope(input.sessionID)
+      if (scope === null) return []
       let from: string | undefined
       let to: string | undefined
       for (const item of input.messages) {
@@ -95,7 +161,7 @@ const layer = Layer.effect(
           if (part.type === "step-finish" && part.snapshot) to = part.snapshot
         }
       }
-      if (from && to) return yield* snapshot.diffFull(from, to)
+      if (from && to) return yield* snapshot.diffFull(from, to, scope)
       return []
     })
 
@@ -121,7 +187,7 @@ const layer = Layer.effect(
       )
       const target = messages.find((m) => m.info.id === input.messageID)
       if (!target || target.info.role !== "user") return
-      const msgDiffs = yield* computeDiff({ messages })
+      const msgDiffs = yield* computeDiff({ sessionID: input.sessionID, messages })
       target.info.summary = { ...target.info.summary, diffs: msgDiffs }
       yield* sessions.updateMessage(target.info)
     })
@@ -133,15 +199,12 @@ const layer = Layer.effect(
       )
       if (!message || message.info.role !== "user") return []
       const diffs = message.info.summary?.diffs ?? []
-      return diffs.map((item) => {
-        if (item.file === undefined) return item
-        const file = unquoteGitPath(item.file)
-        if (file === item.file) return item
-        return { ...item, file }
-      })
+      const scope = yield* fileScope(input.sessionID)
+      const { worktree } = yield* InstanceState.context
+      return scopedDiffs(scope, worktree, diffs)
     })
 
-    return Service.of({ summarize, diff, computeDiff })
+    return Service.of({ summarize, diff, computeDiff, fileScope, filterMessages })
   }),
 )
 
@@ -154,7 +217,7 @@ export type DiffInput = Schema.Schema.Type<typeof DiffInput>
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [Session.node, Snapshot.node, EventV2Bridge.node, Config.node],
+  deps: [Session.node, Snapshot.node, EventV2Bridge.node, Config.node, Database.node],
 })
 
 export * as SessionSummary from "./summary"

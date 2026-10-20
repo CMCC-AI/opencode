@@ -33,15 +33,25 @@ interface GitResult {
 
 type State = Omit<Interface, "init">
 
+export interface Scope {
+  directory: string
+}
+
+export class ScopeError extends Error {}
+
+function assertSnapshotHash(hash: string) {
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(hash)) throw new ScopeError("Invalid session snapshot hash")
+}
+
 export interface Interface {
   readonly init: () => Effect.Effect<void>
   readonly cleanup: () => Effect.Effect<void>
-  readonly track: () => Effect.Effect<string | undefined>
-  readonly patch: (hash: string) => Effect.Effect<Patch>
-  readonly restore: (snapshot: string) => Effect.Effect<void>
-  readonly revert: (patches: Patch[]) => Effect.Effect<void>
-  readonly diff: (hash: string) => Effect.Effect<string>
-  readonly diffFull: (from: string, to: string) => Effect.Effect<FileDiff[]>
+  readonly track: (scope?: Scope) => Effect.Effect<string | undefined>
+  readonly patch: (hash: string, scope?: Scope) => Effect.Effect<Patch>
+  readonly restore: (snapshot: string, scope?: Scope) => Effect.Effect<void>
+  readonly revert: (patches: Patch[], scope?: Scope) => Effect.Effect<void>
+  readonly diff: (hash: string, scope?: Scope) => Effect.Effect<string>
+  readonly diffFull: (from: string, to: string, scope?: Scope) => Effect.Effect<FileDiff[]>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Snapshot") {}
@@ -143,7 +153,7 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           )
         })
 
-        const stage = Effect.fnUntraced(function* (files: string[]) {
+        const stage = Effect.fnUntraced(function* (files: string[], strict = false) {
           if (!files.length) return
           const result = yield* git(
             [...cfg, ...args(["add", "--all", "--sparse", "--pathspec-from-file=-", "--pathspec-file-nul"])],
@@ -157,12 +167,68 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
             exitCode: result.code,
             stderr: result.stderr,
           })
+          if (strict) throw new ScopeError("Cannot capture current session files before snapshot operation")
         })
 
         const exists = (file: string) => fs.exists(file).pipe(Effect.orDie)
         const read = (file: string) => fs.readFileString(file).pipe(Effect.catch(() => Effect.succeed("")))
         const remove = (file: string) => fs.remove(file).pipe(Effect.catch(() => Effect.void))
         const locked = <A, E, R>(fx: Effect.Effect<A, E, R>) => lock(state.gitdir).withPermits(1)(fx)
+
+        const within = (root: string, file: string) => {
+          if (!path.isAbsolute(file) || file.includes("\0")) return false
+          if (file.replaceAll("\\", "/").split("/").includes("..")) return false
+          const relative = path.relative(root, file)
+          return !!relative && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
+        }
+
+        const safePath = Effect.fnUntraced(function* (file: string) {
+          if (!within(state.directory, file)) throw new ScopeError("Snapshot path is outside the session workspace")
+          let parent = state.directory
+          const segments = path.relative(parent, file).split(path.sep)
+          for (const segment of segments) {
+            if (process.platform === "win32" && /[. ]$/.test(segment)) throw new ScopeError("Ambiguous snapshot path")
+            const entries = yield* fs.readDirectoryEntries(parent).pipe(Effect.orDie)
+            const entry = entries.find((item) =>
+              process.platform === "win32" ? item.name.toLowerCase() === segment.toLowerCase() : item.name === segment,
+            )
+            if (!entry) {
+              if (yield* exists(path.join(parent, segment))) throw new ScopeError("Ambiguous snapshot path")
+              return
+            }
+            if (entry.type === "symlink") throw new ScopeError("Snapshot operations cannot traverse symbolic links")
+            parent = path.join(parent, segment)
+          }
+        })
+
+        const pathspec = Effect.fnUntraced(function* (scope?: Scope) {
+          if (!scope) return ["."]
+          if (!within(state.worktree, scope.directory)) throw new ScopeError("Invalid snapshot scope")
+          yield* safePath(scope.directory)
+          if ((yield* exists(scope.directory)) && !(yield* fs.isDir(scope.directory)))
+            throw new ScopeError("Snapshot scope must be a directory")
+          return [`:(top,literal)${path.relative(state.worktree, scope.directory).replaceAll("\\", "/")}`]
+        })
+
+        const safeTree = Effect.fnUntraced(function* (hash: string, scope: Scope) {
+          assertSnapshotHash(hash)
+          yield* pathspec(scope)
+          const result = yield* git([...quote, ...args(["ls-tree", "-r", "-z", hash])], {
+            cwd: state.worktree,
+          })
+          if (result.code !== 0) throw new ScopeError("Cannot read snapshot before restoring session files")
+          const files = new Set<string>()
+          for (const entry of result.text.split("\0").filter(Boolean)) {
+            const relative = entry.slice(entry.indexOf("\t") + 1)
+            const file = path.resolve(state.worktree, relative)
+            if (!within(scope.directory, file)) continue
+            if (entry.startsWith("120000 "))
+              throw new ScopeError("Cannot restore symbolic links from a session snapshot")
+            yield* safePath(file)
+            files.add(relative)
+          }
+          return files
+        })
 
         const enabled = Effect.fnUntraced(function* () {
           if (state.vcs !== "git") return false
@@ -232,16 +298,23 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           }
         })
 
-        const add = Effect.fnUntraced(function* () {
+        const add = Effect.fnUntraced(function* (scope?: Scope) {
+          const paths = yield* pathspec(scope)
           yield* sync()
           const [diff, other] = yield* Effect.all(
             [
-              git([...quote, ...args(["diff-files", "--name-only", "-z", "--", "."])], {
+              git([...quote, ...args(["diff-files", "--name-only", "-z", "--", ...paths])], {
                 cwd: state.directory,
               }),
-              git([...quote, ...args(["ls-files", "--full-name", "--others", "--exclude-standard", "-z", "--", "."])], {
-                cwd: state.directory,
-              }),
+              git(
+                [
+                  ...quote,
+                  ...args(["ls-files", "--full-name", "--others", "--exclude-standard", "-z", "--", ...paths]),
+                ],
+                {
+                  cwd: state.directory,
+                },
+              ),
             ],
             { concurrency: 2 },
           )
@@ -252,6 +325,7 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
               otherCode: other.code,
               otherStderr: other.stderr,
             })
+            if (scope) throw new ScopeError("Cannot list current session files before snapshot operation")
             return
           }
 
@@ -294,7 +368,10 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           const block = new Set(untracked.filter((item) => large.has(item)))
           yield* sync(Array.from(block))
           // Stage only the allowed candidate paths so snapshot updates stay scoped.
-          yield* stage(allow.filter((item) => !block.has(item)))
+          yield* stage(
+            allow.filter((item) => !block.has(item)),
+            !!scope,
+          )
         })
 
         const cleanup = Effect.fnUntraced(function* () {
@@ -315,7 +392,7 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           )
         })
 
-        const track = Effect.fnUntraced(function* () {
+        const track = Effect.fnUntraced(function* (scope?: Scope) {
           return yield* locked(
             Effect.gen(function* () {
               if (!(yield* enabled())) return
@@ -337,7 +414,7 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
                 yield* seed()
                 yield* Effect.logInfo("initialized")
               }
-              yield* add()
+              yield* add(scope)
               const result = yield* git(args(["write-tree"]), { cwd: state.directory })
               const hash = result.text.trim()
               yield* Effect.logInfo("tracking", { hash, cwd: state.directory, git: state.gitdir })
@@ -346,12 +423,25 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           )
         })
 
-        const patch = Effect.fnUntraced(function* (hash: string) {
+        const patch = Effect.fnUntraced(function* (hash: string, scope?: Scope) {
+          if (scope) assertSnapshotHash(hash)
           return yield* locked(
             Effect.gen(function* () {
-              yield* add()
+              yield* add(scope)
               const result = yield* git(
-                [...quote, ...args(["diff", "--cached", "--no-ext-diff", "--name-only", hash, "--", "."])],
+                [
+                  ...quote,
+                  ...args([
+                    "diff",
+                    "--cached",
+                    "--no-ext-diff",
+                    "--name-only",
+                    "-z",
+                    hash,
+                    "--",
+                    ...(yield* pathspec(scope)),
+                  ]),
+                ],
                 {
                   cwd: state.directory,
                 },
@@ -360,11 +450,7 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
                 yield* Effect.logWarning("failed to get diff", { hash, exitCode: result.code })
                 return { hash, files: [] }
               }
-              const files = result.text
-                .trim()
-                .split("\n")
-                .map((x) => x.trim())
-                .filter(Boolean)
+              const files = result.text.split("\0").filter(Boolean)
 
               // Hide ignored-file removals from the user-facing patch output.
               const ignored = yield* ignore(files)
@@ -379,10 +465,56 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           )
         })
 
-        const restore = Effect.fnUntraced(function* (snapshot: string) {
+        const restore = Effect.fnUntraced(function* (snapshot: string, scope?: Scope) {
           return yield* locked(
             Effect.gen(function* () {
               yield* Effect.logInfo("restore", { commit: snapshot })
+              if (scope) {
+                yield* safeTree(snapshot, scope)
+                yield* add(scope)
+                const changed = yield* git(
+                  [
+                    ...quote,
+                    ...args([
+                      "diff",
+                      "--cached",
+                      "--no-ext-diff",
+                      "--no-renames",
+                      "--name-only",
+                      "-z",
+                      snapshot,
+                      "--",
+                      ...(yield* pathspec(scope)),
+                    ]),
+                  ],
+                  { cwd: state.worktree },
+                )
+                if (changed.code !== 0) throw new ScopeError("Cannot determine session files to restore")
+                const files = changed.text.split("\0").filter(Boolean)
+                for (const file of files) {
+                  const absolute = path.resolve(state.worktree, file)
+                  if (!within(scope.directory, absolute))
+                    throw new ScopeError("Restore path is outside the session boundary")
+                  yield* safePath(absolute)
+                }
+                if (!files.length) return
+                const restored = yield* git(
+                  [
+                    ...core,
+                    ...args([
+                      "restore",
+                      `--source=${snapshot}`,
+                      "--staged",
+                      "--worktree",
+                      "--pathspec-from-file=-",
+                      "--pathspec-file-nul",
+                    ]),
+                  ],
+                  { cwd: state.worktree, stdin: encodeTopLevelLiteralPathspecs(files) },
+                )
+                if (restored.code !== 0) throw new ScopeError(`Failed to restore session files: ${restored.stderr}`)
+                return
+              }
               const result = yield* git([...core, ...args(["read-tree", snapshot])], { cwd: state.worktree })
               if (result.code === 0) {
                 const checkout = yield* git([...core, ...args(["checkout-index", "-a", "-f"])], {
@@ -405,13 +537,15 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           )
         })
 
-        const revert = Effect.fnUntraced(function* (patches: Patch[]) {
+        const revert = Effect.fnUntraced(function* (patches: Patch[], scope?: Scope) {
           return yield* locked(
             Effect.gen(function* () {
               const ops: { hash: string; file: string; rel: string }[] = []
               const seen = new Set<string>()
+              if (scope) yield* pathspec(scope)
               for (const item of patches) {
                 for (const file of item.files) {
+                  if (scope && !within(scope.directory, file)) continue
                   if (seen.has(file)) continue
                   seen.add(file)
                   ops.push({
@@ -420,6 +554,37 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
                     rel: path.relative(state.worktree, file).replaceAll("\\", "/"),
                   })
                 }
+              }
+
+              if (scope) {
+                for (const op of ops) yield* safePath(op.file)
+                const trees = new Map<string, Set<string>>()
+                for (const hash of new Set(ops.map((op) => op.hash))) trees.set(hash, yield* safeTree(hash, scope))
+                for (const [hash, tree] of trees) {
+                  const entries = ops.filter((op) => op.hash === hash)
+                  const files = entries.filter((op) => tree.has(op.rel)).map((op) => op.rel)
+                  if (files.length) {
+                    const result = yield* git(
+                      [
+                        ...core,
+                        ...args([
+                          "restore",
+                          `--source=${hash}`,
+                          "--staged",
+                          "--worktree",
+                          "--pathspec-from-file=-",
+                          "--pathspec-file-nul",
+                        ]),
+                      ],
+                      { cwd: state.worktree, stdin: encodeTopLevelLiteralPathspecs(files) },
+                    )
+                    if (result.code !== 0) throw new ScopeError(`Failed to revert session files: ${result.stderr}`)
+                  }
+                  for (const op of entries) {
+                    if (!tree.has(op.rel)) yield* fs.remove(op.file, { force: true }).pipe(Effect.orDie)
+                  }
+                }
+                return
               }
 
               const single = Effect.fnUntraced(function* (op: (typeof ops)[number]) {
@@ -523,13 +688,17 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           )
         })
 
-        const diff = Effect.fnUntraced(function* (hash: string) {
+        const diff = Effect.fnUntraced(function* (hash: string, scope?: Scope) {
+          if (scope) assertSnapshotHash(hash)
           return yield* locked(
             Effect.gen(function* () {
-              yield* add()
-              const result = yield* git([...quote, ...args(["diff", "--cached", "--no-ext-diff", hash, "--", "."])], {
-                cwd: state.worktree,
-              })
+              yield* add(scope)
+              const result = yield* git(
+                [...quote, ...args(["diff", "--cached", "--no-ext-diff", hash, "--", ...(yield* pathspec(scope))])],
+                {
+                  cwd: state.worktree,
+                },
+              )
               if (result.code !== 0) {
                 yield* Effect.logWarning("failed to get diff", {
                   hash,
@@ -543,7 +712,11 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
           )
         })
 
-        const diffFull = Effect.fnUntraced(function* (from: string, to: string) {
+        const diffFull = Effect.fnUntraced(function* (from: string, to: string, scope?: Scope) {
+          if (scope) {
+            assertSnapshotHash(from)
+            assertSnapshotHash(to)
+          }
           return yield* locked(
             Effect.gen(function* () {
               type Row = {
@@ -685,7 +858,19 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
               const status = new Map<string, "added" | "deleted" | "modified">()
 
               const statuses = yield* git(
-                [...quote, ...args(["diff", "--no-ext-diff", "--name-status", "--no-renames", from, to, "--", "."])],
+                [
+                  ...quote,
+                  ...args([
+                    "diff",
+                    "--no-ext-diff",
+                    "--name-status",
+                    "--no-renames",
+                    from,
+                    to,
+                    "--",
+                    ...(yield* pathspec(scope)),
+                  ]),
+                ],
                 { cwd: state.directory },
               )
 
@@ -697,7 +882,19 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
               }
 
               const numstat = yield* git(
-                [...quote, ...args(["diff", "--no-ext-diff", "--no-renames", "--numstat", from, to, "--", "."])],
+                [
+                  ...quote,
+                  ...args([
+                    "diff",
+                    "--no-ext-diff",
+                    "--no-renames",
+                    "--numstat",
+                    from,
+                    to,
+                    "--",
+                    ...(yield* pathspec(scope)),
+                  ]),
+                ],
                 {
                   cwd: state.directory,
                 },
@@ -776,23 +973,23 @@ const layer: Layer.Layer<Service, never, FSUtil.Service | AppProcess.Service | C
       cleanup: Effect.fn("Snapshot.cleanup")(function* () {
         return yield* InstanceState.useEffect(state, (s) => s.cleanup())
       }),
-      track: Effect.fn("Snapshot.track")(function* () {
-        return yield* InstanceState.useEffect(state, (s) => s.track())
+      track: Effect.fn("Snapshot.track")(function* (scope?: Scope) {
+        return yield* InstanceState.useEffect(state, (s) => s.track(scope))
       }),
-      patch: Effect.fn("Snapshot.patch")(function* (hash: string) {
-        return yield* InstanceState.useEffect(state, (s) => s.patch(hash))
+      patch: Effect.fn("Snapshot.patch")(function* (hash: string, scope?: Scope) {
+        return yield* InstanceState.useEffect(state, (s) => s.patch(hash, scope))
       }),
-      restore: Effect.fn("Snapshot.restore")(function* (snapshot: string) {
-        return yield* InstanceState.useEffect(state, (s) => s.restore(snapshot))
+      restore: Effect.fn("Snapshot.restore")(function* (snapshot: string, scope?: Scope) {
+        return yield* InstanceState.useEffect(state, (s) => s.restore(snapshot, scope))
       }),
-      revert: Effect.fn("Snapshot.revert")(function* (patches: Patch[]) {
-        return yield* InstanceState.useEffect(state, (s) => s.revert(patches))
+      revert: Effect.fn("Snapshot.revert")(function* (patches: Patch[], scope?: Scope) {
+        return yield* InstanceState.useEffect(state, (s) => s.revert(patches, scope))
       }),
-      diff: Effect.fn("Snapshot.diff")(function* (hash: string) {
-        return yield* InstanceState.useEffect(state, (s) => s.diff(hash))
+      diff: Effect.fn("Snapshot.diff")(function* (hash: string, scope?: Scope) {
+        return yield* InstanceState.useEffect(state, (s) => s.diff(hash, scope))
       }),
-      diffFull: Effect.fn("Snapshot.diffFull")(function* (from: string, to: string) {
-        return yield* InstanceState.useEffect(state, (s) => s.diffFull(from, to))
+      diffFull: Effect.fn("Snapshot.diffFull")(function* (from: string, to: string, scope?: Scope) {
+        return yield* InstanceState.useEffect(state, (s) => s.diffFull(from, to, scope))
       }),
     })
   }),

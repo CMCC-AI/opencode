@@ -66,6 +66,8 @@ const summary = Layer.succeed(
     summarize: () => Effect.void,
     diff: () => Effect.succeed([]),
     computeDiff: () => Effect.succeed([]),
+    fileScope: () => Effect.succeed(undefined),
+    filterMessages: ({ messages }) => Effect.succeed(messages),
   }),
 )
 

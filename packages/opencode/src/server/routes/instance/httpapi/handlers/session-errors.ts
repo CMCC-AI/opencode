@@ -1,5 +1,6 @@
 import type { NotFoundError as StorageNotFoundError } from "@/storage/storage"
 import type { Session } from "@/session/session"
+import type { SessionFileScope } from "@/session/file-scope"
 import { Effect } from "effect"
 import * as ApiError from "../errors"
 
@@ -17,5 +18,26 @@ export function mapBusy<A, R>(self: Effect.Effect<A, Session.BusyError, R>) {
         }),
       ),
     ),
+  )
+}
+
+export function mapRevert<A, R>(self: Effect.Effect<A, Session.BusyError | SessionFileScope.BoundaryError, R>) {
+  return self.pipe(
+    Effect.catchTags({
+      SessionBusyError: (error) =>
+        Effect.fail(
+          new ApiError.SessionBusyError({
+            sessionID: error.sessionID,
+            message: `Session is busy: ${error.sessionID}`,
+          }),
+        ),
+      SessionFileScopeError: (error) =>
+        Effect.fail(
+          new ApiError.InvalidRequestError({
+            message: error.message,
+            kind: "session_file_scope",
+          }),
+        ),
+    }),
   )
 }

@@ -12,6 +12,7 @@ import { testEffect } from "../lib/effect"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { httpApiLayer, requestInDirectory } from "./httpapi-layer"
+import path from "path"
 
 const it = testEffect(Layer.mergeAll(LayerNode.compile(SessionNs.node), httpApiLayer))
 
@@ -86,6 +87,92 @@ function json<T>(response: HttpClientResponse.HttpClientResponse) {
 }
 
 describe("session messages endpoint", () => {
+  it.instance(
+    "filters legacy cross-task diffs in lists, pages, individual messages and child sessions",
+    withoutWatcher(
+      Effect.gen(function* () {
+        const tmp = yield* TestInstance
+        const service = yield* SessionNs.Service
+        const session = yield* sessionScoped
+        const directory = path.join(tmp.directory, "runs", "task-a")
+        yield* service.setMetadata({ sessionID: session.id, metadata: { cmccArtifactDirectory: directory } })
+        const ids = yield* fill(session.id, 2)
+        const messageID = ids[1]!
+        const stored = (yield* service.messages({ sessionID: session.id })).find(
+          (entry) => entry.info.id === messageID,
+        )!
+        if (stored.info.role !== "user") throw new Error("Expected user message")
+        const own = { file: "runs/task-a/report.md", additions: 1, deletions: 0 }
+        const foreign = { file: "runs/task-b/inspection.json", additions: 140, deletions: 0 }
+        yield* service.updateMessage({
+          ...stored.info,
+          system: `本次会话的独立产物目录是 ${directory}，稳定运行目录是 ${tmp.directory}。`,
+          summary: { diffs: [own, foreign] },
+        })
+        for (const suffix of ["", "?limit=1"]) {
+          const response = yield* request(`/session/${session.id}/message${suffix}`)
+          expect(response.status).toBe(200)
+          const body = yield* json<SessionV1.WithParts[]>(response)
+          const user = body.find((item) => item.info.id === messageID)?.info
+          if (user?.role !== "user") throw new Error("Expected scoped user message")
+          expect(user.summary?.diffs).toEqual([own])
+        }
+        const detail = yield* request(`/session/${session.id}/message/${messageID}`)
+        expect(detail.status).toBe(200)
+        const user = (yield* json<SessionV1.WithParts>(detail)).info
+        if (user.role !== "user") throw new Error("Expected scoped message")
+        expect(user.summary?.diffs).toEqual([own])
+        const diff = yield* request(`/session/${session.id}/diff?messageID=${messageID}`)
+        expect(diff.status).toBe(200)
+        expect(yield* diff.json).toEqual([own])
+
+        const child = yield* service.create({ parentID: session.id })
+        const childUser = yield* service.updateMessage({
+          ...stored.info,
+          id: MessageID.ascending(),
+          sessionID: child.id,
+          summary: { diffs: [own, foreign] },
+        })
+        const childResponse = yield* request(`/session/${child.id}/message/${childUser.id}`)
+        expect(childResponse.status).toBe(200)
+        const childInfo = (yield* json<SessionV1.WithParts>(childResponse)).info
+        if (childInfo.role !== "user") throw new Error("Expected child user message")
+        expect(childInfo.summary?.diffs).toEqual([own])
+
+        // Legacy sessions can recover their boundary from the persisted injected system field.
+        yield* service.setMetadata({ sessionID: session.id, metadata: {} })
+        const legacy = yield* request(`/session/${session.id}/diff?messageID=${messageID}`)
+        expect(legacy.status).toBe(200)
+        expect(yield* legacy.json).toEqual([own])
+        yield* service.updateMessage({
+          ...stored.info,
+          id: MessageID.ascending(),
+          system: `本次会话的独立产物目录是 ${path.join(tmp.directory, "runs", "task-b")}，稳定运行目录是 ${tmp.directory}。`,
+        })
+        const ambiguous = yield* request(`/session/${session.id}/diff?messageID=${messageID}`)
+        expect(ambiguous.status).toBe(200)
+        expect(yield* ambiguous.json).toEqual([])
+        const refused = yield* requestInDirectory(`/session/${session.id}/revert`, tmp.directory, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ messageID }),
+        })
+        expect(refused.status).toBe(400)
+        expect(yield* refused.json).toMatchObject({
+          kind: "session_file_scope",
+          message: "无法确认当前任务的文件目录，已取消回滚操作。",
+        })
+        const unchanged = (yield* service.messages({ sessionID: session.id })).find(
+          (entry) => entry.info.id === messageID,
+        )!.info
+        if (unchanged.role !== "user") throw new Error("Expected stored user message")
+        expect(unchanged.summary?.diffs).toEqual([own, foreign])
+      }),
+    ),
+    { git: true },
+    { timeout: 180000 },
+  )
+
   it.instance(
     "returns cursor headers for older pages",
     withoutWatcher(

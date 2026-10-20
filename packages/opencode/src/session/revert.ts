@@ -9,6 +9,7 @@ import { MessageV2 } from "./message-v2"
 import { SessionID, MessageID, PartID } from "./schema"
 import { SessionRunState } from "./run-state"
 import { SessionSummary } from "./summary"
+import { SessionFileScope } from "./file-scope"
 
 export const RevertInput = Schema.Struct({
   sessionID: SessionID,
@@ -18,12 +19,25 @@ export const RevertInput = Schema.Struct({
 export type RevertInput = Schema.Schema.Type<typeof RevertInput>
 
 export interface Interface {
-  readonly revert: (input: RevertInput) => Effect.Effect<Session.Info, Session.BusyError>
-  readonly unrevert: (input: { sessionID: SessionID }) => Effect.Effect<Session.Info, Session.BusyError>
+  readonly revert: (
+    input: RevertInput,
+  ) => Effect.Effect<Session.Info, Session.BusyError | SessionFileScope.BoundaryError>
+  readonly unrevert: (input: {
+    sessionID: SessionID
+  }) => Effect.Effect<Session.Info, Session.BusyError | SessionFileScope.BoundaryError>
   readonly cleanup: (session: Session.Info) => Effect.Effect<void>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionRevert") {}
+
+const mapSnapshotScope = <A, E, R>(operation: Effect.Effect<A, E, R>) =>
+  operation.pipe(
+    Effect.catchDefect((error) =>
+      error instanceof Snapshot.ScopeError
+        ? Effect.fail(new SessionFileScope.BoundaryError({ message: `无法安全操作当前任务的文件：${error.message}` }))
+        : Effect.die(error),
+    ),
+  )
 
 const layer = Layer.effect(
   Service,
@@ -40,6 +54,9 @@ const layer = Layer.effect(
       const all = yield* sessions.messages({ sessionID: input.sessionID }).pipe(Effect.orDie)
       let lastUser: SessionV1.User | undefined
       const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
+      const fileScope = yield* summary.fileScope(input.sessionID)
+      if (fileScope === null)
+        return yield* new SessionFileScope.BoundaryError({ message: "无法确认当前任务的文件目录，已取消回滚操作。" })
 
       let rev: Session.Info["revert"]
       const patches: Snapshot.Patch[] = []
@@ -67,12 +84,12 @@ const layer = Layer.effect(
 
       if (!rev) return session
 
-      rev.snapshot = session.revert?.snapshot ?? (yield* snap.track())
-      if (session.revert?.snapshot) yield* snap.restore(session.revert.snapshot)
-      yield* snap.revert(patches)
-      if (rev.snapshot) rev.diff = yield* snap.diff(rev.snapshot)
+      rev.snapshot = session.revert?.snapshot ?? (yield* snap.track(fileScope))
+      if (session.revert?.snapshot) yield* snap.restore(session.revert.snapshot, fileScope)
+      if (patches.some((patch) => patch.files.length > 0)) yield* snap.revert(patches, fileScope)
+      if (rev.snapshot) rev.diff = yield* snap.diff(rev.snapshot, fileScope)
       const range = all.filter((msg) => msg.info.id >= rev.messageID)
-      const diffs = yield* summary.computeDiff({ messages: range })
+      const diffs = yield* summary.computeDiff({ sessionID: input.sessionID, messages: range })
       yield* storage.write(["session_diff", input.sessionID], diffs).pipe(Effect.ignore)
       yield* events.publish(Session.Event.Diff, { sessionID: input.sessionID, diff: diffs })
       yield* sessions.setRevert({
@@ -85,17 +102,20 @@ const layer = Layer.effect(
         },
       })
       return yield* sessions.get(input.sessionID).pipe(Effect.orDie)
-    })
+    }, mapSnapshotScope)
 
     const unrevert = Effect.fn("SessionRevert.unrevert")(function* (input: { sessionID: SessionID }) {
       yield* Effect.logInfo("unreverting", { sessionID: input.sessionID })
       yield* state.assertNotBusy(input.sessionID)
       const session = yield* sessions.get(input.sessionID).pipe(Effect.orDie)
       if (!session.revert) return session
-      if (session.revert.snapshot) yield* snap.restore(session.revert.snapshot)
+      const fileScope = yield* summary.fileScope(input.sessionID)
+      if (fileScope === null)
+        return yield* new SessionFileScope.BoundaryError({ message: "无法确认当前任务的文件目录，已取消恢复操作。" })
+      if (session.revert.snapshot) yield* snap.restore(session.revert.snapshot, fileScope)
       yield* sessions.clearRevert(input.sessionID)
       return yield* sessions.get(input.sessionID).pipe(Effect.orDie)
-    })
+    }, mapSnapshotScope)
 
     const cleanup = Effect.fn("SessionRevert.cleanup")(function* (session: Session.Info) {
       if (!session.revert) return
