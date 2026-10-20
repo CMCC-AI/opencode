@@ -1,4 +1,4 @@
-import loginBackground from "@/assets/auth/login-bg.png"
+import loginBackground from "@/assets/auth/login-bg.optimized.webp"
 import { AppLoading } from "@/components/app-loading"
 import { DockApiError, useDockApi } from "@/context/dockapi"
 import { Show, type ParentProps } from "solid-js"

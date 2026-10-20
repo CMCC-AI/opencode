@@ -345,7 +345,7 @@ export default function MstockForm() {
           </section>
           <section class="mstock-section mstock-source-section">
             <header>
-              <img src="/mstock/workflow-1.png" alt="" />
+              <img src="/mstock/workflow-1.optimized.webp" alt="" />
               <h3>
                 <em>第一步：</em>勾选对比个股
               </h3>
@@ -409,7 +409,7 @@ export default function MstockForm() {
           </section>
           <section class="mstock-section mstock-upload-section">
             <header>
-              <img src="/mstock/workflow-2.png" alt="" />
+              <img src="/mstock/workflow-2.optimized.webp" alt="" />
               <h3>
                 <em>第二步：</em>上传外部公司研报 / 自定义文档
               </h3>
@@ -472,7 +472,7 @@ export default function MstockForm() {
           </section>
           <section class="mstock-section mstock-dimensions-section">
             <header>
-              <img src="/mstock/workflow-3.png" alt="" />
+              <img src="/mstock/workflow-3.optimized.webp" alt="" />
               <h3>
                 <em>第三步：</em>配置对比侧重维度
               </h3>

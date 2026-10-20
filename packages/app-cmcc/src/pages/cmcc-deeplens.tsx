@@ -1,7 +1,7 @@
 import { Icon } from "@opencode-ai/ui/icon"
 import { createEffect, createMemo, For, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
-import jiutianLogo from "@/assets/home-v6/jiutian-logo.png"
+import jiutianLogo from "@/assets/home-v6/jiutian-logo.optimized.webp"
 import deeplensQr from "@/assets/deeplens/qr-code.png"
 import homeScreen from "@/assets/deeplens/screens/home.webp"
 import analysisOverviewScreen from "@/assets/deeplens/screens/analysis-overview.webp"

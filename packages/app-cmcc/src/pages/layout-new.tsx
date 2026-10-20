@@ -41,7 +41,7 @@ import { mstockMention } from "@/pages/session/mstock/page-selection"
 import { ResearchHistory } from "@/pages/general-deepinsight/history"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
-import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.png"
+import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.optimized.webp"
 import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
 
 const SIDEBAR_MIN_WIDTH = 280

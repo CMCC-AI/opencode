@@ -1,5 +1,5 @@
 import { children, Show, type JSX } from "solid-js"
-import jiutianLogo from "@/assets/home-v6/jiutian-logo.png"
+import jiutianLogo from "@/assets/home-v6/jiutian-logo.optimized.webp"
 import "./session-new-design-view.css"
 
 export function NewSessionDesignView(props: { children: JSX.Element; footer?: JSX.Element }) {

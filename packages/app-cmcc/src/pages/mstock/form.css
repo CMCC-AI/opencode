@@ -226,21 +226,21 @@
 }
 .mstock-source-section > header {
   background-image:
-    linear-gradient(90deg, rgba(235, 239, 255, 0.54), rgba(255, 255, 255, 0.7)), url("/mstock/module-background.png");
+    linear-gradient(90deg, rgba(235, 239, 255, 0.54), rgba(255, 255, 255, 0.7)), url("/mstock/module-background.optimized.webp");
   background-position:
     center,
     center top;
 }
 .mstock-upload-section > header {
   background-image:
-    linear-gradient(90deg, rgba(231, 246, 255, 0.54), rgba(255, 255, 255, 0.7)), url("/mstock/module-background.png");
+    linear-gradient(90deg, rgba(231, 246, 255, 0.54), rgba(255, 255, 255, 0.7)), url("/mstock/module-background.optimized.webp");
   background-position:
     center,
     center 52%;
 }
 .mstock-dimensions-section > header {
   background-image:
-    linear-gradient(90deg, rgba(241, 236, 255, 0.56), rgba(255, 255, 255, 0.72)), url("/mstock/module-background.png");
+    linear-gradient(90deg, rgba(241, 236, 255, 0.56), rgba(255, 255, 255, 0.72)), url("/mstock/module-background.optimized.webp");
   background-position:
     center,
     center bottom;

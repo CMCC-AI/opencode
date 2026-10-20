@@ -1,5 +1,5 @@
 import "./app-loading.css"
-import logo from "../assets/auth/startup-loading-logo.webp"
+import logo from "../assets/auth/startup-loading-logo.optimized.webp"
 
 export function AppLoading() {
   return (
