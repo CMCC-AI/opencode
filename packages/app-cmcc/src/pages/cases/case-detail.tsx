@@ -33,7 +33,7 @@ import {
   caseFilePanelWidthAfterDrag,
   clampCaseFilePanelWidth,
 } from "./file-panel-layout"
-import echartsRuntimeUrl from "../../../node_modules/echarts/dist/echarts.min.js?url"
+import reportRuntimeUrl from "virtual:cmcc-report-runtime"
 
 const dedicatedViews: Record<string, ReturnType<typeof lazy<Component<DedicatedCaseProps>>>> = {
   mstock: lazy(() => import("./views/mstock")),
@@ -515,10 +515,10 @@ function snapshotData(snapshot: DockApiCaseSnapshot, frame: ReturnType<typeof ca
 function createCaseArtifactSource(baseUrl: string): DeepTradingArtifactSource {
   const [content, setContent] = createStore<Record<string, DeepTradingArtifactContent | undefined>>({})
   const pending = new Map<string, Promise<void>>()
-  const url = (path: string) => {
+  const url = (path: string, preview = false) => {
     const value = new URL(`${baseUrl}/artifacts/${path.split("/").map(encodeURIComponent).join("/")}`)
-    if (/\.html?$/i.test(path))
-      value.searchParams.set("runtime", new URL(echartsRuntimeUrl, window.location.origin).toString())
+    if (preview && /\.html?$/i.test(path))
+      value.searchParams.set("runtime", new URL(reportRuntimeUrl, window.location.origin).toString())
     return value.toString()
   }
   const load = async (path: string) => {
@@ -550,7 +550,7 @@ function createCaseArtifactSource(baseUrl: string): DeepTradingArtifactSource {
       if (!response.ok) throw new Error(`文件下载失败，HTTP ${response.status}`)
       return response.blob()
     },
-    previewUrl: url,
+    previewUrl: (path) => url(path, true),
   }
 }
 

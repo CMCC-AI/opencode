@@ -1,7 +1,7 @@
 import { Icon } from "@opencode-ai/ui/icon"
 import { For, Match, Show, Switch, createEffect, createMemo, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
-import echartsRuntimeUrl from "../../../node_modules/echarts/dist/echarts.min.js?url"
+import reportRuntimeUrl from "virtual:cmcc-report-runtime"
 import { ArtifactPreview } from "@/components/artifact-preview"
 import { PdfPreview } from "@/components/pdf-preview-lazy"
 import { useFile } from "@/context/file"
@@ -60,7 +60,7 @@ export function ReportArtifactPreview(props: {
       serverUrl: sdkContext.url,
       directory: sdkContext.directory,
       path: artifact.path,
-      runtimeUrl: echartsRuntimeUrl,
+      runtimeUrl: reportRuntimeUrl,
       pageOrigin: window.location.origin,
       authToken: connection.password
         ? authTokenFromCredentials({ username: connection.username, password: connection.password })
