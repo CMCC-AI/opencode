@@ -979,6 +979,10 @@
     {
       "source": "public/product-intro/index.html",
       "output": "public/product-intro/index.html"
+    },
+    {
+      "source": "public/landing/assets/index-DhjeLccQ.js",
+      "output": "public/landing/assets/index-images-a3086091475a.js"
     }
   ]
 }

@@ -46,13 +46,16 @@ describe("optimized image assets", () => {
   })
 
   test("preserves original landing bundle and changes its content-hashed entry", async () => {
+    const html = await readFile(path.join(root, "public/landing/index.html"), "utf8")
     const entry = manifest.rewrites.find(
-      (item) => item.source.startsWith("public/landing/assets/") && item.source.endsWith(".js"),
+      (item) =>
+        item.source.startsWith("public/landing/assets/") &&
+        item.source.endsWith(".js") &&
+        html.includes(item.output.slice(6)),
     )
     expect(entry).toBeDefined()
     if (!entry) throw new Error("Missing landing entry")
     expect(entry.output).not.toBe(entry.source)
-    const html = await readFile(path.join(root, "public/landing/index.html"), "utf8")
     expect(html).toContain(entry.output.slice(6))
     expect(html).not.toContain(entry.source.slice(6))
     expect((await readFile(path.join(root, entry.source))).length).toBeGreaterThan(0)
