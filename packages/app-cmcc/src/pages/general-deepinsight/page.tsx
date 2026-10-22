@@ -125,6 +125,25 @@ export default function ResearchPage() {
     const own = generation
     const id = params.id
     if (!id || readOnly()) return
+    await dockapi.quota.checkResearch().catch((error) => {
+      if (alive && own === generation)
+        showToast({
+          variant: "error",
+          title: "暂时无法开始研究",
+          description: error instanceof Error ? error.message : String(error),
+          actions: [
+            {
+              label: "重新检查",
+              onClick: () => {
+                if (alive && own === generation) void action(() => run(resume))
+              },
+            },
+          ],
+        })
+      throw error
+    })
+    if (!alive || own !== generation) return
+    if (resume === undefined && search.start === "1") setSearch({ start: undefined }, { replace: true })
     if (poll) clearTimeout(poll)
     abort?.abort()
     const controller = new AbortController()
@@ -190,7 +209,6 @@ export default function ResearchPage() {
       } else if (id) {
         await refresh(own)
         if (own === generation && state.detail?.session.status === "pending" && search.start === "1") {
-          setSearch({ start: undefined }, { replace: true })
           void action(() => run())
         }
       } else {
@@ -334,6 +352,8 @@ export default function ResearchPage() {
     return state.detail?.reportContent ?? content
   }
   const rewrite = async (selected: string, requirements: string, signal: AbortSignal) => {
+    await dockapi.quota.checkResearch()
+    if (signal.aborted) throw new DOMException("操作已取消", "AbortError")
     const result = await request<{ rewritten_text: string }>(`/sessions/${params.id}/report/rewrite`, {
       method: "POST",
       body: JSON.stringify({ text: selected, requirements }),
@@ -538,6 +558,7 @@ export default function ResearchPage() {
             navigate("/general-deepinsight")
           }}
           onStop={() => void stop()}
+          onStart={() => void action(() => run())}
           onEdit={() => setState("edit", true)}
           onMarkdown={markdown}
           onPdf={() =>

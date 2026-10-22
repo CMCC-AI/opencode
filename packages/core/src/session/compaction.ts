@@ -64,7 +64,7 @@ type Settings = {
 type Dependencies = {
   readonly events: EventV2.Interface
   readonly llm: {
-    readonly stream: (request: LLMRequest) => Stream.Stream<LLMEvent, LLMError>
+    readonly stream: (request: LLMRequest, sessionID: SessionSchema.ID) => Stream.Stream<LLMEvent, LLMError>
   }
   readonly config: readonly Config.Entry[]
 }
@@ -205,6 +205,7 @@ export const make = (dependencies: Dependencies) => {
           tools: [],
           generation: { maxTokens: summaryOutput },
         }),
+        input.sessionID,
       )
       .pipe(
         Stream.runForEach((event) => {

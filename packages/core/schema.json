@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "9219dcd7-dc8b-44be-9ab0-232dba049b84",
+  "id": "da545f3e-8748-430b-afdd-2c77984c3d6c",
   "prevIds": [
-    "f14a9b18-8207-487e-a3d3-227e629ba9ad"
+    "9219dcd7-dc8b-44be-9ab0-232dba049b84"
   ],
   "ddl": [
     {
@@ -80,6 +80,14 @@
     },
     {
       "name": "session_share",
+      "entityType": "tables"
+    },
+    {
+      "name": "dockapi_quota_outbox",
+      "entityType": "tables"
+    },
+    {
+      "name": "dockapi_quota_session",
       "entityType": "tables"
     },
     {
@@ -1483,6 +1491,86 @@
       "table": "session_share"
     },
     {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "call_id",
+      "entityType": "columns",
+      "table": "dockapi_quota_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_json",
+      "entityType": "columns",
+      "table": "dockapi_quota_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "finish_json",
+      "entityType": "columns",
+      "table": "dockapi_quota_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "dispatched",
+      "entityType": "columns",
+      "table": "dockapi_quota_outbox"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_updated",
+      "entityType": "columns",
+      "table": "dockapi_quota_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "session_id",
+      "entityType": "columns",
+      "table": "dockapi_quota_session"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "table": "dockapi_quota_session"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "root_session_id",
+      "entityType": "columns",
+      "table": "dockapi_quota_session"
+    },
+    {
       "columns": [
         "project_id"
       ],
@@ -1853,6 +1941,24 @@
     },
     {
       "columns": [
+        "call_id"
+      ],
+      "nameExplicit": false,
+      "name": "dockapi_quota_outbox_pk",
+      "table": "dockapi_quota_outbox",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "session_id"
+      ],
+      "nameExplicit": false,
+      "name": "dockapi_quota_session_pk",
+      "table": "dockapi_quota_session",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
         {
           "value": "aggregate_id",
           "isExpression": false
@@ -2198,6 +2304,20 @@
       "name": "todo_session_idx",
       "entityType": "indexes",
       "table": "todo"
+    },
+    {
+      "columns": [
+        {
+          "value": "time_updated",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "dockapi_quota_outbox_updated_idx",
+      "entityType": "indexes",
+      "table": "dockapi_quota_outbox"
     }
   ],
   "renames": []

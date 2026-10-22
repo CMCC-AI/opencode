@@ -9,6 +9,7 @@ import { showToast } from "@/utils/toast"
 import { createCaseListCache } from "@/utils/case-list-cache"
 import { createCaseHandoff } from "@/utils/case-handoff"
 import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
+import { parseQuotaSnapshot, requireResearchQuota } from "@/utils/token-quota"
 
 const ACCESS_TOKEN_KEY = "dockapi.accessToken"
 const REFRESH_TOKEN_KEY = "dockapi.refreshToken"
@@ -19,7 +20,13 @@ type ApiResponse<T> = {
   data: T
 }
 
-export type MstockSource = { businessSessionId: string; title: string; companyName?: string; ticker?: string; createdAt: string }
+export type MstockSource = {
+  businessSessionId: string
+  title: string
+  companyName?: string
+  ticker?: string
+  createdAt: string
+}
 
 export type DockApiUser = {
   id: number
@@ -322,9 +329,11 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         saveTokens(auth)
       }
       // Coordinate refresh-token rotation across tabs when Web Locks are available (HTTPS/localhost).
-      refreshRequest = (typeof navigator !== "undefined" && navigator.locks
-        ? navigator.locks.request("dockapi-auth-refresh", renew)
-        : renew())
+      refreshRequest = (
+        typeof navigator !== "undefined" && navigator.locks
+          ? navigator.locks.request("dockapi-auth-refresh", renew)
+          : renew()
+      )
         .then(() => undefined)
         .catch((error) => {
           if (epoch === authEpoch) clear()
@@ -446,6 +455,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         return (import.meta.env.VITE_DOCKAPI_AGENT_TYPE?.trim() || "deepinsight").toLowerCase()
       },
       auth: {
+        refresh,
         async login(input: { phone: string; password: string }) {
           const epoch = ++authEpoch
           const auth = await fetch(`${dockApiBaseUrl()}/api/auth/login`, {
@@ -482,6 +492,20 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         },
       },
       research: { request, fetch: authorizedFetch },
+      quota: {
+        async get() {
+          return parseQuotaSnapshot(
+            await request<unknown>("/api/dockapi/token-quota", { signal: AbortSignal.timeout(10000) }),
+          )
+        },
+        async checkResearch() {
+          requireResearchQuota(
+            parseQuotaSnapshot(
+              await request<unknown>("/api/dockapi/token-quota", { signal: AbortSignal.timeout(10000) }),
+            ),
+          )
+        },
+      },
       sessions: {
         list: loadSessions,
         get(id: string) {
@@ -524,7 +548,10 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           return request<{ items: MstockSource[]; nextPage: number | null }>(`/api/dockapi/mstock/sources?page=${page}`)
         },
         prepare(targetBusinessSessionId: string, sourceBusinessSessionIds: string[]) {
-          return request<Array<{ businessSessionId: string; title: string; path: string }>>("/api/dockapi/mstock/sources/prepare", { method: "POST", body: JSON.stringify({ targetBusinessSessionId, sourceBusinessSessionIds }) })
+          return request<Array<{ businessSessionId: string; title: string; path: string }>>(
+            "/api/dockapi/mstock/sources/prepare",
+            { method: "POST", body: JSON.stringify({ targetBusinessSessionId, sourceBusinessSessionIds }) },
+          )
         },
       },
       cases: {
@@ -546,9 +573,12 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         },
         async snapshot(caseCode: string, signal?: AbortSignal) {
           const epoch = authEpoch
-          const response = await authorizedFetch(`/api/dockapi/cases/${encodeURIComponent(caseCode)}/snapshot?delivery=1`, { signal })
+          const response = await authorizedFetch(
+            `/api/dockapi/cases/${encodeURIComponent(caseCode)}/snapshot?delivery=1`,
+            { signal },
+          )
           if (!response.ok) return readResponse<DockApiCaseSnapshot>(response)
-          const snapshot = await response.json() as DockApiCaseSnapshot
+          const snapshot = (await response.json()) as DockApiCaseSnapshot
           if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
           return snapshot
         },
@@ -565,12 +595,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         discardNavigation(token: string) {
           caseHandoff.clear(token)
         },
-        async publish(input: {
-          businessSessionId: string
-          caseName: string
-          caseTag: string
-          coverFile: File
-        }) {
+        async publish(input: { businessSessionId: string; caseName: string; caseTag: string; coverFile: File }) {
           const form = new FormData()
           form.append("caseName", input.caseName)
           form.append("caseTag", input.caseTag)

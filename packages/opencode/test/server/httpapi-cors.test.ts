@@ -49,14 +49,14 @@ describe("HttpApi CORS", () => {
         HttpClientRequest.setHeaders({
           origin: "http://localhost:3000",
           "access-control-request-method": "GET",
-          "access-control-request-headers": "authorization",
+          "access-control-request-headers": "authorization,x-dockapi-authorization",
         }),
         HttpClient.execute,
       )
 
       expect(response.status).toBe(204)
       expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:3000")
-      expect(response.headers["access-control-allow-headers"]).toBe("authorization")
+      expect(response.headers["access-control-allow-headers"]).toBe("authorization,x-dockapi-authorization")
     }),
   )
 
