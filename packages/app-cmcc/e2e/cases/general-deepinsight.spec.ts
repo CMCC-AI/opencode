@@ -183,6 +183,30 @@ async function prepare(page: Page, initial = "completed", allowed = true, caseCo
   }
 }
 
+test("renders all five research progress icons from the built assets", async ({ page }, info) => {
+  await prepare(page)
+  await page.goto(`/general-deepinsight/session/${id}`)
+  const icons = page.locator(".step-progress .step-icon-wrap > img")
+  await expect(icons).toHaveCount(5)
+  await expect
+    .poll(() =>
+      icons.evaluateAll((images) =>
+        images.every((image) =>
+          image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0,
+        ),
+      ),
+    )
+    .toBe(true)
+  expect(await icons.evaluateAll((images) => images.map((image) => image.getAttribute("alt")))).toEqual([
+    "研究计划",
+    "网络搜索",
+    "反思评估",
+    "生成大纲",
+    "报告撰写",
+  ])
+  await page.locator(".thinking-header").screenshot({ path: info.outputPath("research-progress-icons.png") })
+})
+
 async function freezeConfirmationClock(page: Page) {
   await page.clock.install({ time: new Date("2026-10-09T04:00:00Z") })
   await page.clock.pauseAt(new Date("2026-10-09T04:00:01Z"))
