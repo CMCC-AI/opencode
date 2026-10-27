@@ -1503,8 +1503,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     })
 
   const abort = submission.abort
+  const initializing = () => !props.controls.session.id && props.controls.model.loading
   const handleSubmit = (event: Event) => {
-    if (!uploadStatus.pending) return submission.handleSubmit(event)
+    if (!uploadStatus.pending && !initializing()) return submission.handleSubmit(event)
     event.preventDefault()
   }
 
@@ -2066,7 +2067,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   <PromptSendButton
                     data-action="prompt-submit"
                     type="submit"
-                    disabled={(uploadStatus.pending > 0 && !stopping()) || (!working() && blank())}
+                    disabled={(uploadStatus.pending > 0 && !stopping()) || (!working() && (blank() || initializing()))}
                     tabIndex={store.mode === "normal" ? undefined : -1}
                     mode={stopping() ? "stop" : store.mode === "shell" ? "shell" : "send"}
                     aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
@@ -2205,7 +2206,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     <PromptSendButton
                       data-action="prompt-submit"
                       type="submit"
-                      disabled={(uploadStatus.pending > 0 && !stopping()) || (!working() && blank())}
+                      disabled={(uploadStatus.pending > 0 && !stopping()) || (!working() && (blank() || initializing()))}
                       tabIndex={store.mode === "normal" ? undefined : -1}
                       mode={stopping() ? "stop" : store.mode === "shell" ? "shell" : "send"}
                       aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}

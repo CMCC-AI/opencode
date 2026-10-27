@@ -1,5 +1,5 @@
 import { createSimpleContext } from "@opencode-ai/ui/context"
-import { createEffect, createMemo, createRoot } from "solid-js"
+import { createEffect, createMemo, createRoot, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createServerProjects, ServerConnection, useServer } from "./server"
 import { useServerHealth } from "@/utils/server-health"
@@ -40,6 +40,10 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
     >()
 
     const owner = getOwner()
+    onCleanup(() => {
+      for (const item of serverCtxs.values()) item.dispose()
+      serverCtxs.clear()
+    })
 
     const ensureServerCtx = (conn: ServerConnection.Any) => {
       const key = ServerConnection.key(conn)

@@ -1,6 +1,6 @@
-import { Show, createEffect, createResource, createSignal, untrack } from "solid-js"
+import { Show, Suspense, createEffect, createResource, createSignal, untrack } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
-import { NewSessionDesignView } from "@/components/session"
+import { NewSessionComposerLoading, NewSessionDesignView } from "@/components/session/session-new-design-view"
 import { PromptInput } from "@/components/prompt-input"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { useComments } from "@/context/comments"
@@ -19,6 +19,18 @@ import { cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
  * timeline. Submitting promotes the draft into a real session (see prompt-input/submit).
  */
 export default function NewSessionPage() {
+  return (
+    <div class="relative flex size-full min-h-0 flex-col overflow-hidden">
+      <NewSessionDesignView>
+        <Suspense fallback={<NewSessionComposerLoading />}>
+          <NewSessionComposer />
+        </Suspense>
+      </NewSessionDesignView>
+    </div>
+  )
+}
+
+function NewSessionComposer() {
   const prompt = usePrompt()
   const serverSync = useServerSync()
   const comments = useComments()
@@ -71,30 +83,26 @@ export default function NewSessionPage() {
   )
 
   return (
-    <div class="relative flex size-full min-h-0 flex-col overflow-hidden">
-      <NewSessionDesignView>
-        <Show
-          when={prompt.ready() || promptReady()}
-          fallback={
-            <div class="w-full min-h-32 md:min-h-40 rounded-md border border-border-weak-base bg-background-base/50 px-4 py-3 text-text-weak pointer-events-none">
-              {language.t("prompt.loading")}
-            </div>
-          }
-        >
-          <div class="flex flex-col gap-3">
-            <PromptInput
-              controls={inputController()}
-              variant="new-session"
-              ref={(el) => {
-                inputRef = el
-              }}
-              onSubmit={() => comments.clear()}
-              selectedExpertAgent={selectedExpertAgent()}
-              onSelectedExpertAgentChange={selectExpertAgent}
-            />
-          </div>
-        </Show>
-      </NewSessionDesignView>
-    </div>
+    <Show
+      when={prompt.ready() || promptReady()}
+      fallback={
+        <div class="w-full min-h-32 md:min-h-40 rounded-md border border-border-weak-base bg-background-base/50 px-4 py-3 text-text-weak pointer-events-none">
+          {language.t("prompt.loading")}
+        </div>
+      }
+    >
+      <div class="flex flex-col gap-3">
+        <PromptInput
+          controls={inputController()}
+          variant="new-session"
+          ref={(el) => {
+            inputRef = el
+          }}
+          onSubmit={() => comments.clear()}
+          selectedExpertAgent={selectedExpertAgent()}
+          onSelectedExpertAgentChange={selectExpertAgent}
+        />
+      </div>
+    </Show>
   )
 }
