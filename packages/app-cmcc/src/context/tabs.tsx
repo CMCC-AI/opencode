@@ -28,6 +28,7 @@ export type DraftTab = {
   expertID?: string
   worktree?: string
   agent?: string
+  researchMode?: "quick" | "deep"
 }
 
 export type Tab = SessionTab | DraftTab
@@ -173,7 +174,9 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
         void startTransition(() => {
           setStore(
             produce((tabs) => {
-              tabs.push({ type: "draft", draftID, ...draft, agent: options?.agent ?? draft.agent })
+              tabs.push({ type: "draft", draftID, ...draft,
+                researchMode: draft.researchMode ?? (draft.expertID === "deepinsight" ? "deep" : undefined),
+                agent: options?.agent ?? draft.agent })
             }),
           )
           const params = new URLSearchParams({ draftId: draftID })
@@ -189,6 +192,15 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
             produce((tab) => Object.assign(tab, draft)),
           )
         })
+      },
+      finishResearchDraft(draftID: string, sessionID: string) {
+        void startTransition(() => {
+          setStore((tabs) => tabs.filter((tab) => tab.type !== "draft" || tab.draftID !== draftID))
+          if (recent.key === `draft:${draftID}`) setRecentKey(undefined)
+          navigate(`/general-deepinsight/session/${encodeURIComponent(sessionID)}?start=1`, { replace: true })
+        })
+        memory.remove(`draft:${draftID}`)
+        removeDraftPersisted(draftID)
       },
       promoteDraft(draftID: string, session: Omit<SessionTab, "type">) {
         // Keep the replacement and navigation atomic so /new-session never renders

@@ -1,4 +1,4 @@
-import { Show, Suspense, createEffect, createResource, createSignal, untrack } from "solid-js"
+import { Show, Suspense, createEffect, createResource, createSignal, lazy, untrack } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
 import { NewSessionComposerLoading, NewSessionDesignView } from "@/components/session/session-new-design-view"
 import { PromptInput } from "@/components/prompt-input"
@@ -13,17 +13,22 @@ import { useSessionKey } from "@/pages/session/session-layout"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
 import { cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
 
+const ResearchComposer = lazy(() => import("./general-deepinsight/research-composer"))
+
 /**
  * The `/new-session` draft page. Unlike `session.tsx`, this only renders the prompt
  * composer for a brand-new session — no terminal, review pane, file tree, or message
  * timeline. Submitting promotes the draft into a real session (see prompt-input/submit).
  */
 export default function NewSessionPage() {
+  const tabs = useTabs()
+  const [search] = useSearchParams<{ draftId?: string }>()
+  const research = () => tabs.store.some((tab) => tab.type === "draft" && tab.draftID === search.draftId && !!tab.researchMode)
   return (
     <div class="relative flex size-full min-h-0 flex-col overflow-hidden">
       <NewSessionDesignView>
         <Suspense fallback={<NewSessionComposerLoading />}>
-          <NewSessionComposer />
+          <Show when={research()} fallback={<NewSessionComposer />}><ResearchComposer /></Show>
         </Suspense>
       </NewSessionDesignView>
     </div>

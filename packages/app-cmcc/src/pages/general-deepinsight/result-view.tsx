@@ -35,6 +35,7 @@ export function ResearchResultView(props: {
   editing: boolean
   interrupt?: JSX.Element
   onNew: () => void
+  onBack?: () => void
   onSame: () => void
   onStop: () => void
   onStart: () => void
@@ -482,6 +483,7 @@ export function ResearchResultView(props: {
   const left = () => (
     <div class="left-panel">
       <div class="query-header">
+        <Show when={props.onBack}><button type="button" aria-label="返回案例集" title="返回案例集" onClick={props.onBack}><Icon name="arrow-left" /></button></Show>
         <span class="query-header-title">{heading()}</span>
       </div>
       <div class="thinking-header">

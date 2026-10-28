@@ -47,6 +47,14 @@ export interface ImageAttachmentPart {
   mime: string
   dataUrl: string
   referenceUrl?: string
+  research?: {
+    size: number
+    modified: number
+    relativePath?: string
+    deep?: { path: string; url: string; mime: string }
+    quick?: { uploadId: string; savedName: string }
+    error?: string
+  }
 }
 
 export type ContentPart = TextPart | FileAttachmentPart | AgentPart | ImageAttachmentPart

@@ -33,9 +33,12 @@ function dataUrl(file: File, mime: string) {
 }
 
 type PromptTarget = Pick<ReturnType<ReturnType<typeof usePrompt>["capture"]>, "current" | "cursor" | "set">
-type AttachmentTarget = { prompt: PromptTarget; cursor: number | undefined; storage?: AttachmentStorage }
+type AttachmentReader = (file: File, relativePath?: string) => Promise<ImageAttachmentPart>
+type AttachmentTarget = { prompt: PromptTarget; cursor: number | undefined; storage?: AttachmentStorage; read?: AttachmentReader }
 
 type PromptAttachmentsCoreInput = {
+  disabled?: () => boolean
+  read?: AttachmentReader
   capture: () => PromptTarget
   editor: () => HTMLDivElement | undefined
   focusEditor?: () => void
@@ -48,6 +51,8 @@ type PromptAttachmentsCoreInput = {
 }
 
 type PromptAttachmentsInput = {
+  disabled?: () => boolean
+  read?: AttachmentReader
   prompt: ReturnType<typeof usePrompt>
   editor: () => HTMLDivElement | undefined
   isDialogActive: () => boolean
@@ -63,13 +68,15 @@ type PromptAttachmentsInput = {
 export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
   const [uploadStatus, setUploadStatus] = createStore({ pending: 0, completed: 0, total: 0 })
   const capture = (): AttachmentTarget | undefined => {
+    if (input.disabled?.()) return
     const prompt = input.capture()
     const editor = input.editor()
     if (!editor) return
-    return { prompt, cursor: prompt.cursor() ?? getCursorPosition(editor), storage: input.storage?.() }
+    return { prompt, cursor: prompt.cursor() ?? getCursorPosition(editor), storage: input.storage?.(), read: input.read }
   }
 
   const read = async (file: File, target: AttachmentTarget, relativePath?: string, knownMime?: string) => {
+    if (target.read) return target.read(file, relativePath)
     const mime = knownMime ?? (await attachmentMime(file))
     if (!mime) return
     const stored = await target.storage?.store(file, mime, relativePath)
@@ -107,7 +114,7 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
       if (toast) input.warn?.()
       return false
     }
-    target.prompt.set([...target.prompt.current(), attachment], target.cursor)
+    target.prompt.set([...target.prompt.current().filter((part) => part.type !== "image" || part.id !== attachment.id), attachment], target.cursor)
     return true
   }
 

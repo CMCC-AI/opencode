@@ -38,6 +38,7 @@ import {
 } from "@/utils/cmcc-cases"
 import { cmccHistoryProduct, type CmccHistoryProduct } from "@/utils/cmcc-history-product"
 import { mstockMention } from "@/pages/session/mstock/page-selection"
+import { useResearchHome } from "@/pages/general-deepinsight/research-home"
 import { ResearchHistory } from "@/pages/general-deepinsight/history"
 import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
@@ -407,30 +408,7 @@ function CmccSidebar() {
     })
   }
 
-  const summonDeepInsight = () => {
-    const expert = CMCC_TEAM_EXPERTS.find((e) => e.id === "deepinsight")
-    if (!expert) return
-    const current = directory()
-    const artifactDirectory = cmccArtifactWorkspace(current)
-    if (!current || !artifactDirectory || !tabs.ready()) return
-
-    tabs.newDraft({ server: server.key, directory: current, artifactDirectory, expertID: expert.id }, expert.defaultPrompt, {
-      agent: expert.leadAgent,
-    })
-    cmccRememberConversationWorkspace(current)
-    server.projects.touch(current)
-    void cmccEnsureWorkspace(
-      artifactDirectory,
-      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
-      serverSDK().scope,
-    ).catch((error) => {
-      showToast({
-        title: "无法准备专家团产物目录",
-        description: error instanceof Error ? error.message : String(error),
-        variant: "error",
-      })
-    })
-  }
+  const summonDeepInsight = useResearchHome()
 
   const openSession = (session: Session) => {
     const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
@@ -531,12 +509,7 @@ function CmccSidebar() {
               icon="glasses"
               label="深度研究"
               onClick={() => void summonDeepInsight()}
-            />
-            <CmccSidebarAction
-              icon="glasses"
-              label="通用深度洞察"
-              active={location.pathname === "/general-deepinsight" || location.pathname.startsWith("/general-deepinsight/")}
-              onClick={() => navigate("/general-deepinsight")}
+              active={location.pathname.startsWith("/general-deepinsight") || tabs.store.some((tab) => tab.type === "draft" && tab.researchMode && location.search.includes(tab.draftID))}
             />
             <CmccSidebarAction
               icon="mcp"

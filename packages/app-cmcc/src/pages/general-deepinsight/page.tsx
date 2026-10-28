@@ -4,8 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
 import { useDockApi } from "@/context/dockapi"
 import { useLayout } from "@/context/layout"
-import { NewSessionDesignView } from "@/components/session/session-new-design-view"
-import { PromptSendButton } from "@/components/prompt-input/send-button"
+import { useTabs } from "@/context/tabs"
 import { showToast } from "@/utils/toast"
 import {
   applyResearchEvent,
@@ -15,12 +14,12 @@ import {
   RESEARCH_API,
   RESEARCH_UPDATED,
   text,
-  type ResearchCase,
   type ResearchDetail,
 } from "./model"
 import { ResearchResultView } from "./result-view"
-import { ResearchFeaturedCases } from "./featured-cases"
-import { prepareResearchCase, prepareResearchDraft, takeResearchCase, takeResearchDraft } from "./handoff"
+import { useResearchHome } from "./research-home"
+import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
+import { takeResearchCase, takeResearchDraft } from "./handoff"
 import "./research.css"
 import "./home-composer.css"
 
@@ -29,8 +28,10 @@ const ResearchReportEditor = lazy(() => import("./report-editor-view"))
 export default function ResearchPage() {
   const dockapi = useDockApi()
   const layout = useLayout()
+  const tabs = useTabs()
   const params = useParams<{ id?: string; caseCode?: string }>()
   const navigate = useNavigate()
+  const openResearch = useResearchHome()
   const [search, setSearch] = useSearchParams<{ start?: string; publish?: string }>()
   const [state, setState] = createStore({
     detail: undefined as ResearchDetail | undefined,
@@ -38,10 +39,6 @@ export default function ResearchPage() {
     error: "",
     busy: false,
     query: takeResearchDraft(dockapi.user!.id) ?? "",
-    uploadId: "",
-    uploads: [] as NonNullable<ResearchDetail["conversationData"]["uploadedFiles"]>,
-    cases: [] as ResearchCase[],
-    loadingCase: "",
     tab: "process",
     mobile: "content",
     resume: "",
@@ -61,7 +58,6 @@ export default function ResearchPage() {
   let abort: AbortController | undefined
   let poll: ReturnType<typeof setTimeout> | undefined
   let alive = true
-  let input!: HTMLInputElement
   const media = window.matchMedia("(max-width:767px)")
   const updateMedia = () => setState("small", media.matches)
   media.addEventListener("change", updateMedia)
@@ -184,6 +180,7 @@ export default function ResearchPage() {
   createEffect(() => {
     const id = params.id
     const code = params.caseCode
+    if (!id && !code && !tabs.ready()) return
     const own = ++generation
     abort?.abort()
     abort = undefined
@@ -212,8 +209,7 @@ export default function ResearchPage() {
           void action(() => run())
         }
       } else {
-        const cases = await request<ResearchCase[]>("/cases")
-        if (alive && own === generation) setState("cases", cases)
+        openResearch("quick", state.query)
       }
     }
     void untrack(load)
@@ -279,38 +275,6 @@ export default function ResearchPage() {
     window.removeEventListener(RESEARCH_UPDATED, onHistoryMutation)
   })
 
-  const submit = () =>
-    action(async () => {
-      const session = await request<ResearchDetail["session"]>("/sessions", {
-        method: "POST",
-        body: JSON.stringify({ query: state.query, ...(state.uploadId ? { uploadId: state.uploadId } : {}) }),
-      })
-      announce()
-      navigate(`/general-deepinsight/session/${session.id}?start=1`)
-    })
-  const upload = (files: FileList | null) =>
-    action(async () => {
-      if (!files?.length) return
-      const form = new FormData()
-      for (const file of files) form.append("files", file)
-      if (state.uploadId) form.append("uploadId", state.uploadId)
-      const result = await request<{ upload_id: string; files: typeof state.uploads }>("/files", {
-        method: "POST",
-        body: form,
-      })
-      setState({ uploadId: result.upload_id, uploads: result.files })
-      input.value = ""
-    })
-  const removeUpload = (filename: string) =>
-    action(async () => {
-      await request(`/files?uploadId=${encodeURIComponent(state.uploadId)}&filename=${encodeURIComponent(filename)}`, {
-        method: "DELETE",
-      })
-      setState(
-        "uploads",
-        state.uploads.filter((file) => file.saved_name !== filename),
-      )
-    })
   const resume = (confirm: boolean) =>
     action(() => {
       const pending = state.detail?.conversationData.pendingInterrupt
@@ -390,30 +354,10 @@ export default function ResearchPage() {
       form.append("coverFile", state.cover)
       await request(`/cases/from-session/${params.id}`, { method: "POST", body: form })
       setState("publish", false)
+      dockapi.cases.invalidate()
+      window.dispatchEvent(new Event(CMCC_CASES_UPDATED_EVENT))
       showToast({ title: "案例已发布", variant: "success" })
     })
-  const deleteCase = (code: string) =>
-    action(async () => {
-      if (!window.confirm("删除该案例？")) return
-      await request(`/cases/${code}`, { method: "DELETE" })
-      setState(
-        "cases",
-        state.cases.filter((item) => item.caseCode !== code),
-      )
-      if (params.caseCode === code) navigate("/general-deepinsight")
-    })
-  const openCase = (code: string) =>
-    action(async () => {
-      setState("loadingCase", code)
-      try {
-        const detail = await request<ResearchDetail>(`/cases/${encodeURIComponent(code)}`)
-        prepareResearchCase(dockapi.user!.id, code, detail)
-        navigate(`/general-deepinsight/cases/${encodeURIComponent(code)}`)
-      } finally {
-        setState("loadingCase", "")
-      }
-    })
-
   const interrupt = () => (
     <div class="chat-input-container plan-card-host">
       <div class="interrupt-card plan-confirmation-card">
@@ -552,11 +496,9 @@ export default function ResearchPage() {
             </Show>
           }
           interrupt={interrupt()}
-          onNew={() => navigate("/general-deepinsight")}
-          onSame={() => {
-            prepareResearchDraft(dockapi.user!.id, state.detail?.session.query ?? "")
-            navigate("/general-deepinsight")
-          }}
+          onBack={readOnly() ? () => navigate("/cases") : undefined}
+          onNew={() => openResearch("quick")}
+          onSame={() => openResearch("quick", state.detail?.session.query ?? "")}
           onStop={() => void stop()}
           onStart={() => void action(() => run())}
           onEdit={() => setState("edit", true)}
@@ -578,80 +520,6 @@ export default function ResearchPage() {
             )
           }
         />
-      </Show>
-      <Show when={!params.id && !params.caseCode}>
-        <NewSessionDesignView
-          footer={
-            <ResearchFeaturedCases
-              cases={state.cases}
-              busy={state.busy}
-              loadingCase={state.loadingCase}
-              canDelete={!!dockapi.user?.casePublishAllowed}
-              onOpen={(code) => void openCase(code)}
-              onDelete={(code) => void deleteCase(code)}
-            />
-          }
-        >
-          <section class="research-compose">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                void submit()
-              }}
-            >
-              <textarea
-                aria-label="研究问题"
-                value={state.query}
-                onInput={(event) => setState("query", event.currentTarget.value)}
-                maxLength={20000}
-                placeholder="请告诉您要研究的问题？"
-              />
-              <div class="research-upload-chips">
-                <For each={state.uploads}>
-                  {(file) => (
-                    <span>
-                      {file.original_filename}
-                      <button
-                        type="button"
-                        title="移除资料"
-                        disabled={state.busy}
-                        onClick={() => void removeUpload(file.saved_name)}
-                      >
-                        <Icon name="close" />
-                      </button>
-                    </span>
-                  )}
-                </For>
-              </div>
-              <div class="research-compose-toolbar">
-                <input
-                  ref={input}
-                  type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.json"
-                  class="sr-only"
-                  onChange={(event) => void upload(event.currentTarget.files)}
-                />
-                <button
-                  type="button"
-                  title="上传文件"
-                  aria-label="上传文件"
-                  disabled={state.busy}
-                  onClick={() => input.click()}
-                >
-                  <Icon name="plus" />
-                </button>
-                <PromptSendButton
-                  mode="send"
-                  type="submit"
-                  aria-label="开始研究"
-                  title="开始研究"
-                  disabled={state.busy || !state.query.trim()}
-                />
-              </div>
-            </form>
-          </section>
-        </NewSessionDesignView>
       </Show>
       <Show when={state.publish}>
         <div class="research-modal-backdrop">

@@ -3,7 +3,7 @@ import JSZip from "jszip"
 import { RESEARCH_UPDATED } from "../../src/pages/general-deepinsight/model"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
-import { prepareReferenceDeepInsight, prepareReferenceFeaturedCases } from "./reference-deepinsight"
+import { prepareReferenceDeepInsight } from "./reference-deepinsight"
 import { discoveryPayload } from "./discovery.fixture"
 import { outlineFixture, thinkingFixture } from "./thinking.fixture"
 
@@ -296,6 +296,7 @@ for (const width of [1440, 390]) {
     )
     await page.goto("/app")
     await expect(page.locator('[data-component="session-new-design"]').first()).toBeVisible()
+    await expect(page.locator('[data-component="prompt-input"]').first()).toBeVisible()
     await page.keyboard.press("Control+,")
     await page.getByRole("tab", { name: "Token 额度", exact: true }).click()
     const dialog = page.getByRole("dialog")
@@ -1268,16 +1269,16 @@ for (const status of ["running", "failed", "stopped"]) {
   })
 }
 
-test("separate entry and form create only a LangGraph task", async ({ page }) => {
+test("legacy entry creates only a LangGraph task through the unified form", async ({ page }) => {
   const data = await prepare(page)
   await page.goto("/general-deepinsight")
   await expect(page.getByRole("heading", { name: "DeepInsight深度洞察", exact: true })).toBeVisible()
   const sidebar = page
     .getByRole("navigation")
-    .filter({ has: page.getByRole("button", { name: "通用深度洞察", exact: true }) })
+    .filter({ has: page.getByRole("button", { name: "深度研究", exact: true }) })
   await expect(sidebar.getByRole("button", { name: "深度研究", exact: true })).toBeVisible()
-  await page.getByRole("textbox", { name: "研究问题", exact: true }).fill("研究中文数据治理")
-  await page.getByRole("button", { name: "开始研究", exact: true }).click()
+  await page.getByRole("textbox", { name: "请告诉您要研究的问题？", exact: true }).fill("研究中文数据治理")
+  await page.getByRole("button", { name: "发送", exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/general-deepinsight/session/${id}`))
   await expect(page.locator(".general-research-result")).toHaveAttribute("data-status", "completed")
   expect(
@@ -1365,10 +1366,9 @@ test("edited plans use the observed confirm_with_edits contract", async ({ page 
   })
 })
 
-test("internal cases use one-shot snapshot handoff and remain read-only", async ({ page }) => {
+test("legacy case links remain read-only and create quick drafts", async ({ page }) => {
   const data = await prepare(page, "completed", false)
-  await page.goto("/general-deepinsight")
-  await page.getByRole("button", { name: /数据治理研究案例/ }).click()
+  await page.goto(`/general-deepinsight/cases/${code}`)
   await expect(page).toHaveURL(new RegExp(`/general-deepinsight/cases/${code}`))
   await expect(page.locator(".general-research-result")).toHaveAttribute("data-read-only", "")
   await page.getByRole("tab", { name: "文字报告", exact: true }).click()
@@ -1376,8 +1376,8 @@ test("internal cases use one-shot snapshot handoff and remain read-only", async 
   await expect(page.getByRole("button", { name: "删除案例", exact: true })).toHaveCount(0)
   expect(data.requests.filter((request) => request.path.endsWith(`/cases/${code}`))).toHaveLength(1)
   await page.getByRole("button", { name: "做同款", exact: true }).click()
-  await expect(page).toHaveURL(/\/general-deepinsight$/)
-  await expect(page.getByRole("textbox", { name: "研究问题", exact: true })).toHaveValue("研究中文数据治理")
+  await expect(page).toHaveURL(/\/new-session\?draftId=/)
+  await expect(page.getByRole("textbox", { name: "请告诉您要研究的问题？", exact: true })).toHaveValue("研究中文数据治理")
   expect(
     data.requests.filter((request) => request.method === "POST" && request.path.endsWith("/sessions")),
   ).toHaveLength(0)
@@ -1478,17 +1478,18 @@ test("result presentation matches the original component geometry and materials"
 test("homepage composer matches new conversation and plus directly opens file upload", async ({ page }) => {
   await prepare(page)
   await page.goto("/general-deepinsight")
-  const input = page.getByRole("textbox", { name: "研究问题", exact: true })
+  const input = page.getByRole("textbox", { name: "请告诉您要研究的问题？", exact: true })
   await expect(input).toHaveAttribute("placeholder", "请告诉您要研究的问题？")
   expect(
-    await page.locator(".research-compose form").evaluate((form) => {
+    await page.locator('[data-component="session-new-composer"]').evaluate((form) => {
       const style = getComputedStyle(form)
       return { radius: style.borderRadius, border: style.borderTopWidth, minHeight: style.minHeight }
     }),
   ).toEqual({ radius: "24px", border: "2px", minHeight: "160px" })
   await expect(page.getByRole("button", { name: /执行|计划|选择模型/ })).toHaveCount(0)
   const picker = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: "上传文件", exact: true }).click()
+  await page.getByRole("button", { name: "打开更多操作", exact: true }).click()
+  await page.getByRole("button", { name: "上传文档", exact: true }).click()
   expect((await picker).isMultiple()).toBe(true)
 })
 
@@ -1529,7 +1530,8 @@ test("whole research homepage reuses new conversation branding and geometry", as
   await page.evaluate(() => document.fonts.ready)
   const native = await geometry()
   await page.goto("/general-deepinsight")
-  await expect(page.locator(".featured-list .featured-card")).toHaveCount(5)
+  await expect(page.locator('[data-research-home] [data-component="prompt-input"]')).toBeVisible()
+  await expect(page.locator(".featured-list")).toHaveCount(0)
   await page.evaluate(() => document.fonts.ready)
   expect(await geometry()).toEqual(native)
   await expect(page.getByText("您想深入研究什么？", { exact: true })).toHaveCount(0)
@@ -1538,145 +1540,7 @@ test("whole research homepage reuses new conversation branding and geometry", as
   expect(data.errors).toEqual([])
 })
 
-test("featured cases preserve descriptions, sort by date and show more without categories", async ({ page }) => {
-  const data = await prepare(page, "completed", true, 7)
-  await page.goto("/general-deepinsight")
-  const cards = page.locator(".featured-list .featured-card")
-  await expect(cards).toHaveCount(5)
-  await expect(cards.first().locator(".case-name")).toHaveText("数据治理研究案例 7")
-  await expect(cards.first().locator(".case-tag")).toHaveText("已完成的研究")
-  await page.getByRole("button", { name: "更多", exact: true }).click()
-  const dialog = page.getByRole("dialog", { name: "更多精选案例", exact: true })
-  await expect(dialog.locator(".featured-card")).toHaveCount(7)
-  await expect(dialog.getByRole("button", { name: /按类型|按日期/ })).toHaveCount(0)
-  await expect(dialog.locator(".featured-labels,.featured-dialog-filters")).toHaveCount(0)
-  await page.screenshot({ path: test.info().outputPath("research-more-desktop.png") })
-  page.once("dialog", (confirm) => confirm.accept())
-  await dialog.getByRole("button", { name: "删除案例：数据治理研究案例 7", exact: true }).click()
-  await expect(dialog.locator(".featured-card")).toHaveCount(6)
-  await expect(cards).toHaveCount(5)
-  await expect(cards.first().locator(".case-name")).toHaveText("数据治理研究案例 6")
-  await page.keyboard.press("Escape")
-  await expect(dialog).not.toBeVisible()
-  await page.getByRole("button", { name: "更多", exact: true }).click()
-  await dialog.locator(".featured-card").filter({ hasText: "数据治理研究案例 6" }).click()
-  await expect(page).toHaveURL(new RegExp(`/general-deepinsight/cases/${data.cases[5]!.caseCode}`))
-  expect(data.requests.filter((request) => request.path.endsWith(`/cases/${data.cases[5]!.caseCode}`))).toHaveLength(1)
-  expect(data.errors).toEqual([])
-})
-
-test("case preloading stays on the clicked cover and failed loads remain retryable", async ({ page }) => {
-  const data = await prepare(page, "completed", false)
-  let attempts = 0
-  let release!: () => void
-  const pending = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  await page.route(`**/api/dockapi/general-deepinsight/cases/${code}`, async (route) => {
-    attempts++
-    if (attempts === 1) {
-      await pending
-      return route.fulfill({ status: 503, json: { code: 503, message: "测试加载失败" } })
-    }
-    return route.fallback()
-  })
-  await page.goto("/general-deepinsight")
-  await page.locator(".featured-list .featured-card").click()
-  await expect(page.locator(".research-case-loading")).toBeVisible()
-  await expect(page).toHaveURL(/\/general-deepinsight$/)
-  release()
-  await expect(page.locator(".research-case-loading")).toHaveCount(0)
-  await expect(page.getByRole("alert")).toHaveCount(0)
-  await expect(page).toHaveURL(/\/general-deepinsight$/)
-  await page.locator(".featured-list .featured-card").click()
-  await expect(page).toHaveURL(new RegExp(`/general-deepinsight/cases/${code}`))
-  expect(attempts).toBe(2)
-  expect(data.errors).toEqual([])
-})
-
-for (const width of [390, 320]) {
-  test(`research homepage and more cases fit a ${width}px screen`, async ({ page }) => {
-    const data = await prepare(page, "completed", false, 6)
-    await page.setViewportSize({ width, height: 844 })
-    await page.goto("/general-deepinsight")
-    await expect(page.locator(".featured-list .featured-card")).toHaveCount(5)
-    await expect
-      .poll(() =>
-        page
-          .locator('aside[aria-label="CMCC conversations"]')
-          .evaluate((element) => element.getBoundingClientRect().width),
-      )
-      .toBeLessThanOrEqual(2)
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-    const list = page.locator(".featured-list")
-    expect(await list.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
-    expect(
-      await page
-        .getByRole("textbox", { name: "研究问题", exact: true })
-        .evaluate((element) => element.getBoundingClientRect().right <= window.innerWidth),
-    ).toBe(true)
-    await page.screenshot({ path: test.info().outputPath("research-home-mobile.png") })
-    await page.getByRole("button", { name: "更多", exact: true }).click()
-    const dialog = page.getByRole("dialog", { name: "更多精选案例", exact: true })
-    await expect(dialog.locator(".featured-card")).toHaveCount(6)
-    expect(await dialog.evaluate((element) => element.scrollWidth <= window.innerWidth)).toBe(true)
-    const cover = await dialog.locator(".case-cover").first().boundingBox()
-    expect(cover!.width / cover!.height).toBeCloseTo(1.25, 1)
-    await page.screenshot({ path: test.info().outputPath("research-more-mobile.png") })
-    await dialog.getByRole("button", { name: "关闭", exact: true }).click()
-    await expect(dialog).not.toBeVisible()
-    expect(data.errors).toEqual([])
-  })
-}
-
-test("featured case materials and card sizing match the original Vue page", async ({ page, browser }) => {
-  test.skip(!process.env.CMCC_REFERENCE_BASE_URL, "Reference project preview is required for visual comparison")
-  const data = await prepare(page, "completed", false, 6)
-  await page.setViewportSize({ width: 1920, height: 1080 })
-  await page.goto("/general-deepinsight")
-  const actualSection = page.locator(".research-featured")
-  await expect(actualSection.locator(".featured-card")).toHaveCount(5)
-  const reference = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
-  await prepareReferenceFeaturedCases(reference, data.cases)
-  const expectedSection = reference.locator(".featured-cases")
-  const width = (await actualSection.boundingBox())!.width
-  const referenceWidth = (await expectedSection.boundingBox())!.width
-  await reference.setViewportSize({ width: Math.round(1920 + (width - referenceWidth) / 0.8), height: 1080 })
-  const materials = async (section: ReturnType<Page["locator"]>) =>
-    section.evaluate((root) => {
-      const values = (selector: string) => {
-        const style = getComputedStyle(root.querySelector(selector)!)
-        return {
-          fontSize: style.fontSize,
-          lineHeight: style.lineHeight,
-          fontWeight: style.fontWeight,
-          padding: style.padding,
-          margin: style.margin,
-          border: style.border,
-          borderRadius: style.borderRadius,
-          color: style.color,
-          background: style.background.replace(/(rgba\([^)]+\)) 0%/g, "$1"),
-          boxShadow: style.boxShadow,
-        }
-      }
-      return {
-        header: values(".featured-header h2"),
-        cover: values(".case-cover"),
-        description: values(".case-tag"),
-        title: values(".case-name"),
-        more: values(".featured-more-btn"),
-      }
-    })
-  expect(await materials(actualSection)).toEqual(await materials(expectedSection))
-  const actualCover = (await actualSection.locator(".case-cover").first().boundingBox())!
-  const expectedCover = (await expectedSection.locator(".case-cover").first().boundingBox())!
-  expect(Math.abs(actualCover.width - expectedCover.width)).toBeLessThan(2)
-  expect(Math.abs(actualCover.height - expectedCover.height)).toBeLessThan(2)
-  await actualSection.screenshot({ path: test.info().outputPath("implemented-featured.png") })
-  await expectedSection.screenshot({ path: test.info().outputPath("reference-featured.png") })
-  await reference.close()
-  expect(data.errors).toEqual([])
-})
+// Homepage case browsing is covered by unified-catalog.spec.ts.
 
 test("replay stops without changing source and Word export contains real report text", async ({ page }) => {
   await prepare(page)

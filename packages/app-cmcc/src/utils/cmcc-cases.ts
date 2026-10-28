@@ -52,6 +52,10 @@ export const CMCC_CASE_CATEGORIES = [
 
 export const CMCC_CASES_UPDATED_EVENT = "cmcc:cases-updated"
 
+export function cmccCaseKey(item: { source?: "opencode" | "langgraph"; caseCode: string }) {
+  return `${item.source ?? "opencode"}:${item.caseCode}`
+}
+
 const CMCC_CASE_AGENT_TYPE_ALIASES: Record<string, string> = {
   mstock: "deeptrading",
   "ai-for-science-team": "ai-scientist",

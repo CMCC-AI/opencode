@@ -2,7 +2,7 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { For, Show, createEffect, on, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useNavigate } from "@solidjs/router"
-import type { DockApiCaseGroup, DockApiCaseSummary } from "@/context/dockapi"
+import type { DockApiCaseGroup, DockApiCatalogCaseSummary } from "@/context/dockapi"
 import { dockApiUrl, useDockApi } from "@/context/dockapi"
 import { CaseDeleteDialog } from "@/components/case-delete-dialog"
 import { CmccPageBackground } from "@/components/cmcc-page-background"
@@ -10,11 +10,14 @@ import {
   CMCC_CASES_UPDATED_EVENT,
   CMCC_CASE_CATEGORIES,
   cmccCaseCategoryByCode,
+  cmccCaseKey,
   cmccCaseManagementAllowed,
 } from "@/utils/cmcc-cases"
 import { cmccHistoryProduct } from "@/utils/cmcc-history-product"
 import caseCategoryAssetsUrl from "@/assets/cases/case-category-assets.svg?url"
 import { loadCaseData } from "./cases/load-case"
+import { prepareResearchCase } from "./general-deepinsight/handoff"
+import type { ResearchDetail } from "./general-deepinsight/model"
 import "./cases/card-loading.css"
 
 type SortOrder = "latest" | "oldest"
@@ -35,7 +38,7 @@ export function CmccCasesRoute() {
   const navigate = useNavigate()
   const [state, setState] = createStore({
     overview: [] as DockApiCaseGroup[],
-    items: [] as DockApiCaseSummary[],
+    items: [] as DockApiCatalogCaseSummary[],
     total: 0,
     page: 1,
     loading: true,
@@ -49,7 +52,7 @@ export function CmccCasesRoute() {
     from: "",
     to: "",
     filterOpen: false,
-    deleteCase: undefined as DockApiCaseSummary | undefined,
+    deleteCase: undefined as DockApiCatalogCaseSummary | undefined,
     opening: undefined as CaseOpening | undefined,
   })
   let openingGeneration = 0
@@ -61,15 +64,22 @@ export function CmccCasesRoute() {
     setState("opening", undefined)
   }
   const openingFor = (caseCode: string) => state.opening?.caseCode === caseCode ? state.opening : undefined
-  const openCase = async (item: DockApiCaseSummary) => {
-    if (openingFor(item.caseCode)?.phase === "loading") return
+  const openCase = async (item: DockApiCatalogCaseSummary) => {
+    if (openingFor(cmccCaseKey(item))?.phase === "loading") return
     cancelOpening()
     const run = openingGeneration
     const scope = dockapi.cases.navigationScope
     const controller = new AbortController()
     openingRequest = controller
-    setState("opening", { caseCode: item.caseCode, phase: "loading" })
+    setState("opening", { caseCode: cmccCaseKey(item), phase: "loading" })
     try {
+      if (item.source === "langgraph") {
+        const detail = await dockapi.research.request<ResearchDetail>(`/api/dockapi/general-deepinsight/cases/${encodeURIComponent(item.caseCode)}`, { signal: controller.signal })
+        if (run !== openingGeneration || controller.signal.aborted || scope !== dockapi.cases.navigationScope) return
+        prepareResearchCase(dockapi.user!.id, item.caseCode, detail)
+        navigate(`/general-deepinsight/cases/${encodeURIComponent(item.caseCode)}?from=catalog`)
+        return
+      }
       const [value, view] = await Promise.all([
         loadCaseData(dockapi.cases, item.caseCode, controller.signal),
         import("./cases/case-detail"),
@@ -89,7 +99,7 @@ export function CmccCasesRoute() {
       if (run !== openingGeneration || controller.signal.aborted) return
       controller.abort()
       openingRequest = undefined
-      setState("opening", { caseCode: item.caseCode, phase: "error", error: error instanceof Error ? error.message : String(error) })
+      setState("opening", { caseCode: cmccCaseKey(item), phase: "error", error: error instanceof Error ? error.message : String(error) })
     }
   }
   let generation = 0
@@ -227,7 +237,7 @@ export function CmccCasesRoute() {
   const hasCases = () =>
     filtered() ? state.items.length > 0 : state.overview.some((group) => group.items.length > 0)
   const canManageCases = () => cmccCaseManagementAllowed(dockapi.user?.casePublishAllowed)
-  const requestDelete = (value: DockApiCaseSummary) => {
+  const requestDelete = (value: DockApiCatalogCaseSummary) => {
     cancelOpening()
     setState("deleteCase", value)
   }
@@ -326,7 +336,7 @@ export function CmccCasesRoute() {
                   <CaseCard
                     item={item}
                     onClick={() => void openCase(item)}
-                    opening={openingFor(item.caseCode)}
+                    opening={openingFor(cmccCaseKey(item))}
                     onCancel={cancelOpening}
                     onDelete={canManageCases() ? () => requestDelete(item) : undefined}
                   />
@@ -363,9 +373,9 @@ export function CmccCasesRoute() {
 
 function OverviewGroups(props: {
   groups: DockApiCaseGroup[]
-  open: (item: DockApiCaseSummary) => void
+  open: (item: DockApiCatalogCaseSummary) => void
   viewMore: (category: string) => void
-  remove?: (item: DockApiCaseSummary) => void
+  remove?: (item: DockApiCatalogCaseSummary) => void
   opening: (caseCode: string) => CaseOpening | undefined
   cancelOpening: () => void
 }) {
@@ -393,7 +403,7 @@ function OverviewGroups(props: {
                 <CaseCard
                   item={item}
                   onClick={() => props.open(item)}
-                  opening={props.opening(item.caseCode)}
+                  opening={props.opening(cmccCaseKey(item))}
                   onCancel={props.cancelOpening}
                   onDelete={props.remove ? () => props.remove?.(item) : undefined}
                 />
@@ -445,7 +455,7 @@ function OverviewGroups(props: {
                           <CaseCard
                             item={item}
                             onClick={() => props.open(item)}
-                            opening={props.opening(item.caseCode)}
+                            opening={props.opening(cmccCaseKey(item))}
                             onCancel={props.cancelOpening}
                             onDelete={props.remove ? () => props.remove?.(item) : undefined}
                           />
@@ -503,12 +513,12 @@ function CaseSectionHeading(props: { category: string }) {
   )
 }
 
-function CaseCard(props: { item: DockApiCaseSummary; onClick: () => void; onDelete?: () => void; opening?: CaseOpening; onCancel: () => void }) {
+function CaseCard(props: { item: DockApiCatalogCaseSummary; onClick: () => void; onDelete?: () => void; opening?: CaseOpening; onCancel: () => void }) {
   const [state, setState] = createStore({ coverFailed: false })
   createEffect(on(() => props.item.coverUrl, () => setState("coverFailed", false)))
-  const product = () => cmccHistoryProduct(props.item.agentType)
+  const product = () => cmccHistoryProduct(props.item.source === "langgraph" ? undefined : props.item.agentType)
   return (
-    <div data-case-card={props.item.caseCode} class="group relative min-w-0 text-left">
+    <div data-case-source={props.item.source ?? "opencode"} data-case-card={props.item.caseCode} class="group relative min-w-0 text-left">
       <button type="button" class="block w-full text-left" onClick={props.onClick}
         aria-label={props.item.caseName} aria-busy={props.opening?.phase === "loading"}>
         <div class="overflow-hidden rounded-[8px] border border-[#e9edf5] bg-white shadow-[0_4px_12px_rgba(61,77,112,0.08)] transition-[transform,box-shadow] duration-150 group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_18px_rgba(61,77,112,0.13)]">
@@ -541,6 +551,9 @@ function CaseCard(props: { item: DockApiCaseSummary; onClick: () => void; onDele
             >
               {props.item.caseTag}
             </span></Show>
+            <Show when={props.item.category === "deep-research"}>
+              <span class="absolute bottom-2 right-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-[#536078]">{props.item.source === "langgraph" ? "快速" : "深度"}</span>
+            </Show>
           </div>
         </div>
       </button>

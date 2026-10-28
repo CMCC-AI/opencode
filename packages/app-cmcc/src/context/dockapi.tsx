@@ -57,6 +57,7 @@ export type DockApiSession = {
 }
 
 export type DockApiCaseSummary = {
+  source?: "opencode"
   caseCode: string
   caseName: string
   caseTag: string
@@ -69,10 +70,18 @@ export type DockApiCaseSummary = {
   publishedAt: string
 }
 
+export type DockApiCatalogCaseSummary = DockApiCaseSummary | (Omit<DockApiCaseSummary, "source" | "agentType" | "rootAgent" | "reportCharCount"> & {
+  source: "langgraph"
+  agentType: null
+  rootAgent: null
+  reportCharCount: number | null
+  caseDescription?: string | null
+})
+
 export type DockApiCaseGroup = {
   category: string
   label: string
-  items: DockApiCaseSummary[]
+  items: DockApiCatalogCaseSummary[]
 }
 
 export type DockApiCaseOverview = {
@@ -80,7 +89,7 @@ export type DockApiCaseOverview = {
 }
 
 export type DockApiCaseList = {
-  items: DockApiCaseSummary[]
+  items: DockApiCatalogCaseSummary[]
   total: number
   page: number
   size: number
@@ -98,6 +107,7 @@ export type DockApiCaseQuery = {
 
 function caseListPath(input: DockApiCaseQuery) {
   const query = new URLSearchParams()
+  query.set("sources", "all")
   if (input.keyword) query.set("keyword", input.keyword)
   if (input.category) query.set("category", input.category)
   if (input.sort) query.set("sort", input.sort)
@@ -555,11 +565,12 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         },
       },
       cases: {
+        invalidate: clearCaseCache,
         cachedOverview() {
           return caseOverview.peek("overview")
         },
         overview() {
-          return caseOverview.load("overview", () => request<DockApiCaseOverview>("/api/dockapi/cases/overview"))
+          return caseOverview.load("overview", () => request<DockApiCaseOverview>("/api/dockapi/cases/overview?sources=all"))
         },
         cachedList(input: DockApiCaseQuery) {
           return caseLists.peek(caseListPath(input))

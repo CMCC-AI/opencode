@@ -15,6 +15,7 @@ import { PdfPreview } from "@/components/pdf-preview-lazy"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
 import { useTabs } from "@/context/tabs"
+import { useResearchHome } from "@/pages/general-deepinsight/research-home"
 import type {
   DeepTradingArtifactSource,
   DeepTradingArtifactContent,
@@ -109,12 +110,17 @@ export function CmccCaseDetailRoute() {
 }
 
 function CaseDetailContent(props: { value: LoadedCase }) {
+  const openResearch = useResearchHome()
   const navigate = useNavigate()
   const dockapi = useDockApi()
   const server = useServer()
   const serverSDK = useServerSDK()
   const tabs = useTabs()
   const createSame = () => {
+    if (props.value.detail.agentType === "deepinsight" || props.value.detail.rootAgent === DEEPINSIGHT_LEAD_AGENT) {
+      openResearch("deep", props.value.detail.query)
+      return
+    }
     if (props.value.detail.agentType === "mstock" || props.value.detail.rootAgent === "mstock/mstock") { navigate("/mstock?fresh=1"); return }
     const query = props.value.detail.query.trim()
     const directory = dockapi.workspace?.directoryPath

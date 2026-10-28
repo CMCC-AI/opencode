@@ -2,12 +2,12 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
-import type { DockApiCaseSummary } from "@/context/dockapi"
+import type { DockApiCatalogCaseSummary } from "@/context/dockapi"
 import { useDockApi } from "@/context/dockapi"
 import { showToast } from "@/utils/toast"
 
 export function CaseDeleteDialog(props: {
-  value?: DockApiCaseSummary
+  value?: DockApiCatalogCaseSummary
   onClose: () => void
   onDeleted: () => void
 }) {
@@ -23,9 +23,11 @@ export function CaseDeleteDialog(props: {
     const value = props.value
     if (!value || state.deleting) return
     setState("deleting", true)
-    await dockapi.cases
-      .remove(value.caseCode)
+    await (value.source === "langgraph"
+      ? dockapi.research.request(`/api/dockapi/general-deepinsight/cases/${encodeURIComponent(value.caseCode)}`, { method: "DELETE" })
+      : dockapi.cases.remove(value.caseCode))
       .then(() => {
+        dockapi.cases.invalidate()
         showToast({ variant: "success", title: "案例已删除" })
         props.onDeleted()
       })

@@ -2,6 +2,7 @@ import { useFilteredList } from "@opencode-ai/ui/hooks"
 import { useSpring } from "@opencode-ai/ui/motion-spring"
 import {
   createEffect,
+  For,
   on,
   Component,
   Show,
@@ -48,6 +49,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
+import { RESEARCH_FILE_ACCEPT, type ResearchMode } from "@/pages/general-deepinsight/research-attachments"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES, pickAttachmentFiles } from "./prompt-input/files"
 import { createAttachmentStorage } from "./prompt-input/upload-storage"
@@ -178,6 +180,15 @@ function createPersistedPromptInputHistory() {
 }
 
 export interface PromptInputProps {
+  research?: {
+    mode: ResearchMode
+    pending: boolean
+    blocked: boolean
+    changeMode: (mode: ResearchMode) => void
+    readAttachment: (file: File, relativePath?: string) => Promise<ImageAttachmentPart>
+    removeAttachment: (id: string) => void
+    submit: (deep: () => Promise<void> | void) => Promise<void>
+  }
   hideVariantControl?: boolean
   class?: string
   variant?: "dock" | "new-session"
@@ -1225,7 +1236,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     const shellMode = store.mode === "shell"
 
-    if (!shellMode) {
+    if (!shellMode && !props.research) {
       const atMatch = rawText.substring(0, cursorPosition).match(/@(\S*)$/)
       const slashMatch = rawText.match(/^\/(\S*)$/)
 
@@ -1391,6 +1402,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const { addAttachment, addAttachments, addFolder, uploadStatus, removeAttachment, handlePaste } =
     createPromptAttachments({
+      disabled: () => !!props.research?.pending,
+      read: props.research?.readAttachment,
       prompt,
       editor: () => editorRef,
       isDialogActive: () => !!dialog.active,
@@ -1438,7 +1451,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         ref={(el) => (fileInputRef = el)}
         type="file"
         multiple
-        accept={ACCEPTED_FILE_TYPES.join(",")}
+        accept={props.research?.mode === "quick" ? RESEARCH_FILE_ACCEPT : ACCEPTED_FILE_TYPES.join(",")}
         class="hidden"
         onChange={(e) => {
           const list = e.currentTarget.files
@@ -1462,10 +1475,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     </>
   )
 
-  const variants = createMemo(() => ["default", ...props.controls.model.selection.variant.list()])
+  const variants = createMemo(() => props.research?.mode === "quick" ? [] : ["default", ...props.controls.model.selection.variant.list()])
   // Check provider variants directly: `variants` also includes the UI-only default option.
   const showVariantControl = createMemo(
-    () => !props.hideVariantControl && props.controls.model.selection.variant.list().length > 0,
+    () => props.research?.mode !== "quick" && !props.hideVariantControl && props.controls.model.selection.variant.list().length > 0,
   )
   const accepting = createMemo(() => {
     const id = props.controls.session.id
@@ -1499,17 +1512,23 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       onAbort: props.onAbort,
       onSubmit: props.onSubmit,
       selectedAgent: () => props.selectedExpertAgent,
+      literal: !!props.research,
       knowledge: selectedKnowledge,
     })
 
   const abort = submission.abort
-  const initializing = () => !props.controls.session.id && props.controls.model.loading
+  const initializing = () => props.research?.mode !== "quick" && !props.controls.session.id && props.controls.model.loading
   const handleSubmit = (event: Event) => {
-    if (!uploadStatus.pending && !initializing()) return submission.handleSubmit(event)
+    if (!uploadStatus.pending && !initializing()) {
+      if (!props.research) return submission.handleSubmit(event)
+      event.preventDefault()
+      return props.research.submit(() => submission.handleSubmit(event))
+    }
     event.preventDefault()
   }
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    if (props.research?.pending) { event.preventDefault(); return }
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "u") {
       event.preventDefault()
       if (store.mode !== "normal") return
@@ -1535,7 +1554,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       }
     }
 
-    if (event.key === "!" && store.mode === "normal") {
+    if (!props.research && event.key === "!" && store.mode === "normal") {
       const cursorPosition = getCursorPosition(editorRef)
       if (cursorPosition === 0) {
         setStore("mode", "shell")
@@ -1685,6 +1704,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   )
 
   const designPlaceholder = () => {
+    if (props.research) return "请告诉您要研究的问题？"
     if (store.mode === "shell") return placeholder()
     if (newSession()) return "请告诉您要研究的问题？@召唤领域专家团，/调用技能与指令"
     return language.t("prompt.placeholder.simple")
@@ -1709,8 +1729,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     title: language.t("command.model.choose"),
     keybind: command.keybindParts("model.choose"),
     model: props.controls.model.selection,
-    providerID: props.controls.model.selection.current()?.provider?.id,
-    modelName: props.controls.model.selection.current()?.name ?? language.t("dialog.model.select.title"),
+    providerID: props.research?.mode === "quick" ? undefined : props.controls.model.selection.current()?.provider?.id,
+    modelName: props.research?.mode === "quick" ? "" : props.controls.model.selection.current()?.name ?? language.t("dialog.model.select.title"),
     style: control(),
     onClose: restoreFocus,
     onUnpaidClick: () => {
@@ -1776,7 +1796,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             setActions("panel", "menu")
             requestAnimationFrame(() => cmccPanelRef?.querySelector("button")?.focus({ preventScroll: true }))
           }}
-          disabled={store.mode !== "normal"}
+          disabled={store.mode !== "normal" || (!!props.research && (props.research.pending || uploadStatus.pending > 0))}
           tabIndex={store.mode === "normal" ? undefined : -1}
           aria-label="打开更多操作"
           aria-expanded={!!actions.panel}
@@ -1788,6 +1808,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     <Switch>
       <Match when={actions.panel === "menu"}>
         <CmccPromptActionMenu
+          researchMode={props.research?.mode}
           onAttach={() => {
             setActions("panel", null)
             pick()
@@ -1904,7 +1925,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 onOpen={(attachment) =>
                   dialog.show(() => <ImagePreview src={attachment.dataUrl} alt={attachment.filename} />)
                 }
-                onRemove={removeAttachment}
+                onRemove={props.research?.removeAttachment ?? removeAttachment}
                 removeLabel={language.t("prompt.attachment.remove")}
               />
               <div
@@ -1923,7 +1944,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     role="textbox"
                     aria-multiline="true"
                     aria-label={designPlaceholder()}
-                    contenteditable="true"
+                    contenteditable={!props.research?.pending}
                     autocapitalize={store.mode === "normal" ? "sentences" : "off"}
                     autocorrect={store.mode === "normal" ? "on" : "off"}
                     spellcheck={store.mode === "normal"}
@@ -1967,18 +1988,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       {cmccActionButton()}
                     </HomeActionsPopover>
                   </Show>
-                  <Show when={selectedTeamExpert()}>
+                  <Show when={props.research?.mode !== "quick" && selectedTeamExpert()}>
                     {(expert) => (
                       <button
                         type="button"
                         data-action="prompt-selected-expert"
                         class="flex h-7 min-w-0 max-w-[210px] items-center gap-1.5 rounded-[7px] bg-v2-background-bg-layer-03 pr-1.5 pl-1 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
                         style={buttons()}
+                        disabled={!!props.research}
                         onClick={() => {
                           props.onSelectedExpertAgentChange?.(undefined)
                           restoreFocus()
                         }}
-                        aria-label={`移除${expert().name}`}
+                        aria-label={props.research ? expert().name : `移除${expert().name}`}
                       >
                         <Show
                           when={cmccTeamAvatarUrl(expert())}
@@ -1993,7 +2015,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           )}
                         </Show>
                         <span class="min-w-0 truncate">{cmccExpertChineseName(expert())}</span>
-                        <Icon name="close" class="size-3.5 shrink-0 text-v2-icon-icon-muted" />
+                        <Show when={!props.research}><Icon name="close" class="size-3.5 shrink-0 text-v2-icon-icon-muted" /></Show>
                       </button>
                     )}
                   </Show>
@@ -2001,6 +2023,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     <ComposerAgentControl state={agentControlState()} />
                   </Show>
                   {props.toolbar}
+                  <Show when={props.research?.mode !== "quick"}>
                   <Show when={newSession()} fallback={<ComposerModelControl state={modelControlState()} />}>
                     <HomeModelControl
                       model={props.controls.model.selection}
@@ -2012,6 +2035,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       }}
                       onClose={restoreFocus}
                     />
+                  </Show>
                   </Show>
                   <Show when={!newSession() && !providersLoading() && store.mode !== "shell" && showVariantControl()}>
                     <div
@@ -2052,7 +2076,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </div>
                   </Show>
                 </div>
-                <Show when={newSession() && showAgentControl()}>
+                <Show when={props.research}>
+                  {(research) => <div class="home-agent-control" role="group" aria-label="研究模式">
+                    <For each={["quick", "deep"] as const}>{(mode) => <button type="button" aria-pressed={research().mode === mode}
+                      disabled={research().pending || uploadStatus.pending > 0}
+                      onClick={() => research().changeMode(mode)}>{mode === "quick" ? "快速" : "深度"}</button>}</For>
+                  </div>}
+                </Show>
+                <Show when={!props.research && newSession() && showAgentControl()}>
                   <HomeAgentControl
                     options={props.controls.agents.options}
                     current={props.controls.agents.current}
@@ -2067,7 +2098,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   <PromptSendButton
                     data-action="prompt-submit"
                     type="submit"
-                    disabled={(uploadStatus.pending > 0 && !stopping()) || (!working() && (blank() || initializing()))}
+                    disabled={!!props.research?.pending || !!props.research?.blocked || (uploadStatus.pending > 0 && !stopping()) || (!working() && (blank() || initializing()))}
                     tabIndex={store.mode === "normal" ? undefined : -1}
                     mode={stopping() ? "stop" : store.mode === "shell" ? "shell" : "send"}
                     aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
@@ -2192,7 +2223,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept={ACCEPTED_FILE_TYPES.join(",")}
+                  accept={props.research?.mode === "quick" ? RESEARCH_FILE_ACCEPT : ACCEPTED_FILE_TYPES.join(",")}
                   class="hidden"
                   onChange={(e) => {
                     const list = e.currentTarget.files
@@ -2206,7 +2237,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     <PromptSendButton
                       data-action="prompt-submit"
                       type="submit"
-                      disabled={(uploadStatus.pending > 0 && !stopping()) || (!working() && (blank() || initializing()))}
+                      disabled={!!props.research?.pending || !!props.research?.blocked || (uploadStatus.pending > 0 && !stopping()) || (!working() && (blank() || initializing()))}
                       tabIndex={store.mode === "normal" ? undefined : -1}
                       mode={stopping() ? "stop" : store.mode === "shell" ? "shell" : "send"}
                       aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
@@ -2235,7 +2266,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       class="size-8 p-0"
                       style={buttons()}
                       onClick={pick}
-                      disabled={store.mode !== "normal"}
+                      disabled={store.mode !== "normal" || !!props.research?.pending || !!uploadStatus.pending}
                       tabIndex={store.mode === "normal" ? undefined : -1}
                       aria-label={language.t("prompt.action.attachFile")}
                     >

@@ -282,6 +282,7 @@ function ResolvedDraftRoute(props: { draft: DraftTab }) {
     <Show when={`${props.draft.server}\0${props.draft.directory}`} keyed>
       <ServerSDKProvider server={conn}>
         <ServerSyncProvider server={conn}>
+          <Show when={props.draft.researchMode} fallback={
           <TargetServerScopedProviders directory={directory}>
             <SDKProvider directory={directory}>
               <DirectoryDataProvider directory={directory} server={serverKey}>
@@ -291,6 +292,11 @@ function ResolvedDraftRoute(props: { draft: DraftTab }) {
               </DirectoryDataProvider>
             </SDKProvider>
           </TargetServerScopedProviders>
+          }>
+            <SDKProvider directory={directory}>
+              <PromptProvider><NewSession /></PromptProvider>
+            </SDKProvider>
+          </Show>
         </ServerSyncProvider>
       </ServerSDKProvider>
     </Show>

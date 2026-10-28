@@ -81,6 +81,7 @@ export const CMCC_PROFESSIONAL_DATABASES: CmccProfessionalDatabase[] = [
 ]
 
 type CmccPromptActionMenuProps = {
+  researchMode?: "quick" | "deep"
   onAttach: () => void
   onFolder: () => void
   onExpert: (expert: TeamExpert) => void
@@ -96,13 +97,15 @@ export const CmccPromptActionMenu: Component<CmccPromptActionMenuProps> = (props
     class="max-h-[min(420px,45dvh)] w-[218px] max-w-full overflow-y-auto rounded-[10px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.14)]"
     onMouseDown={(event) => event.preventDefault()}
   >
-    <PromptActionItem icon="link" label="添加文件和图片" onClick={props.onAttach} />
-    <PromptActionItem icon="folder" label="添加文件夹" onClick={props.onFolder} />
+    <PromptActionItem icon="link" label={props.researchMode === "quick" ? "上传文档" : "添加文件和图片"} onClick={props.onAttach} />
+    <Show when={props.researchMode !== "quick"}><PromptActionItem icon="folder" label="添加文件夹" onClick={props.onFolder} /></Show>
+    <Show when={!props.researchMode}>
     <PromptActionItem icon="archive" label="专业数据库" active onClick={props.onProfessionalDatabases} />
     <ExpertTeamMenu onSelect={props.onExpert} selected={props.selectedExpert} />
     <PromptActionItem icon="brain" label="技能" arrow onClick={props.onSkills} />
     <Show when={props.onKnowledge}>
       {(onKnowledge) => <PromptActionItem icon="brain" label="知识库" arrow onClick={onKnowledge()} />}
+    </Show>
     </Show>
   </div>
 )

@@ -186,6 +186,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
 }
 
 type PromptSubmitInput = {
+  literal?: boolean
   prompt: ReturnType<typeof usePrompt>
   info: Accessor<{ id: string; metadata?: Session["metadata"] } | undefined>
   imageAttachments: Accessor<ImageAttachmentPart[]>
@@ -540,7 +541,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
-    if (text.startsWith("/")) {
+    if (!input.literal && text.startsWith("/")) {
       const [cmdName, ...args] = text.split(" ")
       const commandName = cmdName.slice(1)
       const customCommand = sync().data.command.find((c) => c.name === commandName)
