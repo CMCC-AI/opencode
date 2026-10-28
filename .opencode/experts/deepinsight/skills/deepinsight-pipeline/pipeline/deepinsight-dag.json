@@ -207,7 +207,7 @@
       "order": 100,
       "node": "html_render",
       "layer": 2,
-      "agent": "di-publisher",
+      "agent": "di-html-renderer",
       "condition": "after_visualization",
       "third_layer_tools": [
         "render-report.mjs"
@@ -222,7 +222,7 @@
       "order": 110,
       "node": "pdf_export",
       "layer": 2,
-      "agent": "di-publisher",
+      "agent": "di-pdf-exporter",
       "condition": "after_html_render",
       "third_layer_tools": [
         "export-report-pdf.mjs"

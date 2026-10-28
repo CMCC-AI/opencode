@@ -28,58 +28,6 @@ const visual = await readJson(visualPath);
 const input = await readJson(resolve(workspace, '00-input.json'));
 const refs = await readJson(resolve(workspace, '22-references.json'));
 
-// 图表闸门：chart block 由 di-viz 提供扁平 data，统一委托仓库级 chart-builder 技能校验并组装 ECharts option。
-// 结构与证据校验已在 pipeline-state.mjs 注册时 fail-fast，这里做渲染前兜底：不合格的图表整块丢弃
-// （日志报出标题与原因，渲染不中断）；仍自带 option 的旧格式 block 原样保留，兼容历史产物。
-const chartScriptDir = resolve(fileURLToPath(new URL('.', import.meta.url)));
-const chartBuilderCandidates = [
-  resolve(chartScriptDir, '../../../../../skills/chart-builder/scripts/build-charts.mjs'),
-  resolve(chartScriptDir, '../../chart-builder/scripts/build-charts.mjs'),
-];
-const chartBuilderPath = (await Promise.all(chartBuilderCandidates.map((candidate) => access(candidate).then(() => candidate, () => null)))).find(Boolean);
-if (!chartBuilderPath) throw new Error('缺少共享 chart-builder 脚本，请确认仓库级技能已部署');
-const { injectChartOptions } = await import(pathToFileURL(chartBuilderPath).href);
-const chartSummary = injectChartOptions(visual.sections || []);
-process.stdout.write(`图表校验：${chartSummary.kept}/${chartSummary.total} 张通过`);
-if (chartSummary.dropped.length) {
-  process.stdout.write(`，已丢弃 ${chartSummary.dropped.length} 张：\n`);
-  for (const dropped of chartSummary.dropped) process.stdout.write(`  - 「${dropped.title}」：${dropped.errors.join('；')}\n`);
-} else {
-  process.stdout.write('\n');
-}
-if (chartSummary.total && !chartSummary.kept) {
-  process.stdout.write('警告：全部图表被丢弃，应退回 di-viz 按契约重做图表数据\n');
-}
-
-const bodyWithoutRefs = stripReferenceAppendix(markdown).replace(/\n---\s*$/m, '').trim();
-const h2Matches = [...bodyWithoutRefs.matchAll(/^##\s+(.+)$/gm)];
-const contentMap = new Map();
-for (let index = 0; index < h2Matches.length; index += 1) {
-  const heading = h2Matches[index][1].trim();
-  const start = h2Matches[index].index + h2Matches[index][0].length;
-  const end = h2Matches[index + 1]?.index ?? bodyWithoutRefs.length;
-  const chapterBody = bodyWithoutRefs.slice(start, end).trim();
-  if (heading === '摘要') {
-    contentMap.set('__ABSTRACT__', chapterBody);
-    continue;
-  }
-  const number = heading.match(/^(\d+)/)?.[1];
-  if (!number) continue;
-  const h3Matches = [...chapterBody.matchAll(/^###\s+(.+)$/gm)];
-  if (!h3Matches.length) {
-    contentMap.set(`__CH${number}_1__`, chapterBody);
-    continue;
-  }
-  const intro = chapterBody.slice(0, h3Matches[0].index).trim();
-  for (let subIndex = 0; subIndex < h3Matches.length; subIndex += 1) {
-    const subStart = h3Matches[subIndex].index;
-    const subEnd = h3Matches[subIndex + 1]?.index ?? chapterBody.length;
-    const subContent = chapterBody.slice(subStart, subEnd).trim();
-    const content = subIndex === 0 && intro ? `${intro}\n\n${subContent}` : subContent;
-    contentMap.set(`__CH${number}_${subIndex + 1}__`, content);
-  }
-}
-
 const sectionsWithAnchors = new WeakSet();
 // 新版可视化可以用 after 明确声明“放在某个正文子节之后”。先按锚点归位，
 // 再填充正文占位符，避免模型输出顺序波动破坏阅读节奏。
@@ -109,21 +57,36 @@ for (const section of visual.sections || []) {
   });
 }
 
-let replacements = 0;
-const unresolved = [];
-for (const section of visual.sections || []) {
-  for (const block of section.blocks || []) {
-    if (block.type !== 'markdown') continue;
-    const key = String(block.content || '').trim();
-    if (!/^__(?:ABSTRACT|CH\d+_\d+)__$/.test(key)) continue;
-    if (!contentMap.has(key)) unresolved.push(key);
-    else {
-      block.content = contentMap.get(key);
-      replacements += 1;
-    }
-  }
+// 正文回填 + 图表闸门：委托仓库级 report-render 引擎（与独立技能同一实现）。
+// 引擎能力：章号自动识别（数字含前导零/中文序号/无编号 H2）、自适应粒度宽松回填（块数不齐时
+// 并入最后一个占位符，正文永不丢失，失配只警告不失败）、图表扁平 data 校验并组装 ECharts option。
+// 结构与证据校验仍在 pipeline-state.mjs 注册时 fail-fast；这里做渲染前兜底。
+const scriptDir = resolve(fileURLToPath(new URL('.', import.meta.url)));
+const renderEngineCandidates = [
+  resolve(scriptDir, '../../../../../skills/report-render/scripts/render-report.mjs'),
+  resolve(scriptDir, '../../report-render/scripts/render-report.mjs'),
+];
+const renderEnginePath = (await Promise.all(renderEngineCandidates.map((candidate) => access(candidate).then(() => candidate, () => null)))).find(Boolean);
+if (!renderEnginePath) throw new Error('缺少共享 report-render 引擎，请确认仓库级技能已部署');
+const { backfillAndGate, copyLibFiles } = await import(pathToFileURL(renderEnginePath).href);
+const renderSummary = await backfillAndGate(visual, markdown);
+const replacements = renderSummary.backfill.replacements;
+if (renderSummary.backfill.warnings.length) {
+  process.stdout.write(`警告：${renderSummary.backfill.warnings.join('；')}\n`);
 }
-if (unresolved.length) throw new Error(`无法填充正文占位符：${[...new Set(unresolved)].join(', ')}`);
+if (replacements) {
+  process.stdout.write(`正文回填：${replacements} 个占位符，并入 ${renderSummary.backfill.mergedPieces} 块，剥离 ${renderSummary.backfill.strippedTables} 个表格段\n`);
+}
+process.stdout.write(`图表校验：${renderSummary.charts.kept}/${renderSummary.charts.total} 张通过`);
+if (renderSummary.charts.dropped.length) {
+  process.stdout.write(`，已丢弃 ${renderSummary.charts.dropped.length} 张：\n`);
+  for (const dropped of renderSummary.charts.dropped) process.stdout.write(`  - 「${dropped.title}」：${dropped.errors.join('；')}\n`);
+} else {
+  process.stdout.write('\n');
+}
+if (renderSummary.charts.total && !renderSummary.charts.kept) {
+  process.stdout.write('警告：全部图表被丢弃，应退回 di-viz 按契约重做图表数据\n');
+}
 
 // 旧模型有时不输出占位符，而是复制整段正文，并把 Writer 自行生成的参考文献也
 // 塞进最后一个 markdown block。渲染层再次确定性裁切，保证正式参考文献只来自
@@ -251,6 +214,7 @@ const html = template
 
 if (/__(?:TITLE|VISUAL_REPORT_JSON|REFERENCES_JSON|PRINT_CSS)__/.test(html)) throw new Error('HTML 模板仍有未替换占位符');
 await writeFile(resolve(workspace, '30-report.html'), html, 'utf8');
+await copyLibFiles(workspace);
 await writeFile(resolve(workspace, '31-render-state.json'), `${JSON.stringify({
   schema_version: 1,
   generator: 'render-report.mjs',

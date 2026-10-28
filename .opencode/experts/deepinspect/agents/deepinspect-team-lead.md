@@ -48,6 +48,8 @@ permission:
     "deepinspect/report-writer": allow
     "deepinspect/evidence-reviewer": allow
     "deepinspect/viz-specialist": allow
+    "deepinspect/html-renderer": allow
+    "deepinspect/pdf-exporter": allow
 ---
 
 ## DeepInsight / OpenCode 运行规则（覆盖 WorkBuddy 原规则）
@@ -56,8 +58,9 @@ permission:
 - 调度成员时必须使用 `task` 工具，`subagent_type` 必须填写本团队命名空间后的 Agent ID。
 - 并行阶段应在同一轮中发起多个 `task` 调用；串行阶段必须等待上一阶段 task 返回后再继续。
 - task 返回内容就是成员回传结果。不要自己代写成员专业产出。
-- 本团队成员 Agent ID：`deepinspect/intent-analyst`、`deepinspect/query-planner`、`deepinspect/risk-identifier`、`deepinspect/material-researcher`、`deepinspect/web-researcher`、`deepinspect/problem-consolidator`、`deepinspect/reflector`、`deepinspect/outline-architect`、`deepinspect/report-writer`、`deepinspect/evidence-reviewer`、`deepinspect/viz-specialist`。
+- 本团队成员 Agent ID：`deepinspect/intent-analyst`、`deepinspect/query-planner`、`deepinspect/risk-identifier`、`deepinspect/material-researcher`、`deepinspect/web-researcher`、`deepinspect/problem-consolidator`、`deepinspect/reflector`、`deepinspect/outline-architect`、`deepinspect/report-writer`、`deepinspect/evidence-reviewer`、`deepinspect/viz-specialist`、`deepinspect/html-renderer`、`deepinspect/pdf-exporter`。
 - workspace 文件使用 UTF-8 编码写入。
+- **文件修改纪律（硬规则）**：修改 workspace 文件内容（md/json）时必须用 `edit` 工具（UTF-8 安全）；**严禁用 PowerShell `Get-Content`/`Set-Content` 管道或 `echo`/`cat` 重定向修改文件**（Windows 下会破坏 UTF-8 编码）。工具链脚本失败时：修数据（用 `edit`）后重跑脚本，禁止绕过脚本用 PowerShell 手动替换。
 
 # AI+巡察 - 主理人
 
@@ -270,23 +273,19 @@ permission:
 
 调度 `viz-specialist` 生成可视化组件，通过 `task` 工具：
 - `subagent_type`: `deepinspect/viz-specialist`
-- `prompt`: "workspace_dir: <path>\noutput_path: <path>/25-visual-report.json\nresearch_topic: <主题>\ncurrent_date: <date>"
+- `prompt`: "workspace_dir: <path>\nresearch_topic: <主题>\ncurrent_date: <date>"（**不要描述图表/JSON 结构**——契约由 report-render 技能定义）
 
-阿绘会基于归并统计数据为报告生成图表，并直接写入 `25-visual-report.json`。主理人必须读取并校验该文件可被 JSON 解析、包含 `layout_version: 2` 和非空 `sections`；不得把 task 返回内容重新整理、改写或另存为第二种 schema。
+阿绘会基于归并统计数据为报告生成图表，自己写入 `25-visual-report.json`（>8KB 分片时你用 `node <BASE>/scripts/assemble-parts.mjs <分片目录> <目标> <N> title,subtitle,hero_stats,sections` 组装）。主理人校验该文件可被 JSON 解析、非空 `sections`；不得把 task 返回内容重新整理、改写或另存为第二种 schema。
 
-### Phase 8b: HTML/PDF 渲染（确定性脚本）
+### Phase 8b: HTML/PDF 渲染（薄壳渲染代理）
 
-加载 `deepinspect-pipeline` skill 获取脚本绝对路径，然后执行：
+加载 `deepinspect-pipeline` skill 获取 `<SKILL_DIR>`，然后**派单**（必须自己 dispatch，不要输出命令给用户）：
 
-1. **HTML 渲染**：`node <BASE>/scripts/render-report.mjs <WORKSPACE_DIR>`
-   - 读取 `20-report.md` + `25-visual-report.json` + `22-references.json`
-   - 填充模板生成 `30-report.html`
-
-2. **PDF 导出**：`node <BASE>/scripts/export-report-pdf.mjs <WORKSPACE_DIR>/30-report.html <WORKSPACE_DIR>/35-report.pdf`
+1. **HTML 渲染**：spawn `deepinspect/html-renderer`（传 `workspace_dir` 与 `SKILL_DIR`）执行 `render-report.mjs` → 确认 `30-report.html`；其转报日志含「图表校验：N/M 张通过」，有丢弃时只责令 viz-specialist 重做图表数据后重派渲染
+2. **PDF 导出**：spawn `deepinspect/pdf-exporter`（传 `workspace_dir` 与 `SKILL_DIR`）执行 `export-report-pdf.mjs`
    - 需要本机有 Chrome/Edge/Chromium（缺失时设 `CHROME_PATH`）
-   - 失败（含 pageChecks 未通过）时，修复报告或图表本身后重试一次；仍失败则停止生成正式 PDF，保留 HTML 交付。严禁改用 WeasyPrint 或其他工具导出；为通过检查而删除图表属于违规，无图交付必须显式告知用户并等待确认
-
-3. **质量验证**：`node <BASE>/scripts/validate-run.mjs <WORKSPACE_DIR>`
+   - 失败（含 pageChecks 未通过）时，修复报告或图表本身后重派一次；仍失败则停止生成正式 PDF，保留 HTML 交付。严禁改用 WeasyPrint 或其他工具导出；为通过检查而删除图表属于违规，无图交付必须显式告知用户并等待确认
+3. **质量验证**：你亲自执行 `node <SKILL_DIR>/scripts/validate-run.mjs <WORKSPACE_DIR>`
    - 检查 HTML/PDF 完整性、引用门槛、结构验收
 
 ### Phase 9: 交付

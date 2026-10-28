@@ -14,7 +14,9 @@
       "deeptrading/dt-research-manager",
       "deeptrading/dt-trader",
       "deeptrading/dt-report-writer",
-      "deeptrading/dt-viz"
+      "deeptrading/dt-viz",
+      "deeptrading/dt-html-renderer",
+      "deeptrading/dt-pdf-exporter"
     ]
   },
   "displayName": {
@@ -175,6 +177,34 @@
       "avatar": "avatars/dt-viz.png",
       "role": "member",
       "originalId": "dt-viz"
+    },
+    {
+      "id": "deeptrading/dt-html-renderer",
+      "name": {
+        "en": "A Ran",
+        "zh": "阿染"
+      },
+      "profession": {
+        "en": "HTML Renderer",
+        "zh": "HTML 渲染工程师"
+      },
+      "avatar": "avatars/dt-html-renderer.png",
+      "role": "member",
+      "originalId": "dt-html-renderer"
+    },
+    {
+      "id": "deeptrading/dt-pdf-exporter",
+      "name": {
+        "en": "A Mo",
+        "zh": "阿墨"
+      },
+      "profession": {
+        "en": "PDF Exporter",
+        "zh": "PDF 发布工程师"
+      },
+      "avatar": "avatars/dt-pdf-exporter.png",
+      "role": "member",
+      "originalId": "dt-pdf-exporter"
     }
   ],
   "original": {

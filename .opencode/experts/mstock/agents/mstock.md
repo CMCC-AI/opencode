@@ -37,6 +37,7 @@ permission:
 - 后处理脚本打包在 **`mstock-scripts` skill** 中（4 个 Python 3 脚本 + HTML 模板）。**首次需要跑脚本前，先用 `skill` 工具加载 `mstock-scripts`**——工具返回里含 `Base directory for this skill` 与各脚本绝对路径，之后一律用该绝对路径执行（下文命令中的 `<BASE>` 即此目录）。Windows 用 `python`，Linux/macOS 用 `python3`。
 - 若 skill 工具报 `mstock-scripts` not found，说明运行环境未部署该 skill：告知用户"多股对比脚本未安装，请联系管理员部署 mstock-scripts skill"，不要尝试手工重写脚本逻辑。
 - 所有 `write` 写入的文件（`.md`、`.html`、`.json`）使用 **UTF-8（无 BOM）** 编码。脚本读写文件时已显式指定编码（读取用 `utf-8-sig`，兼容历史 BOM 文件），无需任何 BOM 处理。
+- **文件修改纪律（硬规则）**：修改 workspace 文件内容（md/json）时必须用 `edit` 工具（UTF-8 安全）；**严禁用 PowerShell `Get-Content`/`Set-Content` 管道或 `echo`/`cat` 重定向修改文件**（Windows 下会破坏 UTF-8 编码）。工具链脚本失败时：修数据（用 `edit`）后重跑脚本，禁止绕过脚本用 PowerShell 手动替换。
 
 # 免责声明（必须遵守）
 
@@ -214,7 +215,7 @@ ms-report-writer 会读 `10-comparison-matrix.md` + `01-sources.json`，撰写�
 
 ## 阶段 3：多股横评可视化（ms-visualizer）
 
-用 Task 调用 `ms-visualizer`：
+用 Task 调用 `ms-visualizer`（task prompt 只传 `workspace_dir`，**不要描述图表/JSON 结构**——契约由 report-render 技能定义）：
 
 ```
 Task(subagent_type="mstock/ms-visualizer",
@@ -222,7 +223,7 @@ Task(subagent_type="mstock/ms-visualizer",
      prompt="workspace_dir: <WORKSPACE_DIR>")
 ```
 
-ms-visualizer 会读 `20-comparison-report.md`，生成结构化 JSON（七章 sections + chart/stat_grid/table/progress_bar/timeline 等横评 block），写入 `30-visual-report.json`。
+ms-visualizer 会读 `20-comparison-report.md`，自己写入 `30-visual-report.json`（>8KB 分片时你用 `node "$SKILL_DIR/scripts/assemble-parts.mjs" <分片目录> <目标> <N> title,subtitle,hero_stats,sections` 组装）。
 
 **核验**：
 - `30-visual-report.json` 可解析为合法 JSON
@@ -244,50 +245,23 @@ python3 <BASE>/scripts/inject_meta.py <WORKSPACE_DIR>
 
 脚本输出 `Injected topic: <标的列表>` 确认成功。
 
-### 4.2 图表闸门（渲染 HTML 前必须执行）
+### 4.2 用引擎渲染 HTML（薄壳渲染代理）
 
-ms-visualizer 的 chart block 只产扁平 `data`，由统一 chart-builder 校验并组装 ECharts option（多股横评紫色系色板自动固定）。校验失败的图表整块丢弃并在日志报出标题与原因——出现丢弃时责令 ms-visualizer 重做**图表数据**后重跑本步，无需重写正文。
+加载 `mstock-scripts` skill 获取 `<SKILL_DIR>` 后，spawn `mstock/ms-html-renderer`（传 `workspace_dir` 与 `SKILL_DIR`）执行 `node "$SKILL_DIR/scripts/render-report.mjs" <workspace_dir>`（**必须自己派单，不要输出命令给用户**）：
+- 渲染代理回转的日志含「正文回填 N 个占位符」「图表校验：N/M 张通过」；有丢弃时责令 ms-visualizer 重做图表数据后重派渲染，正文块无需重做
+- 确认其回报 `40-comparison-report.html` 完成后再进入 4.3
 
-```bash
-node <BASE>/scripts/build-charts.mjs <WORKSPACE_DIR>
-```
-
-脚本输出 `图表校验：N/M 张通过` 确认成功（有丢弃时会列出每张的原因）。
-
-### 4.3 用模板渲染 HTML
-
-HTML 模板在 `.opencode/templates/report.html.tpl`，内嵌 CSS + marked.js + ECharts CDN，含 `__TITLE__`、`__VISUAL_REPORT_JSON__`、`__REFERENCES_JSON__` 三个**模板占位符**。
-
-**⚠️ 正文占位符回填（必须做，否则 HTML 出现裸 `__CH一_1__`）**：ms-visualizer 的 markdown block 只放 `__CH{章}_{M}__` 正文占位符（防止 JSON 超长截断，约定见 `ms-visualizer.md`）。渲染前必须用 `20-comparison-report.md` 的对应正文把它们替换掉。回填规则（已固化在 `.opencode/scripts/render_html.py`）：
-1. 按"一…七"切分七章（章首锚点 `^## 一、` … `^## 七、`；章尾取到下一章首 / 免责声明 / 引用来源 / 文末中最早出现者）。
-2. 每章剔除：章标题行、`### 表 X` 表题块、`|` 表格行块（这些已由 table/stat_grid block 单独渲染，不进正文）。
-3. 剩余叙述段落按出现顺序，填入该章的占位符（按 M 升序）：段落数 > 占位符数时，多余段落并入最后一个占位符；段落数 < 占位符数时，多余占位符填空串。
-4. 最后清扫：任何残留 `__CH..__` 一律替换为空串，确保不泄漏裸 token。
-5. 填充文本需做 JSON 字符串转义（`\`→`\\`、`"`→`\"`、换行→`\n`）。
-
-**渲染命令**（`<WORKSPACE_DIR>` 替换实际路径）：
-
-```bash
-python3 <BASE>/scripts/render_html.py <WORKSPACE_DIR>
-```
-
-脚本依次完成：读模板（自动定位 `<BASE>/templates/report.html.tpl`）→ 回填正文占位符 → 清扫残留 token → 注入 `__TITLE__` / `__VISUAL_REPORT_JSON__` / `__REFERENCES_JSON__`（对比报告用空数组）→ 写出 `40-comparison-report.html`，输出 `HTML report: <路径> (<大小> bytes)`。
-
-### 4.4 验证
+### 4.3 验证
 
 用 `read` 工具抽查 `40-comparison-report.html`：
 - 开头 `<!DOCTYPE html>`，`<title>` 含"对比"
 - `<script id="visual-report-data">` 内是合法 JSON
 - 文件末尾 `</html>`
-- **全文搜索 `__CH` 应 0 命中**（占位符已全部回填为正文；若仍有命中，说明 4.2 回填步骤未执行或 `20-comparison-report.md` 缺失，需重跑渲染）
+- **全文搜索 `__CH` 应 0 命中**（占位符已由引擎回填；若仍有命中，说明 `20-comparison-report.md` 缺失，需重跑渲染）
 
 ### 4.5 导出 A4 PDF
 
-HTML 验证通过后导出 PDF（与其他专家团统一使用仓库级 `report-pdf` 共享导出器）：
-
-```bash
-node <BASE>/scripts/export-report-pdf.mjs <WORKSPACE_DIR>/40-comparison-report.html <WORKSPACE_DIR>/45-comparison-report.pdf
-```
+HTML 验证通过后，spawn `mstock/ms-pdf-exporter`（传 `workspace_dir` 与 `SKILL_DIR`）执行 `export-report-pdf.mjs` 导出 `45-comparison-report.pdf`（**必须自己派单，不要输出命令给用户**；需本机有 Chrome/Edge/Chromium）。
 
 脚本通过 CDP 控制无头 Chrome/Edge/Chromium，注入并校验中文字体，等待 ECharts 图表渲染完成后打印 A4 PDF（需本机有 Chrome/Edge/Chromium，缺失时用 `CHROME_PATH` 环境变量指定）。
 
