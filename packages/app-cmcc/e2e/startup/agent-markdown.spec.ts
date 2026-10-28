@@ -8,6 +8,7 @@ import { setupHomePage, homeDirectory } from "./home-fixture"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { previewFiles } from "./preview-files.fixture"
+import { htmlReportFixture, htmlReportPreview, serveReportRuntime } from "./html-report.fixture"
 
 test.use({ locale: "zh-CN" })
 const baseline = process.env.MARKDOWN_PHASE === "before"
@@ -258,6 +259,88 @@ async function clipboardText(page: Page) {
 }
 
 for (const team of teams) {
+  for (const width of team.id === "deepinsight" ? [1440, 390] : [1440]) {
+    test(`${team.id} renders isolated HTML headings, tables, formulas and charts without CDN at ${width}`, async ({
+      page,
+      baseURL,
+    }, info) => {
+      await page.setViewportSize({ width, height: 1000 })
+      const data = await prepare(page, team)
+      const html = await htmlReportFixture()
+      const answer = data.transcripts.get(data.root.id)![1]
+      const write = answer.parts.find((part) => part.type === "tool")!
+      if (write.type !== "tool" || write.state.status !== "completed") throw new Error("Missing report write fixture")
+      answer.parts.push({
+        ...write,
+        id: "write-html",
+        callID: "write-html",
+        state: {
+          ...write.state,
+          input: { filePath: `${homeDirectory}/runs/markdown-style/report.html`, content: html },
+        },
+      })
+      const runtimeRequests: string[] = []
+      const externalRequests: string[] = []
+      const runtimeDiagnostics: string[] = []
+      page.on("console", (message) => {
+        if (message.type() === "error") runtimeDiagnostics.push(message.text())
+      })
+      page.on("requestfailed", (request) =>
+        runtimeDiagnostics.push(`${request.url()}: ${request.failure()?.errorText}`),
+      )
+      page.on("response", (response) => {
+        if (response.url().includes("/assets/report-runtime-"))
+          runtimeDiagnostics.push(`${response.status()}: ${response.headers()["content-type"]}`)
+      })
+      page.on("request", (request) => {
+        if (/\/assets\/report-runtime-/.test(request.url())) runtimeRequests.push(request.url())
+        if (/cdn\.jsdelivr\.net|cdnjs|unpkg/.test(request.url())) externalRequests.push(request.url())
+      })
+      await serveReportRuntime(page)
+      await page.route("**/file/preview?*", (route) => route.fulfill(htmlReportPreview(html, route.request().url())))
+      await page.route("**/file/download?*", (route) =>
+        route.fulfill({ contentType: "application/octet-stream", body: html }),
+      )
+      await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+      await narrow(page, width)
+      if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+      await expect(page.getByRole("button", { name: "可视化报告", exact: true })).toBeVisible()
+      expect(runtimeRequests).toEqual([])
+      await page.getByRole("button", { name: "可视化报告", exact: true }).click()
+      const report = page.frameLocator("iframe")
+      const heading = report.getByRole("heading", { name: /^1\.1 / }).first()
+      await expect(heading)
+        .toBeVisible()
+        .catch(async (error) => {
+          await info.attach("html-report-diagnostics", {
+            body: JSON.stringify({ errors: data.errors, runtimeRequests, runtimeDiagnostics }),
+            contentType: "application/json",
+          })
+          throw error
+        })
+      await expect.poll(() => report.locator(".katex").count()).toBeGreaterThan(1)
+      await expect.poll(() => report.locator(".block-markdown table").count()).toBeGreaterThan(0)
+      await expect(report.locator(".chart-canvas svg").first()).toBeVisible()
+      await expect(page.locator("iframe")).toHaveAttribute("sandbox", "allow-scripts")
+      expect(externalRequests).toEqual([])
+      expect(runtimeRequests.length).toBeGreaterThan(0)
+      if (!process.env.CMCC_HTML_REPORT_FIXTURE) {
+        await expect(report.locator(".block-markdown pre code")).toContainText("$$not-a-formula$$")
+        await expect(report.locator(".block-markdown pre .katex")).toHaveCount(0)
+        await expect(report.locator(".block-markdown")).toContainText("Cost $100-$200")
+      }
+      await heading.scrollIntoViewIfNeeded()
+      await page.screenshot({ path: info.outputPath("html-report-math.png") })
+      await report.locator(".katex").first().scrollIntoViewIfNeeded()
+      await expect(report.locator(".katex").first()).toBeVisible()
+      await page.screenshot({ path: info.outputPath("html-report-formula.png") })
+      const download = page.waitForEvent("download")
+      await page.getByRole("button", { name: "下载", exact: true }).click()
+      expect(await readFile((await (await download).path())!, "utf8")).toBe(html)
+      expect(data.errors).toEqual([])
+    })
+  }
+
   test(`${team.id} separates text reports from HTML and PDF reports`, async ({ page, baseURL }, info) => {
     const data = await prepare(page, team)
     const answer = data.transcripts.get(data.root.id)![1]

@@ -37,6 +37,7 @@ export function ResearchResultView(props: {
   onNew: () => void
   onSame: () => void
   onStop: () => void
+  onStart: () => void
   onEdit: () => void
   onMarkdown: () => void
   onPdf: () => void
@@ -712,9 +713,27 @@ export function ResearchResultView(props: {
           when={!props.readOnly && !view.replaying && (running() || (interrupted() && !!data().pendingInterrupt))}
           fallback={
             <Show when={!view.replaying}>
-              <div class="session-ended-bar" onClick={props.onNew}>
-                <span>当前会话已结束，可点创建任务开始新的会话。</span>
-                <button class="new-btn" title="创建新任务" onClick={props.onNew}>
+              <div
+                class="session-ended-bar"
+                onClick={() =>
+                  !props.readOnly && props.detail.session.status === "pending" ? props.onStart() : props.onNew()
+                }
+              >
+                <span>
+                  {!props.readOnly && props.detail.session.status === "pending"
+                    ? "任务尚未开始，可重新检查额度后开始研究。"
+                    : "当前会话已结束，可点创建任务开始新的会话。"}
+                </span>
+                <button
+                  class="new-btn"
+                  disabled={props.busy}
+                  title={!props.readOnly && props.detail.session.status === "pending" ? "开始研究" : "创建新任务"}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    if (!props.readOnly && props.detail.session.status === "pending") props.onStart()
+                    else props.onNew()
+                  }}
+                >
                   <img src={sendIcon} width="14" height="14" alt="" />
                 </button>
               </div>

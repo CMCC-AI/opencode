@@ -34,6 +34,9 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/LL
 
 const BODY_LIMIT = 16_384
 const MAX_RETRIES = 2
+export const RetryLimit = Context.Reference<number>("@opencode/LLM/RequestExecutor/RetryLimit", {
+  defaultValue: () => MAX_RETRIES,
+})
 const BASE_DELAY_MS = 500
 const MAX_DELAY_MS = 10_000
 const REDACTED = "<redacted>"
@@ -375,7 +378,7 @@ export const layer: Layer.Layer<Service, never, HttpClient.HttpClient> = Layer.e
           .pipe(Effect.mapError(toHttpError(redactedNames)), Effect.flatMap(statusError(request, redactedNames)))
       })
     return Service.of({
-      execute: (request) => retryStatusFailures(executeOnce(request)),
+      execute: (request) => Effect.flatMap(RetryLimit, (retries) => retryStatusFailures(executeOnce(request), retries)),
     })
   }),
 )

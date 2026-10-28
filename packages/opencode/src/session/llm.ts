@@ -29,6 +29,8 @@ import * as OtelTracer from "@effect/opentelemetry/Tracer"
 import { LLMAISDK } from "./llm/ai-sdk"
 import { LLMNativeRuntime } from "./llm/native-runtime"
 import { LLMRequestPrep } from "./llm/request"
+import { TokenQuota } from "@opencode-ai/core/token-quota/client"
+import { RequestExecutor } from "@opencode-ai/llm/route"
 
 export const OUTPUT_TOKEN_MAX = ProviderTransform.OUTPUT_TOKEN_MAX
 
@@ -70,6 +72,7 @@ const live: Layer.Layer<
   | EventV2Bridge.Service
   | LLMClientService
   | RuntimeFlags.Service
+  | TokenQuota.Service
 > = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -81,6 +84,7 @@ const live: Layer.Layer<
     const events = yield* EventV2Bridge.Service
     const llmClient = yield* LLMClient.Service
     const flags = yield* RuntimeFlags.Service
+    const quota = yield* TokenQuota.Service
 
     const run = Effect.fn("LLM.run")(function* (input: StreamRequest) {
       yield* Effect.logInfo("stream", {
@@ -111,6 +115,30 @@ const live: Layer.Layer<
         flags,
         isWorkflow,
       })
+      const quotaInput = quota.enabled
+        ? yield* Effect.promise(async () => {
+            const { asSchema } = await import("ai")
+            return {
+              messages: prepared.messages,
+              system: prepared.messages.some((message) => message.role === "system") ? undefined : prepared.system,
+              tools: await Promise.all(
+                Object.entries(prepared.tools).map(async ([name, tool]) => ({
+                  name,
+                  description: tool.description,
+                  parameters: tool.inputSchema === undefined ? undefined : await asSchema(tool.inputSchema).jsonSchema,
+                })),
+              ),
+            }
+          })
+        : undefined
+      const lease = yield* quota.open({
+        sessionID: input.sessionID,
+        providerID: input.model.providerID,
+        modelID: input.model.id,
+        input: quotaInput,
+        maxOutputTokens: prepared.params.maxOutputTokens,
+      })
+      const maxOutputTokens = lease?.maxOutputTokens ?? prepared.params.maxOutputTokens
 
       // Wire up toolExecutor for DWS workflow models so that tool calls
       // from the workflow service are executed via opencode's tool system
@@ -223,6 +251,7 @@ const live: Layer.Layer<
 
       // Runtime seam: native is an opt-in adapter over @opencode-ai/llm. It
       // either returns a ready LLMEvent stream or a concrete fallback reason.
+      if (lease) yield* lease.dispatch
       if (flags.experimentalNativeLlm) {
         const native = LLMNativeRuntime.stream({
           model: input.model,
@@ -235,7 +264,7 @@ const live: Layer.Layer<
           temperature: prepared.params.temperature,
           topP: prepared.params.topP,
           topK: prepared.params.topK,
-          maxOutputTokens: prepared.params.maxOutputTokens,
+          maxOutputTokens,
           providerOptions: prepared.params.options,
           headers: prepared.headers,
           abort: input.abort,
@@ -249,6 +278,7 @@ const live: Layer.Layer<
           return {
             type: "native" as const,
             stream: native.stream,
+            lease,
           }
         }
         yield* Effect.logInfo("llm runtime selected", {
@@ -277,6 +307,7 @@ const live: Layer.Layer<
       // LLMAISDK.toLLMEvents below normalizes fullStream parts for the processor.
       return {
         type: "ai-sdk" as const,
+        lease,
         result: streamText({
           onError(error) {
             bridge.fork(
@@ -317,10 +348,10 @@ const live: Layer.Layer<
           activeTools: Object.keys(prepared.tools).filter((x) => x !== "invalid"),
           tools: prepared.tools,
           toolChoice: input.toolChoice,
-          maxOutputTokens: prepared.params.maxOutputTokens,
+          maxOutputTokens,
           abortSignal: input.abort,
           headers: prepared.headers,
-          maxRetries: input.retries ?? 0,
+          maxRetries: quota.enabled ? 0 : (input.retries ?? 0),
           messages: prepared.messages,
           model: wrapLanguageModel({
             model: language,
@@ -365,7 +396,10 @@ const live: Layer.Layer<
 
             const result = yield* run({ ...input, abort: ctrl.signal })
 
-            if (result.type === "native") return result.stream
+            if (result.type === "native") {
+              const source = result.stream.pipe(Stream.tap((event) => Effect.sync(() => result.lease?.observe(event))))
+              return result.lease ? source.pipe(Stream.provideService(RequestExecutor.RetryLimit, 0)) : source
+            }
 
             // Adapter seam: both runtimes expose the same LLMEvent stream. Native
             // already returns one; AI SDK streams are converted here.
@@ -375,6 +409,7 @@ const live: Layer.Layer<
             ).pipe(
               Stream.mapEffect((event) => LLMAISDK.toLLMEvents(state, event)),
               Stream.flatMap((events) => Stream.fromIterable(events)),
+              Stream.tap((event) => Effect.sync(() => result.lease?.observe(event))),
             )
           }),
         ),
@@ -398,6 +433,7 @@ export const node = LayerNode.make({
     EventV2Bridge.node,
     llmClient,
     RuntimeFlags.node,
+    TokenQuota.node,
   ],
 })
 

@@ -43,6 +43,7 @@ import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.optimized.webp"
 import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
+import { NewSessionLoading } from "@/components/session/session-new-design-view"
 
 const SIDEBAR_MIN_WIDTH = 280
 const SIDEBAR_MAX_WIDTH = 420
@@ -146,7 +147,15 @@ export default function NewLayout(props: ParentProps) {
             </defs>
           </svg>
           <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
-            <Suspense>{props.children}</Suspense>
+            <Suspense
+              fallback={
+                <Show when={location.pathname === "/app" || location.pathname === "/new-session"}>
+                  <NewSessionLoading />
+                </Show>
+              }
+            >
+              {props.children}
+            </Suspense>
             <Show when={persistentViews.deepXivMounted}>
               <CmccDeepXivFrame active={isDeepXivPath(location.pathname)} />
             </Show>

@@ -37,6 +37,7 @@ import {
 } from "../groups/session"
 import { PermissionNotFoundError } from "../errors"
 import * as SessionError from "./session-errors"
+import { TokenQuota } from "@opencode-ai/core/token-quota/client"
 
 const tryParseJson = (text: string) =>
   Effect.try({
@@ -59,6 +60,18 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const summary = yield* SessionSummary.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
+    const quota = yield* TokenQuota.Service
+    const currentUser = Effect.gen(function* () {
+      if (!quota.enabled) return undefined
+      const request = yield* HttpServerRequest.HttpServerRequest
+      return yield* quota.identity(request.headers).pipe(Effect.mapError(() => new HttpApiError.Unauthorized({})))
+    })
+    const bindCurrentUser = (sessionID: string, fresh = false) =>
+      Effect.gen(function* () {
+        const user = yield* currentUser
+        if (user !== undefined)
+          yield* quota.bind(sessionID, user, fresh).pipe(Effect.mapError(() => new HttpApiError.Unauthorized({})))
+      })
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
       return yield* session.list({
@@ -154,7 +167,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     })
 
     const create = Effect.fn("SessionHttpApi.create")(function* (ctx: { payload?: Session.CreateInput }) {
-      return yield* shareSvc.create(ctx.payload)
+      const user = yield* currentUser
+      if (ctx.payload?.parentID) yield* bindCurrentUser(ctx.payload.parentID)
+      const created = yield* shareSvc.create(ctx.payload)
+      if (user !== undefined)
+        yield* quota.bind(created.id, user, true).pipe(Effect.mapError(() => new HttpApiError.Unauthorized({})))
+      return created
     })
 
     const createRaw = Effect.fn("SessionHttpApi.createRaw")(function* (ctx: {
@@ -208,12 +226,15 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       params: { sessionID: SessionID }
       payload?: typeof ForkPayload.Type
     }) {
-      return yield* SessionError.mapStorageNotFound(
+      yield* bindCurrentUser(ctx.params.sessionID)
+      const forked = yield* SessionError.mapStorageNotFound(
         session.fork({
           sessionID: ctx.params.sessionID,
           messageID: ctx.payload?.messageID,
         }),
       )
+      yield* bindCurrentUser(forked.id, true)
+      return forked
     })
 
     const forkRaw = Effect.fn("SessionHttpApi.forkRaw")(function* (ctx: {
@@ -240,6 +261,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       payload: typeof InitPayload.Type
     }) {
       yield* requireSession(ctx.params.sessionID)
+      yield* bindCurrentUser(ctx.params.sessionID)
       yield* promptSvc
         .command({
           sessionID: ctx.params.sessionID,
@@ -275,6 +297,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       params: { sessionID: SessionID }
       payload: typeof SummarizePayload.Type
     }) {
+      yield* bindCurrentUser(ctx.params.sessionID)
       yield* revertSvc.cleanup(yield* requireSession(ctx.params.sessionID))
       const messages = yield* SessionError.mapStorageNotFound(session.messages({ sessionID: ctx.params.sessionID }))
       const defaultAgent = yield* agentSvc.defaultAgent()
@@ -298,6 +321,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       payload: typeof PromptPayload.Type
     }) {
       yield* requireSession(ctx.params.sessionID)
+      yield* bindCurrentUser(ctx.params.sessionID)
       const message = yield* promptSvc
         .prompt({
           ...ctx.payload,
@@ -314,6 +338,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       payload: typeof PromptPayload.Type
     }) {
       yield* requireSession(ctx.params.sessionID)
+      yield* bindCurrentUser(ctx.params.sessionID)
       yield* promptSvc.prompt({ ...ctx.payload, sessionID: ctx.params.sessionID }).pipe(
         Effect.catchCause((cause) =>
           Effect.gen(function* () {
@@ -334,6 +359,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       payload: typeof CommandPayload.Type
     }) {
       yield* requireSession(ctx.params.sessionID)
+      yield* bindCurrentUser(ctx.params.sessionID)
       return yield* promptSvc
         .command({ ...ctx.payload, sessionID: ctx.params.sessionID })
         .pipe(Effect.mapError(() => new HttpApiError.BadRequest({})))

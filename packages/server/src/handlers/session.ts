@@ -12,6 +12,9 @@ import {
   UnknownError,
 } from "@opencode-ai/protocol/errors"
 import { AbsolutePath } from "@opencode-ai/core/schema"
+import { TokenQuota } from "@opencode-ai/core/token-quota/client"
+import { HttpServerRequest } from "effect/unstable/http"
+import { UnauthorizedError } from "@opencode-ai/protocol/errors"
 
 const DefaultSessionsLimit = 50
 const DefaultSessionHistoryLimit = 50
@@ -19,6 +22,22 @@ const DefaultSessionHistoryLimit = 50
 export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handlers) =>
   Effect.gen(function* () {
     const session = yield* SessionV2.Service
+    const quota = yield* TokenQuota.Service
+    const currentUser = Effect.gen(function* () {
+      if (!quota.enabled) return undefined
+      const request = yield* HttpServerRequest.HttpServerRequest
+      return yield* quota
+        .identity(request.headers)
+        .pipe(Effect.mapError((error) => new UnauthorizedError({ message: error.reason.message })))
+    })
+    const bind = (id: string, fresh = false) =>
+      Effect.gen(function* () {
+        const user = yield* currentUser
+        if (user !== undefined)
+          yield* quota
+            .bind(id, user, fresh)
+            .pipe(Effect.mapError((error) => new UnauthorizedError({ message: error.reason.message })))
+      })
 
     return handlers
       .handle(
@@ -67,13 +86,30 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.create",
         Effect.fn(function* (ctx) {
+          const user = yield* currentUser
+          const existing =
+            quota.enabled && ctx.payload.id
+              ? yield* session
+                  .get(ctx.payload.id)
+                  .pipe(Effect.catchTag("Session.NotFoundError", () => Effect.succeed(undefined)))
+              : undefined
+          if (existing) yield* bind(existing.id)
+          if (!existing && ctx.payload.id && user !== undefined)
+            yield* quota
+              .bind(ctx.payload.id, user, true)
+              .pipe(Effect.mapError((error) => new UnauthorizedError({ message: error.reason.message })))
+          const created = yield* session.create({
+            id: ctx.payload.id,
+            agent: ctx.payload.agent,
+            model: ctx.payload.model,
+            location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) },
+          })
+          if (user !== undefined)
+            yield* quota
+              .bind(created.id, user, !existing)
+              .pipe(Effect.mapError((error) => new UnauthorizedError({ message: error.reason.message })))
           return {
-            data: yield* session.create({
-              id: ctx.payload.id,
-              agent: ctx.payload.agent,
-              model: ctx.payload.model,
-              location: ctx.payload.location ?? { directory: AbsolutePath.make(process.cwd()) },
-            }),
+            data: created,
           }
         }),
       )
@@ -139,6 +175,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.prompt",
         Effect.fn(function* (ctx) {
+          yield* bind(ctx.params.sessionID)
           return {
             data: yield* session
               .prompt({
@@ -172,6 +209,7 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
       .handle(
         "session.compact",
         Effect.fn(function* (ctx) {
+          yield* bind(ctx.params.sessionID)
           yield* session.compact({ sessionID: ctx.params.sessionID }).pipe(
             Effect.catchTag("Session.NotFoundError", (error) =>
               Effect.fail(

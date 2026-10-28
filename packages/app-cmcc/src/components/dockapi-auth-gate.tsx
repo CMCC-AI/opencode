@@ -1,11 +1,24 @@
 import loginBackground from "@/assets/auth/login-bg.optimized.webp"
 import { AppLoading } from "@/components/app-loading"
 import { DockApiError, useDockApi } from "@/context/dockapi"
-import { Show, type ParentProps } from "solid-js"
+import { createEffect, onCleanup, Show, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
+import { prefetchHome } from "@/utils/home-prefetch"
 
 export function DockApiAuthGate(props: ParentProps) {
   const dockapi = useDockApi()
+  createEffect(() => {
+    if (dockapi.status !== "unauthenticated") return
+    // Only load static code here; authenticated data starts after the login gate.
+    const preload = () => prefetchHome()
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(preload, { timeout: 1500 })
+      onCleanup(() => cancelIdleCallback(id))
+      return
+    }
+    const id = setTimeout(preload, 0)
+    onCleanup(() => clearTimeout(id))
+  })
   const [form, setForm] = createStore({
     mode: "login" as "login" | "register",
     name: "",
@@ -37,7 +50,8 @@ export function DockApiAuthGate(props: ParentProps) {
   return (
     <Show when={dockapi.status !== "loading"} fallback={<AppLoading />}>
       <Show
-        when={dockapi.status === "authenticated" && dockapi.workspace}
+        when={dockapi.status === "authenticated" && dockapi.workspace && dockapi.user?.id}
+        keyed
         fallback={
           <main class="fixed inset-0 flex items-center justify-end overflow-hidden max-lg:justify-center">
             <img class="absolute inset-0 size-full object-cover" src={loginBackground} alt="" />

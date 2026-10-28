@@ -1,5 +1,5 @@
 import { FSUtil } from "@opencode-ai/core/fs-util"
-import { Effect, Stream } from "effect"
+import { Effect, Option, Stream } from "effect"
 import { HttpBody, HttpClient, HttpClientRequest, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { createHash } from "node:crypto"
 import { ProxyUtil } from "../proxy-util"
@@ -111,7 +111,10 @@ export function serveEmbeddedUIEffect(
   embeddedWebUI: Record<string, string>,
   options?: { method?: string; ifNoneMatch?: string },
 ) {
-  const requestedKey = requestPath.replace(/^\//, "")
+  // URLs encode non-ASCII asset names; the embedded manifest keeps the original filenames.
+  const decoded = Option.liftThrowable(decodeURIComponent)(requestPath)
+  if (Option.isNone(decoded)) return Effect.succeed(notFound())
+  const requestedKey = decoded.value.replace(/^\//, "")
   const requestedFile = embeddedWebUI[requestedKey]
   const key = requestedFile ? requestedKey : "index.html"
   const file = requestedFile ?? embeddedWebUI[key] ?? null

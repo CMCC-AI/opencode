@@ -12,6 +12,7 @@ import { useGlobal } from "./global"
 import { ServerScope } from "@/utils/server-scope"
 import { useDockApi } from "./dockapi"
 import { pathKey } from "@/utils/path-key"
+import { dockApiServerFetch } from "@/utils/dockapi-server-fetch"
 
 const isAbortError = (error: unknown) =>
   error !== null && typeof error === "object" && "name" in error && error.name === "AbortError"
@@ -84,6 +85,14 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
   const defaultDirectory = dockapi.workspace?.directoryPath
   if (!defaultDirectory) throw new Error("DockAPI workspace is unavailable")
   const abort = new AbortController()
+  const authenticatedFetch = (base?: typeof fetch) =>
+    dockApiServerFetch({
+      origin: server.http.url,
+      token: () => dockapi.state.accessToken,
+      user: () => dockapi.user?.id,
+      refresh: dockapi.auth.refresh,
+      fetch: base,
+    })
 
   const eventFetch = (() => {
     if (!platform.fetch || !server) return
@@ -98,7 +107,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
 
   const eventSdk = createSdkForServer({
     signal: abort.signal,
-    fetch: eventFetch,
+    fetch: authenticatedFetch(eventFetch),
     server: server.http,
   })
   const emitter = createGlobalEmitter<{
@@ -305,7 +314,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
 
   const sdk = createSdkForServer({
     server: server.http,
-    fetch: platform.fetch,
+    fetch: authenticatedFetch(platform.fetch),
     throwOnError: true,
   })
 
@@ -323,7 +332,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     createClient(opts: Omit<Parameters<typeof createSdkForServer>[0], "server" | "fetch">) {
       return createSdkForServer({
         server: server.http,
-        fetch: platform.fetch,
+        fetch: authenticatedFetch(platform.fetch),
         ...opts,
       })
     },

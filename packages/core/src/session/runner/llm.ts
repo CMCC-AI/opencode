@@ -38,6 +38,8 @@ import { MAX_STEPS_PROMPT } from "./max-steps"
 import { Snapshot } from "../../snapshot"
 import { makeLocationNode } from "../../effect/app-node"
 import { llmClient } from "../../effect/app-node-platform"
+import { TokenQuota } from "../../token-quota/client"
+import { RequestExecutor } from "@opencode-ai/llm/route"
 
 /**
  * Runs one durable coding-agent Session until it settles.
@@ -94,6 +96,7 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const events = yield* EventV2.Service
     const llm = yield* LLMClient.Service
+    const quota = yield* TokenQuota.Service
     const agents = yield* AgentV2.Service
     const tools = yield* ToolRegistry.Service
     const models = yield* SessionRunnerModel.Service
@@ -105,7 +108,34 @@ const layer = Layer.effect(
     const config = yield* Config.Service
     const snapshots = yield* Snapshot.Service
     const db = (yield* Database.Service).db
-    const compaction = SessionCompaction.make({ events, llm, config: yield* config.entries() })
+    const metered = (sessionID: SessionSchema.ID, request: Parameters<typeof llm.stream>[0]) =>
+      Stream.scoped(
+        Stream.unwrap(
+          Effect.gen(function* () {
+            const lease = yield* quota.open({
+              sessionID,
+              providerID: request.model.provider,
+              modelID: request.model.id,
+              input: { system: request.system, messages: request.messages, tools: request.tools },
+              maxOutputTokens:
+                request.generation?.maxTokens ??
+                request.model.route.defaults.generation?.maxTokens ??
+                request.model.route.defaults.limits?.output,
+            })
+            if (lease) yield* lease.dispatch
+            const effective = lease
+              ? LLM.request({ ...request, generation: { ...request.generation, maxTokens: lease.maxOutputTokens } })
+              : request
+            const source = llm.stream(effective).pipe(Stream.tap((event) => Effect.sync(() => lease?.observe(event))))
+            return lease ? source.pipe(Stream.provideService(RequestExecutor.RetryLimit, 0)) : source
+          }),
+        ),
+      )
+    const compaction = SessionCompaction.make({
+      events,
+      llm: { stream: (request, sessionID) => metered(sessionID, request) },
+      config: yield* config.entries(),
+    })
     const getSession = Effect.fn("SessionRunner.getSession")(function* (sessionID: SessionSchema.ID) {
       const session = yield* store.get(sessionID)
       if (!session) return yield* Effect.die(`Session not found: ${sessionID}`)
@@ -224,7 +254,7 @@ const layer = Layer.effect(
       const publish = (event: LLMEvent, outputPaths: ReadonlyArray<string> = []) =>
         withPublication(publisher.publish(event, outputPaths))
       let overflowFailure: ProviderErrorEvent | undefined
-      const providerStream = llm.stream(request).pipe(
+      const providerStream = metered(session.id, request).pipe(
         Stream.runForEach((event) =>
           Effect.gen(function* () {
             if (overflowFailure || publisher.hasProviderError()) return
@@ -412,6 +442,7 @@ export const node = makeLocationNode({
   deps: [
     EventV2.node,
     llmClient,
+    TokenQuota.node,
     AgentV2.node,
     ToolRegistry.node,
     SessionRunnerModel.node,

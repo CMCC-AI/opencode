@@ -124,6 +124,18 @@ async function prepare(page: Page, initial = "completed", allowed = true, caseCo
         workspace: { id: 7, workspaceKey: "test", directoryPath: fixture.directory, status: "READY" },
       })
     if (path === "/api/dockapi/sessions") return json([])
+    if (path === "/api/dockapi/token-quota")
+      return json({
+        enabled: false,
+        vip: false,
+        weeklyLimit: null,
+        used: 0,
+        reserved: 0,
+        remaining: null,
+        weekStart: 1,
+        resetAt: 2,
+        hasUnknownUsage: false,
+      })
     if (path === "/api/dockapi/history") return json([info()])
     if (path.endsWith("/cases") && path.includes("general-deepinsight")) return json(currentCases)
     const selectedCase = currentCases.find((item) => path.endsWith(`/cases/${item.caseCode}`))
@@ -171,9 +183,128 @@ async function prepare(page: Page, initial = "completed", allowed = true, caseCo
   }
 }
 
+test("renders all five research progress icons from the built assets", async ({ page }, info) => {
+  await prepare(page)
+  await page.goto(`/general-deepinsight/session/${id}`)
+  const icons = page.locator(".step-progress .step-icon-wrap > img")
+  await expect(icons).toHaveCount(5)
+  await expect
+    .poll(() =>
+      icons.evaluateAll((images) =>
+        images.every((image) =>
+          image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0,
+        ),
+      ),
+    )
+    .toBe(true)
+  expect(await icons.evaluateAll((images) => images.map((image) => image.getAttribute("alt")))).toEqual([
+    "研究计划",
+    "网络搜索",
+    "反思评估",
+    "生成大纲",
+    "报告撰写",
+  ])
+  await page.locator(".thinking-header").screenshot({ path: info.outputPath("research-progress-icons.png") })
+})
+
 async function freezeConfirmationClock(page: Page) {
   await page.clock.install({ time: new Date("2026-10-09T04:00:00Z") })
   await page.clock.pauseAt(new Date("2026-10-09T04:00:01Z"))
+}
+
+const limitedQuota = {
+  enabled: true,
+  vip: false,
+  weeklyLimit: 100000,
+  used: 90000,
+  reserved: 10000,
+  remaining: 0,
+  weekStart: Date.UTC(2026, 9, 18, 16),
+  resetAt: Date.UTC(2026, 9, 25, 16),
+  hasUnknownUsage: false,
+}
+
+test("weekly quota blocks initial research and supports a manual balance recheck", async ({ page }) => {
+  const data = await prepare(page, "pending")
+  let remaining = 0
+  await page.route("**/api/dockapi/token-quota", (route) =>
+    route.fulfill({ json: { code: 200, data: { ...limitedQuota, remaining } } }),
+  )
+  await page.goto(`/general-deepinsight/session/${id}?start=1`)
+  await expect(page.getByText("本周 Token 额度不足，请联系管理员或等待下周一重置", { exact: true })).toBeVisible()
+  expect(data.requests.filter((request) => request.path.endsWith("/stream"))).toHaveLength(0)
+  remaining = 50000
+  await page.getByRole("button", { name: "重新检查", exact: true }).click()
+  await expect.poll(() => data.requests.filter((request) => request.path.endsWith("/stream")).length).toBe(1)
+  expect(data.errors).toEqual([])
+})
+
+test("weekly quota VIP can start research without a finite balance", async ({ page }) => {
+  const data = await prepare(page, "pending")
+  await page.route("**/api/dockapi/token-quota", (route) =>
+    route.fulfill({ json: { code: 200, data: { ...limitedQuota, vip: true, weeklyLimit: null, remaining: null } } }),
+  )
+  await page.goto(`/general-deepinsight/session/${id}?start=1`)
+  await expect.poll(() => data.requests.filter((request) => request.path.endsWith("/stream")).length).toBe(1)
+  expect(data.errors).toEqual([])
+})
+
+test("weekly quota lookup failures never submit research", async ({ page }) => {
+  const data = await prepare(page, "pending")
+  await page.route("**/api/dockapi/token-quota", (route) =>
+    route.fulfill({ status: 503, json: { code: 503, message: "额度服务暂时不可用", data: null } }),
+  )
+  await page.goto(`/general-deepinsight/session/${id}?start=1`)
+  await expect(page.getByText("额度服务暂时不可用", { exact: true })).toBeVisible()
+  expect(data.requests.filter((request) => request.path.endsWith("/stream"))).toHaveLength(0)
+  expect(data.errors).toEqual([])
+})
+
+test("weekly quota blocks continuing an interrupted plan", async ({ page }) => {
+  const data = await prepare(page, "interrupted")
+  await page.route("**/api/dockapi/token-quota", (route) => route.fulfill({ json: { code: 200, data: limitedQuota } }))
+  await page.goto(`/general-deepinsight/session/${id}`)
+  await page.locator(".plan-confirmation-card .confirm-btn").click()
+  await expect(page.getByText("本周 Token 额度不足，请联系管理员或等待下周一重置", { exact: true })).toBeVisible()
+  expect(data.requests.filter((request) => request.path.endsWith("/resume"))).toHaveLength(0)
+  await expect(page.locator(".general-research-result")).toHaveAttribute("data-status", "interrupted")
+})
+
+test("weekly quota blocks AI polishing without changing the chapter", async ({ page }) => {
+  const data = await openChapterEditor(page)
+  await page.route("**/api/dockapi/token-quota", (route) => route.fulfill({ json: { code: 200, data: limitedQuota } }))
+  await selectChapterText(page)
+  await page.getByRole("textbox", { name: "AI 修改需求", exact: true }).fill("更简练")
+  await page.getByRole("button", { name: "AI 润色", exact: true }).click()
+  await expect(page.getByText("本周 Token 额度不足，请联系管理员或等待下周一重置", { exact: true })).toBeVisible()
+  expect(data.requests.filter((request) => request.path.endsWith("/report/rewrite"))).toHaveLength(0)
+  await expect(page.getByRole("button", { name: "应用 AI 修改", exact: true })).toBeDisabled()
+  await page.getByRole("button", { name: "取消 AI 修改", exact: true }).click()
+  await expect(page.getByRole("textbox", { name: "章节 Markdown 正文", exact: true })).toHaveValue(
+    "相同文字，前文。相同文字，后文。\n\n",
+  )
+  expect(data.requests.filter((request) => request.method === "PUT")).toHaveLength(0)
+})
+
+for (const width of [1440, 390]) {
+  test(`weekly quota settings show consumed and reserved separately at ${width}px`, async ({ page }) => {
+    const data = await prepare(page)
+    await page.setViewportSize({ width, height: 1000 })
+    await page.route("**/file/directory*", (route) => route.fulfill({ json: { path: fixture.directory } }))
+    await page.route("**/api/dockapi/token-quota", (route) =>
+      route.fulfill({ json: { code: 200, data: { ...limitedQuota, used: 32000, reserved: 8000, remaining: 60000 } } }),
+    )
+    await page.goto("/app")
+    await expect(page.locator('[data-component="session-new-design"]').first()).toBeVisible()
+    await page.keyboard.press("Control+,")
+    await page.getByRole("tab", { name: "Token 额度", exact: true }).click()
+    const dialog = page.getByRole("dialog")
+    await expect(dialog.getByText("32,000 Token", { exact: true })).toBeVisible()
+    await expect(dialog.getByText("8,000 Token", { exact: true })).toBeVisible()
+    await expect(dialog.getByText("60,000 Token", { exact: true })).toBeVisible()
+    await page.screenshot({ path: test.info().outputPath("weekly-quota.png") })
+    expect(data.errors).toEqual([])
+  })
 }
 
 for (const width of [1920, 390]) {

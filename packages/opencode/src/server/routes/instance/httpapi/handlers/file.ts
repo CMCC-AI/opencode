@@ -9,12 +9,11 @@ import { AbsolutePath, RelativePath } from "@opencode-ai/core/schema"
 import { Effect, Encoding, Layer, Option } from "effect"
 import ignore from "ignore"
 import { mkdir, rm } from "node:fs/promises"
-import { existsSync, readFileSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "path"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder, HttpApiError } from "effect/unstable/httpapi"
-import { DomUtils, parseDocument } from "htmlparser2"
+import { htmlPreviewCsp, htmlPreviewRuntime, prepareHtmlPreview } from "@/server/html-preview"
 import { InstanceHttpApi } from "../api"
 import { scanKnowledgeGraph } from "@/knowledge/graph"
 import { attachmentUploadGroup } from "@opencode-ai/core/util/attachment-reference"
@@ -360,70 +359,6 @@ function downloadPath(directory: string, value: string) {
   const relative = path.relative(directory, absolute)
   if (!relative) return
   return RelativePath.make(relative)
-}
-
-function htmlPreviewRuntime(input: string | undefined, request: string, referer: string | undefined) {
-  if (!input || !URL.canParse(input)) return
-  const runtime = new URL(input)
-  if (runtime.protocol !== "http:" && runtime.protocol !== "https:") return
-  if (runtime.username || runtime.password || runtime.hash) return
-  const pathname = runtime.pathname.toLowerCase()
-  if (!pathname.includes("echarts") || !pathname.endsWith(".js")) return
-
-  const requestOrigin = new URL(request, "http://localhost").origin
-  const refererOrigin = referer && URL.canParse(referer) ? new URL(referer).origin : undefined
-  if (runtime.origin !== requestOrigin && runtime.origin !== refererOrigin) return
-  return runtime
-}
-
-function prepareHtmlPreview(content: string, runtime: string, directory: string, htmlPath: string) {
-  const document = parseDocument(content)
-  const htmlDirectory = path.resolve(directory, path.dirname(htmlPath))
-  for (const image of DomUtils.getElementsByTagName("img", document.children)) {
-    const source = image.attribs.src
-    if (!source || /^(?:data:|https?:|blob:|\/|#)/i.test(source)) continue
-    const assetPath = path.resolve(htmlDirectory, source.split(/[?#]/, 1)[0] ?? "")
-    if (!FSUtil.contains(directory, assetPath) || !/\.svg$/i.test(assetPath)) continue
-    if (!existsSync(assetPath) || !statSync(assetPath).isFile()) continue
-    image.attribs.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(readFileSync(assetPath, "utf8"))}`
-  }
-  const scripts = DomUtils.getElementsByTagName("script", document.children).filter((script) =>
-    script.attribs.src?.toLowerCase().includes("echarts"),
-  )
-  const primary = scripts[0]
-  if (primary) {
-    primary.attribs.src = runtime
-    primary.attribs["data-deeptrading-echarts"] = "local"
-    delete primary.attribs.integrity
-    delete primary.attribs.crossorigin
-    delete primary.attribs.referrerpolicy
-    scripts.slice(1).forEach((script) => DomUtils.removeElement(script))
-  } else {
-    const runtimeDocument = parseDocument("<script></script>")
-    const runtimeScript = DomUtils.getElementsByTagName("script", runtimeDocument.children)[0]
-    runtimeScript.attribs.src = runtime
-    runtimeScript.attribs["data-deeptrading-echarts"] = "local"
-    const head = DomUtils.getElementsByTagName("head", document.children)[0]
-    DomUtils.prependChild(head ?? document, runtimeScript)
-  }
-  return DomUtils.getOuterHTML(document)
-}
-
-function htmlPreviewCsp(runtime: URL) {
-  return [
-    "default-src 'none'",
-    `script-src 'unsafe-inline' ${runtime.origin}${runtime.pathname}`,
-    "script-src-attr 'none'",
-    "style-src 'unsafe-inline'",
-    "img-src data:",
-    "font-src data:",
-    "connect-src 'none'",
-    "media-src 'none'",
-    "object-src 'none'",
-    "base-uri 'none'",
-    "form-action 'none'",
-    "frame-src 'none'",
-  ].join("; ")
 }
 
 function parseRange(

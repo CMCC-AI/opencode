@@ -10,7 +10,7 @@ import { Font } from "@opencode-ai/ui/font"
 import { ThemeProvider } from "@opencode-ai/ui/theme/context"
 import { MetaProvider } from "@solidjs/meta"
 import { type BaseRouterProps, Navigate, Route, Router, useParams, useSearchParams } from "@solidjs/router"
-import { QueryClient, QueryClientProvider } from "@tanstack/solid-query"
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/solid-query"
 import { Effect } from "effect"
 import {
   type Component,
@@ -73,6 +73,8 @@ import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
 import { AppLoading } from "@/components/app-loading"
+import { NewSessionLoading } from "@/components/session/session-new-design-view"
+import { pathKey } from "@/utils/path-key"
 
 const LegacyLayout = lazy(() => import("@/pages/layout"))
 const Session = lazy(() => import("@/pages/session"))
@@ -106,7 +108,6 @@ const CmccCasesRoute = lazy(() =>
 const CmccCaseDetailRoute = lazy(() =>
   import("@/pages/cases/case-detail").then((module) => ({ default: module.CmccCaseDetailRoute })),
 )
-const cmccAgentWarmups = new Set<string>()
 
 const SessionRoute = () => {
   const settings = useSettings()
@@ -323,6 +324,7 @@ function QueryProvider(props: ParentProps) {
       },
     },
   })
+  onCleanup(() => client.clear())
   return <QueryClientProvider client={client}>{props.children}</QueryClientProvider>
 }
 
@@ -416,29 +418,14 @@ function NewAppLayout(props: ParentProps) {
 }
 
 function CmccRuntimePrewarm() {
-  const serverSDK = useServerSDK()
+  const queryClient = useQueryClient()
   const sync = useServerSync()
   const dockapi = useDockApi()
 
-  const prewarm = () => {
-    if (!sync().data.ready) return
+  createEffect(() => {
     const runtime = dockapi.workspace?.directoryPath
     if (!runtime) return
-    const key = `${serverSDK().scope}\n${runtime}`
-    if (cmccAgentWarmups.has(key)) return
-    cmccAgentWarmups.add(key)
-    void serverSDK()
-      .client.app.agents({ directory: runtime }, { throwOnError: true })
-      .finally(() => cmccAgentWarmups.delete(key))
-      .catch(() => undefined)
-  }
-
-  createEffect(prewarm)
-  createEffect(() => {
-    const stop = serverSDK().event.listen((event) => {
-      if (event.details.type === "server.connected") prewarm()
-    })
-    onCleanup(stop)
+    void queryClient.ensureQueryData(sync().queryOptions.agents(pathKey(runtime))).catch(() => undefined)
   })
 
   return null
@@ -643,45 +630,45 @@ export function AppInterface(props: {
   // route changes. Draft and session routes override only their server-bound data
   // providers beneath it.
   const ServerShell = (shellProps: ParentProps) => (
-    <QueryProvider>
-      <SharedProviders>
-        {props.children}
-        {shellProps.children}
-      </SharedProviders>
-    </QueryProvider>
+    <SharedProviders>
+      {props.children}
+      {shellProps.children}
+    </SharedProviders>
   )
 
   return (
-    <ServerProvider
-      defaultServer={props.defaultServer}
-      canonicalLocalServer={props.canonicalLocalServer}
-      servers={props.servers}
-    >
-      <GlobalProvider>
-        <SettingsProvider>
-          <ConnectionGate disableHealthCheck={props.disableHealthCheck}>
-            <Show when={useSettings().general.newLayoutDesigns().toString()} keyed>
-              <Dynamic
-                component={props.router ?? Router}
-                root={(routerProps) => (
-                  <TabsProvider>
-                    <NotificationProvider>
-                      <ServerShell>
-                        <Show when={useSettings().general.newLayoutDesigns()} fallback={routerProps.children}>
-                          <NewAppLayout>{routerProps.children}</NewAppLayout>
-                        </Show>
-                      </ServerShell>
-                    </NotificationProvider>
-                  </TabsProvider>
-                )}
-              >
-                <Routes />
-              </Dynamic>
-            </Show>
-          </ConnectionGate>
-        </SettingsProvider>
-      </GlobalProvider>
-    </ServerProvider>
+    <QueryProvider>
+      <ServerProvider
+        defaultServer={props.defaultServer}
+        canonicalLocalServer={props.canonicalLocalServer}
+        servers={props.servers}
+      >
+        <GlobalProvider>
+          <SettingsProvider>
+            <ConnectionGate disableHealthCheck={props.disableHealthCheck}>
+              <Show when={useSettings().general.newLayoutDesigns().toString()} keyed>
+                <Dynamic
+                  component={props.router ?? Router}
+                  root={(routerProps) => (
+                    <TabsProvider>
+                      <NotificationProvider>
+                        <ServerShell>
+                          <Show when={useSettings().general.newLayoutDesigns()} fallback={routerProps.children}>
+                            <NewAppLayout>{routerProps.children}</NewAppLayout>
+                          </Show>
+                        </ServerShell>
+                      </NotificationProvider>
+                    </TabsProvider>
+                  )}
+                >
+                  <Routes />
+                </Dynamic>
+              </Show>
+            </ConnectionGate>
+          </SettingsProvider>
+        </GlobalProvider>
+      </ServerProvider>
+    </QueryProvider>
   )
 }
 
@@ -780,11 +767,7 @@ function CmccDefaultRoute() {
     })
   })
 
-  return (
-    <div class="flex size-full items-center justify-center text-v2-text-text-faint">
-      <DeepInsightMark class="h-10 w-8 opacity-30" />
-    </div>
-  )
+  return <NewSessionLoading />
 }
 
 function LegacyTargetSessionRoute() {

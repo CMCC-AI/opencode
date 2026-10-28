@@ -254,6 +254,26 @@ describe("file HttpApi", () => {
     ).toBe(400)
   })
 
+  test("previews Markdown-based HTML with a bounded local runtime without changing the original download", async () => {
+    await using tmp = await tmpdir()
+    const report = `<!doctype html><html><head>
+      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+      </head><body><script>window.report = "### 1.1 Report";</script></body></html>`
+    await Bun.write(path.join(tmp.path, "report.html"), report)
+    const runtime = "http://app.local:3000/assets/report-runtime-0123456789ab.js"
+    const response = await request(FilePaths.preview, tmp.path, { path: "report.html", runtime }, {
+      headers: { Referer: "http://app.local:3000/session/report" },
+    })
+    expect(response.status).toBe(200)
+    const html = await response.text()
+    expect(html).toContain('data-cmcc-report-runtime="local"')
+    expect(html).not.toContain("cdn.jsdelivr.net")
+    expect(response.headers.get("content-security-policy")).toContain("connect-src 'none'")
+    expect(await Bun.file(path.join(tmp.path, "report.html")).text()).toBe(report)
+    expect(await (await request(FilePaths.download, tmp.path, { path: "report.html" })).text()).toBe(report)
+  }, 30_000)
+
   test("serves search endpoints", async () => {
     await using tmp = await tmpdir({ git: true })
     await Bun.write(path.join(tmp.path, "hello.txt"), "needle")

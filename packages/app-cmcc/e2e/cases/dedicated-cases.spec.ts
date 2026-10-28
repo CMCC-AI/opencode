@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises"
 import type { DockApiCaseSnapshot } from "../../src/context/dockapi"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { fixture } from "../smoke/session-timeline.fixture"
+import { htmlReportFixture, htmlReportPreview, serveReportRuntime } from "../startup/html-report.fixture"
 
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL, video: "off" })
 
@@ -292,6 +293,36 @@ async function prepare(
   await expect(page.getByText(`测试案例-${input.category}`, { exact: true })).toBeVisible({ timeout: 60000 })
   return { errors, apiRequests, fileRequests }
 }
+
+test("case HTML renders local Markdown and formulas while downloading original bytes", async ({ page }, info) => {
+  const state = await prepare(page, cases[4])
+  const html = await htmlReportFixture()
+  const requests: URL[] = []
+  await serveReportRuntime(page)
+  await page.route("**/api/dockapi/case-preview/deep-research/artifacts/30-report.html*", (route) => {
+    const url = new URL(route.request().url())
+    requests.push(url)
+    if (url.searchParams.has("runtime")) return route.fulfill(htmlReportPreview(html, url.toString(), page.url()))
+    return route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: html,
+      headers: { "access-control-allow-origin": "*" },
+    })
+  })
+  await page.getByRole("button", { name: "可视化报告", exact: true }).click()
+  const report = page.frameLocator("iframe")
+  await expect(report.getByRole("heading", { name: /^1\.1 / })).toBeVisible()
+  await expect.poll(() => report.locator(".katex").count()).toBeGreaterThan(1)
+  await expect(report.locator(".chart-canvas svg").first()).toBeVisible()
+  await expect(page.locator("iframe")).toHaveAttribute("sandbox", "allow-scripts")
+  const download = page.waitForEvent("download")
+  await page.getByRole("button", { name: "下载", exact: true }).click()
+  expect(await readFile((await (await download).path())!, "utf8")).toBe(html)
+  expect(requests.some((url) => url.searchParams.has("runtime"))).toBe(true)
+  expect(requests.at(-1)?.searchParams.has("runtime")).toBe(false)
+  await page.screenshot({ path: info.outputPath("case-html-math.png") })
+  expect(state.errors).toEqual([])
+})
 
 test("finance retains its dedicated layout after lazy loading", async ({ page }) => {
   const state = await prepare(page, {

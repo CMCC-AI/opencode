@@ -56,6 +56,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { Truncate } from "@/tool/truncate"
 import { Worktree } from "@/worktree"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { TokenQuota } from "@opencode-ai/core/token-quota/client"
 import { MoveSession } from "@opencode-ai/core/control-plane/move-session"
 import { Database } from "@opencode-ai/core/database/database"
 import { AppNodeBuilderV1 } from "@/effect/app-node-builder-v1"
@@ -258,6 +259,7 @@ const app = LayerNode.group([
   SessionStatus.node,
   BackgroundJob.node,
   RuntimeFlags.node,
+  TokenQuota.node,
   EventV2Bridge.node,
   SessionRunState.node,
   SessionProcessor.node,

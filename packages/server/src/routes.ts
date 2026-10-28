@@ -1,4 +1,5 @@
 import { Database } from "@opencode-ai/core/database/database"
+import { TokenQuota } from "@opencode-ai/core/token-quota/client"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
@@ -25,6 +26,7 @@ import { sessionLocationLayer } from "./middleware/session-location"
 
 const applicationServices = LayerNode.group([
   Database.node,
+  TokenQuota.node,
   EventV2.node,
   httpClient,
   ToolOutputStore.cleanupNode,

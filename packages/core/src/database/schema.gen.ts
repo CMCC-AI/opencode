@@ -236,6 +236,22 @@ export default {
           CONSTRAINT \`fk_session_share_session_id_session_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session\`(\`id\`) ON DELETE CASCADE
         );
       `)
+      yield* tx.run(`
+        CREATE TABLE \`dockapi_quota_outbox\` (
+          \`call_id\` text PRIMARY KEY,
+          \`request_json\` text NOT NULL,
+          \`finish_json\` text,
+          \`dispatched\` integer DEFAULT 0 NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`dockapi_quota_session\` (
+          \`session_id\` text PRIMARY KEY,
+          \`user_id\` integer NOT NULL,
+          \`root_session_id\` text NOT NULL
+        );
+      `)
       yield* tx.run(`CREATE UNIQUE INDEX \`event_aggregate_seq_idx\` ON \`event\` (\`aggregate_id\`,\`seq\`);`)
       yield* tx.run(`CREATE INDEX \`event_aggregate_type_seq_idx\` ON \`event\` (\`aggregate_id\`,\`type\`,\`seq\`);`)
       yield* tx.run(
@@ -274,6 +290,7 @@ export default {
       yield* tx.run(`CREATE INDEX \`session_workspace_idx\` ON \`session\` (\`workspace_id\`);`)
       yield* tx.run(`CREATE INDEX \`session_parent_idx\` ON \`session\` (\`parent_id\`);`)
       yield* tx.run(`CREATE INDEX \`todo_session_idx\` ON \`todo\` (\`session_id\`);`)
+      yield* tx.run(`CREATE INDEX \`dockapi_quota_outbox_updated_idx\` ON \`dockapi_quota_outbox\` (\`time_updated\`);`)
     })
   },
 } satisfies Omit<DatabaseMigration.Migration, "id">
