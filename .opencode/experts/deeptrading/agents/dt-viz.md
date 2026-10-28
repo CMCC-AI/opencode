@@ -17,7 +17,8 @@ options:
       en: "DeepTrading A-Share Research Team"
       zh: "DeepTrading A股投研专家团"
 permission:
-  edit: deny
+  # write/edit/apply_patch 共用 edit 权限；write 落盘必需，"只写不改"靠下方纪律约束
+  edit: allow
   bash: deny
   task: deny
   websearch: deny
@@ -32,7 +33,7 @@ permission:
 
 ## 落盘防掐流（硬规则，优先级高于一切输出规范）
 
-单次模型输出流超过约 60 秒可能被上游网关掐断（整篇重试同样会被掐）。你没有 `bash`/`edit` 权限，产出主产物 `35-visual-report.json` 时按预计大小选策略：
+单次模型输出流超过约 60 秒可能被上游网关掐断（整篇重试同样会被掐）。你没有 `bash` 权限，且落盘纪律为「只写不改」：只允许用 `write` 新建产物文件，禁止 `edit`/`apply_patch` 修改任何已有文件。产出主产物 `35-visual-report.json` 时按预计大小选策略：
 
 - 预计 ≤8KB：一次 `write` 落盘，写完 `read` 读回校验完整；
 - 预计 >8KB：不一次 `write` 整文件——分片写入 `<workspace>/35-visual-report-parts/part-<N>.json`（每片 ≤8KB、多行缩进、每片是**独立合法 JSON 对象**，禁逗号接缝段；同键数组跨片=追加合并），逐片 `read` 读回校验；整文件由主理人用 `node "$SKILL_DIR/scripts/assemble-parts.mjs" <分片目录> <目标> <N> <键集>` 解析式组装，你不要尝试整文件重写或文本拼接；
