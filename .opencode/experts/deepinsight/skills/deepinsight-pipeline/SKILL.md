@@ -103,7 +103,8 @@ node "$SKILL_DIR/scripts/report-batches.mjs" plan <WS>                     # 生
 node "$SKILL_DIR/scripts/report-batches.mjs" assemble <WS>                 # 合并 19-report-part-*.md
 node "$SKILL_DIR/scripts/build-evidence-review-packet.mjs" <WS> <round>    # 生成审查包
 node "$SKILL_DIR/scripts/postprocess-report.mjs" <WS>                      # 引用编号+参考文献
-node "$SKILL_DIR/scripts/render-report.mjs" <WS>                           # 生成 30-report.html（渲染前图表闸门：chart block 的扁平 data 委托仓库级 chart-builder 校验并组装 option，不合格整块丢弃并报出原因）
+node "$SKILL_DIR/scripts/assemble-parts.mjs" <分片目录> <目标> <N> <键集>   # viz 产物分片解析式组装（防掐流）
+node "$SKILL_DIR/scripts/render-report.mjs" <WS>                           # 生成 30-report.html（正文回填+图表闸门委托仓库级 report-render 引擎：扁平 data 校验并组装 option，不合格整块丢弃并报出原因）
 node "$SKILL_DIR/scripts/export-report-pdf.mjs" <WS>/30-report.html <WS>/35-report.pdf
 node "$SKILL_DIR/scripts/validate-run.mjs" <WS>                            # 最终验证
 ```
@@ -122,8 +123,8 @@ node "$SKILL_DIR/scripts/validate-run.mjs" <WS>                            # 最
 | `writing` | `di-report-writer` | 必经（分批） | `19-report-part-NN.md`、`20-report.md` |
 | `evidence_review` | `di-evidence-reviewer` | 写作后必经 | `21-evidence-review-N.json` |
 | `visualization` | `di-viz` | 审查后必经 | `25-visual-report.json` |
-| `html_render` | `di-publisher` | 可视化后必经 | `30-report.html`、`31-render-state.json` |
-| `pdf_export` | `di-publisher` | HTML 后必经 | `35-report.pdf`、`36-pdf-export-state.json` |
+| `html_render` | `di-html-renderer` | 可视化后必经 | `30-report.html`、`31-render-state.json` |
+| `pdf_export` | `di-pdf-exporter` | HTML 后必经 | `35-report.pdf`、`36-pdf-export-state.json` |
 
 调用纪律：
 - 先 `start` 登记 → 调用成员 → 结果落盘 → `complete` 登记，顺序不可颠倒

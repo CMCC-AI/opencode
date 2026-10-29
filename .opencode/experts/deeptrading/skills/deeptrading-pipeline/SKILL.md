@@ -17,13 +17,21 @@ node <BASE>/scripts/finalize-report.mjs <WORKSPACE_DIR>
 
 把 `30-final-report.md` 里所有 `<cite>URL</cite>` 按首次出现顺序替换为 `[1]`、`[2]`...，并在文末追加「## 引用来源」章节（`N. [标题](URL)`）。标题优先取 `25-sources.json` 登记的来源元数据，缺失时用域名+路径兜底并在输出中告警。正文既无 `<cite>` 也无引用来源章节时直接报错，不允许无引用交付。幂等，重复执行不会产生重复章节。成功输出 `引用后处理完成：<N> 个独立 URL 已编号`。
 
-### 1. `<BASE>/scripts/render-report.mjs` — 渲染 HTML 报告
+### 1a. `<BASE>/scripts/assemble-parts.mjs` — viz 产物分片组装（防掐流，需要时执行）
+
+```bash
+node <BASE>/scripts/assemble-parts.mjs <分片目录> <WORKSPACE_DIR>/35-visual-report.json <N> title,subtitle,hero_stats,sections
+```
+
+dt-viz 产物超过 8KB 时按防掐流纪律分片写入 `35-visual-report-parts/part-<N>.json`（每片独立合法 JSON 对象，同键数组跨片=追加合并），由主理人用本脚本解析式组装，禁止 bash/python 文本拼接。
+
+### 1b. `<BASE>/scripts/render-report.mjs` — 渲染 HTML 报告
 
 ```bash
 node <BASE>/scripts/render-report.mjs <WORKSPACE_DIR>
 ```
 
-依次：读取 `35-visual-report.json` 与 `30-final-report.md` → **正文占位符回填**（markdown block 只放 `__CH{N}_{M}__`，脚本按 `## ` 章节切分、段落切分并回填；表格段剥离由 table block 承载；段落数多于占位符时并入最后一个，正文永不丢失，`[N]` 引用标记自动保留；旧格式带正文的产物原样兼容）→ 从 `30-final-report.md` 末尾「## 引用来源」章节解析参考文献 → **引用闸门校验**（每条必须有真实标题且非裸 URL；每个编号必须在正文有 `[N]` 标记；正文不得残留 `<cite>` 中间格式；违反即报错中止）→ **图表闸门**（chart block 携带 dt-viz 的扁平 `data`，委托仓库级 `chart-builder` 技能校验并组装 ECharts option：通过则注入 option，不合格则整块丢弃并在输出日志报出标题与原因，渲染不中断；仍自带 `option` 的旧格式 block 原样保留）→ 填充 `<BASE>/templates/report.html.tpl` 的占位符（`__TITLE__` / `__VISUAL_REPORT_JSON__` / `__REFERENCES_JSON__`）→ 写出 `40-report.html`。成功输出 `正文回填：N 个占位符…`、`图表校验：N/M 张通过`、`HTML 报告完成：<路径>` 与参考文献条数；出现图表丢弃时主理人应责令 dt-viz 按契约重做图表数据后重渲染。
+依次：读取 `35-visual-report.json` 与 `30-final-report.md` → **正文占位符回填 + 图表闸门（委托仓库级 `report-render` 引擎，与独立技能同一实现）**：章号自动识别（中文序号/数字含前导零）、宽松回填（段落数多于占位符时并入最后一个，正文永不丢失，`[N]` 引用标记自动保留，表格段剥离由 table block 承载；旧格式带正文/option 的产物原样兼容）；chart block 携带 dt-viz 的扁平 `data`，校验通过则组装 ECharts option 注入，不合格则整块丢弃并在日志报出标题与原因（渲染不中断）→ 从 `30-final-report.md` 末尾「## 引用来源」章节解析参考文献 → **引用闸门校验**（每条必须有真实标题且非裸 URL；每个编号必须在正文有 `[N]` 标记；正文不得残留 `<cite>` 中间格式；违反即报错中止）→ viz 闸门（可视化正文不得缺 `[N]` 标记、组件不得替代正文）→ 填充 `<BASE>/templates/report.html.tpl` 的占位符 → 写出 `40-report.html`。成功输出 `正文回填：N 个占位符…`、`图表校验：N/M 张通过`、`HTML 报告完成：<路径>` 与参考文献条数；出现图表丢弃时主理人应责令 dt-viz 重做图表数据后重派 `dt-html-renderer` 渲染。
 
 ### 2. `<BASE>/scripts/export-report-pdf.mjs` — 导出 A4 PDF
 

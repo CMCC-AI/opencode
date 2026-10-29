@@ -16,7 +16,9 @@
       "deepinspect/outline-architect",
       "deepinspect/report-writer",
       "deepinspect/evidence-reviewer",
-      "deepinspect/viz-specialist"
+      "deepinspect/viz-specialist",
+      "deepinspect/html-renderer",
+      "deepinspect/pdf-exporter"
     ]
   },
   "displayName": {
@@ -205,6 +207,34 @@
       "avatar": "avatars/viz-specialist.png",
       "role": "member",
       "originalId": "viz-specialist"
+    },
+    {
+      "id": "deepinspect/html-renderer",
+      "name": {
+        "en": "A Ran",
+        "zh": "阿染"
+      },
+      "profession": {
+        "en": "HTML Renderer",
+        "zh": "HTML 渲染工程师"
+      },
+      "avatar": "avatars/html-renderer.png",
+      "role": "member",
+      "originalId": "html-renderer"
+    },
+    {
+      "id": "deepinspect/pdf-exporter",
+      "name": {
+        "en": "A Mo",
+        "zh": "阿墨"
+      },
+      "profession": {
+        "en": "PDF Exporter",
+        "zh": "PDF 发布工程师"
+      },
+      "avatar": "avatars/pdf-exporter.png",
+      "role": "member",
+      "originalId": "pdf-exporter"
     }
   ],
   "original": {

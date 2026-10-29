@@ -15,7 +15,9 @@
       "zhengqi-visit-intel/outline-architect",
       "zhengqi-visit-intel/report-chief-writer",
       "zhengqi-visit-intel/evidence-verify-officer",
-      "zhengqi-visit-intel/report-visual-designer"
+      "zhengqi-visit-intel/report-visual-designer",
+      "zhengqi-visit-intel/html-renderer",
+      "zhengqi-visit-intel/pdf-exporter"
     ]
   },
   "displayName": {
@@ -190,6 +192,34 @@
       "avatar": "avatars/report-visual-designer.png",
       "role": "member",
       "originalId": "report-visual-designer"
+    },
+    {
+      "id": "zhengqi-visit-intel/html-renderer",
+      "name": {
+        "en": "A Ran",
+        "zh": "阿染"
+      },
+      "profession": {
+        "en": "HTML Renderer",
+        "zh": "HTML 渲染工程师"
+      },
+      "avatar": "avatars/html-renderer.png",
+      "role": "member",
+      "originalId": "html-renderer"
+    },
+    {
+      "id": "zhengqi-visit-intel/pdf-exporter",
+      "name": {
+        "en": "A Mo",
+        "zh": "阿墨"
+      },
+      "profession": {
+        "en": "PDF Exporter",
+        "zh": "PDF 发布工程师"
+      },
+      "avatar": "avatars/pdf-exporter.png",
+      "role": "member",
+      "originalId": "pdf-exporter"
     }
   ],
   "original": {

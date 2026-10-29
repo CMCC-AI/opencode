@@ -15,7 +15,8 @@
       "deepinsight/di-report-writer",
       "deepinsight/di-evidence-reviewer",
       "deepinsight/di-viz",
-      "deepinsight/di-publisher"
+      "deepinsight/di-html-renderer",
+      "deepinsight/di-pdf-exporter"
     ]
   },
   "displayName": {
@@ -178,18 +179,32 @@
       "originalId": "di-viz"
     },
     {
-      "id": "deepinsight/di-publisher",
+      "id": "deepinsight/di-html-renderer",
       "name": {
-        "en": "A Gao",
-        "zh": "阿稿"
+        "en": "A Ran",
+        "zh": "阿染"
       },
       "profession": {
-        "en": "Publication Engineer",
-        "zh": "发布工程师"
+        "en": "HTML Renderer",
+        "zh": "HTML 渲染工程师"
       },
-      "avatar": "avatars/di-publisher.png",
+      "avatar": "avatars/di-html-renderer.png",
       "role": "member",
-      "originalId": "di-publisher"
+      "originalId": "di-html-renderer"
+    },
+    {
+      "id": "deepinsight/di-pdf-exporter",
+      "name": {
+        "en": "A Mo",
+        "zh": "阿墨"
+      },
+      "profession": {
+        "en": "PDF Exporter",
+        "zh": "PDF 发布工程师"
+      },
+      "avatar": "avatars/di-pdf-exporter.png",
+      "role": "member",
+      "originalId": "di-pdf-exporter"
     }
   ],
   "original": {

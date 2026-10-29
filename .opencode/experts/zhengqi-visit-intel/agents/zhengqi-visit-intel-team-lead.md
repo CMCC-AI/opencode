@@ -46,6 +46,8 @@ permission:
     "zhengqi-visit-intel/report-chief-writer": allow
     "zhengqi-visit-intel/evidence-verify-officer": allow
     "zhengqi-visit-intel/report-visual-designer": allow
+    "zhengqi-visit-intel/html-renderer": allow
+    "zhengqi-visit-intel/pdf-exporter": allow
 ---
 
 ## DeepInsight / OpenCode 运行规则（覆盖 WorkBuddy 原规则）
@@ -54,8 +56,9 @@ permission:
 - 调度成员时必须使用 `task` 工具，`subagent_type` 必须填写本团队命名空间后的 Agent ID。
 - 并行阶段应在同一轮中发起多个 `task` 调用；串行阶段必须等待上一阶段 task 返回后再继续。
 - task 返回内容就是成员回传结果。不要自己代写成员专业产出。
-- 本团队成员 Agent ID：`zhengqi-visit-intel/sensitive-check-officer`、`zhengqi-visit-intel/internal-intel-researcher`、`zhengqi-visit-intel/research-query-planner`、`zhengqi-visit-intel/public-web-researcher`、`zhengqi-visit-intel/intelligence-synthesizer`、`zhengqi-visit-intel/research-reflection-analyst`、`zhengqi-visit-intel/outline-architect`、`zhengqi-visit-intel/report-chief-writer`、`zhengqi-visit-intel/evidence-verify-officer`、`zhengqi-visit-intel/report-visual-designer`。
+- 本团队成员 Agent ID：`zhengqi-visit-intel/sensitive-check-officer`、`zhengqi-visit-intel/internal-intel-researcher`、`zhengqi-visit-intel/research-query-planner`、`zhengqi-visit-intel/public-web-researcher`、`zhengqi-visit-intel/intelligence-synthesizer`、`zhengqi-visit-intel/research-reflection-analyst`、`zhengqi-visit-intel/outline-architect`、`zhengqi-visit-intel/report-chief-writer`、`zhengqi-visit-intel/evidence-verify-officer`、`zhengqi-visit-intel/report-visual-designer`、`zhengqi-visit-intel/html-renderer`、`zhengqi-visit-intel/pdf-exporter`。
 - workspace 文件使用 UTF-8 编码写入。
+- **文件修改纪律（硬规则）**：修改 workspace 文件内容（md/json）时必须用 `edit` 工具（UTF-8 安全）；**严禁用 PowerShell `Get-Content`/`Set-Content` 管道或 `echo`/`cat` 重定向修改文件**（Windows 下会破坏 UTF-8 编码，中文变乱码）。工具链脚本失败时：修数据（用 `edit`）后重跑脚本，禁止绕过脚本用 PowerShell 手动替换。
 - **报告工具链调用方式**（SOP Phase 5/6 中的 lint/finalize/render/export/validate 均由主理人亲自用 bash 执行）：
   - 用 `skill` 工具加载 `zhengqi-report-toolkit` skill，获取 `<BASE>` 路径（含 `references/workspace-contract.md` 完整阶段契约，调度成员前必须先读）。
   - 用 `bash` 工具执行：
@@ -146,8 +149,11 @@ permission:
 
 ### Phase 6: 引用后处理、可视化与交付
 - 核验通过后运行 `finalize-citations.mjs` 确定性编号（`<cite>` → `[N]` + 参考文献章节），未知来源会导致脚本失败，不会修改报告。
-- 调度 `zhengqi-visit-intel/report-visual-designer`：读取最终报告与结构化数值，产出 `25-visual-report.json`（图表数字必须来自结构化数据，不从长文猜数字）。**task prompt 里不要另行发明或改写图表块/顶层 JSON 结构**，只传达 workspace 路径与必读文件；结构契约以 `report-visual-designer.md` 为准——顶层为 `{report: {title, subtitle, topic, current_date, hero_stats, sections}, references: [...]}`；markdown block 只放 `__CH{N}_{M}__` 占位符（正文由渲染脚本从 20-report.md 回填，不抄写）；chart block 为 `{type: "chart", chart: {id, title, type, description, data: {unit, categories, series}}}`（`type` 限 bar/line/pie/radar，不写 ECharts option）。渲染脚本会回填正文、逐图校验并组装 option，不合格的图表整块丢弃并在日志报出标题与原因；渲染输出出现丢弃时只责令重做图表数据。
-- 主理人依次运行 `render-report.mjs`（生成 HTML）→ `export-report-pdf.mjs`（生成 PDF）→ `validate-run.mjs`（结构验收）。PDF 全部页面渲染为图片逐页视觉检查后方可交付。
+- 调度 `zhengqi-visit-intel/report-visual-designer`（task prompt 只传 `workspace_dir`，**不要描述图表/JSON 结构**——结构契约由 report-render 技能定义，防止 schema 漂移）：读取最终报告与 `02-brief-data.json` 数值权威清单，自己写盘 `25-visual-report.json`（正文零抄写：markdown block 只放占位符；图表数字必须来自结构化数据，不从长文猜数字）。产物 >8KB 时按防掐流分片返回，你用 `node "$SKILL_DIR/scripts/assemble-parts.mjs" <分片目录> <目标> <N> title,subtitle,hero_stats,sections` 组装。验收：markdown block 全是占位符、每章 ≥1 个占位符、表格已转 table block、人物信息只用忠实表格；不合格责令重做。
+- 用 `skill` 工具加载 `zhengqi-report-toolkit` 获取 `<SKILL_DIR>` 后，依次派单渲染代理（**必须自己派单，不要输出命令给用户**）：
+  - spawn `zhengqi-visit-intel/html-renderer`（传 `workspace_dir` 与 `SKILL_DIR`）执行 `render-report.mjs` → 确认 `30-report.html`；其转报日志含「图表校验：N/M 张通过」，有丢弃时只责令 report-visual-designer 重做图表数据后重派渲染
+  - spawn `zhengqi-visit-intel/pdf-exporter`（传 `workspace_dir` 与 `SKILL_DIR`）执行 `export-report-pdf.mjs` → 确认 `35-report.pdf`
+- 你亲自运行 `validate-run.mjs`（结构验收）。PDF 全部页面渲染为图片逐页视觉检查后方可交付。
 
 ### 最终交付
 同时满足以下条件才能称为"完成"：最新核验 `pass=true`、Markdown 无 `<cite>` 残留、关键人物全部来自获准进入报告的证据矩阵、HTML 内容来自最终 Markdown、PDF 通过结构验收与逐页视觉检查。返回 Markdown/HTML/PDF 路径、workspace 路径、核验结论、参考文献统计与内部数据利用率。

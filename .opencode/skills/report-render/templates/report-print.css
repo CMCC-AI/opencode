@@ -1,0 +1,119 @@
+@media print {
+  @page { size: A4; margin: 18mm 17mm 18mm 19mm; }
+
+  html, body {
+    width: auto; min-width: 0; margin: 0; padding: 0;
+    background: #fff !important; color: #172033 !important;
+    font-family: "Noto Serif CJK SC", "Songti SC", "STSong", "SimSun", serif;
+    font-size: 10.5pt; line-height: 1.78;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .layout { display: block; max-width: none; margin: 0; }
+  .toc { display: none !important; }
+  .main { min-width: 0; padding: 0; }
+
+  .hero {
+    position: relative; display: flex; min-height: 245mm; margin: 0;
+    padding: 34mm 18mm 24mm; flex-direction: column; justify-content: center;
+    overflow: hidden; border: 0; border-top: 8mm solid #0066cc;
+    border-bottom: 1.5mm solid #34aadc; border-radius: 0;
+    background: #fff !important; color: #172033 !important;
+    box-shadow: inset 16mm 0 0 #eef7ff; break-after: page;
+  }
+  .hero::before {
+    content: "DEEPINSIGHT  深度洞察"; position: absolute; top: 10mm; right: 12mm;
+    color: #0066cc; font-family: "Noto Sans CJK SC", "Helvetica Neue", "PingFang SC", sans-serif;
+    font-size: 8.5pt; font-weight: 700; letter-spacing: .14em;
+  }
+  .hero::after {
+    content: none;
+  }
+  .hero h1 {
+    margin: 0; padding-left: 8mm; color: #0052a3 !important;
+    font-family: "Noto Serif CJK SC", "STZhongsong", "Songti SC", serif; font-size: 28pt;
+    font-weight: 700; line-height: 1.38; text-align: left; letter-spacing: .04em;
+  }
+  .hero .subtitle {
+    margin: 9mm 0 0; padding-left: 8mm; color: #3a5f7d !important;
+    font-size: 14pt; line-height: 1.65; text-align: left;
+  }
+  .hero .meta {
+    margin: 12mm 0 0; padding-left: 8mm; color: #63778a !important;
+    font-family: "Noto Sans CJK SC", "PingFang SC", sans-serif; font-size: 9pt;
+  }
+  /* 网页概览卡不进入正式 PDF；正文、表格和图像仍完整保留。 */
+  .hero .hero-stats { display: none !important; }
+  .hero .hero-stat {
+    min-height: 20mm; padding: 4mm; border: .25mm solid #bad8ef;
+    border-radius: 0; background: #f3f9ff !important; text-align: center;
+  }
+  .hero .hero-stat .hs-label { color: #54738f !important; font-size: 8pt; }
+  .hero .hero-stat .hs-value { margin-top: 1.5mm; color: #0066cc !important; font-size: 16pt; }
+
+  #report-body > section { margin: 0 0 8mm; }
+  section > h2 {
+    margin: 0 0 6mm; padding: 0 0 3mm; border-bottom: .65mm solid #1597d4;
+    color: #0059b3 !important; font-family: "Noto Serif CJK SC", "STZhongsong", "Songti SC", serif;
+    font-size: 18pt; font-weight: 700; line-height: 1.45;
+    break-after: avoid-page;
+  }
+  section > h3, .block-markdown h2, .block-markdown h3, .block-markdown h4 {
+    color: #173b5c !important; font-family: "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-weight: 700; break-after: avoid-page;
+  }
+  .block-markdown h2 { font-size: 14pt; }
+  .block-markdown h3 { margin-top: 6mm; font-size: 12pt; }
+  .block-markdown h4 { font-size: 11pt; }
+  .block, .block-markdown p { margin: 0 0 3mm; }
+  .block-markdown p { text-align: justify; text-indent: 2em; orphans: 3; widows: 3; }
+  .block-markdown li, .callout-content p, .references li { text-align: justify; orphans: 3; widows: 3; }
+
+  .block-chart, .block-callout,
+  .block-quote_card, .timeline-item, figure, img { break-inside: avoid-page; }
+  .block-chart {
+    margin: 5mm 0 6mm; padding: 2mm 0 0; border: 0; border-radius: 0;
+    background: #fff !important; box-shadow: none;
+  }
+  .block-chart.low-density-chart { display: none !important; }
+  .chart-title, .stat-grid-title {
+    color: #173b5c !important; font-family: "Noto Sans CJK SC", "PingFang SC", sans-serif;
+    font-size: 10pt; font-weight: 700; text-align: center; letter-spacing: 0;
+  }
+  .chart-description { color: #60788c !important; font-size: 8.5pt; text-align: center; }
+  .chart-canvas { height: 70mm !important; }
+  .chart-canvas.tall { height: 80mm !important; }
+  .chart-canvas.pie { height: 88mm !important; }
+  /* 数字卡片、标签云是 HTML 的浏览辅助，不复制到正式 PDF 中。 */
+  .block-stat_grid, .block-chip_list { display: none !important; }
+  .block-table { overflow: visible; break-inside: auto; }
+  .block-table table, .block-markdown table {
+    width: 100%; border-collapse: collapse; border: .25mm solid #aec7dc;
+    border-radius: 0; font-size: 8.5pt; break-inside: auto;
+  }
+  .block-table thead, .block-markdown thead { display: table-header-group; }
+  .block-table tr, .block-markdown tr { break-inside: avoid-page; }
+  .block-table th, .block-markdown th {
+    padding: 2.4mm; background: #eaf5fd !important; color: #173b5c !important;
+    border-bottom: .5mm solid #1597d4;
+  }
+  .block-table td, .block-markdown td { padding: 2.2mm; border-bottom: .2mm solid #d6e4ef; }
+  .block-callout {
+    margin: 4mm 0; padding: 3.5mm 4mm; border-left: 1mm solid #1597d4;
+    border-radius: 0; background: #f1f8fd !important;
+  }
+  .block-callout.tone-warning { border-left-color: #f0a020; background: #fff8eb !important; }
+  .block-quote_card {
+    margin: 4mm 0; padding: 3.5mm 4mm; border-left: 1mm solid #1597d4;
+    border-radius: 0; background: #f4f9fd !important;
+  }
+  img {
+    display: block; max-width: 100% !important; width: auto; height: auto;
+    margin: 4mm auto; object-fit: contain; image-rendering: auto;
+  }
+  svg { shape-rendering: geometricPrecision; text-rendering: geometricPrecision; }
+  .references { margin-top: 10mm; padding-top: 5mm; border-top: .7mm solid #0066cc; break-before: page; }
+  .references h2 { color: #0059b3 !important; font-size: 18pt; }
+  .references ol { padding-left: 7mm; font-size: 8.5pt; }
+  .references a { color: #173b5c !important; text-decoration: none; }
+  .fallback { border: .4mm solid #d93025; background: #fff !important; color: #d93025 !important; }
+}

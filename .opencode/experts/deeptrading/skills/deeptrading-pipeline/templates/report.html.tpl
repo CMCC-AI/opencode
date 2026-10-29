@@ -4,8 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>__TITLE__</title>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="./marked.min.js"></script>
+<script src="./echarts.min.js"></script>
+<script>
+/* 本地优先，加载失败时回退 CDN */
+if (typeof marked === 'undefined') { document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>'); }
+if (typeof echarts === 'undefined') { document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"><\/script>'); }
+</script>
 <style>
   :root {
     --bg: #ffffff;
