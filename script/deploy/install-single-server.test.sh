@@ -53,6 +53,9 @@ assert_contains "$unit" "Environment=OPENCODE_CONFIG_DIR=/opt/opencode-test/curr
 assert_not_contains "$unit" "Environment=OPENCODE_BUNDLED_CONFIG_DIR="
 assert_contains "$unit" "WorkingDirectory=/srv/opencode-test"
 assert_contains "$unit" "Environment=HOME=/home/opencode-test"
+assert_contains "$unit" "EnvironmentFile=/etc/opencode-cmcc/opencode.env"
+assert_contains "$unit" "EnvironmentFile=/etc/opencode-cmcc/quota.env"
+assert_not_contains "$unit" "EnvironmentFile=-/etc/opencode-cmcc/quota.env"
 
 deepxiv_unit=$(render_deepxiv_service)
 assert_contains "$deepxiv_unit" "PartOf=opencode-cmcc.service"
@@ -113,5 +116,8 @@ assert_not_contains "$deployer_source" "auth_token="
 assert_contains "$deployer_source" 'MODELS_DEV_API_JSON="$models_snapshot"'
 assert_not_contains "$deployer_source" "NODE_TLS_REJECT_UNAUTHORIZED=0"
 assert_not_contains "$deployer_source" "--insecure"
+assert_contains "$deployer_source" 'upload_quota_config'
+assert_contains "$deployer_source" 'unset OPENCODE_DOCKAPI_QUOTA_ENABLED OPENCODE_DOCKAPI_URL DOCKAPI_QUOTA_SERVICE_TOKEN'
+assert_contains "$installer_source" 'quota_resolve "$quota_input" /etc/opencode-cmcc/quota.env /etc/opencode-cmcc/opencode.env'
 
 echo "install-single-server tests passed"

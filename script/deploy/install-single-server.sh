@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set +vx
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=quota-env.sh
+source "$script_dir/quota-env.sh"
 
 render_opencode_service() {
   cat <<EOF
@@ -23,6 +28,7 @@ Environment=OPENCODE_DISABLE_AUTOUPDATE=true
 # same path as OPENCODE_BUNDLED_CONFIG_DIR would rescan experts for local configs.
 Environment=OPENCODE_CONFIG_DIR=$install_root/current/.opencode
 EnvironmentFile=/etc/opencode-cmcc/opencode.env
+EnvironmentFile=/etc/opencode-cmcc/quota.env
 ExecStart=$install_root/current/opencode serve --hostname $bind_host --port $port
 Restart=always
 RestartSec=3
@@ -112,6 +118,7 @@ fi
 
 release_dir=${1:?release directory is required}
 service_user=${2:-ubuntu}
+quota_input=${3:-${OPENCODE_QUOTA_ENV_FILE:-}}
 install_root=${OPENCODE_INSTALL_ROOT:-/opt/opencode-cmcc}
 data_root=${OPENCODE_DATA_ROOT:-/var/lib/opencode-cmcc}
 workspace_root=${OPENCODE_WORKSPACE_ROOT:-/srv/opencode/workspaces}
@@ -155,6 +162,8 @@ if [[ ! -f $release_dir/deepxiv.env ]]; then
   echo "DeepXiv proxy environment is missing: $release_dir/deepxiv.env" >&2
   exit 1
 fi
+# Validate before overwriting the old env file, switching releases or touching services.
+quota_env=$(quota_resolve "$quota_input" /etc/opencode-cmcc/quota.env /etc/opencode-cmcc/opencode.env /etc/systemd/system/opencode-cmcc.service)
 install -d -m 0755 "$install_root/releases" "$target" "$workspace_root"
 install -d -o "$service_user" -g "$service_user" -m 0750 \
   "$data_root/data" \
@@ -168,6 +177,8 @@ cp -a "$release_dir/.opencode/." "$target/.opencode/"
 chown -R root:root "$target/.opencode"
 chmod -R a+rX "$target/.opencode"
 install -d -m 0755 /etc/opencode-cmcc
+quota_install "$quota_env" /etc/opencode-cmcc/quota.env
+chown root:root /etc/opencode-cmcc/quota.env
 install -o root -g root -m 0600 "$release_dir/opencode.env" /etc/opencode-cmcc/opencode.env
 install -o root -g root -m 0600 "$release_dir/deepxiv.env" /etc/opencode-cmcc/deepxiv.env
 ln -sfn "$target" "$install_root/current"
@@ -179,6 +190,11 @@ if [[ -d /etc/logrotate.d ]]; then
   render_logrotate_config >/etc/logrotate.d/opencode-cmcc
 fi
 
+if [[ $quota_env == *'OPENCODE_DOCKAPI_QUOTA_ENABLED="true"'* ]]; then
+  echo "Token quota: enabled. DockAPI must already be configured with the same service token."
+else
+  echo "Token quota: disabled. Configure both services explicitly before enabling it."
+fi
 systemctl daemon-reload
 systemctl enable opencode-cmcc.service opencode-cmcc-deepxiv.service
 systemctl restart opencode-cmcc.service opencode-cmcc-deepxiv.service

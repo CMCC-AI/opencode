@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+set +vx
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=script/deploy/quota-env.sh
+source "$root/script/deploy/quota-env.sh"
 remote=${DEPLOY_HOST:-ubuntu@81.70.49.200}
 port=${OPENCODE_PORT:-4096}
 bind_host=${OPENCODE_BIND_HOST:-127.0.0.1}
@@ -20,6 +23,12 @@ deeplit_trust_forwarded_headers=${DEEPLIT_PROXY_TRUST_FORWARD_HEADERS:-false}
 requested_deepxiv_url=${VITE_DEEPXIV_URL:-}
 deploy_dir="$root/.deploy"
 version=${OPENCODE_VERSION:-0.0.0-cmcc-$(date +%Y%m%d%H%M%S)}
+quota_file=${OPENCODE_QUOTA_ENV_FILE:-$deploy_dir/quota.env}
+quota_required=
+if [[ -n ${OPENCODE_QUOTA_ENV_FILE:-} ]]; then quota_required=required; fi
+quota_payload=$(quota_local_config "$quota_file" "$quota_required")
+# Keep service credentials out of compiler and frontend build environments.
+unset OPENCODE_DOCKAPI_QUOTA_ENABLED OPENCODE_DOCKAPI_URL DOCKAPI_QUOTA_SERVICE_TOKEN
 
 if [[ ! $keep_releases =~ ^[1-9][0-9]*$ ]]; then
   echo "OPENCODE_KEEP_RELEASES must be a positive integer" >&2
@@ -253,6 +262,7 @@ trap 'rm -rf "$stage"' EXIT
 install -m 0755 "$root/packages/opencode/dist/$target/bin/opencode" "$stage/opencode"
 install -m 0755 "$root/packages/opencode/dist/$target/bin/deepxiv-proxy" "$stage/deepxiv-proxy"
 install -m 0755 "$root/script/deploy/install-single-server.sh" "$stage/install-single-server.sh"
+install -m 0644 "$root/script/deploy/quota-env.sh" "$stage/quota-env.sh"
 install -d -m 0755 "$stage/.opencode"
 install -m 0644 "$root/script/deploy/opencode-cmcc.jsonc" "$stage/.opencode/opencode.jsonc"
 cp -a "$root/.opencode/experts" "$stage/.opencode/experts"
@@ -295,10 +305,22 @@ create_bundle() {
 if [[ ${DEPLOY_BUILD_ONLY:-0} == 1 ]]; then
   create_bundle
   echo "Offline bundle created: $bundle"
+  echo "Quota secrets are not included; configure quota.env separately when installing offline."
   exit 0
 fi
 
 remote_stage="/tmp/opencode-cmcc-$version"
+remote_quota=
+upload_quota_config() {
+  if [[ -z $quota_payload ]]; then
+    echo "Token quota: preserving server configuration (a new server defaults to disabled)."
+    return
+  fi
+  remote_quota="$remote_stage/quota.env"
+  echo "Uploading private token quota configuration over SSH"
+  printf '%s\n' "$quota_payload" | ssh -T "$remote" \
+    "chmod 700 '$remote_stage' && umask 077 && cat > '$remote_quota'"
+}
 if [[ $upload_mode == delta ]] && ! command -v rsync >/dev/null 2>&1; then
   echo "Local rsync is unavailable; falling back to compressed bundle upload"
   upload_mode=bundle
@@ -343,9 +365,10 @@ if [[ $upload_mode == delta ]]; then
 fi
 
 if [[ $delta_uploaded == 1 ]]; then
+  upload_quota_config
   echo "Installing the verified delta release and restarting the service"
   ssh -t "$remote" \
-    "sudo env OPENCODE_INSTALL_ROOT='$install_root' OPENCODE_BIND_HOST='$bind_host' OPENCODE_PORT='$port' OPENCODE_KEEP_RELEASES='$keep_releases' bash '$remote_stage/release/install-single-server.sh' '$remote_stage/release' '$service_user' && rm -rf -- '$remote_stage'"
+    "sudo env OPENCODE_INSTALL_ROOT='$install_root' OPENCODE_BIND_HOST='$bind_host' OPENCODE_PORT='$port' OPENCODE_KEEP_RELEASES='$keep_releases' bash '$remote_stage/release/install-single-server.sh' '$remote_stage/release' '$service_user' '$remote_quota' && rm -rf -- '$remote_stage'"
 else
   create_bundle
   echo "Uploading one compressed offline bundle"
@@ -356,9 +379,10 @@ else
     scp "$bundle" "$remote:$remote_stage/release.tar.gz"
   fi
 
+  upload_quota_config
   echo "Installing the bundle release and restarting the service"
   ssh -t "$remote" \
-    "tar -xzf '$remote_stage/release.tar.gz' -C '$remote_stage' && sudo env OPENCODE_INSTALL_ROOT='$install_root' OPENCODE_BIND_HOST='$bind_host' OPENCODE_PORT='$port' OPENCODE_KEEP_RELEASES='$keep_releases' bash '$remote_stage/install-single-server.sh' '$remote_stage' '$service_user' && rm -rf -- '$remote_stage'"
+    "tar -xzf '$remote_stage/release.tar.gz' -C '$remote_stage' && sudo env OPENCODE_INSTALL_ROOT='$install_root' OPENCODE_BIND_HOST='$bind_host' OPENCODE_PORT='$port' OPENCODE_KEEP_RELEASES='$keep_releases' bash '$remote_stage/install-single-server.sh' '$remote_stage' '$service_user' '$remote_quota' && rm -rf -- '$remote_stage'"
 fi
 
 echo

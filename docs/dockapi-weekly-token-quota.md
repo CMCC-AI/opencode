@@ -2,7 +2,7 @@
 
 ## 配置
 
-功能默认关闭。显式设置：
+OpenCode 的额度开关默认关闭。启用时显式设置：
 
 ```text
 OPENCODE_DOCKAPI_QUOTA_ENABLED=true
@@ -13,6 +13,57 @@ DOCKAPI_QUOTA_SERVICE_TOKEN=<与 DockAPI 相同的不少于 32 字符的随机�
 错误的开关值、缺少地址或密钥会报错，不能静默变成无限额度。以上变量不要放在 VITE_* 中，不能暴露给浏览器。旧 research-quota-demo 的 OPENCODE_TOKEN_QUOTA 配置不是本实现的配置入口。
 
 DockAPI 的数据库迁移、周额度 SQL、VIP 切换和内部 API 以 dockapi-service/docs/token-quota.md 为准。模型 API Key 仍由原有 Provider 配置管理。
+
+## 一键部署
+
+首次部署前，在仓库根目录的 Git Bash 中准备私有配置：
+
+```bash
+mkdir -p .deploy
+cp script/deploy/quota.env.example .deploy/quota.env
+chmod 600 .deploy/quota.env
+```
+
+编辑 `.deploy/quota.env`（UTF-8 无 BOM、LF 换行），把 `DOCKAPI_QUOTA_SERVICE_TOKEN` 填成与 DockAPI 相同的真实随机密钥，再执行原来的命令：
+
+```bash
+bash deploy_to_server.sh
+```
+
+模板默认启用额度，但密钥留空；未填写、少于 32 字符或含空白/非 ASCII 字符时部署会明确报错。推荐使用 `openssl rand -hex 32` 生成一次，然后在 DockAPI 和 OpenCode 两边配置相同值，不要分别生成。
+
+- `OPENCODE_DOCKAPI_URL` 填 DockAPI 内网根地址，不含 `/api`。模板中的 `http://127.0.0.1:8081` 仅适用于同机、非跨容器部署；不要填公网 Nginx 的 `:3002` 入口。
+- `.deploy/` 已被 Git 忽略。真实配置不进入 Git、前端、编译环境或发布压缩包；通过 SSH 标准输入单独传输，不写入 SSH 命令参数，也不输出密钥。
+- 可以用 `OPENCODE_QUOTA_ENV_FILE=/path/to/private/quota.env bash deploy_to_server.sh` 指定仓库外的配置文件，方便多个部署 worktree 共用。指定文件不存在时直接失败，不默默忽略。
+- 也支持现有的三个环境变量；显式环境变量优先于配置文件，未覆盖的字段继续读取文件。只提供地址或密钥、未明确开关时会报错。
+- 不提供本地文件且三个变量都未设置时，沿用服务器配置；新服务器没有任何旧配置时保持关闭，并在安装日志中明确显示，绝不会凭空生成密钥或启用配额。
+
+安装脚本把额度配置保存到服务器的 `/etc/opencode-cmcc/quota.env`，由 systemd 在普通 `opencode.env` 之后读取，文件归属 root、权限 `0600`。普通代码部署保留额度设置；原先写在 `opencode.env` 中的三个额度变量会先迁移到独立文件，再更新普通环境文件。非法的新配置或旧配置会在切换版本、覆盖配置、操作服务前被拒绝。systemd 必须能读到独立文件；已经使用独立文件的服务器若丢失该文件，重新部署也会报错，需恢复旧文件或明确提供新配置，不会悄悄关闭限额。
+
+生成文件的双引号转义遵循 [systemd EnvironmentFile 的格式](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#EnvironmentFile=)，同时支持由 Bash 重新读取。
+
+`DEPLOY_BUILD_ONLY=1` 生成的离线包也不含密钥。离线首次安装需另外准备受信任的私有 Bash env 文件：
+
+```bash
+sudo bash /path/to/release/install-single-server.sh /path/to/release ubuntu /path/to/private/quota.env
+```
+
+后续离线安装可不传最后一个参数，沿用服务器配置。配置文件会作为管理员控制的 Bash env 文件读取，不要使用来自不可信来源的文件。启用或更换密钥前应停止新任务、等待已有任务及结算完成，并协调 DockAPI 两侧配置；不要单侧切换开关。
+
+此脚本只负责 OpenCode 部署，不会自动迁移 DockAPI 数据库、填写周额度或修改 Nginx。启用前仍需先完成 DockAPI 配置和启动，并确认已使用 `script/deploy/nginx-dockapi.conf` 的内部接口限制。DockAPI 开关也应显式配置；当前 `token-quota.properties` 的缺省值是 `true`，不要仅根据旧文档的“默认关闭”判断其状态。
+
+### 部署脚本测试
+
+```bash
+cd script/deploy
+bash quota-env.test.sh
+bash install-single-server.test.sh
+node --test deploy-quota.test.mjs
+```
+
+Windows 下可用 `BASH_EXECUTABLE` 指定 Git Bash 的 `bash.exe`。部署集成测试使用临时目录、模拟 SSH/rsync/SCP 和模拟二进制，覆盖整包、增量、离线打包、配置保留及非法配置拦截，不连接真实服务器，不启动或重启任何服务。
+
+2026-10-29 本地验证：41 项配置检查、原安装脚本测试、5 项模拟部署测试及 Bash/JavaScript 语法检查通过。Windows 下跳过 POSIX 文件权限断言；未在实际 Linux systemd 中启动服务，未执行真实部署、数据库迁移或模型调用。
 
 ## 执行链
 
