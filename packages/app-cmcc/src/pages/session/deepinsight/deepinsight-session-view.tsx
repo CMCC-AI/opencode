@@ -15,7 +15,7 @@ export function DeepInsightSessionView() {
       return {
         id: "overview",
         name: "总览",
-        profession: "深度研究",
+        profession: "深度研究专家团",
         status: data.overviewStatus,
         markdown: data.overviewMarkdown,
         messages: data.overviewMessages,

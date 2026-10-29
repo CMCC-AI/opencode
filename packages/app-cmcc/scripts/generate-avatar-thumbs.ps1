@@ -8,7 +8,7 @@ Add-Type -AssemblyName System.Drawing
 $expertsRoot = Join-Path $PSScriptRoot "..\..\..\.opencode\experts"
 $size = 96
 
-$avatars = Get-ChildItem -LiteralPath $expertsRoot -Recurse -Filter *.png | Where-Object { $_.Directory.Name -ne "thumb" }
+$avatars = Get-ChildItem -LiteralPath $expertsRoot -Recurse -Filter *.png | Where-Object { $_.Directory.Name -notin @("thumb", "originals") }
 $generated = 0
 $skipped = 0
 $totalSaved = 0
@@ -34,7 +34,12 @@ foreach ($avatar in $avatars) {
                 $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
                 $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
                 $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-                $graphics.DrawImage($image, (New-Object System.Drawing.Rectangle 0, 0, $size, $size), (New-Object System.Drawing.Rectangle $cropX, $cropY, $side, $side), [System.Drawing.GraphicsUnit]::Pixel)
+                # SourceCopy + TileFlipXY keeps alpha exact and stops transparent-pixel bleed on RGBA sources
+                $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
+                $attrs = New-Object System.Drawing.Imaging.ImageAttributes
+                $attrs.SetWrapMode([System.Drawing.Drawing2D.WrapMode]::TileFlipXY)
+                $graphics.DrawImage($image, (New-Object System.Drawing.Rectangle 0, 0, $size, $size), $cropX, $cropY, $side, $side, [System.Drawing.GraphicsUnit]::Pixel, $attrs)
+                $attrs.Dispose()
             } finally {
                 $graphics.Dispose()
             }

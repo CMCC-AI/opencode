@@ -50,7 +50,7 @@ for (const width of [1440, 390]) {
       await image.evaluate((node) => node.scrollIntoView({ block: "center", behavior: "instant" }))
       await ready(image)
     }
-    await expect(page.getByAltText("DeepInsight 四层 Agentic 架构图")).toHaveAttribute("src", /\.optimized\.webp$/)
+    await expect(page.getByAltText("DeepInsight 四层 Agentic 架构图")).toHaveAttribute("src", /\.webp$/)
     await page.evaluate(() => scrollTo(0, 0))
     await page.screenshot({ path: info.outputPath("landing.png"), fullPage: true })
   })

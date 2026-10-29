@@ -28,6 +28,10 @@ Environment=OPENCODE_DISABLE_AUTOUPDATE=true
 # same path as OPENCODE_BUNDLED_CONFIG_DIR would rescan experts for local configs.
 Environment=OPENCODE_CONFIG_DIR=$install_root/current/.opencode
 EnvironmentFile=/etc/opencode-cmcc/opencode.env
+# Server-owned overrides (e.g. DASHSCOPE_API_KEY). The "-" prefix tolerates a
+# missing file; deployments regenerate opencode.env but never touch this file.
+EnvironmentFile=-/etc/opencode-cmcc/opencode.env.local
+# Validated quota settings take precedence over general server overrides.
 EnvironmentFile=/etc/opencode-cmcc/quota.env
 ExecStart=$install_root/current/opencode serve --hostname $bind_host --port $port
 Restart=always

@@ -58,6 +58,22 @@ deployment script requires `VITE_DEEPXIV_URL`, when supplied, to match
 `DEEPLIT_PROXY_PUBLIC_ORIGIN` so the iframe URL, proxy headers, and CSP cannot
 drift apart.
 
+## Server-owned environment overrides
+
+Deployments regenerate `/etc/opencode-cmcc/opencode.env` on every release, so
+secrets such as `DASHSCOPE_API_KEY` must not live there. The systemd unit also
+loads `/etc/opencode-cmcc/opencode.env.local` (missing file is tolerated), which
+deployments never touch. Put server-local variables in it once:
+
+```bash
+sudo install -o root -g root -m 0600 /dev/null /etc/opencode-cmcc/opencode.env.local
+echo 'DASHSCOPE_API_KEY=sk-xxx' | sudo tee -a /etc/opencode-cmcc/opencode.env.local >/dev/null
+sudo systemctl restart opencode-cmcc
+```
+
+Changes to the `.local` file require a manual `systemctl restart opencode-cmcc`;
+regular deployments restart the service on their own.
+
 The page will reload if you make edits.<br>
 
 ### `npm run build`

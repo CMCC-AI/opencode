@@ -6,7 +6,6 @@ import { createEffect, createMemo, For, onCleanup, Show, Suspense, untrack, type
 import { createStore } from "solid-js/store"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { DebugBar } from "@/components/debug-bar"
-import { HelpButton } from "@/components/help-button"
 import { useSettingsDialog } from "@/components/settings-dialog"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { CasePublishDialog } from "@/components/case-publish-dialog"
@@ -40,7 +39,6 @@ import { cmccHistoryProduct, type CmccHistoryProduct } from "@/utils/cmcc-histor
 import { mstockMention } from "@/pages/session/mstock/page-selection"
 import { useResearchHome } from "@/pages/general-deepinsight/research-home"
 import { ResearchHistory } from "@/pages/general-deepinsight/history"
-import { CmccDeepXivFrame, isDeepXivPath } from "./cmcc-deepxiv"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import jiutianSidebarLogo from "@/assets/home-v6/jiutian-sidebar-logo.optimized.webp"
 import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
@@ -63,7 +61,6 @@ export default function NewLayout(props: ParentProps) {
   const location = useLocation()
   const layout = useLayout()
   const [persistentViews, setPersistentViews] = createStore({
-    deepXivMounted: isDeepXivPath(location.pathname),
     deepLensMounted: isDeepLensPath(location.pathname),
   })
   setNavigate(navigate)
@@ -71,9 +68,6 @@ export default function NewLayout(props: ParentProps) {
   createEffect(() => setV2Toast(true))
   // Preserve the embedded app's in-memory state across APP-CMCC menu changes;
   // the same-site proxy restores its Cookie independently after a real reload.
-  createEffect(() => {
-    if (isDeepXivPath(location.pathname)) setPersistentViews("deepXivMounted", true)
-  })
   createEffect(() => {
     if (isDeepLensPath(location.pathname)) setPersistentViews("deepLensMounted", true)
   })
@@ -157,9 +151,6 @@ export default function NewLayout(props: ParentProps) {
             >
               {props.children}
             </Suspense>
-            <Show when={persistentViews.deepXivMounted}>
-              <CmccDeepXivFrame active={isDeepXivPath(location.pathname)} />
-            </Show>
             <Show when={persistentViews.deepLensMounted}>
               <CmccDeepLensFrame active={isDeepLensPath(location.pathname)} />
             </Show>
@@ -167,7 +158,6 @@ export default function NewLayout(props: ParentProps) {
         </section>
       </main>
       {import.meta.env.DEV && <DebugBar inline />}
-      <HelpButton />
       <ToastRegion v2 />
     </div>
   )
@@ -533,12 +523,6 @@ function CmccSidebar() {
               label="DeepTrack 行业追踪"
               active={location.pathname === "/expert/workspace"}
               onClick={() => navigate("/expert/workspace")}
-            />
-            <CmccSidebarAction
-              icon="review"
-              label="DeepXiv 前沿论文"
-              active={isDeepXivPath(location.pathname)}
-              onClick={() => navigate("/deepxiv")}
             />
             <CmccSidebarAction
               icon="photo"

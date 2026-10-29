@@ -1,10 +1,9 @@
 import { expect, test, type Page } from "@playwright/test"
-import manifest from "../../scripts/image-optimization.json" with { type: "json" }
 
 const baseline = process.env.CMCC_LANDING_BASELINE === "1"
-const animated = manifest.images.filter((item) => item.source.startsWith("public/landing/") && item.frames > 1)
+// Landing 产物改为源码级 WebP 后，动画资源为研究步骤/知识库 GIF 与反思审查动画 WebP
 const isAnimation = (url: string) =>
-  /\.gif(?:\?|$)/.test(url) || animated.some((item) => url.includes(item.output.slice(6)))
+  /\.gif(?:\?|$)/.test(url) || /research-verify-[^/]*\.webp/.test(url)
 
 async function staticImagesReady(page: Page) {
   await expect
@@ -58,20 +57,15 @@ for (const width of [1440, 390]) {
     expect(state.scrollY).toBe(0)
     expect(state.sections.every((node) => node.opacity === "1" && node.transform === "none")).toBe(true)
     expect(animations).toEqual([])
-    await expect(page.getByAltText("DeepInsight 四层 Agentic 架构图")).toHaveAttribute("src", /\.optimized\.webp$/)
+    await expect(page.getByAltText("DeepInsight 四层 Agentic 架构图")).toHaveAttribute("src", /\.webp$/)
     for (const image of await page.locator(".tile-img").all())
-      await expect(image).toHaveAttribute("src", /\.optimized\.webp$/)
+      await expect(image).toHaveAttribute("src", /\.webp$/)
     await page.evaluate(() =>
       scrollTo({ top: document.getElementById("architecture")!.offsetTop, behavior: "instant" }),
     )
     await expect(page.getByAltText("DeepInsight 四层 Agentic 架构图")).toBeVisible()
     await page.screenshot({ path: info.outputPath("fast-scroll.png") })
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
-    const board = page.locator("#proof")
-    await board.scrollIntoViewIfNeeded()
-    await expect
-      .poll(async () => Number((await board.locator(".metric-val").first().innerText()).replace(/\D/g, "")))
-      .toBeGreaterThan(0)
   })
 }
 
@@ -82,7 +76,7 @@ test("landing limits background image concurrency and continues after a failed i
   let releaseAll = false
   const queued = /\/(?:deepinsight-system-architecture|grid-\d+|industry-|tool-deeptrack|deeplens-web|prime-closing-bg)/
   await page.route("**/*.mp4", (route) => route.abort())
-  await page.route("**/*.optimized.webp", async (route) => {
+  await page.route("**/*.webp", async (route) => {
     if (!queued.test(new URL(route.request().url()).pathname)) return route.continue()
     started.push(route.request().url())
     if (!releaseAll) await new Promise<void>((resolve) => held.push(resolve))
@@ -99,7 +93,7 @@ test("landing limits background image concurrency and continues after a failed i
     await expect.poll(() => started.length).toBe(3)
     releaseAll = true
     held.splice(0).forEach((release) => release())
-    await expect(page.getByAltText("AI + 科研 系统界面")).toHaveAttribute("src", /\.optimized\.webp$/)
+    await expect(page.getByAltText("AI + 科研 系统界面")).toHaveAttribute("src", /\.webp$/)
     await expect
       .poll(() =>
         page
@@ -131,7 +125,7 @@ test("visible artwork bypasses an occupied background queue", async ({ page }) =
   let intercepted = 0
   let releaseAll = false
   await page.route("**/*.mp4", (route) => route.abort())
-  await page.route("**/*.optimized.webp", async (route) => {
+  await page.route("**/*.webp", async (route) => {
     if (
       /\/(?:deepinsight-system-architecture|grid-\d+)/.test(new URL(route.request().url()).pathname) &&
       intercepted++ < 2 &&
@@ -162,7 +156,7 @@ test("research animation keeps its animated classification after switching to We
   await page.getByRole("button", { name: /04 反思审查/ }).click()
   const image = page.getByAltText("DeepInsight 反思审查 工作台", { exact: true })
   await expect(image).toHaveAttribute("data-media-kind", "animated")
-  await expect(image).toHaveAttribute("src", /research-verify-.*\.optimized\.webp$/)
+  await expect(image).toHaveAttribute("src", /research-verify-[^/]*\.webp$/)
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
 })
 

@@ -50,7 +50,6 @@ import { SDKProvider, useSDK } from "@/context/sdk"
 import { WslServersProvider } from "@/wsl/context"
 import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout"
 import NewLayout from "@/pages/layout-new"
-import { CmccDeepXivRoute } from "@/pages/cmcc-deepxiv"
 import { CmccDeepLensRoute } from "@/pages/cmcc-deeplens"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
@@ -701,8 +700,6 @@ function Routes() {
         <Route path="/knowledge" component={CmccKnowledgeHomeRoute} />
         <Route path="/knowledge/:id/session/:sessionID" component={KnowledgeNotebookRoute} />
         <Route path="/knowledge/:id" component={KnowledgeNotebookRoute} />
-        <Route path="/deepxiv" component={CmccDeepXivRoute} />
-        <Route path="/deepxiv/" component={CmccDeepXivRoute} />
         <Route path="/deeplens" component={CmccDeepLensRoute} />
         <Route path="/deeplens/" component={CmccDeepLensRoute} />
         <Route path="/plugins" component={CmccPluginHubRoute} />

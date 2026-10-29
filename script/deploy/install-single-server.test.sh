@@ -54,8 +54,12 @@ assert_not_contains "$unit" "Environment=OPENCODE_BUNDLED_CONFIG_DIR="
 assert_contains "$unit" "WorkingDirectory=/srv/opencode-test"
 assert_contains "$unit" "Environment=HOME=/home/opencode-test"
 assert_contains "$unit" "EnvironmentFile=/etc/opencode-cmcc/opencode.env"
+assert_contains "$unit" "EnvironmentFile=-/etc/opencode-cmcc/opencode.env.local"
 assert_contains "$unit" "EnvironmentFile=/etc/opencode-cmcc/quota.env"
 assert_not_contains "$unit" "EnvironmentFile=-/etc/opencode-cmcc/quota.env"
+environment_files=$(printf '%s\n' "$unit" | grep '^EnvironmentFile=')
+[[ $environment_files == $'EnvironmentFile=/etc/opencode-cmcc/opencode.env\nEnvironmentFile=-/etc/opencode-cmcc/opencode.env.local\nEnvironmentFile=/etc/opencode-cmcc/quota.env' ]] ||
+  fail "environment files must load base, local overrides, then required quota settings"
 
 deepxiv_unit=$(render_deepxiv_service)
 assert_contains "$deepxiv_unit" "PartOf=opencode-cmcc.service"
