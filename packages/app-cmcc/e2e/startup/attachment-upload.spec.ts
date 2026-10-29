@@ -33,7 +33,7 @@ for (const width of [1440, 390]) {
     const menu = page.locator("[data-cmcc-expert-menu]")
     await expect(menu).toBeVisible()
     for (const name of [
-      "深度研究",
+      "深度研究专家团",
       "财经分析专家团",
       "购买决策专家团",
       "巡察分析专家团",
@@ -185,7 +185,7 @@ test("existing conversation expert menus insert the real Agent reference without
   await page.goto(`/server/${base64Encode(baseURL!)}/session/${homeSession.id}`)
   await page.getByRole("button", { name: "打开更多操作" }).click()
   await page.getByRole("button", { name: "专家团", exact: true }).click()
-  await page.getByRole("menuitem", { name: "深度研究", exact: true }).click()
+  await page.getByRole("menuitem", { name: "深度研究专家团", exact: true }).click()
   await expect(page.locator('[data-component="prompt-input"]')).toContainText("@deepinsight/deepinsight-team-lead")
   await expect(page).toHaveURL(new RegExp(`/session/${homeSession.id}$`))
 })
