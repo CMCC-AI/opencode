@@ -1,6 +1,25 @@
 @import "@opencode-ai/ui/v2/text-input-v2.css";
 @import "@opencode-ai/ui/v2/button-v2.css";
 
+[data-component="dialog-v2"]:has(.token-quota-dialog) [data-slot="dialog-container"] {
+  width: min(calc(100vw - 32px), 640px);
+  max-height: calc(100dvh - 32px);
+  background: var(--v2-background-bg-base);
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"] .token-quota-dialog [data-slot="dialog-header"] {
+  padding: 24px;
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"] .token-quota-dialog [data-slot="dialog-body"] {
+  overflow-y: auto;
+}
+
+.token-quota-dialog .settings-v2-tab-body {
+  padding: 0 24px 24px;
+  gap: 16px;
+}
+
 [data-component="tabs-v2"][data-variant="settings"] {
   height: 100%;
 }

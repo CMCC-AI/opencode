@@ -942,8 +942,8 @@ export default function LegacyLayout(props: ParentProps) {
       },
       {
         id: "settings.open",
-        title: language.t("command.settings.open"),
-        category: language.t("command.category.settings"),
+        title: "Token 额度",
+        category: "Token 额度",
         keybind: "mod+comma",
         onSelect: () => openSettings(),
       },

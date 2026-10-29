@@ -286,11 +286,16 @@ test("weekly quota blocks AI polishing without changing the chapter", async ({ p
   expect(data.requests.filter((request) => request.method === "PUT")).toHaveLength(0)
 })
 
+async function prepareQuotaPanel(page: Page) {
+  const data = await prepare(page)
+  await page.route("**/file/directory*", (route) => route.fulfill({ json: { path: fixture.directory } }))
+  return data
+}
+
 for (const width of [1440, 390]) {
   test(`weekly quota settings show consumed and reserved separately at ${width}px`, async ({ page }) => {
-    const data = await prepare(page)
-    await page.setViewportSize({ width, height: 1000 })
-    await page.route("**/file/directory*", (route) => route.fulfill({ json: { path: fixture.directory } }))
+    const data = await prepareQuotaPanel(page)
+    await page.setViewportSize({ width, height: width === 390 ? 740 : 1000 })
     await page.route("**/api/dockapi/token-quota", (route) =>
       route.fulfill({ json: { code: 200, data: { ...limitedQuota, used: 32000, reserved: 8000, remaining: 60000 } } }),
     )
@@ -298,15 +303,133 @@ for (const width of [1440, 390]) {
     await expect(page.locator('[data-component="session-new-design"]').first()).toBeVisible()
     await expect(page.locator('[data-component="prompt-input"]').first()).toBeVisible()
     await page.keyboard.press("Control+,")
-    await page.getByRole("tab", { name: "Token 额度", exact: true }).click()
-    const dialog = page.getByRole("dialog")
+    const dialog = page.getByRole("dialog", { name: "Token 额度", exact: true })
     await expect(dialog.getByText("32,000 Token", { exact: true })).toBeVisible()
     await expect(dialog.getByText("8,000 Token", { exact: true })).toBeVisible()
     await expect(dialog.getByText("60,000 Token", { exact: true })).toBeVisible()
+    await expect(dialog.getByRole("tab")).toHaveCount(0)
+    expect(await dialog.evaluate((element) => element.getBoundingClientRect().right <= innerWidth)).toBe(true)
+    expect(await dialog.evaluate((element) => element.getBoundingClientRect().bottom <= innerHeight)).toBe(true)
+    await dialog.getByRole("button", { name: "刷新额度", exact: true }).scrollIntoViewIfNeeded()
     await page.screenshot({ path: test.info().outputPath("weekly-quota.png") })
+    await dialog.getByRole("button", { name: "关闭", exact: true }).click()
+    await expect(dialog).toHaveCount(0)
     expect(data.errors).toEqual([])
   })
 }
+
+test("user menu opens quota directly and refreshes without exposing settings", async ({ page }) => {
+  const data = await prepareQuotaPanel(page)
+  let reads = 0
+  await page.route("**/api/dockapi/token-quota", (route) => {
+    reads++
+    return route.fulfill({ json: { code: 200, data: { ...limitedQuota, used: reads * 1000 } } })
+  })
+  await page.goto("/app")
+  const user = page.getByRole("button", { name: /测试用户/ })
+  await expect(user).toBeVisible()
+  expect(reads).toBe(0)
+  await user.click()
+  await expect(page.getByRole("menuitem")).toHaveText(["首页", "Token 额度", "退出登录"])
+  await expect(page.getByRole("menu")).toHaveCSS("opacity", "1")
+  await page.screenshot({ path: test.info().outputPath("user-menu.png") })
+  await page.getByRole("menuitem", { name: "Token 额度", exact: true }).click()
+  const dialog = page.getByRole("dialog", { name: "Token 额度", exact: true })
+  await expect(dialog.getByText("1,000 Token", { exact: true })).toBeVisible()
+  await expect(dialog.getByRole("tab")).toHaveCount(0)
+  await expect(dialog.getByText(/^(通用|快捷键|服务器|提供商|模型)$/)).toHaveCount(0)
+  await dialog.getByRole("button", { name: "刷新额度", exact: true }).click()
+  await expect(dialog.getByText("2,000 Token", { exact: true })).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(dialog).toHaveCount(0)
+  await user.click()
+  await page.getByRole("menuitem", { name: "Token 额度", exact: true }).click()
+  await expect(dialog.getByText("3,000 Token", { exact: true })).toBeVisible()
+  expect(reads).toBe(3)
+  expect(data.errors).toEqual([])
+})
+
+test("user menu home navigates to the current site's landing page without logging out", async ({ page }) => {
+  const data = await prepareQuotaPanel(page)
+  await page.route("**/landing/index.html", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Home</title><h1>Home</h1>" }),
+  )
+  await page.goto("/app")
+  const origin = new URL(page.url()).origin
+  await page.getByRole("button", { name: /测试用户/ }).click()
+  await page.getByRole("menuitem", { name: "首页", exact: true }).click()
+  await expect(page).toHaveURL(`${origin}/landing/index.html`)
+  expect(await page.evaluate(() => localStorage.getItem("dockapi.accessToken"))).toBe("research-test")
+  expect(data.requests.some((request) => request.path === "/api/auth/logout")).toBe(false)
+  expect(data.errors).toEqual([])
+})
+
+test("user menu logout still revokes the login", async ({ page }) => {
+  const data = await prepareQuotaPanel(page)
+  await page.goto("/app")
+  await page.getByRole("button", { name: /测试用户/ }).click()
+  await page.getByRole("menuitem", { name: "退出登录", exact: true }).click()
+  await expect.poll(() => data.requests.filter((request) => request.path === "/api/auth/logout").length).toBe(1)
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("dockapi.accessToken"))).toBe(null)
+  expect(data.errors).toEqual([])
+})
+
+test("quota dialog disables refresh while loading and shows when quota is disabled", async ({ page }) => {
+  const data = await prepareQuotaPanel(page)
+  let release = () => {}
+  const pending = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route("**/api/dockapi/token-quota", async (route) => {
+    await pending
+    return route.fulfill({ json: { code: 200, data: { ...limitedQuota, enabled: false } } })
+  })
+  await page.goto("/app")
+  await page.getByRole("button", { name: /测试用户/ }).click()
+  await page.getByRole("menuitem", { name: "Token 额度", exact: true }).click()
+  const dialog = page.getByRole("dialog", { name: "Token 额度", exact: true })
+  try {
+    await expect(dialog.getByText("正在读取额度...", { exact: true })).toBeVisible()
+    await expect(dialog.getByRole("button", { name: "刷新额度", exact: true })).toBeDisabled()
+  } finally {
+    release()
+  }
+  await expect(dialog.getByText("Token 额度控制未启用", { exact: true })).toBeVisible()
+  await expect(dialog.getByRole("button", { name: "刷新额度", exact: true })).toBeEnabled()
+  expect(data.errors).toEqual([])
+})
+
+test("quota dialog keeps refresh available after a lookup error and displays VIP without a limit", async ({ page }) => {
+  const data = await prepareQuotaPanel(page)
+  let available = false
+  await page.route("**/api/dockapi/token-quota", (route) =>
+    available
+      ? route.fulfill({ json: { code: 200, data: { ...limitedQuota, vip: true, weeklyLimit: null, remaining: null } } })
+      : route.fulfill({ status: 503, json: { code: 503, message: "额度服务暂时不可用", data: null } }),
+  )
+  await page.goto("/app")
+  await page.getByRole("button", { name: /测试用户/ }).click()
+  await page.getByRole("menuitem", { name: "Token 额度", exact: true }).click()
+  const dialog = page.getByRole("dialog", { name: "Token 额度", exact: true })
+  await expect(dialog.getByRole("alert")).toHaveText("额度服务暂时不可用")
+  await expect(page.getByRole("heading", { name: "Something went wrong", exact: true })).toHaveCount(0)
+  available = true
+  await dialog.getByRole("button", { name: "刷新额度", exact: true }).click()
+  await expect(dialog.getByText("VIP", { exact: true })).toBeVisible()
+  await expect(dialog.getByText("不限额", { exact: true })).toHaveCount(2)
+  await expect(dialog.getByRole("alert")).toHaveCount(0)
+  available = false
+  await dialog.getByRole("button", { name: "刷新额度", exact: true }).click()
+  await expect(dialog.getByRole("alert")).toHaveText("额度服务暂时不可用")
+  await expect(dialog.getByText("VIP", { exact: true })).toHaveCount(0)
+  available = true
+  await dialog.getByRole("button", { name: "刷新额度", exact: true }).click()
+  await expect(dialog.getByText("VIP", { exact: true })).toBeVisible()
+  await dialog.getByRole("button", { name: "关闭", exact: true }).click()
+  await expect(page.locator('[data-component="session-new-design"]').first()).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Something went wrong", exact: true })).toHaveCount(0)
+  expect(data.errors).toEqual([])
+})
 
 for (const width of [1920, 390]) {
   test(`final report citations reuse numbers across chapters and Word without changing data at ${width}px`, async ({

@@ -283,7 +283,7 @@ function CmccSidebar() {
   const sync = useServerSync()
   const dockapi = useDockApi()
   const tabs = useTabs()
-  const openSettings = useSettingsDialog()
+  const openQuota = useSettingsDialog()
   const knowledgeNotebooks = createMemo(() => {
     location.pathname
     return cmccKnowledgeNotebooks()
@@ -599,10 +599,17 @@ function CmccSidebar() {
                 <DropdownMenu.Content class="w-[calc(var(--kb-popper-anchor-width)-8px)] min-w-[220px] rounded-[12px] border border-[rgba(99,102,241,0.14)] bg-white p-1.5 text-[#4a4a6a] shadow-[0_12px_32px_rgba(49,46,129,0.18)] outline-none">
                   <DropdownMenu.Item
                     class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)] data-[highlighted]:text-[#4f46e5]"
-                    onSelect={openSettings}
+                    onSelect={() => window.location.assign("/landing/index.html")}
                   >
-                    <Icon name="settings-gear" class="size-4 shrink-0" />
-                    <DropdownMenu.ItemLabel>设置</DropdownMenu.ItemLabel>
+                    <Icon name="dot-grid" class="size-4 shrink-0" />
+                    <DropdownMenu.ItemLabel>首页</DropdownMenu.ItemLabel>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)] data-[highlighted]:text-[#4f46e5]"
+                    onSelect={openQuota}
+                  >
+                    <Icon name="sliders" class="size-4 shrink-0" />
+                    <DropdownMenu.ItemLabel>Token 额度</DropdownMenu.ItemLabel>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)] data-[highlighted]:text-[#4f46e5]"

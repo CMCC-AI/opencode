@@ -19,9 +19,6 @@ export function SettingsQuotaV2() {
   const [quota, { refetch }] = createResource(() => dockapi.quota.get())
   return (
     <>
-      <div class="settings-v2-tab-header">
-        <h2 class="settings-v2-tab-title">Token 额度</h2>
-      </div>
       <div class="settings-v2-tab-body">
         <Show when={quota.loading}>
           <p class="text-14-regular text-text-weak">正在读取额度...</p>
@@ -31,7 +28,7 @@ export function SettingsQuotaV2() {
             {quota.error instanceof Error ? quota.error.message : "额度读取失败"}
           </p>
         </Show>
-        <Show when={quota()}>
+        <Show when={!quota.error && quota()}>
           {(value) => (
             <>
               <Show
@@ -80,7 +77,12 @@ export function SettingsQuotaV2() {
             </>
           )}
         </Show>
-        <ButtonV2 class="mt-4" variant="neutral" disabled={quota.loading} onClick={() => void refetch()}>
+        <ButtonV2
+          class="mt-4"
+          variant="neutral"
+          disabled={quota.loading}
+          onClick={() => void Promise.resolve(refetch()).catch(() => undefined)}
+        >
           刷新额度
         </ButtonV2>
       </div>
