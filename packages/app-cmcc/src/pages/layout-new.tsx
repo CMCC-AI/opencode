@@ -6,7 +6,6 @@ import { createEffect, createMemo, For, onCleanup, Show, Suspense, untrack, type
 import { createStore } from "solid-js/store"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { DebugBar } from "@/components/debug-bar"
-import { HelpButton } from "@/components/help-button"
 import { useSettingsDialog } from "@/components/settings-dialog"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { CasePublishDialog } from "@/components/case-publish-dialog"
@@ -158,7 +157,6 @@ export default function NewLayout(props: ParentProps) {
         </section>
       </main>
       {import.meta.env.DEV && <DebugBar inline />}
-      <HelpButton />
       <ToastRegion v2 />
     </div>
   )
