@@ -1,4 +1,4 @@
-import { onMount } from "solid-js"
+import { onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { showToast } from "@/utils/toast"
@@ -55,6 +55,7 @@ type PromptAttachmentsInput = {
   read?: AttachmentReader
   prompt: ReturnType<typeof usePrompt>
   editor: () => HTMLDivElement | undefined
+  dropTarget: () => HTMLElement | undefined
   isDialogActive: () => boolean
   setDraggingType: (type: "image" | "@mention" | null) => void
   focusEditor: () => void
@@ -237,13 +238,38 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
       })
     },
   })
+  createPromptAttachmentDrop(input, attachments.addAttachments)
+  return attachments
+}
 
-  const handleGlobalDragOver = (event: DragEvent) => {
-    if (input.isDialogActive()) return
+export function createPromptAttachmentDrop(
+  input: Pick<
+    PromptAttachmentsInput,
+    "editor" | "dropTarget" | "disabled" | "isDialogActive" | "setDraggingType" | "focusEditor" | "addPart"
+  >,
+  addAttachments: (files: File[]) => Promise<boolean>,
+) {
+  let disposed = false
+  const active = () => {
+    if (disposed || input.disabled?.() || input.isDialogActive()) return false
+    const editor = input.editor()
+    const target = input.dropTarget()
+    if (!editor?.isConnected || !target?.contains(editor) || !editor.getClientRects().length) return false
+    if (editor.closest('[hidden], [inert], [aria-hidden="true"]')) return false
+    return (
+      editor.checkVisibility?.({ checkOpacity: true, checkVisibilityCSS: true }) ??
+      getComputedStyle(editor).visibility === "visible"
+    )
+  }
 
-    event.preventDefault()
+  const handleDragOver = (event: DragEvent) => {
+    if (event.defaultPrevented || !active()) return
+
     const hasFiles = event.dataTransfer?.types.includes("Files")
     const hasText = event.dataTransfer?.types.includes("text/plain")
+    if (!hasFiles && !hasText) return
+    event.preventDefault()
+    event.stopPropagation()
     if (hasFiles) {
       input.setDraggingType("image")
     } else if (hasText) {
@@ -251,17 +277,16 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
     }
   }
 
-  const handleGlobalDragLeave = (event: DragEvent) => {
-    if (input.isDialogActive()) return
-    if (!event.relatedTarget) {
-      input.setDraggingType(null)
-    }
+  const handleDragLeave = (event: DragEvent) => {
+    if (event.relatedTarget instanceof Node && input.dropTarget()?.contains(event.relatedTarget)) return
+    input.setDraggingType(null)
   }
 
-  const handleGlobalDrop = async (event: DragEvent) => {
-    if (input.isDialogActive()) return
+  const handleDrop = async (event: DragEvent) => {
+    if (event.defaultPrevented || !active()) return
 
     event.preventDefault()
+    event.stopPropagation()
     input.setDraggingType(null)
 
     const plainText = event.dataTransfer?.getData("text/plain")
@@ -276,14 +301,18 @@ export function createPromptAttachments(input: PromptAttachmentsInput) {
     const dropped = event.dataTransfer?.files
     if (!dropped) return
 
-    await attachments.addAttachments(Array.from(dropped))
+    await addAttachments(Array.from(dropped))
   }
 
-  onMount(() => {
-    makeEventListener(document, "dragover", handleGlobalDragOver)
-    makeEventListener(document, "dragleave", handleGlobalDragLeave)
-    makeEventListener(document, "drop", handleGlobalDrop)
+  onCleanup(() => {
+    disposed = true
   })
-
-  return attachments
+  onMount(() => {
+    // A retained composer must never receive another conversation's page-wide drop.
+    const target = input.dropTarget()
+    if (!target) return
+    makeEventListener(target, "dragover", handleDragOver)
+    makeEventListener(target, "dragleave", handleDragLeave)
+    makeEventListener(target, "drop", handleDrop)
+  })
 }

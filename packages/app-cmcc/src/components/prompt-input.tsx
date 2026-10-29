@@ -256,6 +256,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const platform = usePlatform()
   const tabs = () => props.controls.session.tabs
   let editorRef!: HTMLDivElement
+  let attachmentDropRef: HTMLDivElement | undefined
   let fileInputRef: HTMLInputElement | undefined
   let folderInputRef: HTMLInputElement | undefined
   let scrollRef!: HTMLDivElement
@@ -1406,6 +1407,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       read: props.research?.readAttachment,
       prompt,
       editor: () => editorRef,
+      dropTarget: () => attachmentDropRef,
       isDialogActive: () => !!dialog.active,
       setDraggingType: (type) => setStore("draggingType", type),
       focusEditor: () => {
@@ -1848,7 +1850,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     </Switch>
   )
   return (
-    <div class="relative size-full flex flex-col gap-0">
+    <div ref={attachmentDropRef} data-component="prompt-attachment-drop" class="relative size-full flex flex-col gap-0">
       {(promptReady(), null)}
       <Show when={selectedKnowledge()}>
         {(notebook) => (
