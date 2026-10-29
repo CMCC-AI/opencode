@@ -253,6 +253,29 @@ for (const legacy of [false, true])
     expect(state.errors).toEqual([])
   })
 
+for (const width of [1440, 390])
+  test(`form omits center navigation text and preserves history label (${width})`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 950 })
+    const state = await prepare(page)
+    await page.goto("/mstock")
+    await expect(page.locator('aside[aria-label="CMCC conversations"]').getByText("多股对比", { exact: true })).toBeVisible()
+    if (width < 640) {
+      await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+      await expect.poll(() => page.locator(".mstock-form").evaluate((element) => element.clientWidth)).toBeGreaterThan(380)
+    }
+    await expect(page.getByRole("heading", { name: "DeepTrading财经分析专家团", exact: true })).toBeVisible()
+    await expect(page.getByText("对比中心", { exact: true })).toHaveCount(0)
+    await expect(page.locator(".mstock-hero h2")).toContainText("多股投研")
+    await expect(page.locator(".mstock-hero h2")).toContainText("对比分析中心")
+    await expect(page.getByRole("button", { name: "返回产业洞察", exact: true })).toBeVisible()
+    expect(state.counters.creates).toBe(0)
+    await page.evaluate(() => document.fonts.ready)
+    await page.screenshot({ path: testInfo.outputPath(`mstock-heading-${width}.png`), fullPage: true })
+    await page.getByRole("button", { name: "返回产业洞察", exact: true }).click()
+    await expect(page).toHaveURL(/\/expert$/)
+    expect(state.errors).toEqual([])
+  })
+
 for (const width of [1920, 1440, 1024, 390])
   test(`form uses original artwork and interactive display dimensions (${width})`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 950 })

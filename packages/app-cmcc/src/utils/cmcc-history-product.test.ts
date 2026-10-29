@@ -8,6 +8,7 @@ describe("CMCC history product labels", () => {
       ["zhengqi-visit-intel", "AI+政企"],
       ["deepinspect", "AI+巡察"],
       ["deeptrading", "AI+财经"],
+      ["mstock", "多股对比"],
       ["shoppers-pro", "AI+推荐"],
       ["ai-for-science-team", "AI+科研"],
       ["ai-scientist", "AI+科研"],

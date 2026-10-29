@@ -295,7 +295,6 @@ export default function MstockForm() {
       <header class="mstock-heading">
         <h1>DeepTrading财经分析专家团</h1>
         <div class="mstock-heading-nav">
-          <span>对比中心</span>
           <button aria-label="返回产业洞察" title="返回产业洞察" onClick={() => navigate("/expert")}>
             <Icon name="arrow-right" />
           </button>
