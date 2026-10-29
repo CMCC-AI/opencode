@@ -16,10 +16,10 @@ export function ForceKnowledgeGraph(props: {
   const [ready, setReady] = createSignal(false)
   const [simulating, setSimulating] = createSignal(false)
   const [settings, setSettings] = createSignal(false)
+  const [sizing, setSizing] = createStore({ nodeScale: 0.65 })
   const [preferences, setPreferences] = persisted(
     Persist.global("knowledge-graph"),
     createStore({
-      nodeScale: 1.2,
       linkDistance: 70,
       repulsion: 120,
     }),
@@ -113,7 +113,7 @@ export function ForceKnowledgeGraph(props: {
       id: node.id,
       label: node.degree > 0 || active || hit ? truncate(node.label, 24) : "",
       title: `${node.label}\n${node.degree} 个关联`,
-      size: (8 + Math.min(15, Math.sqrt(node.degree) * 3.2)) * preferences.nodeScale,
+      size: (8 + Math.min(15, Math.sqrt(node.degree) * 3.2)) * sizing.nodeScale,
       color: {
         background: dimmed ? withAlpha(background, 0.2) : background,
         border: active || hit ? "#d49a35" : background,
@@ -234,7 +234,7 @@ export function ForceKnowledgeGraph(props: {
     props.selection
     props.matched
     props.query
-    preferences.nodeScale
+    sizing.nodeScale
     if (ready()) syncGraph()
   })
 
@@ -301,8 +301,8 @@ export function ForceKnowledgeGraph(props: {
             min={0.65}
             max={1.6}
             step={0.05}
-            value={preferences.nodeScale}
-            input={(value) => setPreferences("nodeScale", value)}
+            value={sizing.nodeScale}
+            input={(value) => setSizing("nodeScale", value)}
           />
           <GraphRange
             label="连线距离"
