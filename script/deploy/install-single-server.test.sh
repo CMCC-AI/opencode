@@ -53,6 +53,8 @@ assert_contains "$unit" "Environment=OPENCODE_CONFIG_DIR=/opt/opencode-test/curr
 assert_not_contains "$unit" "Environment=OPENCODE_BUNDLED_CONFIG_DIR="
 assert_contains "$unit" "WorkingDirectory=/srv/opencode-test"
 assert_contains "$unit" "Environment=HOME=/home/opencode-test"
+assert_contains "$unit" "EnvironmentFile=/etc/opencode-cmcc/opencode.env"
+assert_contains "$unit" "EnvironmentFile=-/etc/opencode-cmcc/opencode.env.local"
 
 deepxiv_unit=$(render_deepxiv_service)
 assert_contains "$deepxiv_unit" "PartOf=opencode-cmcc.service"
