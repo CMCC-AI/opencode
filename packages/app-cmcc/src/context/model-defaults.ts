@@ -1,5 +1,7 @@
 export const CMCC_BAILIAN_PROVIDERS = ["alibaba-cn", "alibaba"]
 
+export const CMCC_PREFERRED_MODEL = { providerID: "alibaba-cn", modelID: "qwen3.7-flash" }
+
 export const CMCC_DEFAULT_MODEL_IDS = [
   "qwen3.8-max",
   "qwen3.7-plus",

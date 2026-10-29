@@ -64,6 +64,7 @@ export function modelSelectorItems<T extends SelectableModel>(input: {
 }) {
   return input.items.filter((item) => {
     if (input.provider && item.provider.id !== input.provider) return false
+    if (modelSelectorCategory(item).id === "free") return false
     // Keep the active model selectable until the user switches away from it.
     if (input.current && item.id === input.current.id && item.provider.id === input.current.provider.id) return true
     return input.visible({ modelID: item.id, providerID: item.provider.id })

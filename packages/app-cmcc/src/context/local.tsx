@@ -11,7 +11,7 @@ import { useSDK } from "./sdk"
 import { useSync } from "./sync"
 import { useServerSDK } from "./server-sdk"
 import { ScopedKey, type ServerScope } from "@/utils/server-scope"
-import { isCmccWhitelistedModel } from "./model-defaults"
+import { CMCC_PREFERRED_MODEL, isCmccWhitelistedModel } from "./model-defaults"
 import { cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
 
 export type ModelKey = { providerID: string; modelID: string; variant?: string }
@@ -206,7 +206,8 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           const prev = scope()
           const next = {
             agent: item.name,
-            model: item.model ?? prev?.model,
+            // Resolve draft defaults in current() without persisting them as a manual choice.
+            model: id() ? item.model ?? prev?.model : prev?.model,
             variant: item.variant ?? prev?.variant,
           } satisfies State
           const session = id()
@@ -244,6 +245,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
     const current = () => {
       const item = firstModel(
         () => scope()?.model,
+        () => (!id() ? CMCC_PREFERRED_MODEL : undefined),
         () => agent.current()?.model,
         fallback,
       )

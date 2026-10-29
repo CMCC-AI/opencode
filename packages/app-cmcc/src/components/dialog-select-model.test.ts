@@ -18,7 +18,7 @@ test("shows every model enabled by model management", () => {
 })
 
 test("keeps the current model selectable when it is later hidden", () => {
-  const current = model("opencode", "nemotron-free")
+  const current = model("alibaba-cn", "qwen3.7-flash")
   const items = [current]
 
   expect(
@@ -27,19 +27,33 @@ test("keeps the current model selectable when it is later hidden", () => {
       current,
       visible: () => false,
     }).map((item) => item.id),
-  ).toEqual(["nemotron-free"])
+  ).toEqual(["qwen3.7-flash"])
 })
 
 test("excludes models disabled by model management", () => {
-  const visible = model("opencode", "visible-free")
-  const hidden = model("opencode", "hidden-free")
+  const visible = model("alibaba-cn", "qwen3.7-flash")
+  const hidden = model("alibaba-cn", "qwen3.8-max")
 
   expect(
     modelSelectorItems({
       items: [visible, hidden],
       visible: (item) => item.modelID === visible.id,
     }).map((item) => item.id),
-  ).toEqual(["visible-free"])
+  ).toEqual(["qwen3.7-flash"])
+})
+
+test("excludes Free models even when current or explicitly visible", () => {
+  const current = { ...model("opencode", "qwen-free"), cost: { input: 0 } }
+  const items = [
+    current,
+    model("opencode", "existing-free-model"),
+    { ...model("opencode", "kimi-k2.5"), cost: { input: 1 } },
+    { ...model("alibaba-cn", "qwen3.7-flash"), cost: { input: 0 } },
+  ]
+  const visible = modelSelectorItems({ items, current, visible: () => true })
+  expect(visible).toEqual([items[2], items[3]])
+  expect(modelSelectorGroups(visible).map((group) => group.id)).toEqual(["kimi", "qwen"])
+  expect(modelSelectorItems({ items, current, provider: "opencode", visible: () => true })).toEqual([items[2]])
 })
 
 test("groups model families across providers without replacing their real identities", () => {
@@ -89,7 +103,7 @@ test("uses family metadata first and falls back to names for custom model aliase
   expect(modelSelectorCategory({ ...model("gateway", "notqwen"), name: "qwenish" }).id).toBe("other")
 })
 
-test("groups only the existing OpenCode free models under Free", () => {
+test("identifies only OpenCode free models for exclusion", () => {
   expect(modelSelectorCategory({ ...model("opencode", "qwen-free"), cost: { input: 0 } }).id).toBe("free")
   expect(modelSelectorCategory(model("opencode", "existing-free-model")).id).toBe("free")
   expect(modelSelectorCategory({ ...model("opencode", "kimi-k2.5"), cost: { input: 1 } }).id).toBe("kimi")

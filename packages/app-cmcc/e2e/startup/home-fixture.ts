@@ -28,7 +28,7 @@ function provider(id: string, name: string, modelName: string) {
 
 export async function setupHomePage(
   page: Page,
-  options: { models?: boolean; history?: boolean; free?: boolean; duplicateModels?: boolean } = {},
+  options: { models?: boolean; history?: boolean; free?: boolean; duplicateModels?: boolean; bailian?: boolean } = {},
 ) {
   await page.addInitScript(() => {
     if (window !== window.top) return
@@ -71,6 +71,19 @@ export async function setupHomePage(
         cost: { input: 0, output: 0 },
       }
   }
+  if (options.bailian && options.models && !options.free) {
+    providers[0].name = "阿里云百炼"
+    providers[0].models["qwen3.7-flash"] = {
+      id: "qwen3.7-flash",
+      name: "Qwen3.7 Flash",
+      limit: { context: 200000 },
+      cost: { input: 0, output: 0 },
+    }
+    const alibaba = provider("alibaba", "Alibaba", "Alibaba 默认测试模型")
+    alibaba.models["qwen3.7-flash"] = { ...providers[0].models["qwen3.7-flash"] }
+    providers.unshift(alibaba)
+    providers.push(provider("opencode", "OpenCode", "测试免费模型"))
+  }
   await mockOpenCodeServer(page, {
     directory: homeDirectory,
     project: { id: "home-sizing-test", worktree: homeDirectory, time: { created: 1 } },
@@ -85,8 +98,16 @@ export async function setupHomePage(
   await page.route("**/agent?*", (route) =>
     route.fulfill({
       json: [
-        { name: "build", mode: "primary" },
-        { name: "plan", mode: "primary" },
+        {
+          name: "build",
+          mode: "primary",
+          model: options.bailian ? { providerID: "alibaba-cn", modelID: "glm-5.2" } : undefined,
+        },
+        {
+          name: "plan",
+          mode: "primary",
+          model: options.bailian ? { providerID: "alibaba-cn", modelID: "glm-5.2" } : undefined,
+        },
       ],
     }),
   )

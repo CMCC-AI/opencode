@@ -161,9 +161,6 @@ export function HomeModelControl(props: {
                                   </span>
                                 </Show>
                               </DropdownMenu.ItemLabel>
-                              <Show when={group.id === "free"}>
-                                <Tag>免费</Tag>
-                              </Show>
                               <Show when={model.latest}>
                                 <Tag>最新</Tag>
                               </Show>

@@ -108,13 +108,42 @@ test("model family menus select models, search, preserve drafts and switch real 
   await expect(page.getByRole("menu", { name: "选择模型", exact: true })).toHaveCount(0)
 })
 
-test("models work with only free providers", async ({ page }) => {
+test("Free models remain hidden even when they are the only available models", async ({ page }) => {
   await setupHomePage(page, { models: true, free: true })
   await page.goto("/app")
   await page.locator(modelTrigger).click()
-  await page.getByRole("menuitem", { name: "Free", exact: true }).hover()
-  await page.getByRole("menuitemradio", { name: "测试免费模型" }).click()
-  await expect(page.locator(modelTrigger)).toContainText("测试免费模型")
+  await expect(page.getByRole("menuitem", { name: "Free", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("menuitemradio", { name: "测试免费模型" })).toHaveCount(0)
+  await expect(page.getByText("暂无可选模型", { exact: true })).toBeVisible()
+  await page.getByRole("searchbox", { name: "搜索模型" }).fill("免费")
+  await expect(page.getByText("暂无可选模型", { exact: true })).toBeVisible()
+})
+
+test("new drafts prefer Bailian Flash and retain manual model choices", async ({ page }, info) => {
+  await setupHomePage(page, { models: true, bailian: true })
+  await page.route(/\/(?:global\/)?config(?:\?|$)/, (route) =>
+    route.fulfill({ json: { model: "alibaba-cn/glm-5.2" } }),
+  )
+  await page.goto("/app")
+  await expect(page.locator(modelTrigger)).toContainText("Qwen3.7 Flash")
+  await page.locator(modelTrigger).click()
+  await expect(page.getByRole("menuitem", { name: "Free", exact: true })).toHaveCount(0)
+  await page.getByRole("menuitem", { name: "Qwen", exact: true }).hover()
+  const bailian = page.getByRole("menuitemradio", { name: "Qwen3.7 Flash 阿里云百炼", exact: true })
+  const alibaba = page.getByRole("menuitemradio", { name: "Qwen3.7 Flash Alibaba", exact: true })
+  await expect(bailian).toHaveAttribute("aria-checked", "true")
+  await expect(alibaba).toHaveAttribute("aria-checked", "false")
+  await expect(page.locator(".home-model-submenu")).toHaveCSS("opacity", "1")
+  await page.screenshot({ path: info.outputPath("bailian-default.png") })
+  await alibaba.click()
+  await page.getByRole("button", { name: "计划", exact: true }).click()
+  await page.getByRole("button", { name: "执行", exact: true }).click()
+  await page.locator(modelTrigger).click()
+  await page.getByRole("menuitem", { name: "Qwen", exact: true }).hover()
+  await expect(alibaba).toHaveAttribute("aria-checked", "true")
+  await expect(bailian).toHaveAttribute("aria-checked", "false")
+  await page.getByRole("searchbox", { name: "搜索模型" }).fill("免费")
+  await expect(page.getByText("暂无可选模型", { exact: true })).toBeVisible()
 })
 
 test("empty model lists hide the model setup entries", async ({ page }) => {
@@ -173,15 +202,54 @@ for (const free of [false, true]) {
     await page.goto(`/server/${base64Encode(baseURL!)}/session/${homeSession.id}`)
     await expect(page.locator('[data-component="session-composer"]')).toBeVisible()
     await page.locator(modelTrigger).click()
-    await expect(page.getByText(free ? "Free" : "Kimi", { exact: true })).toBeVisible()
+    await expect(page.getByText("Free", { exact: true })).toHaveCount(0)
+    if (!free) await expect(page.getByText("Kimi", { exact: true })).toBeVisible()
     await expect(page.getByRole("button", { name: "管理模型", exact: true })).toHaveCount(0)
     await expect(page.getByRole("button", { name: "连接提供商", exact: true })).toHaveCount(0)
     await expect(page.getByText("公司网关", { exact: true })).toHaveCount(0)
     await page.screenshot({ path: info.outputPath("history-models.png") })
-    await page.getByRole("button", { name: free ? "测试免费模型 免费" : "Kimi 测试模型", exact: true }).click()
-    await expect(page.locator(modelTrigger)).toContainText(free ? "测试免费模型" : "Kimi 测试模型")
+    if (free) {
+      await expect(page.getByRole("button", { name: "测试免费模型 免费", exact: true })).toHaveCount(0)
+      await expect(page.getByText("未找到模型", { exact: true })).toBeVisible()
+      return
+    }
+    await page.getByRole("button", { name: "Kimi 测试模型", exact: true }).click()
+    await expect(page.locator(modelTrigger)).toContainText("Kimi 测试模型")
   })
 }
+
+test("history restores its model rather than applying the new draft default", async ({ page, baseURL }) => {
+  await setupHomePage(page, { models: true, history: true, bailian: true })
+  await page.route(`**/session/${homeSession.id}/message*`, (route) =>
+    route.fulfill({
+      json: [
+        {
+          info: {
+            id: "msg_existing_model",
+            sessionID: homeSession.id,
+            role: "user",
+            time: { created: 1 },
+            agent: "build",
+            model: { providerID: "alibaba-cn", modelID: "kimi-k2.6" },
+          },
+          parts: [
+            {
+              id: "part_existing_model",
+              messageID: "msg_existing_model",
+              sessionID: homeSession.id,
+              type: "text",
+              text: "保留历史模型",
+            },
+          ],
+        },
+      ],
+    }),
+  )
+  await page.goto(`/server/${base64Encode(baseURL!)}/session/${homeSession.id}`)
+  await expect(page.locator(modelTrigger)).toContainText("Kimi 测试模型")
+  await page.reload()
+  await expect(page.locator(modelTrigger)).toContainText("Kimi 测试模型")
+})
 
 test("history sessions retain their existing model and agent controls", async ({ page, baseURL }) => {
   await setupHomePage(page, { models: true, history: true })

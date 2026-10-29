@@ -65,9 +65,6 @@ const ModelList: Component<{
               <span class="block text-[11px] text-v2-text-text-muted">{i.provider.name || i.provider.id}</span>
             </Show>
           </span>
-          <Show when={modelSelectorCategory(i).id === "free"}>
-            <Tag>{language.t("model.tag.free")}</Tag>
-          </Show>
           <Show when={i.latest}>
             <Tag>{language.t("model.tag.latest")}</Tag>
           </Show>
