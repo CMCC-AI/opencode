@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test"
-import { cmccHistoryProduct } from "./cmcc-history-product"
+import { CMCC_DEEP_RESEARCH_PRODUCT, cmccHistoryProduct } from "./cmcc-history-product"
 
 describe("CMCC history product labels", () => {
+  test("shares the research badge without relabeling general conversations", () => {
+    expect(CMCC_DEEP_RESEARCH_PRODUCT.label).toBe("深度研究")
+    expect(cmccHistoryProduct("deepinsight", "deepinsight/deepinsight-team-lead")).toBe(CMCC_DEEP_RESEARCH_PRODUCT)
+    expect(cmccHistoryProduct("deepinsight", "build", "deepinsight/deepinsight-team-lead")).toBe(
+      CMCC_DEEP_RESEARCH_PRODUCT,
+    )
+    expect(cmccHistoryProduct("deepinsight", "build", "build")?.label).toBe("通用对话")
+  })
+
   test("maps supported agent types to Chinese product labels", () => {
     const cases = [
       ["DeepInsight", "通用对话"],

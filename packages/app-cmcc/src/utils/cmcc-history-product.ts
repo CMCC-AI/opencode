@@ -12,6 +12,8 @@ const deepResearch = {
   textColor: "#4774e8",
 } as const
 
+export const CMCC_DEEP_RESEARCH_PRODUCT = { ...deepResearch, label: "深度研究" } as const
+
 const aiScience = {
   label: "AI+科研",
   backgroundColor: "#f0ecff",
@@ -63,7 +65,7 @@ export function cmccHistoryProduct(
 ): CmccHistoryProduct | undefined {
   if (rootAgent === "mstock/mstock" || initialAgent === "mstock/mstock") return products.mstock
   if (rootAgent === "deepinsight/deepinsight-team-lead" || initialAgent === "deepinsight/deepinsight-team-lead")
-    return { ...deepResearch, label: "深度研究" }
+    return CMCC_DEEP_RESEARCH_PRODUCT
   const key = agentType?.trim().toLowerCase()
   if (!key) return undefined
   return products[key]

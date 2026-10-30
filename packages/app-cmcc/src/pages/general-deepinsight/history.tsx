@@ -2,9 +2,11 @@ import { createEffect, createMemo, For, onCleanup, Show, untrack, type JSX } fro
 import { createStore } from "solid-js/store"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
-import { Icon } from "@opencode-ai/ui/icon"
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { useDockApi } from "@/context/dockapi"
+import { CmccHistoryRow } from "@/components/cmcc-history-row"
+import { CMCC_DEEP_RESEARCH_PRODUCT } from "@/utils/cmcc-history-product"
+import { cmccHistoryTime } from "@/utils/cmcc-history-time"
 import { showToast } from "@/utils/toast"
 import { langGraphHistory, RESEARCH_API, RESEARCH_UPDATED, type HistoryItem, type LangGraphHistoryItem } from "./model"
 
@@ -80,69 +82,38 @@ export function ResearchHistory(props: { sessions: Session[]; renderOpenCode: (s
         item.source === "opencode" ? (
           props.renderOpenCode(item.session)
         ) : (
-          <div
-            class="group/research relative mb-0.5 flex min-h-12 items-center rounded-[6px] text-[#4a4a6a] hover:bg-indigo-100/60"
-            classList={{
-              "bg-indigo-100 text-indigo-600": location.pathname.endsWith(`/session/${item.session.sourceId}`),
-            }}
-            data-source="langgraph"
-          >
-            <button
-              type="button"
-              class="min-w-0 flex-1 px-2.5 py-1.5 text-left"
-              disabled={!item.session.capabilities.open}
-              onClick={() => navigate(`/general-deepinsight/session/${item.session.sourceId}`)}
-            >
-              <span class="flex min-w-0 items-center gap-1.5">
-                <span class="min-w-0 flex-1 truncate text-[13px] font-medium">{item.session.title}</span>
-                <span
-                  class="shrink-0 rounded-full border px-1.5 py-0.5 text-[11px]"
-                  style={{ color: "#2876aa", background: "#e7f2ff", "border-color": "#b8d5ed" }}
-                >
-                  通用深度洞察
-                </span>
-              </span>
-              <span class="mt-0.5 block text-[11px] text-[#8b8daf]">
-                {new Date(item.session.updatedAt).toLocaleDateString()}
-              </span>
-            </button>
-            <Show when={item.session.status === "running"}>
-              <span
-                aria-label="任务进行中"
-                role="status"
-                class="mr-2 size-3.5 shrink-0 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"
-              />
-            </Show>
-            <DropdownMenu>
-              <DropdownMenu.Trigger
-                class="mr-1 flex size-6 items-center justify-center rounded hover:bg-indigo-100"
-                aria-label="研究任务操作"
-              >
-                <Icon name="dot-grid" class="size-3.5" />
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Portal>
-                <DropdownMenu.Content>
-                  <Show when={dockapi.user?.casePublishAllowed && item.session.status === "completed"}>
-                    <DropdownMenu.Item
-                      onSelect={() => navigate(`/general-deepinsight/session/${item.session.sourceId}?publish=1`)}
-                    >
-                      <DropdownMenu.ItemLabel>添加至案例库</DropdownMenu.ItemLabel>
-                    </DropdownMenu.Item>
-                  </Show>
-                  <Show when={item.session.capabilities.rename}>
-                    <DropdownMenu.Item onSelect={() => void mutate(item.session, "rename")}>
-                      <DropdownMenu.ItemLabel>重命名</DropdownMenu.ItemLabel>
-                    </DropdownMenu.Item>
-                  </Show>
-                  <Show when={item.session.capabilities.delete}>
-                    <DropdownMenu.Item onSelect={() => void mutate(item.session, "delete")}>
-                      <DropdownMenu.ItemLabel>删除</DropdownMenu.ItemLabel>
-                    </DropdownMenu.Item>
-                  </Show>
-                </DropdownMenu.Content>
-              </DropdownMenu.Portal>
-            </DropdownMenu>
-          </div>
+          <CmccHistoryRow
+            source="langgraph"
+            title={item.session.title}
+            active={location.pathname.endsWith(`/session/${item.session.sourceId}`)}
+            running={item.session.status === "running"}
+            product={CMCC_DEEP_RESEARCH_PRODUCT}
+            timeLabel={cmccHistoryTime(Date.parse(item.session.updatedAt))}
+            disabled={!item.session.capabilities.open}
+            onOpen={() => navigate(`/general-deepinsight/session/${item.session.sourceId}`)}
+            menuLabel="研究任务操作"
+            menu={
+              <>
+                <Show when={dockapi.user?.casePublishAllowed && item.session.status === "completed"}>
+                  <DropdownMenu.Item
+                    onSelect={() => navigate(`/general-deepinsight/session/${item.session.sourceId}?publish=1`)}
+                  >
+                    <DropdownMenu.ItemLabel>添加至案例库</DropdownMenu.ItemLabel>
+                  </DropdownMenu.Item>
+                </Show>
+                <Show when={item.session.capabilities.rename}>
+                  <DropdownMenu.Item onSelect={() => void mutate(item.session, "rename")}>
+                    <DropdownMenu.ItemLabel>重命名</DropdownMenu.ItemLabel>
+                  </DropdownMenu.Item>
+                </Show>
+                <Show when={item.session.capabilities.delete}>
+                  <DropdownMenu.Item onSelect={() => void mutate(item.session, "delete")}>
+                    <DropdownMenu.ItemLabel>删除</DropdownMenu.ItemLabel>
+                  </DropdownMenu.Item>
+                </Show>
+              </>
+            }
+          />
         )
       }
     </For>
