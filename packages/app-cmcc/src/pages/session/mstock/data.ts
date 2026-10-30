@@ -4,7 +4,6 @@ import {
   buildAgentNodes,
   buildNestedAgentSessions,
   deriveSessionStatus,
-  extractAssistantMarkdown,
   extractOverviewConversation,
   extractWorkbenchMessages,
   extractTaskChildPreferences,
@@ -96,6 +95,7 @@ export function mstockWorkbench(input: {
     (leadId ? transcripts.get(leadId) : undefined) ??
     (leads.length === 1 ? leads[0] : undefined) ??
     (root?.session.agent === MSTOCK_LEAD_AGENT ? root : undefined)
+  const overview = mstockOverview(root, lead)
   const children = input.transcripts
     .filter((entry) => lead && entry.session.parentID === lead.session.id)
     .map((entry) => entry.session)
@@ -119,25 +119,19 @@ export function mstockWorkbench(input: {
     ...(input.warnings ?? []),
     ...nodes.ambiguities,
     ...(leads.length > 1 && !lead ? ["存在多个团长执行记录，暂时无法确定本次执行"] : []),
+    ...(overview.ambiguity ? [overview.ambiguity] : []),
   ]
   for (const role of ["text-report", "visual-report"])
     if (files.filter((file) => file.role === role).length > 1) ambiguities.push("存在多个最终报告，无法确定归属")
   return {
     rootSessionId: input.rootId,
     query: root ? extractUserQuery(root.messages, root.parts) : "",
-    overviewMarkdown: root
-      ? extractAssistantMarkdown(root.messages, root.parts) ||
-        (lead ? extractAssistantMarkdown(lead.messages, lead.parts) : "")
-      : "",
+    overviewMarkdown: overview.messages
+      .filter((message) => message.role === "assistant" && message.text.trim())
+      .map((message) => message.text)
+      .join("\n\n"),
     overviewTurns: root ? extractOverviewConversation(root.messages, root.parts) : [],
-    overviewMessages: root
-      ? [
-          ...extractWorkbenchMessages(root.messages, root.parts),
-          ...(!extractAssistantMarkdown(root.messages, root.parts) && lead
-            ? extractWorkbenchMessages(lead.messages, lead.parts).filter((message) => message.role === "assistant")
-            : []),
-        ]
-      : [],
+    overviewMessages: overview.messages,
     overviewStatus: input.running ? "running" : root ? deriveSessionStatus(root) : "waiting",
     agents: nodes.nodes,
     nestedAgentSessions: buildNestedAgentSessions({
@@ -168,6 +162,45 @@ export function mstockWorkbench(input: {
     error: input.error,
   }
 }
+
+function mstockOverview(root?: SessionTranscript, lead?: SessionTranscript) {
+  const messages = root ? extractWorkbenchMessages(root.messages, root.parts) : []
+  if (
+    !root ||
+    !lead ||
+    root.session.id === lead.session.id ||
+    messages.some((message) => message.role === "assistant" && message.text.trim())
+  )
+    return { messages }
+  const replies = extractWorkbenchMessages(lead.messages, lead.parts).filter((message) => message.role === "assistant")
+  if (!replies.length) return { messages }
+
+  // Child replies point to private prompts; reparent display copies only through an explicit root task.
+  const parents = new Set(
+    root.messages.flatMap((message) =>
+      message.role === "assistant" &&
+      (root.parts[message.id] ?? []).some(
+        (part) =>
+          part.type === "tool" &&
+          part.tool === "task" &&
+          part.state.status !== "pending" &&
+          part.state.input.subagent_type === MSTOCK_LEAD_AGENT &&
+          part.state.metadata?.sessionId === lead.session.id,
+      )
+        ? [message.parentID]
+        : [],
+    ),
+  )
+  const parentID = parents.size === 1 ? [...parents][0] : undefined
+  if (
+    lead.session.parentID !== root.session.id ||
+    !parentID ||
+    !messages.some((message) => message.role === "user" && message.id === parentID)
+  )
+    return { messages, ambiguity: "团长回复暂时无法唯一关联到已加载的用户提问，待调用记录明确后再合并展示。" }
+  return { messages: [...messages, ...replies.map((message) => ({ ...message, parentID }))] }
+}
+
 export function mstockProgress(workbench: AgentWorkbench, delivered: boolean) {
   return (workbench.agents.filter((node) => node.status === "completed").length + (delivered ? 1 : 0)) * 25
 }

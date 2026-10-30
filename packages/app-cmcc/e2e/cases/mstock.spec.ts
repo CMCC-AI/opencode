@@ -23,6 +23,7 @@ function expectReferences(request: PromptRequest, count: number) {
 async function prepare(page: Page, legacy = false, form = false) {
   const data = mstockFixture(legacy)
   const errors: string[] = []
+  const events: unknown[] = []
   const sent: PromptRequest[] = []
   const uploaded: Array<{ path: string; content: string; encoding: string }> = []
   const counters = { creates: 0, prepares: 0, uploads: 0 }
@@ -34,6 +35,8 @@ async function prepare(page: Page, legacy = false, form = false) {
     directory: data.directory,
     project: { ...fixture.project, worktree: data.directory },
     sessions: data.transcripts.map((entry) => entry.session),
+    events: () => events.splice(0),
+    eventRetry: 50,
     pageMessages: (id) => ({
       items: form
         ? []
@@ -224,6 +227,7 @@ async function prepare(page: Page, legacy = false, form = false) {
   return {
     data,
     errors,
+    events,
     sent,
     uploaded,
     counters,
@@ -577,6 +581,96 @@ for (const width of [1440, 390])
     await entry.click()
     await expect(page).toHaveURL(/\/mstock$/)
     await expect(page.getByRole("button", { name: "开始多股票综合对比" })).toBeVisible()
+    expect(state.errors).toEqual([])
+  })
+
+for (const width of [1440, 390])
+  test(`streaming mstock overview keeps one card per real question (${width})`, async ({ page, context }, info) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"])
+    await page.setViewportSize({ width, height: 950 })
+    const state = await prepare(page)
+    const root = state.data.transcripts[0]
+    const lead = state.data.transcripts[1]
+    const caller = root.messages[1]
+    const answer = lead.messages[1]
+    const rootText = root.parts[caller.id]!.find((part) => part.type === "text")!
+    const leadText = lead.parts[answer.id]!.find((part) => part.type === "text")!
+    const task = root.parts[caller.id]!.find((part) => part.type === "tool" && part.tool === "task")!
+    if (
+      caller.role !== "assistant" ||
+      answer.role !== "assistant" ||
+      leadText.type !== "text" ||
+      task.type !== "tool" ||
+      task.state.status !== "completed"
+    )
+      throw new Error("Missing streaming overview fixture")
+    root.parts[caller.id] = root.parts[caller.id]!.filter((part) => part.type !== "text")
+    lead.parts[answer.id] = lead.parts[answer.id]!.filter((part) => part.type !== "text")
+    task.state = { status: "running", input: task.state.input, metadata: task.state.metadata, time: { start: 1075 } }
+    caller.time.completed = undefined
+    answer.time.completed = undefined
+    await page.route("**/session/status*", (route) =>
+      route.fulfill({ json: { [root.session.id]: { type: "busy" }, [lead.session.id]: { type: "busy" } } }),
+    )
+    await page.goto(`/server/${base64Encode(process.env.PLAYWRIGHT_BASE_URL!)}/session/${root.session.id}`)
+    if (width < 760) await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+    const headers = page.locator('[data-component="workbench-expert-header"]')
+    const cards = page.locator('[data-component="workbench-response-card"]')
+    const waiting = page.getByText("该节点暂未返回正文", { exact: true })
+    await expect(headers).toHaveCount(1)
+    await expect(cards).toHaveCount(0)
+    await expect(waiting).toHaveCount(1)
+
+    lead.parts[answer.id] = [...lead.parts[answer.id]!, leadText]
+    state.events.push({ type: "message.part.updated", properties: { part: leadText } })
+    await expect(cards).toHaveCount(1)
+    await expect(cards).toContainText("执行专家结论")
+    await expect(headers).toHaveCount(1)
+    await expect(waiting).toHaveCount(0)
+    await expect(page.locator('[data-role="user"]')).toHaveCount(1)
+    leadText.text += "\n\n团长继续补充对比结论。"
+    state.events.push({ type: "message.part.updated", properties: { part: leadText } })
+    await expect(cards).toContainText("团长继续补充对比结论。")
+    await expect(cards).toHaveCount(1)
+    const response = page.locator('[data-component="workbench-response"]')
+    await expect(response.locator("footer")).toHaveCount(1)
+    await response.getByRole("button", { name: "复制全部回复", exact: true }).click()
+    expect((await page.evaluate(() => navigator.clipboard.readText())).replaceAll("\r\n", "\n")).toBe(leadText.text)
+    await headers.first().scrollIntoViewIfNeeded()
+    await page.screenshot({ path: info.outputPath(`mstock-streaming-overview-${width}.png`) })
+
+    const followup = { ...root.messages[0], id: "pending-followup", time: { created: 2000 } }
+    const followupText = {
+      id: "pending-followup-text",
+      messageID: followup.id,
+      sessionID: root.session.id,
+      type: "text" as const,
+      text: "请继续比较风险",
+    }
+    root.messages = [...root.messages, followup]
+    root.parts[followup.id] = [followupText]
+    state.events.push(
+      { type: "message.updated", properties: { info: followup } },
+      { type: "message.part.updated", properties: { part: followupText } },
+    )
+    const turns = page.locator("[data-workbench-turn]")
+    await expect(turns).toHaveCount(2)
+    await expect(turns.first()).toContainText("团长继续补充对比结论。")
+    await expect(turns.last()).toContainText("请继续比较风险")
+    await expect(turns.last().getByText("该节点暂未返回正文", { exact: true })).toHaveCount(1)
+    await expect(turns.last().locator('[data-role="assistant"]')).toHaveCount(0)
+
+    root.parts[caller.id] = [...root.parts[caller.id]!, rootText]
+    state.events.push({ type: "message.part.updated", properties: { part: rootText } })
+    await expect(turns.first()).toContainText("对比报告已完成")
+    await expect(turns.first()).not.toContainText("团长继续补充对比结论。")
+    await expect(headers).toHaveCount(2)
+    await expect(cards).toHaveCount(1)
+    await expect(waiting).toHaveCount(1)
+    await page.reload()
+    await expect(turns).toHaveCount(2)
+    await expect(cards).toHaveCount(1)
+    await expect(waiting).toHaveCount(1)
     expect(state.errors).toEqual([])
   })
 

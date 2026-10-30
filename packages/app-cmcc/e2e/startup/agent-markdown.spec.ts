@@ -407,6 +407,8 @@ for (const width of [1440, 390]) {
       })
       if (!baseline) expect(rootStyles).toEqual(reference)
       const response = page.locator('[data-component="workbench-response"]').filter({ has: root })
+      await expect(page.locator('[data-component="workbench-expert-header"]')).toHaveCount(1)
+      await expect(page.locator('[data-component="workbench-response-card"]')).toHaveCount(1)
       await expect(response.getByRole("button", { name: "复制全部回复", exact: true })).toHaveCount(1)
       await expect(response.locator("time")).toHaveAttribute("datetime", new Date(1500).toISOString())
       await expect(response).toContainText("markdown-model")
@@ -443,6 +445,8 @@ for (const width of [1440, 390]) {
       await expert.click()
       const child = page.locator(`[data-workbench-message="${data.child.id}-a"] [data-component="markdown"]`)
       if (!baseline) expect(await styles(child)).toEqual(reference)
+      await expect(page.locator('[data-component="workbench-expert-header"]')).toHaveCount(1)
+      await expect(page.locator('[data-component="workbench-response-card"]')).toHaveCount(1)
       await expect(page.locator('[data-component="expert-duration"]')).toBeVisible()
       await page.screenshot({ path: info.outputPath("expert.png") })
       if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
@@ -536,40 +540,47 @@ for (const width of [1440, 390]) {
   })
 }
 
-test("streamed expert replies keep a single current copy footer", async ({ page, context, baseURL }) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"])
-  const data = await prepare(page, teams[2], true)
-  const message = data.transcripts.get(data.root.id)!.at(-1)!
-  if (message.info.role !== "assistant") throw new Error("Missing assistant test message")
-  message.info.time.completed = undefined
-  message.info.finish = undefined
-  const part = message.parts[0]
-  if (part.type !== "text") throw new Error("Missing text test part")
-  let running = true
-  await page.route("**/session/status*", (route) =>
-    route.fulfill({ json: running ? { [data.root.id]: { type: "busy" } } : {} }),
-  )
-  await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
-  const response = page.locator("[data-workbench-turn]").last().locator('[data-component="workbench-response"]')
-  await expect(response.getByText("分析中", { exact: true })).toBeVisible()
-  const copy = response.getByRole("button", { name: "复制全部回复", exact: true })
-  await expect(copy).toHaveCount(1)
-  part.text += "\n\n后续流式补充结论。"
-  data.events.push({ type: "message.part.updated", properties: { part } })
-  await expect(response).toContainText("后续流式补充结论。")
-  message.info.time.completed = 4000
-  message.info.finish = "stop"
-  running = false
-  data.events.push(
-    { type: "message.updated", properties: { info: message.info } },
-    { type: "session.status", properties: { sessionID: data.root.id, status: { type: "idle" } } },
-  )
-  await expect(response.getByText("已完成", { exact: true })).toBeVisible()
-  await expect(response.locator("footer")).toHaveCount(1)
-  await copy.click()
-  expect(await clipboardText(page)).toBe(part.text)
-  expect(data.errors).toEqual([])
-})
+for (const team of teams) {
+  test(`${team.id} streamed expert replies keep a single current copy footer`, async ({ page, context, baseURL }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"])
+    const data = await prepare(page, team, true)
+    const message = data.transcripts.get(data.root.id)!.at(-1)!
+    if (message.info.role !== "assistant") throw new Error("Missing assistant test message")
+    message.info.time.completed = undefined
+    message.info.finish = undefined
+    const part = message.parts[0]
+    if (part.type !== "text") throw new Error("Missing text test part")
+    let running = true
+    await page.route("**/session/status*", (route) =>
+      route.fulfill({ json: running ? { [data.root.id]: { type: "busy" } } : {} }),
+    )
+    await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+    const response = page.locator("[data-workbench-turn]").last().locator('[data-component="workbench-response"]')
+    await expect(response.getByText("分析中", { exact: true })).toBeVisible()
+    await expect(page.locator("[data-workbench-turn]")).toHaveCount(2)
+    await expect(page.locator('[data-component="workbench-response-card"]')).toHaveCount(2)
+    await expect(page.locator('[data-component="workbench-expert-header"]')).toHaveCount(2)
+    const copy = response.getByRole("button", { name: "复制全部回复", exact: true })
+    await expect(copy).toHaveCount(1)
+    part.text += "\n\n后续流式补充结论。"
+    data.events.push({ type: "message.part.updated", properties: { part } })
+    await expect(response).toContainText("后续流式补充结论。")
+    await expect(response.locator('[data-component="workbench-response-card"]')).toHaveCount(1)
+    await expect(response.locator('[data-component="workbench-expert-header"]')).toHaveCount(1)
+    message.info.time.completed = 4000
+    message.info.finish = "stop"
+    running = false
+    data.events.push(
+      { type: "message.updated", properties: { info: message.info } },
+      { type: "session.status", properties: { sessionID: data.root.id, status: { type: "idle" } } },
+    )
+    await expect(response.getByText("已完成", { exact: true })).toBeVisible()
+    await expect(response.locator("footer")).toHaveCount(1)
+    await copy.click()
+    expect(await clipboardText(page)).toBe(part.text)
+    expect(data.errors).toEqual([])
+  })
+}
 
 for (const team of teams) {
   for (const width of team.id === "deeptrading" ? [1440, 390] : [1440]) {
