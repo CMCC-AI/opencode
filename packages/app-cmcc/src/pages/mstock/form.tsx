@@ -16,8 +16,6 @@ import { CmccPageBackground } from "@/components/cmcc-page-background"
 import { ACCEPTED_FILE_TYPES } from "@/constants/file-picker"
 import { attachmentMime } from "@/components/prompt-input/files"
 import { fileBase64, isWordDocument, safeUploadedFilename } from "@/components/prompt-input/word-documents"
-import { attachmentReferenceUrl } from "@opencode-ai/core/util/attachment-reference"
-import { encodeFilePath } from "@/context/file/path"
 import { sendFollowupDraft } from "@/components/prompt-input/submit"
 import { cmccArtifactWorkspace, cmccEnsureWorkspace, cmccArtifactSystemPrompt } from "@/utils/cmcc-workspace"
 import { cmccWorkspaceRelativePath } from "@/utils/cmcc-artifact-paths"
@@ -236,7 +234,6 @@ export default function MstockForm() {
         path: source.path,
         title: source.title,
         mime: "text/plain",
-        url: undefined as string | undefined,
       }))
       for (const upload of state.uploads) {
         const path =
@@ -258,7 +255,6 @@ export default function MstockForm() {
           path,
           title: upload.name,
           mime: upload.mime,
-          url: attachmentReferenceUrl(`file://${encodeFilePath(path)}`),
         })
       }
       if (!current()) return

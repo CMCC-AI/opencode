@@ -1,14 +1,30 @@
 import { expect, test, type Page } from "@playwright/test"
+import { readFile } from "node:fs/promises"
 import { base64Encode } from "@opencode-ai/core/util/encode"
+import { isAttachmentReference } from "@opencode-ai/core/util/attachment-reference"
+import type { SessionPromptAsyncData } from "@opencode-ai/sdk/v2/client"
 import { mstockFixture } from "../../src/pages/session/mstock/fixtures"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL, video: "off" })
 
+type PromptRequest = NonNullable<SessionPromptAsyncData["body"]>
+
+function expectReferences(request: PromptRequest, count: number) {
+  const files = request.parts.filter((part) => part.type === "file")
+  expect(files).toHaveLength(count)
+  for (const file of files) expect(isAttachmentReference(file.url)).toBe(true)
+  const texts = request.parts.filter((part) => part.type === "text")
+  expect(texts).toHaveLength(1)
+  expect(texts[0].text).not.toContain("Called the Read tool")
+  return files
+}
+
 async function prepare(page: Page, legacy = false, form = false) {
   const data = mstockFixture(legacy)
   const errors: string[] = []
-  const sent: Array<Record<string, unknown>> = []
+  const sent: PromptRequest[] = []
+  const uploaded: Array<{ path: string; content: string; encoding: string }> = []
   const counters = { creates: 0, prepares: 0, uploads: 0 }
   let reject = false
   let rejectPrepare = false
@@ -172,6 +188,7 @@ async function prepare(page: Page, legacy = false, form = false) {
     const path = url.searchParams.get("path") ?? ""
     if (url.pathname === "/file/upload") {
       counters.uploads++
+      uploaded.push(route.request().postDataJSON())
       return route.fulfill({ json: { path } })
     }
     if (url.pathname === "/file/directory") return route.fulfill({ json: { path } })
@@ -208,6 +225,7 @@ async function prepare(page: Page, legacy = false, form = false) {
     data,
     errors,
     sent,
+    uploaded,
     counters,
     reject: (value: boolean) => {
       reject = value
@@ -335,7 +353,7 @@ for (const width of [1920, 1440, 1024, 390])
     }
     await expect(page.locator(".mstock-source-section > header")).toHaveCSS(
       "background-image",
-      /module-background\.png/,
+      /module-background\.optimized\.webp/,
     )
     await expect
       .poll(() =>
@@ -368,6 +386,10 @@ for (const width of [1920, 1440, 1024, 390])
     expect(state.counters.creates).toBe(1)
     expect(state.counters.uploads).toBe(1)
     expect(state.sent).toHaveLength(1)
+    const files = expectReferences(state.sent[0], 2)
+    expect(files[0].url).toContain("/inputs/history/source-1/30-final-report.md?")
+    expect(files[1].url).toContain("/inputs/uploads/")
+    expect(JSON.stringify(state.sent[0])).not.toContain("外部报告正文")
     expect(state.sent[0].agent).toBe("build")
     expect(JSON.stringify(state.sent[0])).not.toContain("comparison_dimensions")
     expect(JSON.stringify(state.sent[0])).not.toContain("估值水平")
@@ -391,6 +413,10 @@ test("submission failure preserves inputs and reuses binding and message ID", as
   await expect(page).toHaveURL(/\/session\/mstock-root/)
   expect(state.counters.creates).toBe(1)
   expect(state.sent[1].messageID).toBe(first)
+  expectReferences(state.sent[0], 2)
+  expect(expectReferences(state.sent[1], 2).map((file) => file.url)).toEqual(
+    state.sent[0].parts.filter((part) => part.type === "file").map((file) => file.url),
+  )
 })
 
 test("finance snapshot selects mstock UI and do-same returns to empty form", async ({ page }) => {
@@ -419,6 +445,54 @@ test("two uploaded reports work without selecting history", async ({ page }) => 
   await expect(page).toHaveURL(/\/session\/mstock-root/)
   expect(state.counters.uploads).toBe(2)
   expect(state.sent).toHaveLength(1)
+  const files = expectReferences(state.sent[0], 2)
+  expect(files.map((file) => file.filename)).toEqual(["A.md", "B.txt"])
+  expect(JSON.stringify(state.sent[0])).not.toContain("report A")
+  expect(JSON.stringify(state.sent[0])).not.toContain("report B")
+})
+
+test("history and a Word original are sent as references without decoding the upload", async ({ page }, info) => {
+  const state = await prepare(page, false, true)
+  const bytes = await readFile(new URL("../../../opencode/test/tool/fixtures/word-reference.doc", import.meta.url))
+  await page.goto("/mstock")
+  await page.locator(".mstock-source input").first().check()
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "财报 A #1%.doc",
+    mimeType: "application/msword",
+    buffer: bytes,
+  })
+  await page.getByRole("button", { name: "开始多股票综合对比" }).click()
+  await expect(page).toHaveURL(/\/session\/mstock-root/)
+  expect(state.uploaded).toHaveLength(1)
+  expect(state.uploaded[0].encoding).toBe("base64")
+  expect(Buffer.from(state.uploaded[0].content, "base64")).toEqual(bytes)
+  const files = expectReferences(state.sent[0], 2)
+  expect(files[0].url).toContain("/inputs/history/source-1/30-final-report.md?")
+  expect(files[1]).toMatchObject({ filename: "财报 A #1%.doc", mime: "application/msword" })
+  expect(decodeURIComponent(new URL(files[1].url).pathname)).toBe(`${state.data.directory}/${state.uploaded[0].path}`)
+  expect(new URL(files[1].url).hash).toBe("")
+  expect(JSON.stringify(state.sent[0])).not.toContain("This text has been inserted")
+  await page.route(`**/session/${state.data.root.id}/message?*`, (route) =>
+    route.fulfill({
+      json: [
+        {
+          info: { ...state.data.transcripts[0].messages[0], id: state.sent[0].messageID },
+          parts: state.sent[0].parts.map((part) => ({
+            ...part,
+            sessionID: state.data.root.id,
+            messageID: state.sent[0].messageID,
+          })),
+        },
+      ],
+    }),
+  )
+  await page.reload()
+  const attachments = page.locator('[data-component="workbench-attachments"]')
+  await expect(attachments.getByTitle("source-1", { exact: true })).toBeVisible()
+  await expect(attachments.getByTitle("财报 A #1%.doc", { exact: true })).toBeVisible()
+  await expect(page.locator('[data-role="user"]')).not.toContainText("This text has been inserted")
+  await page.screenshot({ path: info.outputPath("mstock-reference-attachments.png"), fullPage: true })
+  expect(state.errors).toEqual([])
 })
 
 test("source revalidation failure never sends and retry survives a reload", async ({ page }) => {
@@ -436,6 +510,9 @@ test("source revalidation failure never sends and retry survives a reload", asyn
   await page.getByRole("button", { name: "开始多股票综合对比" }).click()
   await expect(page).toHaveURL(/\/session\/mstock-root/)
   expect(state.counters.creates).toBe(1)
+  const files = expectReferences(state.sent[0], 2)
+  expect(files.every((file) => file.url.includes("/inputs/history/"))).toBe(true)
+  expect(state.counters.uploads).toBe(0)
 })
 
 test("followup keeps the workbench, its question and reply", async ({ page }) => {

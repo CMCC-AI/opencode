@@ -59,6 +59,7 @@ import { pathToFileURL } from "url"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { wordFixture } from "../fixture/word"
 
 const summary = Layer.succeed(
   SessionSummary.Service,
@@ -746,6 +747,76 @@ it.instance("new uploaded attachment references do not eagerly read document bod
       result.parts.some((part) => part.type === "file" && part.url.includes("opencode-attachment=reference")),
     ).toBe(true)
     expect(JSON.stringify(result.parts)).not.toContain("BODY_MUST_NOT_BE_INJECTED")
+  }),
+)
+
+it.instance("mstock input references stay out of persisted user text and remain readable", () =>
+  Effect.gen(function* () {
+    const { dir } = yield* useServerConfig(providerCfg)
+    const prompt = yield* SessionPrompt.Service
+    const sessions = yield* Session.Service
+    const fs = yield* FSUtil.Service
+    const registry = yield* ToolRegistry.Service
+    const { read } = yield* registry.named()
+    const artifact = path.join(dir, "runs", "mstock-reference-test")
+    const files = [
+      {
+        path: path.join(artifact, "inputs", "history", "source-1", "30-final-report.md"),
+        mime: "text/plain",
+        body: "HISTORY_BODY_MUST_NOT_BE_INJECTED",
+      },
+      {
+        path: path.join(artifact, "inputs", "uploads", "财报 A #1%.docx"),
+        mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        body: "WORD_BODY_MUST_NOT_BE_INJECTED",
+      },
+    ]
+    for (const file of files) {
+      const bytes =
+        file.mime === "text/plain" ? file.body : yield* Effect.promise(() => wordFixture([file.body], false))
+      yield* fs.writeWithDirs(file.path, bytes)
+    }
+    const chat = yield* sessions.create({ metadata: { cmccArtifactDirectory: artifact } })
+    yield* prompt.prompt({
+      sessionID: chat.id,
+      agent: "build",
+      noReply: true,
+      parts: [
+        { type: "text", text: "对比选定的历史报告和附件" },
+        ...files.map((file) => ({
+          type: "file" as const,
+          mime: file.mime,
+          filename: path.basename(file.path),
+          url: attachmentReferenceUrl(pathToFileURL(file.path).href),
+        })),
+      ],
+    })
+    const messages = yield* sessions.messages({ sessionID: chat.id })
+    expect(messages).toHaveLength(1)
+    const saved = messages[0]!
+    expect(saved.parts.filter((part) => part.type === "text").map((part) => part.text)).toEqual([
+      "对比选定的历史报告和附件",
+    ])
+    const attachments = saved.parts.filter((part) => part.type === "file")
+    expect(attachments).toHaveLength(files.length)
+    for (const file of files) {
+      expect(JSON.stringify(messages)).not.toContain(file.body)
+      const attachment = attachments.find((part) => part.filename === path.basename(file.path))!
+      expect(attachment.url).toContain("opencode-attachment=reference")
+      const result = yield* read.execute(
+        { filePath: fileURLToPath(attachment.url) },
+        {
+          sessionID: chat.id,
+          messageID: saved.info.id,
+          agent: "build",
+          abort: new AbortController().signal,
+          messages: [],
+          metadata: () => Effect.void,
+          ask: () => Effect.void,
+        },
+      )
+      expect(result.output).toContain(file.body)
+    }
   }),
 )
 
