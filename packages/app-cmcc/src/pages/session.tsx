@@ -1784,6 +1784,7 @@ export default function Page() {
           <PromptInput
             controls={inputController()}
             hideVariantControl={generalChat()}
+            hideAgentControl={dedicatedAnalysis()}
             ref={(el) => {
               inputRef = el
             }}

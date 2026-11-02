@@ -79,6 +79,7 @@ export type ArtifactDiscovery = {
   artifacts: SessionArtifact[]
   runDirectory?: string
   ambiguities: string[]
+  excludedPaths?: string[]
 }
 
 export type AgentWorkbench = {

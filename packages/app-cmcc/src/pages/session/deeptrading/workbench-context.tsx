@@ -12,6 +12,7 @@ import {
 import { createStore, reconcile } from "solid-js/store"
 import { createWorkbenchRuntime } from "../agent-workbench/runtime"
 import { createArtifactFileCatalog } from "../agent-workbench/artifact-file-catalog"
+import { mergeSessionReportArtifacts } from "../agent-workbench/artifact-files"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -405,9 +406,17 @@ function createLiveDeepTradingWorkbench(props: { sessionID: Accessor<string | un
         return response.data
       }),
     })
+    const reportDiscovery = createMemo(() =>
+      mergeSessionReportArtifacts({
+        discovery: discovery(),
+        files: fileCatalog.files(),
+        root: fileCatalog.root(),
+        roles: DEEPTRADING_ARTIFACT_ROLES,
+      }),
+    )
     const reports = createMemo(() => ({
-      text: artifactByRole(discovery(), "text-report"),
-      visual: artifactByRole(discovery(), "visual-report"),
+      text: artifactByRole(reportDiscovery(), "text-report"),
+      visual: artifactByRole(reportDiscovery(), "visual-report"),
     }))
 
     const stableStats = createMemo(() => {
@@ -437,7 +446,7 @@ function createLiveDeepTradingWorkbench(props: { sessionID: Accessor<string | un
       if (!root || !rootData) return emptyWorkbench(state.loading, state.error, props.sessionID() ?? "")
       const nodes = nodeResult()
       const reportFiles = reports()
-      const artifacts = discovery()
+      const artifacts = reportDiscovery()
       const stats = stableStats()
       const detailParent = selectedParentSession()
 

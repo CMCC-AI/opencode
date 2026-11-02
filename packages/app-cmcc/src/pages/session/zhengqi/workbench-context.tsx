@@ -11,6 +11,7 @@ import {
 import { createStore, reconcile } from "solid-js/store"
 import { createWorkbenchRuntime } from "../agent-workbench/runtime"
 import { createArtifactFileCatalog } from "../agent-workbench/artifact-file-catalog"
+import { mergeSessionReportArtifacts } from "../agent-workbench/artifact-files"
 import { createReportLength } from "../agent-workbench/report-length-context"
 import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
@@ -394,9 +395,17 @@ export function ZhengqiWorkbenchProvider(
       return response.data
     }),
   })
+  const reportDiscovery = createMemo(() =>
+    mergeSessionReportArtifacts({
+      discovery: discovery(),
+      files: fileCatalog.files(),
+      root: fileCatalog.root(),
+      roles: ZHENGQI_ARTIFACT_ROLES,
+    }),
+  )
   const reports = createMemo(() => ({
-    text: artifactByRole(discovery(), "text-report"),
-    visual: artifactByRole(discovery(), "visual-report"),
+    text: artifactByRole(reportDiscovery(), "text-report"),
+    visual: artifactByRole(reportDiscovery(), "visual-report"),
   }))
   const reportRevision = createMemo<number | undefined>((previous) => running() ? previous : rootSession()?.time.updated)
   const reportLength = createReportLength({
@@ -445,7 +454,7 @@ export function ZhengqiWorkbenchProvider(
     if (!root || !rootData) return emptyWorkbench(state.loading, state.error, props.sessionID() ?? "")
     const nodes = nodeResult()
     const reportFiles = reports()
-    const artifacts = discovery()
+    const artifacts = reportDiscovery()
     const currentStats = stats()
     const detailParent = selectedParentSession()
     return {

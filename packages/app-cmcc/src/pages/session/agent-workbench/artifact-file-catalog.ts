@@ -91,6 +91,7 @@ export function createArtifactFileCatalog(input: {
   })
 
   return {
+    root: () => scope()?.path,
     files: createMemo(() =>
       mergeSessionArtifactFiles({
         artifacts: input.artifacts(),

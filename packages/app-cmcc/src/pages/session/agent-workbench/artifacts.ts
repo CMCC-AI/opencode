@@ -59,12 +59,18 @@ function toolPaths(directory: string, input: Record<string, unknown>, metadata: 
   const normalizedMetadata = metadataPath ? relativeArtifactPath(directory, metadataPath) : undefined
 
   if (inputPath && metadataPath && !!normalizedInput !== !!normalizedMetadata) {
-    return { issue: "write 路径字段的工作目录归属不一致" }
+    return {
+      issue: "write 路径字段的工作目录归属不一致",
+      excludedPaths: [normalizedInput, normalizedMetadata].filter((path): path is string => !!path),
+    }
   }
   if (inputPath && !normalizedInput) return {}
   if (metadataPath && !normalizedMetadata) return {}
   if (normalizedInput && normalizedMetadata && normalizedInput !== normalizedMetadata) {
-    return { issue: `write 路径字段不一致: ${normalizedInput} / ${normalizedMetadata}` }
+    return {
+      issue: `write 路径字段不一致: ${normalizedInput} / ${normalizedMetadata}`,
+      excludedPaths: [normalizedInput, normalizedMetadata],
+    }
   }
   return { path: normalizedInput ?? normalizedMetadata }
 }
@@ -79,6 +85,7 @@ export function discoverSessionArtifacts(input: {
   const ambiguities: string[] = []
   const artifacts = new Map<string, SessionArtifact>()
   const conflictedPaths = new Set<string>()
+  const excludedPaths = new Set<string>()
 
   for (const transcript of input.transcripts) {
     for (const message of transcript.messages) {
@@ -91,6 +98,7 @@ export function discoverSessionArtifacts(input: {
         )
         if (result.issue) {
           ambiguities.push(`${transcript.session.id}/${part.id}: ${result.issue}`)
+          result.excludedPaths?.forEach((path) => excludedPaths.add(path))
           continue
         }
         if (!result.path) continue
@@ -147,6 +155,9 @@ export function discoverSessionArtifacts(input: {
     artifacts: values,
     runDirectory: runDirectories.size === 1 ? [...runDirectories][0] : undefined,
     ambiguities: [...new Set(ambiguities)],
+    ...(excludedPaths.size || conflictedPaths.size
+      ? { excludedPaths: [...new Set([...excludedPaths, ...conflictedPaths])] }
+      : {}),
   }
 }
 

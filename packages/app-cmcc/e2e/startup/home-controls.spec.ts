@@ -251,13 +251,68 @@ test("history restores its model rather than applying the new draft default", as
   await expect(page.locator(modelTrigger)).toContainText("Kimi 测试模型")
 })
 
-test("history sessions retain their existing model and agent controls", async ({ page, baseURL }) => {
-  await setupHomePage(page, { models: true, history: true })
-  await page.goto(`/server/${base64Encode(baseURL!)}/session/${homeSession.id}`)
-  await expect(page.locator('[data-component="session-composer"]')).toBeVisible()
-  await expect(page.locator(".home-agent-control")).toHaveCount(0)
-  await expect(page.locator('[data-action="prompt-agent"]')).toContainText("构建")
-  await page.getByRole("button", { name: "打开更多操作" }).click()
-  await expect(page.locator('[data-component="cmcc-prompt-panels"]')).toBeVisible()
-  await expect(page.locator(".home-actions-popover")).toHaveCount(0)
-})
+for (const width of [1440, 390]) {
+  for (const name of [
+    "深度研究专家团",
+    "财经分析专家团",
+    "购买决策专家团",
+    "巡察分析专家团",
+    "谈参高拜专家团",
+    "位置决策专家团",
+    "科研专家团",
+  ]) {
+    test(`${name} draft hides execution modes and restores ordinary controls at ${width}`, async ({ page }, info) => {
+      await openHome(page, width)
+      const editor = page.locator(`${composer} [data-component="prompt-input"]`)
+      const modes = page.getByRole("group", { name: "执行模式", exact: true })
+      await editor.fill("保留研究草稿")
+      await modes.getByRole("button", { name: "计划", exact: true }).click()
+      await page.getByRole("button", { name: "打开更多操作" }).click()
+      await page.getByRole("button", { name: "专家团", exact: true }).click()
+      await page.getByRole("menuitem", { name, exact: true }).click()
+      const expert = page.locator('[data-action="prompt-selected-expert"]')
+      await expect(expert).toContainText(name)
+      await expect(modes).toHaveCount(0)
+      await expect(page.locator('[data-action="prompt-agent"]')).toHaveCount(0)
+      await expect(page.locator(modelTrigger)).toBeVisible()
+      await expect(editor).toHaveText("保留研究草稿")
+      await page.screenshot({ path: info.outputPath("expert-draft.png") })
+      await expert.click()
+      await expect(modes).toBeVisible()
+      await expect(modes.getByRole("button", { name: "计划", exact: true })).toHaveAttribute("aria-pressed", "true")
+      await modes.getByRole("button", { name: "执行", exact: true }).click()
+      await expect(modes.getByRole("button", { name: "执行", exact: true })).toHaveAttribute("aria-pressed", "true")
+      await expect(editor).toHaveText("保留研究草稿")
+      await page.getByRole("button", { name: "打开更多操作" }).click()
+      await page.getByRole("button", { name: "专家团", exact: true }).click()
+      await page.getByRole("menuitem", { name, exact: true }).click()
+      await page.reload()
+      await expect(expert).toContainText(name)
+      await expect(modes).toHaveCount(0)
+      await expert.click()
+      await expect(modes).toBeVisible()
+      await expect(editor).toHaveText("保留研究草稿")
+    })
+  }
+
+  test(`history sessions retain their existing model and agent controls at ${width}`, async ({ page, baseURL }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await setupHomePage(page, { models: true, history: true })
+    await page.goto(`/server/${base64Encode(baseURL!)}/session/${homeSession.id}`)
+    await expect(page.locator('[data-component="session-composer"]')).toBeVisible()
+    if (width < 760) await page.getByRole("button", { name: "隐藏左栏" }).click()
+    await expect(page.locator(".home-agent-control")).toHaveCount(0)
+    const agent = page.locator('[data-action="prompt-agent"]')
+    await expect(agent).toContainText("构建")
+    await agent.click()
+    await page.getByRole("option", { name: "计划", exact: true }).click()
+    await expect(agent).toContainText("计划")
+    await agent.click()
+    await page.getByRole("option", { name: "构建", exact: true }).click()
+    await expect(agent).toContainText("构建")
+    await expect(page.locator(modelTrigger)).toBeVisible()
+    await page.getByRole("button", { name: "打开更多操作" }).click()
+    await expect(page.locator('[data-component="cmcc-prompt-panels"]')).toBeVisible()
+    await expect(page.locator(".home-actions-popover")).toHaveCount(0)
+  })
+}

@@ -25,6 +25,7 @@ export function scopeZhengqiArtifacts(discovery: ArtifactDiscovery, artifactRoot
   const runDirectory = discovery.runDirectory
   const scopedRunDirectory = runDirectory && isWithin(normalize(runDirectory), root) ? runDirectory : undefined
   return {
+    ...discovery,
     artifacts,
     runDirectory: scopedRunDirectory,
     ambiguities: [

@@ -116,6 +116,10 @@ describe("agent workbench artifacts", () => {
 
     expect(result.artifacts).toEqual([])
     expect(result.ambiguities).toHaveLength(1)
+    expect(result.excludedPaths).toEqual([
+      "tmp/trading-workspace/run-1/30-final-report.md",
+      "tmp/trading-workspace/run-2/30-final-report.md",
+    ])
   })
 
   test("does not choose a latest report when multiple run directories exist", () => {
@@ -154,6 +158,7 @@ describe("agent workbench artifacts", () => {
 
     expect(result.artifacts).toEqual([])
     expect(result.ambiguities).toHaveLength(1)
+    expect(result.excludedPaths).toEqual(["tmp/trading-workspace/run-1/30-final-report.md"])
   })
 
   test("allows same-agent retry sessions to update one path only when explicitly enabled", () => {

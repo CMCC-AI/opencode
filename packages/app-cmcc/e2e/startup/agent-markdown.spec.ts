@@ -259,6 +259,141 @@ async function clipboardText(page: Page) {
 }
 
 for (const team of teams) {
+  for (const width of team.id === "deepinspect" ? [1440, 390] : [1440]) {
+    test(`${team.id} discovers script reports at completion and after refresh at ${width}`, async ({
+      page,
+      baseURL,
+    }, info) => {
+      await page.setViewportSize({ width, height: 1000 })
+      const data = await prepare(page, team)
+      const root = "runs/markdown-style"
+      const directory = `${root}/tmp/report-output`
+      const write = data.transcripts.get(data.root.id)![1].parts.find((part) => part.type === "tool")!
+      if (write.type !== "tool" || write.state.status !== "completed") throw new Error("Missing report write fixture")
+      const textPath = `${directory}/${String(write.state.input.filePath).split("/").at(-1)}`
+      write.state.input.filePath = `${homeDirectory}/${textPath}`
+      const htmlPath = `${directory}/30-report.html`
+      const pdfPath = `${directory}/35-report.pdf`
+      const uploadPath = `${root}/attachments/upload-12345678-1234-1234-1234-123456789abc/uploaded.html`
+      const supplemented = ["deepinspect", "deeptrading", "zhengqi-visit-intel", "shoppers-pro"].includes(team.id)
+      const sourcePaths = supplemented
+        ? [`${root}/inputs/history/old/source.pdf`, `${directory}/assets/example.html`]
+        : []
+      const pdf = (await previewFiles())["report.pdf"].bytes
+      const listed: string[] = []
+      const previews: string[] = []
+      let completed = false
+      await page.route("**/session/status*", (route) =>
+        route.fulfill({ json: { [data.root.id]: { type: completed ? "idle" : "busy" } } }),
+      )
+      await page.route("**/file?*", (route) => {
+        const path = new URL(route.request().url()).searchParams.get("path") ?? ""
+        listed.push(path)
+        const prefix = `${path}/`
+        const paths = [textPath, uploadPath, ...sourcePaths, ...(completed ? [htmlPath, pdfPath] : [])]
+        const nodes = new Map(
+          paths
+            .filter((file) => file.startsWith(prefix))
+            .map((file) => {
+              const name = file.slice(prefix.length).split("/")[0]
+              const child = `${prefix}${name}`
+              return [
+                child,
+                {
+                  path: child,
+                  name,
+                  absolute: `${homeDirectory}/${child}`,
+                  type: child === file ? "file" : "directory",
+                  ignored: false,
+                },
+              ]
+            }),
+        )
+        return route.fulfill({ json: [...nodes.values()] })
+      })
+      await page.route("**/file/preview?*", (route) => {
+        const path = new URL(route.request().url()).searchParams.get("path") ?? ""
+        previews.push(path)
+        if (path === pdfPath) return route.fulfill({ contentType: "application/pdf", body: pdf })
+        if (path !== htmlPath) return route.fulfill({ status: 404, body: "Unexpected report path" })
+        return route.fulfill({
+          contentType: "text/html; charset=utf-8",
+          body: '<!doctype html><html lang="zh"><meta charset="utf-8"><h1>脚本生成的可视化报告</h1><p>报告目录扫描验收</p></html>',
+        })
+      })
+      await page.route("**/file/download?*", (route) => {
+        const path = new URL(route.request().url()).searchParams.get("path") ?? ""
+        previews.push(path)
+        return path === pdfPath
+          ? route.fulfill({ contentType: "application/pdf", body: pdf })
+          : route.fulfill({ status: 404, body: "Unexpected report path" })
+      })
+      await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+      await narrow(page, width)
+      if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+      await page.getByRole("button", { name: "可视化报告", exact: true }).click()
+      await expect(page.getByText("可视化报告尚未生成", { exact: true })).toBeVisible()
+      completed = true
+      data.events.push({ type: "session.status", properties: { sessionID: data.root.id, status: { type: "idle" } } })
+      await expect(page.getByRole("button", { name: "30-report.html", exact: true })).toHaveCount(1)
+      await expect(page.frameLocator("iframe").getByRole("heading", { name: "脚本生成的可视化报告" })).toBeVisible()
+      await expect(page.getByRole("button", { name: "35-report.pdf", exact: true })).toHaveCount(1)
+      for (const name of ["uploaded.html", "source.pdf", "example.html"])
+        await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0)
+      await page.screenshot({ path: info.outputPath("scanned-html-report.png") })
+      await page.getByRole("button", { name: "35-report.pdf", exact: true }).click()
+      await expect(page.locator("[data-cmcc-pdf-preview]")).toHaveAttribute("data-ready", "true")
+      await page.reload()
+      if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+      await page.getByRole("button", { name: "可视化报告", exact: true }).click()
+      await expect(page.frameLocator("iframe").getByRole("heading", { name: "脚本生成的可视化报告" })).toBeVisible()
+      expect(previews.every((path) => path === htmlPath || path === pdfPath)).toBe(true)
+      expect(listed.every((path) => path === root || path.startsWith(`${root}/`))).toBe(true)
+      expect(data.errors).toEqual([])
+    })
+  }
+}
+
+test("deepinspect restores a scanned JSON visual report without HTML or PDF", async ({ page, baseURL }) => {
+  const team = teams.find((team) => team.id === "deepinspect")!
+  const data = await prepare(page, team)
+  const directory = "runs/markdown-style"
+  const report = {
+    layout_version: 2,
+    title: "扫描发现的巡察报告",
+    sections: [
+      { id: "summary", heading: "问题摘要", blocks: [{ type: "markdown", content: "仅有 JSON 的可视化内容" }] },
+    ],
+  }
+  await page.route("**/file?*", (route) =>
+    route.fulfill({
+      json: ["20-report.md", "25-visual-report.json"].map((name) => ({
+        name,
+        path: `${directory}/${name}`,
+        absolute: `${homeDirectory}/${directory}/${name}`,
+        type: "file",
+        ignored: false,
+      })),
+    }),
+  )
+  await page.route("**/file/content?*", (route) =>
+    route.fulfill({
+      json: {
+        type: "text",
+        content: new URL(route.request().url()).searchParams.get("path")?.endsWith("25-visual-report.json")
+          ? JSON.stringify(report)
+          : markdown,
+      },
+    }),
+  )
+  await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+  await page.getByRole("button", { name: "可视化报告", exact: true }).click()
+  await expect(page.getByText("仅有 JSON 的可视化内容", { exact: true })).toBeVisible()
+  await expect(page.getByText("可视化报告尚未生成", { exact: true })).toHaveCount(0)
+  expect(data.errors).toEqual([])
+})
+
+for (const team of teams) {
   for (const width of team.id === "deepinsight" ? [1440, 390] : [1440]) {
     test(`${team.id} renders isolated HTML headings, tables, formulas and charts without CDN at ${width}`, async ({
       page,
@@ -398,6 +533,10 @@ for (const width of [1440, 390]) {
       const started = performance.now()
       await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
       await narrow(page, width)
+      await expect(page.locator('[data-component="session-composer"]')).toBeVisible()
+      await expect(page.locator('[data-action="prompt-agent"]')).toHaveCount(0)
+      await expect(page.getByRole("group", { name: "执行模式", exact: true })).toHaveCount(0)
+      await expect(page.locator('[data-action="prompt-model"]')).toBeVisible()
       const root = page.locator(`[data-workbench-message="${data.root.id}-a"]`)
       const content = root.locator('[data-component="markdown"]')
       const rootStyles = await styles(content)

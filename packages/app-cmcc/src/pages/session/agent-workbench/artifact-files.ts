@@ -1,7 +1,9 @@
 import type { FileNode } from "@opencode-ai/sdk/v2"
 import { cmccArtifactDirectory } from "@/utils/cmcc-workspace"
 import { cmccWorkspaceRelativePath } from "@/utils/cmcc-artifact-paths"
-import type { AgentWorkbench, SessionArtifact } from "./model"
+import { artifactReportFiles } from "../artifact-preview"
+import type { ArtifactRoleConfig } from "./artifacts"
+import type { AgentWorkbench, ArtifactDiscovery, SessionArtifact } from "./model"
 
 const FILE_LIMIT = 200
 const DIRECTORY_LIMIT = 200
@@ -86,6 +88,56 @@ export function mergeSessionArtifactFiles(input: {
     })
   }
   return [...files.values()]
+}
+
+export function mergeSessionReportArtifacts(input: {
+  discovery: ArtifactDiscovery
+  files: readonly SessionArtifact[]
+  root?: string
+  roles: ArtifactRoleConfig
+}): ArtifactDiscovery {
+  const root = input.root ? safeRelative(input.root) : undefined
+  if (!root || !root.startsWith("runs/")) return input.discovery
+  const knownDirectory = input.discovery.runDirectory?.replaceAll("\\", "/")
+  if (knownDirectory && knownDirectory !== root && !knownDirectory.startsWith(`${root}/`)) return input.discovery
+  const excluded = new Set(input.discovery.excludedPaths?.map((path) => path.replaceAll("\\", "/")))
+  const files = input.files.filter((file) => {
+    const path = safeRelative(file.path)
+    return path && path.startsWith(`${root}/`) && !/(?:^|\/)(inputs|attachments)\//.test(path) && !excluded.has(path)
+  })
+  const parent = (file: SessionArtifact) => file.path.replaceAll("\\", "/").split("/").slice(0, -1).join("/")
+  const directories = new Set(
+    [...input.discovery.artifacts, ...files]
+      .filter((file) => {
+        const role = input.roles[file.filename]?.role
+        return (
+          (role === "text-report" || role === "visual-report") &&
+          !/(?:^|\/)(inputs|attachments)\//.test(file.path.replaceAll("\\", "/"))
+        )
+      })
+      .map(parent),
+  )
+  if (!directories.size && knownDirectory) directories.add(knownDirectory)
+  if (directories.size > 1)
+    return {
+      ...input.discovery,
+      ambiguities: [...new Set([...input.discovery.ambiguities, "检测到多个报告目录，暂时无法确定最终报告"])],
+    }
+  const directory = [...directories][0]
+  if (!directory || (directory !== root && !directory.startsWith(`${root}/`))) return input.discovery
+  const reportPaths = new Set(
+    [...artifactReportFiles(files, "text"), ...artifactReportFiles(files, "visual")].map((file) => file.path),
+  )
+  const artifacts = new Map(input.discovery.artifacts.map((file) => [file.path.replaceAll("\\", "/"), file]))
+  for (const file of files) {
+    const configured = input.roles[file.filename]
+    if (parent(file) !== directory || (!reportPaths.has(file.path) && configured?.role !== "visual-report")) continue
+    const path = file.path.replaceAll("\\", "/")
+    if (artifacts.has(path)) continue
+    // Directory listings prove existence, not the author, timestamp or successful tool call.
+    artifacts.set(path, { ...file, path, role: configured?.role ?? file.role, label: configured?.label ?? file.label })
+  }
+  return { ...input.discovery, artifacts: [...artifacts.values()], runDirectory: directory }
 }
 
 function safeRelative(path: string) {

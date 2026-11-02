@@ -52,10 +52,12 @@ describe("Zhengqi workbench data", () => {
       ],
       runDirectory: "runs/run-1/customer",
       ambiguities: [],
+      excludedPaths: ["runs/run-1/customer/25-visual-report.json"],
     }
     const result = scopeZhengqiArtifacts(discovery, "runs/run-1")
     expect(result.artifacts.map((artifact) => artifact.path)).toEqual(["runs/run-1/customer/20-report.md"])
     expect(result.runDirectory).toBe("runs/run-1/customer")
+    expect(result.excludedPaths).toEqual(discovery.excludedPaths)
     expect(result.ambiguities).toContain("检测到 1 个写入会话产物目录外的文件，已从政企文件列表排除")
   })
 })

@@ -190,6 +190,7 @@ export interface PromptInputProps {
     submit: (deep: () => Promise<void> | void) => Promise<void>
   }
   hideVariantControl?: boolean
+  hideAgentControl?: boolean
   class?: string
   variant?: "dock" | "new-session"
   state?: PromptInputState
@@ -1748,7 +1749,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     restoreEndOnFocus = true
     props.ref?.(el)
   }
-  const showAgentControl = createMemo(() => props.controls.agents.visible && props.controls.agents.options.length > 0)
+  const hideAgentControl = () => props.hideAgentControl || !!selectedTeamExpert()
+  const showAgentControl = createMemo(
+    () => !hideAgentControl() && props.controls.agents.visible && props.controls.agents.options.length > 0,
+  )
   const agentControlState = createMemo<ComposerAgentControlState>(() => ({
     title: language.t("command.agent.cycle"),
     keybind: command.keybindParts("agent.cycle"),
@@ -2304,7 +2308,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </Button>
                   </div>
                   <div class="flex items-center gap-1.5 min-w-0 flex-1 h-7">
-                    <Show when={!agentsLoading()}>
+                    <Show when={!agentsLoading() && !hideAgentControl()}>
                       <div
                         data-component="prompt-agent-control"
                         classList={{ "animate-in fade-in duration-300": agentsShouldFadeIn() }}
