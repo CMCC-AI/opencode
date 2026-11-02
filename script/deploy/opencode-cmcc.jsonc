@@ -1,6 +1,15 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "disabled_providers": ["alibaba"],
+  "disabled_providers": [
+    "alibaba",
+    "zai",
+    "zhipuai",
+    "zai-coding-plan",
+    "moonshotai",
+    "kimi-code-plan-cn",
+    "kimi-code-plan-global",
+    "kimi-for-coding",
+  ],
   "provider": {
     "alibaba-cn": {
       "name": "阿里云百炼",
