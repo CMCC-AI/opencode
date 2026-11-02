@@ -35,9 +35,20 @@ const sameExecution = (left, right) => left.node === right.node
   && left.round === right.round
   && left.attempt === right.attempt
   && (left.batch || 0) === (right.batch || 0);
-const active = (state) => {
-  const starts = state.events.filter((event) => event.event === 'started');
-  return starts.findLast((start) => !state.events.some((event) => event.sequence > start.sequence && sameExecution(event, start) && ['completed', 'failed'].includes(event.event)));
+// 所有仍未终结的执行（支持并行组登记）
+const runningTasks = (state) => state.events.filter((event) => event.event === 'started'
+  && !state.events.some((later) => later.sequence > event.sequence && sameExecution(later, event) && ['completed', 'failed'].includes(later.event)));
+// 并行白名单：仅同一轮次的 local_research 与 web_research 允许并存，其余节点维持严格串行
+const parallelOk = (running, next) => running.round === next.round
+  && ['local_research', 'web_research'].includes(running.node)
+  && ['local_research', 'web_research'].includes(next.node);
+// 按执行键精确匹配运行中 Task；兼容历史登记习惯：同节点只有一个在跑时回退匹配
+const findRunning = (state, key) => {
+  const exact = runningTasks(state).filter((start) => start.node === key.node && start.agent === key.agent
+    && start.round === key.round && start.attempt === key.attempt && (start.batch || 0) === (key.batch || 0));
+  if (exact.length) return exact.at(-1);
+  const sameNode = runningTasks(state).filter((start) => start.node === key.node);
+  return sameNode.length === 1 ? sameNode[0] : undefined;
 };
 const nextSequence = (state) => (state.events.at(-1)?.sequence || 0) + 1;
 const assertAgent = (node, agent) => {
@@ -411,9 +422,10 @@ if (command === 'route') {
 if (command === 'start') {
   const [node, agent, attemptArg = '1', roundArg = '1', batchArg] = args;
   assertAgent(node, agent);
-  if (active(state)) throw new Error(`仍有未结束的 Task：${active(state).node}#${active(state).attempt}`);
   const attempt = parsePositive(attemptArg, 'attempt');
   const round = parsePositive(roundArg, 'round');
+  const blocker = runningTasks(state).find((running) => !parallelOk(running, { node, round }));
+  if (blocker) throw new Error(`仍有未结束的 Task：${blocker.node}#${blocker.attempt}；仅同轮 local_research/web_research 允许并行`);
   const batchInfo = parseBatchToken(batchArg);
   if (batchArg && !batchInfo) throw new Error(`无法识别的 start 参数：${batchArg}`);
   if (batchInfo && (node !== 'writing' || round !== 1)) throw new Error('batch 仅用于 writing 首轮章节分批');
@@ -516,10 +528,8 @@ if (command === 'complete') {
   const round = parsePositive(roundArg, 'round');
   const batchInfo = parseBatchToken(rest[0]);
   const artifactPaths = batchInfo ? rest.slice(1) : rest;
-  const running = active(state);
-  if (!running || running.node !== node || running.agent !== agent || running.round !== round || running.attempt !== attempt || (running.batch || 0) !== (batchInfo?.batch || 0)) {
-    // throw new Error(`没有匹配的运行中 Task：${node} -> ${agent}#round${round}/attempt${attempt}`);
-  }
+  const running = findRunning(state, { node, agent, round, attempt, batch: batchInfo?.batch || 0 });
+  if (!running) throw new Error(`没有匹配的运行中 Task：${node} -> ${agent}#round${round}/attempt${attempt}${batchInfo ? `/batch${batchInfo.batch}` : ''}`);
   if (!artifactPaths.length) throw new Error('complete 必须提供至少一个已落盘的 Task 产物');
   if (batchInfo) {
     const plan = await readJson(resolve(workspace, '11-writing-plan.json'));
@@ -548,8 +558,8 @@ if (command === 'fail') {
   const round = parsePositive(roundArg, 'round');
   const batchInfo = parseBatchToken(rest[0]);
   const reasonParts = batchInfo ? rest.slice(1) : rest;
-  const running = active(state);
-  if (!running || running.node !== node || running.agent !== agent || running.round !== round || running.attempt !== attempt || (running.batch || 0) !== (batchInfo?.batch || 0)) throw new Error('没有匹配的运行中 Task');
+  const running = findRunning(state, { node, agent, round, attempt, batch: batchInfo?.batch || 0 });
+  if (!running) throw new Error(`没有匹配的运行中 Task：${node} -> ${agent}#round${round}/attempt${attempt}${batchInfo ? `/batch${batchInfo.batch}` : ''}`);
   state.events.push({ sequence: nextSequence(state), event: 'failed', node, agent, round, attempt, ...(batchInfo || {}), task_tool: 'Task', at: now(), duration_ms: Date.now() - Date.parse(running.at), reason: reasonParts.join(' ') || 'Task failed' });
   await save(state);
   process.stdout.write(`Task failed: ${node} -> ${agent}#round${round}/attempt${attempt}\n`);
@@ -571,7 +581,8 @@ if (command === 'skip') {
 }
 
 if (command === 'validate') {
-  if (active(state)) throw new Error(`仍有未结束的 Task：${active(state).node}`);
+  const running = runningTasks(state);
+  if (running.length) throw new Error(`仍有未结束的 Task：${running.map((item) => `${item.node}#${item.attempt}`).join(', ')}`);
   if (!state.route) throw new Error('研究路由尚未固化');
   const mandatory = ['safety', 'intent', 'planning', 'reflection', 'outline', 'writing', 'evidence_review', 'visualization', 'html_render', 'pdf_export'];
   if (state.route.local_research_required) mandatory.push('local_research');

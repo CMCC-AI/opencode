@@ -207,7 +207,7 @@
       "order": 100,
       "node": "html_render",
       "layer": 2,
-      "agent": "di-html-renderer",
+      "agent": "deepinsight-team-lead",
       "condition": "after_visualization",
       "third_layer_tools": [
         "render-report.mjs"
@@ -222,7 +222,7 @@
       "order": 110,
       "node": "pdf_export",
       "layer": 2,
-      "agent": "di-pdf-exporter",
+      "agent": "deepinsight-team-lead",
       "condition": "after_html_render",
       "third_layer_tools": [
         "export-report-pdf.mjs"

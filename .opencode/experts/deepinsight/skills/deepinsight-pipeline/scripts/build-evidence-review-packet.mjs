@@ -249,14 +249,35 @@ const packet = {
   },
 };
 
-let serialized = `${JSON.stringify(packet, null, 2)}\n`;
-while (Buffer.byteLength(serialized) > 56_000 && packet.review_segments.length > (round === 1 ? 12 : 4)) {
+// 自动瘦身：先逐级压缩字段，再弹段落——消除主理人手工干预（历史上因此停顿 10 分钟级）
+const serialize = () => `${JSON.stringify(packet, null, 2)}\n`;
+let autoShrunk = false;
+for (const excerptLimit of [560, 400, 240]) {
+  if (Buffer.byteLength(serialize()) <= 56_000) break;
+  autoShrunk = true;
+  for (const segment of packet.review_segments) {
+    if (segment.excerpt.length > excerptLimit) {
+      segment.excerpt = segment.excerpt.slice(0, excerptLimit);
+      segment.excerpt_sha256 = sha256(segment.excerpt);
+    }
+  }
+}
+for (const sourceLimit of [280, 160]) {
+  if (Buffer.byteLength(serialize()) <= 56_000) break;
+  autoShrunk = true;
+  for (const source of packet.source_evidence) {
+    if (source.excerpt.length > sourceLimit) source.excerpt = source.excerpt.slice(0, sourceLimit);
+  }
+}
+while (Buffer.byteLength(serialize()) > 56_000 && packet.review_segments.length > (round === 1 ? 12 : 4)) {
+  autoShrunk = true;
   packet.review_segments.pop();
   const retained = new Set(packet.review_segments.flatMap((item) => item.citations));
   packet.source_evidence = packet.source_evidence.filter((source) => retained.has(source.key));
   packet.scope_summary.selected_blocks = packet.review_segments.length;
-  serialized = `${JSON.stringify(packet, null, 2)}\n`;
 }
+if (autoShrunk) packet.scope_summary.auto_shrunk = true;
+const serialized = serialize();
 if (Buffer.byteLength(serialized) > 64_000) throw new Error('审查包超过 64KB；请检查异常清单或单条需求是否异常膨胀');
 
 const outputName = `20-evidence-review-packet-${round}.json`;

@@ -120,16 +120,17 @@ node "$SKILL_DIR/scripts/validate-run.mjs" <WS>                            # 最
 | `web_research` | `di-web-researcher` | external / hybrid 需外部证据 | `05-web-findings-N.*` |
 | `reflection` | `di-reflector` | 至少一轮研究后必经 | `07-reflection-N.json` |
 | `outline` | `di-outline-architect` | 必经 | `10-outline.json` |
-| `writing` | `di-report-writer` | 必经（分批） | `19-report-part-NN.md`、`20-report.md` |
+| `writing` | `di-report-writer` | 必经（同消息并行批次，整节点登记） | `19-report-part-NN.md`、`20-report.md` |
 | `evidence_review` | `di-evidence-reviewer` | 写作后必经 | `21-evidence-review-N.json` |
 | `visualization` | `di-viz` | 审查后必经 | `25-visual-report.json` |
-| `html_render` | `di-html-renderer` | 可视化后必经 | `30-report.html`、`31-render-state.json` |
-| `pdf_export` | `di-pdf-exporter` | HTML 后必经 | `35-report.pdf`、`36-pdf-export-state.json` |
+| `html_render` | `deepinsight-team-lead`（直跑，不经子代理） | 可视化后必经 | `30-report.html`、`31-render-state.json` |
+| `pdf_export` | `deepinsight-team-lead`（直跑，不经子代理） | HTML 后必经 | `35-report.pdf`、`36-pdf-export-state.json` |
 
 调用纪律：
-- 先 `start` 登记 → 调用成员 → 结果落盘 → `complete` 登记，顺序不可颠倒
+- 先 `start` 登记 → 调用成员 → 结果落盘 → `complete` 登记，顺序不可颠倒；start/complete 的 bash 与 dispatch 的 task 调用合并在同一条消息内发出，不为登记单独消耗回合
 - 同一节点内技术重试最多 `attempt=2`；没有新业务理由不得用 `round` 绕过重试上限
-- 首轮 writing 按批次登记 `batch=<i>/<n>`；每批独立 start/complete
+- 同轮 `local_research`/`web_research` 允许并行：一条 bash 内 `;` 串联两个 start，同一消息并行 dispatch，返回后一条 bash 串联两个 complete
+- 首轮 writing 为整节点登记（不带 batch）：plan → start → 同消息并行 dispatch 全部批次 → assemble → complete；单批失败由主理人直接重派该批，不动台账
 - 脚本失败时保留 workspace 和明确错误，不用模型猜测补齐产物
 
 ## 搜索工具约定（WorkBuddy 环境）
