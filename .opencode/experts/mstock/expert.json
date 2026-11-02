@@ -1,0 +1,125 @@
+{
+  "id": "mstock",
+  "source": "workbuddy",
+  "expertType": "team",
+  "agentName": "mstock/mstock",
+  "teamInfo": {
+    "leadAgent": "mstock/mstock",
+    "memberAgents": [
+      "mstock/ms-comparator",
+      "mstock/ms-report-writer",
+      "mstock/ms-visualizer",
+      "mstock/ms-html-renderer",
+      "mstock/ms-pdf-exporter"
+    ]
+  },
+  "displayName": {
+    "en": "Mstock",
+    "zh": "多股对比专家团"
+  },
+  "profession": {
+    "en": "Mstock",
+    "zh": "多股对比专家团"
+  },
+  "displayDescription": {
+    "en": "Multi-stock comparison team: cross-checks multiple single-stock reports across fundamentals, valuation, technicals, sentiment and risk, delivering a 7-chapter comparison report and a visual comparison dashboard.",
+    "zh": "多股对比专家团：多份个股报告交叉对比基本面/估值/技术面/舆情/风险，交付七章对比总报告与多股横评可视化看板。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "08-FinanceInvestment",
+  "defaultInitPrompt": {
+    "zh": "对比贵州茅台、五粮液、泸州老窖三只白酒股的投资价值",
+    "en": "Compare the investment value of Kweichow Moutai, Wuliangye and Luzhou Laojiao"
+  },
+  "members": [
+    {
+      "id": "mstock/mstock",
+      "name": {
+        "en": "A Chou",
+        "zh": "阿筹"
+      },
+      "profession": {
+        "en": "Multi-Stock Comparison Orchestration Expert",
+        "zh": "多股对比编排专家"
+      },
+      "avatar": "avatars/mstock.png",
+      "role": "lead",
+      "originalId": "mstock"
+    },
+    {
+      "id": "mstock/ms-comparator",
+      "name": {
+        "en": "A Bi",
+        "zh": "阿比"
+      },
+      "profession": {
+        "en": "Cross-Stock Comparison Analyst",
+        "zh": "横向对比分析专家"
+      },
+      "avatar": "avatars/ms-comparator.png",
+      "role": "member",
+      "originalId": "ms-comparator"
+    },
+    {
+      "id": "mstock/ms-report-writer",
+      "name": {
+        "en": "A Shu",
+        "zh": "阿述"
+      },
+      "profession": {
+        "en": "Comparison Report Writer",
+        "zh": "对比报告撰写专家"
+      },
+      "avatar": "avatars/ms-report-writer.png",
+      "role": "member",
+      "originalId": "ms-report-writer"
+    },
+    {
+      "id": "mstock/ms-visualizer",
+      "name": {
+        "en": "A Xian",
+        "zh": "阿显"
+      },
+      "profession": {
+        "en": "Comparison Dashboard Visualization Expert",
+        "zh": "横评看板可视化专家"
+      },
+      "avatar": "avatars/ms-visualizer.png",
+      "role": "member",
+      "originalId": "ms-visualizer"
+    },
+    {
+      "id": "mstock/ms-html-renderer",
+      "name": {
+        "en": "A Ran",
+        "zh": "阿染"
+      },
+      "profession": {
+        "en": "HTML Renderer",
+        "zh": "HTML 渲染工程师"
+      },
+      "avatar": "avatars/ms-html-renderer.png",
+      "role": "member",
+      "originalId": "ms-html-renderer"
+    },
+    {
+      "id": "mstock/ms-pdf-exporter",
+      "name": {
+        "en": "A Mo",
+        "zh": "阿墨"
+      },
+      "profession": {
+        "en": "PDF Exporter",
+        "zh": "PDF 发布工程师"
+      },
+      "avatar": "avatars/ms-pdf-exporter.png",
+      "role": "member",
+      "originalId": "ms-pdf-exporter"
+    }
+  ],
+  "original": {
+    "name": "mstock",
+    "version": "1.0.0",
+    "description": "Multi-stock comparison expert team: orchestrates cross-stock analysis, 7-chapter comparison report and visual dashboard delivery"
+  }
+}
