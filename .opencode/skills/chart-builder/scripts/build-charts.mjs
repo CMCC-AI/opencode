@@ -25,6 +25,24 @@ const isPercent = (unit) => {
   return u === '%' || u === '％';
 };
 
+// ---------- 规整（①确定性数据清洗，语义不变，先于一切校验执行）----------
+// 只修"转换后语义完全不变"的错误：纯数字字符串→数字、数字 categories→字符串。
+// 修不了的（null/NaN/非数字字符串/嵌套结构）保持原样，交给校验如实报错。
+const NUMERIC_STRING_RE = /^\s*-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\s*$/;
+export function normalizeChart(chart) {
+  if (!chart || typeof chart !== 'object' || Array.isArray(chart)) return chart;
+  if (Array.isArray(chart.categories)) {
+    chart.categories = chart.categories.map((c) => (typeof c === 'number' && Number.isFinite(c) ? String(c) : c));
+  }
+  if (Array.isArray(chart.series)) {
+    for (const s of chart.series) {
+      if (!s || typeof s !== 'object' || Array.isArray(s) || !Array.isArray(s.values)) continue;
+      s.values = s.values.map((v) => (typeof v === 'string' && NUMERIC_STRING_RE.test(v) ? Number(v) : v));
+    }
+  }
+  return chart;
+}
+
 // ---------- 校验：只做结构判定，不做数值口径判断 ----------
 
 function validateSeriesNumbers(chart, errors) {
@@ -392,6 +410,7 @@ export function buildChart(chart, index = 0, options = {}) {
   if (!chart || typeof chart !== 'object' || Array.isArray(chart)) {
     return { index, id, ok: false, errors: ['图表必须是 JSON 对象'] };
   }
+  chart = normalizeChart(chart); // ① 规整先于类型与字段校验（所有调用模式统一受益）
   const type = typeof chart.type === 'string' ? chart.type.trim().toLowerCase() : '';
   if (!CHART_TYPES.includes(type)) {
     return { index, id, ok: false, errors: [`type 仅支持 ${CHART_TYPES.join('/')}，当前为「${String(chart.type ?? '')}」`] };
@@ -419,14 +438,15 @@ export function buildCharts(charts, options = {}) {
 }
 
 // 渲染前统一闸门：sections 内的 chart block 若带扁平 data，则校验并注入组装好的 option；
-// 校验失败的整块移除（摘要供日志报出，渲染不中断）；自带 option 的旧格式 block 原样保留。
+// 校验失败的图优先降级为 table block（③数据零丢失呈现），无法降级的才整块移除（摘要供日志报出，渲染不中断）；
+// 自带 option 的旧格式 block 原样保留。
 // sections 支持 visual-report 顶层 sections（deeptrading/deepinspect/deepinsight/mstock），
 // 也支持传入 report.sections（zhengqi）。
-export function injectChartOptions(sections, options = {}) {
-  if (!Array.isArray(sections)) return { total: 0, kept: 0, dropped: [] };
+
+function collectChartBlocks(sections) {
   const chartBlocks = [];
   // type=chart 但缺少嵌套 chart 对象的块（例如编排方在 task prompt 里另行发明了图表结构）：
-  // 模板无法渲染，必须丢弃，且要计入统计并报出原因——绝不能静默消失
+  // 模板无法渲染，也无法降级（没有可呈现的数据），必须移除且计入统计报出原因——绝不能静默消失
   const malformedBlocks = [];
   for (const section of sections) {
     for (const block of Array.isArray(section && section.blocks) ? section.blocks : []) {
@@ -435,12 +455,51 @@ export function injectChartOptions(sections, options = {}) {
       else malformedBlocks.push(block);
     }
   }
+  return { chartBlocks, malformedBlocks };
+}
+
+// ③ 坏图降级：把校验失败的 chart block 原地转换为 table block（扁平数据天然就是表格）。
+// 返回降级摘要；series 里没有任何可呈现数据时返回 null（调用方维持丢弃）。
+function degradeToTable(block, errors) {
+  const chart = block.chart;
+  // 扁平数据在 chart.data 下（校验构造时合并到顶层，但原 block 保持嵌套）；兼容平铺形态
+  const src = chart.data && typeof chart.data === 'object' && !Array.isArray(chart.data) ? chart.data : chart;
+  const series = Array.isArray(src.series) ? src.series : null;
+  if (!series || !series.length) return null;
+  const hasData = series.some((s) => s && typeof s === 'object' && !Array.isArray(s) && Array.isArray(s.values) && s.values.length);
+  if (!hasData) return null;
+  const names = series.map((s, i) => (s && typeof s.name === 'string' && s.name.trim() ? s.name : `系列${i + 1}`));
+  const categories = Array.isArray(src.categories) ? src.categories : [];
+  const maxLen = Math.max(categories.length, ...series.map((s) => (s && Array.isArray(s.values) ? s.values.length : 0)));
+  const cell = (v) => {
+    if (v === null || v === undefined) return '';
+    if (Array.isArray(v)) return v.join('/');
+    return v;
+  };
+  const rows = [];
+  for (let i = 0; i < maxLen; i++) {
+    const label = i < categories.length ? categories[i] : `#${i + 1}`;
+    rows.push([typeof label === 'number' ? String(label) : label, ...series.map((s) => cell(s && Array.isArray(s.values) ? s.values[i] : ''))]);
+  }
+  const title = String(chart.title || block.title || '未命名图表');
+  block.type = 'table';
+  block.title = `${title}（图表校验未过，已降级为数据表）`;
+  block.columns = ['类别', ...names];
+  block.rows = rows;
+  delete block.chart;
+  return { title, errors };
+}
+
+export function injectChartOptions(sections, options = {}) {
+  if (!Array.isArray(sections)) return { total: 0, kept: 0, degraded: [], dropped: [] };
+  const { chartBlocks, malformedBlocks } = collectChartBlocks(sections);
   const dataBlocks = chartBlocks.filter((b) => b.chart.data != null);
   const legacyBlocks = chartBlocks.filter((b) => b.chart.data == null && b.chart.option != null);
   const dropped = malformedBlocks.map((block) => ({
     title: String(block.title || block.id || '未命名图表'),
     errors: ['chart block 缺少嵌套 chart 对象（契约：{type:"chart", chart:{id,title,type,description,data}}），不符合契约已丢弃'],
   }));
+  const degraded = [];
   let kept = legacyBlocks.length;
   if (dataBlocks.length) {
     const { results } = buildCharts(dataBlocks.map((b) => {
@@ -457,13 +516,18 @@ export function injectChartOptions(sections, options = {}) {
         delete block.chart.data;
         kept++;
       } else {
-        dropped.push({ title: block.chart.title || result.id, errors: result.errors });
+        const d = degradeToTable(block, result.errors);
+        if (d) degraded.push(d);
+        else dropped.push({ title: block.chart.title || result.id, errors: result.errors });
       }
     }
   }
   for (const block of chartBlocks) {
+    if (!block.chart) continue; // 已降级（degradeToTable 删除了 chart 字段，type 已变 table）
     if (block.chart.data == null && block.chart.option == null) {
-      dropped.push({ title: block.chart.title || '未命名图表', errors: ['chart block 缺少 data（新契约）或 option（旧格式）'] });
+      const d = degradeToTable(block, ['chart block 缺少 data（新契约）或 option（旧格式）']);
+      if (d) degraded.push(d);
+      else dropped.push({ title: block.chart.title || '未命名图表', errors: ['chart block 缺少 data（新契约）或 option（旧格式）'] });
     }
   }
   for (const section of sections) {
@@ -471,7 +535,7 @@ export function injectChartOptions(sections, options = {}) {
       section.blocks = section.blocks.filter((b) => !(b && b.type === 'chart' && !(b.chart && b.chart.option)));
     }
   }
-  return { total: chartBlocks.length + malformedBlocks.length, kept, dropped };
+  return { total: chartBlocks.length + malformedBlocks.length, kept, degraded, dropped };
 }
 
 // ---------- CLI ----------
@@ -480,13 +544,17 @@ export function injectChartOptions(sections, options = {}) {
 
 const printSummary = (summary) => {
   process.stdout.write(`图表校验：${summary.kept}/${summary.total} 张通过`);
+  if (summary.degraded && summary.degraded.length) {
+    process.stdout.write(`，${summary.degraded.length} 张降级为数据表：\n`);
+    for (const d of summary.degraded) process.stdout.write(`  - 「${d.title}」：${d.errors.join('；')}\n`);
+  }
   if (summary.dropped.length) {
     process.stdout.write(`，已丢弃 ${summary.dropped.length} 张：\n`);
     for (const d of summary.dropped) process.stdout.write(`  - 「${d.title}」：${d.errors.join('；')}\n`);
-  } else {
+  } else if (!summary.degraded || !summary.degraded.length) {
     process.stdout.write('\n');
   }
-  if (summary.total && !summary.kept) process.stdout.write('警告：全部图表被丢弃，应退回生成方按契约重做图表数据\n');
+  if (summary.total && !summary.kept) process.stdout.write('警告：全部图表被丢弃或降级，应退回生成方按契约重做图表数据\n');
 };
 
 const readStdin = async () => {
@@ -529,6 +597,68 @@ if (isMain) {
     process.stdout.write(`已写回：${resolve(file)}\n`);
     // 渲染模式不因丢弃而失败退出：坏图表已移除，管道继续，摘要日志供编排方决定是否重做
     process.exit(0);
+  }
+
+  // --check 模式（生成阶段自查自纠 ②）：只校验不写回——从 visual-report JSON 提取全部 chart data，
+  // 规整后逐图校验，stdout 输出逐图结果 JSON；有失败/畸形块时退出码 1，供生成方按 errors 修正后重跑。
+  const checkFlag = args.indexOf('--check');
+  if (checkFlag >= 0) {
+    const file = args[checkFlag + 1];
+    if (!file) {
+      process.stderr.write('用法：node build-charts.mjs --check <visual-report.json> [--palette "#a,#b,..."]\n');
+      process.exit(2);
+    }
+    const raw = await readFile(resolve(file), 'utf8');
+    let visual;
+    try {
+      visual = JSON.parse(raw.replace(/^\uFEFF/, ''));
+    } catch (e) {
+      process.stderr.write(`输入不是合法 JSON：${e.message}\n`);
+      process.exit(1);
+    }
+    const sections = Array.isArray(visual.sections)
+      ? visual.sections
+      : visual.report && Array.isArray(visual.report.sections)
+        ? visual.report.sections
+        : null;
+    if (!sections) {
+      process.stderr.write('可视化 JSON 中找不到 sections（支持顶层 sections 或 report.sections）\n');
+      process.exit(1);
+    }
+    const { chartBlocks, malformedBlocks } = collectChartBlocks(sections);
+    const malformed = malformedBlocks.map((block) => ({
+      title: String(block.title || block.id || '未命名图表'),
+      errors: ['chart block 缺少嵌套 chart 对象（契约：{type:"chart", chart:{id,title,type,description,data}}）'],
+    }));
+    const dataBlocks = chartBlocks.filter((b) => b.chart.data != null);
+    const legacyCount = chartBlocks.length - dataBlocks.length;
+    let report2 = { results: [], okCount: 0, failCount: 0 };
+    if (dataBlocks.length) {
+      report2 = buildCharts(dataBlocks.map((b) => {
+        const data = b.chart.data;
+        return data && typeof data === 'object' && !Array.isArray(data)
+          ? { ...b.chart, ...data }
+          : { ...b.chart };
+      }), { palette });
+    }
+    const failures = report2.results.filter((r) => !r.ok).map((r) => ({
+      title: (dataBlocks[r.index] && dataBlocks[r.index].chart && dataBlocks[r.index].chart.title) || r.id,
+      errors: r.errors,
+    }));
+    const summaryOut = {
+      total: chartBlocks.length + malformedBlocks.length,
+      okCount: report2.okCount,
+      failCount: report2.failCount + malformed.length,
+      legacyOptionBlocks: legacyCount,
+      failures,
+      malformed,
+      note: '仅校验，未写回文件；字符串数字/数字categories已在内存规整（渲染闸门同规则），按 failures 修正后重跑本命令至 failCount=0',
+    };
+    process.stdout.write(JSON.stringify(summaryOut, null, 2) + '\n');
+    process.stderr.write(`图表自查：${report2.okCount}/${summaryOut.total} 通过` +
+      (malformed.length ? `，畸形块 ${malformed.length} 个` : '') +
+      (summaryOut.failCount ? `，${summaryOut.failCount} 项待修` : '，全部通过') + '\n');
+    process.exit(summaryOut.failCount > 0 ? 1 : 0);
   }
 
   const arg = args.find((a) => !a.startsWith('--'));
