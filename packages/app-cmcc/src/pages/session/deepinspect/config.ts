@@ -26,6 +26,8 @@ export const DEEPINSPECT_DAG_LEVELS = [
   ["deepinspect/report-writer"],
   ["deepinspect/evidence-reviewer"],
   ["deepinspect/viz-specialist"],
+  ["deepinspect/html-renderer"],
+  ["deepinspect/pdf-exporter"],
 ] as const
 
 export const DEEPINSPECT_DAG_EDGES = [
@@ -41,6 +43,8 @@ export const DEEPINSPECT_DAG_EDGES = [
   ["deepinspect/outline-architect", "deepinspect/report-writer"],
   ["deepinspect/report-writer", "deepinspect/evidence-reviewer"],
   ["deepinspect/evidence-reviewer", "deepinspect/viz-specialist"],
+  ["deepinspect/viz-specialist", "deepinspect/html-renderer"],
+  ["deepinspect/html-renderer", "deepinspect/pdf-exporter"],
 ] as const
 
 export const DEEPINSPECT_ARTIFACT_ROLES: ArtifactRoleConfig = {

@@ -46,7 +46,7 @@ describe.each([false, true])("observed research shape: repeated=%s", (repeated) 
       transcripts: new Map(fixture.transcripts.map((item) => [item.session.id, item])),
       preferredSessionIds: preferences,
     })
-    expect(result.nodes).toHaveLength(10)
+    expect(result.nodes).toHaveLength(DEEPINSIGHT_MEMBERS.length)
     expect(result.nodes.find((item) => item.id.endsWith("di-local-researcher"))?.status).toBe("waiting")
     expect(result.nodes.find((item) => item.id.endsWith("di-report-writer"))?.sessionId).toBe(
       preferences.get("deepinsight/di-report-writer"),
@@ -55,7 +55,7 @@ describe.each([false, true])("observed research shape: repeated=%s", (repeated) 
     expect(deepInsightProgress(result.nodes, { local: false, web: true })).toBe(100)
     expect(deepInsightProgress(result.nodes, { local: true, web: true })).toBeLessThan(100)
     expect(deepInsightProgress(result.nodes, { local: false, web: true }, true)).toBe(99)
-    for (const id of ["di-viz", "di-publisher"]) {
+    for (const id of ["di-viz", "di-html-renderer", "di-pdf-exporter"]) {
       expect(
         deepInsightProgress(
           result.nodes.map((node) => (node.id.endsWith(id) ? { ...node, status: "waiting" } : node)),
@@ -105,6 +105,28 @@ describe.each([false, true])("observed research shape: repeated=%s", (repeated) 
     expect(artifactReportFiles(files, "visual").map((file) => file.filename)).toEqual(["30-report.html", "35-report.pdf"])
     expect(artifactReportFiles(files, "text").some((file) => file.filename === "35-report.pdf")).toBe(false)
   })
+})
+
+test("retired publisher records remain readable without restoring an obsolete team node", () => {
+  const fixture = deepInsightFixture(false, true, false, true)
+  const result = buildAgentNodes({
+    members: DEEPINSIGHT_MEMBERS,
+    children: fixture.transcripts.slice(1).map((item) => item.session),
+    transcripts: new Map(fixture.transcripts.map((item) => [item.session.id, item])),
+    preferredSessionIds: extractTaskChildPreferences(fixture.transcripts[0]),
+  })
+  expect(result.nodes.some((node) => node.id === "deepinsight/di-publisher")).toBe(false)
+  expect(fixture.transcripts.filter((item) => item.session.agent === "deepinsight/di-publisher")).toHaveLength(2)
+  const files = deepInsightCatalogArtifacts(
+    mergeSessionArtifactFiles({
+      artifacts: [],
+      paths: fixture.filenames.map((name) => `${fixture.rootPath}/${name}`),
+      rootSessionId: fixture.root.id,
+    }),
+    fixture.transcripts,
+  )
+  expect(deepInsightReports(files, fixture.rootPath).visual?.filename).toBe("30-report.html")
+  expect(files.find((file) => file.filename === "35-report.pdf")?.ownerAgentId).toBe("deepinsight/di-publisher")
 })
 
 test("new runs use their assigned directory and multiple real directories remain ambiguous", () => {

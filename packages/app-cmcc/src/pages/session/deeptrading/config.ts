@@ -23,6 +23,8 @@ export const DEEPTRADING_DAG_LEVELS = [
   ["deeptrading/dt-trader"],
   ["deeptrading/dt-report-writer"],
   ["deeptrading/dt-viz"],
+  ["deeptrading/dt-html-renderer"],
+  ["deeptrading/dt-pdf-exporter"],
 ] as const
 
 export const DEEPTRADING_DAG_EDGES = [
@@ -31,6 +33,8 @@ export const DEEPTRADING_DAG_EDGES = [
   ["deeptrading/dt-research-manager", "deeptrading/dt-trader"],
   ["deeptrading/dt-trader", "deeptrading/dt-report-writer"],
   ["deeptrading/dt-report-writer", "deeptrading/dt-viz"],
+  ["deeptrading/dt-viz", "deeptrading/dt-html-renderer"],
+  ["deeptrading/dt-html-renderer", "deeptrading/dt-pdf-exporter"],
 ] as const
 
 export const DEEPTRADING_STAGE_LABELS = [
@@ -40,6 +44,8 @@ export const DEEPTRADING_STAGE_LABELS = [
   "交易方案",
   "报告撰写",
   "可视化交付",
+  "HTML 渲染",
+  "PDF 发布",
 ] as const
 
 export const DEEPTRADING_ARTIFACT_ROLES: ArtifactRoleConfig = {

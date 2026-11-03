@@ -245,8 +245,10 @@ for (const legacy of [false, true])
     const state = await prepare(page, legacy)
     const started = Date.now()
     await page.goto(`/server/${base64Encode(process.env.PLAYWRIGHT_BASE_URL!)}/session/${state.data.root.id}`)
-    await expect(page.getByText("3 位", { exact: true })).toBeVisible()
-    await expect(page.getByText("消耗 token", { exact: true }).locator("..").locator("strong")).toHaveText("165")
+    await expect(page.getByText("5 位", { exact: true })).toBeVisible()
+    await expect(page.getByText("消耗 token", { exact: true }).locator("..").locator("strong")).toHaveText(
+      String(state.data.transcripts.length * 33),
+    )
     await expect(page.getByText("报告篇幅", { exact: true }).locator("..").locator("strong")).toHaveText("10字")
     await expectVerticalDag(page)
     await expect(page.locator('[data-component="workbench-response"]').filter({ has: page.locator('[data-workbench-message="mstock-root-a"]') }).locator("time")).toHaveAttribute("datetime", new Date(1001).toISOString())
@@ -426,7 +428,7 @@ test("submission failure preserves inputs and reuses binding and message ID", as
 test("finance snapshot selects mstock UI and do-same returns to empty form", async ({ page }) => {
   const state = await prepare(page)
   await page.goto("/cases/mstock")
-  await expect(page.getByText("3 位", { exact: true })).toBeVisible()
+  await expect(page.getByText("5 位", { exact: true })).toBeVisible()
   await expect(page.getByText("报告篇幅", { exact: true }).locator("..").locator("strong")).toHaveText("10字")
   await expectVerticalDag(page)
   await page.getByRole("button", { name: "文件", exact: true }).click()
@@ -532,11 +534,11 @@ test("followup keeps the workbench, its question and reply", async ({ page }) =>
     { id: "followup-answer", messageID: answer.id, sessionID: root.session.id, type: "text", text: "这是补充风险对比" },
   ]
   await page.goto(`/server/${base64Encode(process.env.PLAYWRIGHT_BASE_URL!)}/session/${state.data.root.id}`)
-  await expect(page.getByText("3 位", { exact: true })).toBeVisible()
+  await expect(page.getByText("5 位", { exact: true })).toBeVisible()
   await expect(page.getByText("再比较一下风险", { exact: true })).toBeVisible()
   await expect(page.getByText("这是补充风险对比", { exact: true })).toBeVisible()
   await page.reload()
-  await expect(page.getByText("3 位", { exact: true })).toBeVisible()
+  await expect(page.getByText("5 位", { exact: true })).toBeVisible()
   expect(state.errors).toEqual([])
 })
 
@@ -677,7 +679,7 @@ for (const width of [1440, 390])
 async function expectVerticalDag(page: Page) {
   const dag = page.getByRole("region", { name: "多股对比 DAG", exact: true })
   await expect(dag).toHaveAttribute("data-layout", "vertical")
-  await expect(dag.locator("[data-agent-id]")).toHaveCount(3)
+  await expect(dag.locator("[data-agent-id]")).toHaveCount(5)
   const boxes = await dag.locator("[data-agent-id]").evaluateAll((nodes) =>
     nodes.map((node) => {
       const rect = node.getBoundingClientRect()
@@ -694,7 +696,7 @@ async function expectVerticalDag(page: Page) {
         .locator("path[data-edge]")
         .evaluateAll(
           (edges) =>
-            edges.length === 2 &&
+            edges.length === 4 &&
             edges.every((edge) => /^M [\d.]+ [\d.]+ V [\d.]+$/.test(edge.getAttribute("d") ?? "")),
         ),
     )

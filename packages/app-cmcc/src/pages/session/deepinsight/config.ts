@@ -18,7 +18,8 @@ export const DEEPINSIGHT_DAG_LEVELS = [
   ["deepinsight/di-report-writer"],
   ["deepinsight/di-evidence-reviewer"],
   ["deepinsight/di-viz"],
-  ["deepinsight/di-publisher"],
+  ["deepinsight/di-html-renderer"],
+  ["deepinsight/di-pdf-exporter"],
 ] as const
 export const DEEPINSIGHT_DAG_EDGES = DEEPINSIGHT_DAG_LEVELS.slice(1).flatMap((level, index) =>
   DEEPINSIGHT_DAG_LEVELS[index].flatMap((source) => level.map((target) => [source, target] as const)),

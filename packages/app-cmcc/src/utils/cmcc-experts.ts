@@ -1,3 +1,5 @@
+import { cmccExpertMembers } from "./cmcc-expert-members"
+
 export type ExternalExpert = {
   kind: "external"
   id: string
@@ -43,19 +45,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
       "基于我上传的材料做内部证据研究，输出带引用的深度报告",
       "内外混合模式研究：结合这份材料与最新公开信息分析竞争格局",
     ],
-    members: [
-      { id: "deepinsight/deepinsight-team-lead", name: "阿全", profession: "研究主编", role: "lead" },
-      { id: "deepinsight/di-intent-analyst", name: "阿辨", profession: "安全与需求分析师" },
-      { id: "deepinsight/di-query-planner", name: "阿谋", profession: "研究规划专家" },
-      { id: "deepinsight/di-local-researcher", name: "阿掘", profession: "材料研究专家" },
-      { id: "deepinsight/di-web-researcher", name: "阿览", profession: "公开信息研究专家" },
-      { id: "deepinsight/di-reflector", name: "阿省", profession: "证据反思专家" },
-      { id: "deepinsight/di-outline-architect", name: "阿构", profession: "大纲架构专家" },
-      { id: "deepinsight/di-report-writer", name: "阿据", profession: "证据型写作专家" },
-      { id: "deepinsight/di-evidence-reviewer", name: "阿核", profession: "独立证据核验专家" },
-      { id: "deepinsight/di-viz", name: "阿显", profession: "证据型可视化专家" },
-      { id: "deepinsight/di-publisher", name: "阿稿", profession: "发布工程师" },
-    ],
+    members: cmccExpertMembers("deepinsight"),
   },
   {
     kind: "external",
@@ -88,18 +78,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
       "分析 600519 在 2026-08-08 的交易决策",
       "帮我深度研究宁德时代（300750）",
     ],
-    members: [
-      { id: "deeptrading/deeptrading-team-lead", name: "何执舟", profession: "A股投研全流程编排专家", role: "lead" },
-      { id: "deeptrading/dt-intake", name: "阿核", profession: "信息确认员" },
-      { id: "deeptrading/dt-market-analyst", name: "阿波", profession: "市场分析专家" },
-      { id: "deeptrading/dt-sentiment-analyst", name: "阿言", profession: "舆情分析专家" },
-      { id: "deeptrading/dt-news-analyst", name: "阿讯", profession: "新闻分析专家" },
-      { id: "deeptrading/dt-fundamentals-analyst", name: "阿基", profession: "基本面分析专家" },
-      { id: "deeptrading/dt-research-manager", name: "阿理", profession: "投资决策经理" },
-      { id: "deeptrading/dt-trader", name: "阿控", profession: "仓位与风控经理" },
-      { id: "deeptrading/dt-report-writer", name: "阿汇", profession: "报告撰写专家" },
-      { id: "deeptrading/dt-viz", name: "阿绘", profession: "可视化专家" },
-    ],
+    members: cmccExpertMembers("deeptrading"),
   },
   {
     kind: "team",
@@ -138,20 +117,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
       "我有几张现场照片，帮我识别安全隐患",
       "根据巡察发现的问题，生成整改方案",
     ],
-    members: [
-      { id: "deepinspect/deepinspect-team-lead", name: "阿督", profession: "巡察编排总监", role: "lead" },
-      { id: "deepinspect/intent-analyst", name: "阿意", profession: "意图分析专家" },
-      { id: "deepinspect/query-planner", name: "阿谋", profession: "巡察规划专家" },
-      { id: "deepinspect/risk-identifier", name: "阿辨", profession: "风险识别专家" },
-      { id: "deepinspect/material-researcher", name: "阿研", profession: "材料研究专家" },
-      { id: "deepinspect/web-researcher", name: "阿博", profession: "网络研究专家" },
-      { id: "deepinspect/problem-consolidator", name: "阿归", profession: "问题归并分析师" },
-      { id: "deepinspect/reflector", name: "阿审", profession: "反思评估专家" },
-      { id: "deepinspect/outline-architect", name: "阿构", profession: "大纲架构专家" },
-      { id: "deepinspect/report-writer", name: "阿述", profession: "报告撰写专家" },
-      { id: "deepinspect/evidence-reviewer", name: "阿证", profession: "证据核验专家" },
-      { id: "deepinspect/viz-specialist", name: "阿绘", profession: "数据可视化专家" },
-    ],
+    members: cmccExpertMembers("deepinspect"),
   },
   {
     kind: "team",
@@ -167,19 +133,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
       "拜访前快速研判：这家客户最近发生了什么，值得跟进的合作机会有哪些？",
       "核验这份报告里的企业基本信息和领导层人物，给我可溯源的修订建议。",
     ],
-    members: [
-      { id: "zhengqi-visit-intel/zhengqi-visit-intel-team-lead", name: "阿谈", profession: "谈参报告总编", role: "lead" },
-      { id: "zhengqi-visit-intel/sensitive-check-officer", name: "阿安", profession: "政企安全检测专员" },
-      { id: "zhengqi-visit-intel/internal-intel-researcher", name: "阿闻", profession: "内部客户情报研究员" },
-      { id: "zhengqi-visit-intel/research-query-planner", name: "阿谋", profession: "政企研究规划师" },
-      { id: "zhengqi-visit-intel/public-web-researcher", name: "阿广", profession: "权威公开信息研究员" },
-      { id: "zhengqi-visit-intel/intelligence-synthesizer", name: "阿融", profession: "内外情报融合分析师" },
-      { id: "zhengqi-visit-intel/research-reflection-analyst", name: "阿慎", profession: "研究质量反思专员" },
-      { id: "zhengqi-visit-intel/outline-architect", name: "阿纲", profession: "谈参报告大纲设计师" },
-      { id: "zhengqi-visit-intel/report-chief-writer", name: "阿撰", profession: "政企报告撰写专家" },
-      { id: "zhengqi-visit-intel/evidence-verify-officer", name: "阿证", profession: "关键事实证据核验官" },
-      { id: "zhengqi-visit-intel/report-visual-designer", name: "阿图", profession: "报告视觉设计师" },
-    ],
+    members: cmccExpertMembers("zhengqi-visit-intel"),
   },
   {
     kind: "team",

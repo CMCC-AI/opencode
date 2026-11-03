@@ -1,7 +1,8 @@
 import { For, Show } from "solid-js"
 import { SerialAgentDag } from "../agent-workbench/serial-agent-dag"
 import { formatCaseCharacterCount } from "@/utils/cmcc-cases"
-import { MSTOCK_DAG_ORDER, MSTOCK_DAG_EDGES, mstockAvatar } from "./config"
+import { MSTOCK_DAG_ORDER, MSTOCK_DAG_EDGES } from "./config"
+import { mstockAvatar } from "./avatars"
 import { useMstockWorkbench } from "./workbench-context"
 
 export function MstockTeamTab() {

@@ -202,5 +202,6 @@ function mstockOverview(root?: SessionTranscript, lead?: SessionTranscript) {
 }
 
 export function mstockProgress(workbench: AgentWorkbench, delivered: boolean) {
-  return (workbench.agents.filter((node) => node.status === "completed").length + (delivered ? 1 : 0)) * 25
+  const completed = workbench.agents.filter((node) => node.status === "completed").length
+  return Math.round(((completed + (delivered ? 1 : 0)) / (workbench.agents.length + 1)) * 100)
 }

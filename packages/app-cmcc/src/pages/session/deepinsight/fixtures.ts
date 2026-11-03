@@ -2,8 +2,8 @@ import type { Message, Part, Session } from "@opencode-ai/sdk/v2"
 import type { SessionTranscript } from "../agent-workbench/model"
 import { DEEPINSIGHT_LEAD_AGENT } from "./page-selection"
 
-// Minimal, anonymized shapes from the two observed runs; times and text are test data.
-export function deepInsightFixture(repeated = false, legacy = true, nested = false) {
+// Anonymized observed runs with current delivery workers or the retired publisher; times and text are test data.
+export function deepInsightFixture(repeated = false, legacy = true, nested = false, legacyPublisher = false) {
   const directory = "/workspace/user"
   const rootPath = nested
     ? "runs/test-run/tmp/research-workspace/20260916-1524"
@@ -35,8 +35,8 @@ export function deepInsightFixture(repeated = false, legacy = true, nested = fal
         ]
       : []),
     ["di-viz", "25-visual-report.json"],
-    ["di-publisher", "30-report.html"],
-    ["di-publisher", "35-report.pdf"],
+    [legacyPublisher ? "di-publisher" : "di-html-renderer", "30-report.html"],
+    [legacyPublisher ? "di-publisher" : "di-pdf-exporter", "35-report.pdf"],
   ]
   const tokens = { input: 10, output: 20, reasoning: 3, cache: { read: 999, write: 999 } }
   const session = (id: string, agent: string, time: number, parentID?: string): Session => ({

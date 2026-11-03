@@ -3,7 +3,7 @@ import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { For, Show, createEffect, createMemo, on, type JSX } from "solid-js"
 
 import { AgentAvatar, StatusBadge } from "../deeptrading/deeptrading-session-view"
-import { mstockAvatar, mstockTeamAvatar } from "./config"
+import { mstockAvatar, mstockTeamAvatar } from "./avatars"
 import { useMstockWorkbench } from "./workbench-context"
 
 export function MstockSessionView() {

@@ -2,8 +2,8 @@ import type { Message, Part, Session } from "@opencode-ai/sdk/v2"
 import type { SessionTranscript } from "../agent-workbench/model"
 import { MSTOCK_LEAD_AGENT, MSTOCK_MEMBERS } from "./config"
 
-// Anonymized shapes from the two September 17 runs. Contents and times are test data.
-export function mstockFixture(legacy = false) {
+// Anonymized run shapes with current or legacy delivery ownership. Contents and times are test data.
+export function mstockFixture(legacy = false, deliveryWorkers = true) {
   const directory = "/workspace/user"
   const rootPath = legacy ? "tmp/comparison-workspace/20260917-1202" : "runs/comparison-test"
   const tokens = { input: 10, output: 20, reasoning: 3, cache: { read: 999, write: 999 } }
@@ -72,8 +72,8 @@ export function mstockFixture(legacy = false) {
   }
   const root = entry("mstock-root", "build", 1000)
   const lead = entry("mstock-lead", MSTOCK_LEAD_AGENT, 1100, root.session.id)
-  const workers = MSTOCK_MEMBERS.map((member, index) =>
-    entry(`worker-${index}`, member.id, 1200 + index * 100, lead.session.id),
+  const workers = MSTOCK_MEMBERS.filter((member) => deliveryWorkers || !["阿染", "阿墨"].includes(member.name)).map(
+    (member, index) => entry(`worker-${index}`, member.id, 1200 + index * 100, lead.session.id),
   )
   root.parts[root.messages[0].id] = [
     ...root.parts[root.messages[0].id]!,
@@ -136,9 +136,9 @@ export function mstockFixture(legacy = false) {
     { filePath: `${directory}/${rootPath}/20-comparison-report.md`, content: "# 对比报告\n\n最终对比正文" },
     1380,
   )
-  tool(lead, "html", "bash", { command: `python3 /skills/render_html.py ${directory}/${rootPath}` }, 1600)
+  tool(workers[3] ?? lead, "html", "bash", { command: `python3 /skills/render_html.py ${directory}/${rootPath}` }, 1600)
   tool(
-    lead,
+    workers[4] ?? lead,
     "pdf",
     "bash",
     {

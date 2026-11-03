@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { discoverSessionArtifacts } from "../agent-workbench/artifacts"
 import { mergeSessionArtifactFiles } from "../agent-workbench/artifact-files"
-import { MSTOCK_ARTIFACT_ROLES } from "./config"
+import { MSTOCK_ARTIFACT_ROLES, MSTOCK_MEMBERS } from "./config"
 import { mstockFixture } from "./fixtures"
 import { mstockFiles, mstockMention, mstockProgress, mstockScope, mstockWorkbench, shouldUseMstockPage } from "./data"
 import { mstockPrompt } from "../../mstock/input"
@@ -30,15 +30,54 @@ describe("mstock integration", () => {
         files,
         selected: "overview",
       })
-      expect(model.agents.map((node) => node.status)).toEqual(["completed", "completed", "completed"])
+      expect(model.agents.map((node) => node.status)).toEqual(MSTOCK_MEMBERS.map(() => "completed"))
+      expect(model.stats.expertCount).toBe(5)
       expect(model.artifacts.length).toBe(8)
-      expect(model.stats.tokenCount).toBe(165)
+      expect(model.stats.tokenCount).toBe(data.transcripts.length * 33)
       expect(model.textReportPath).toBe(`${data.rootPath}/20-comparison-report.md`)
       expect(model.visualReportPath).toBe(`${data.rootPath}/40-comparison-report.html`)
       expect(model.artifacts.find((file) => file.filename === "45-comparison-report.pdf")?.createdAt).toBe(1700)
-      expect(mstockProgress(model, false)).toBe(75)
+      expect(mstockProgress(model, false)).toBe(83)
       expect(mstockProgress(model, true)).toBe(100)
     })
+  test("progress follows the current roster and reserves the final delivery step", () => {
+    const data = mstockFixture()
+    const model = mstockWorkbench({
+      rootId: data.root.id,
+      transcripts: data.transcripts,
+      files: [],
+      selected: "overview",
+    })
+    expect(mstockProgress({ ...model, agents: [] }, false)).toBe(0)
+    for (let completed = 0; completed <= model.agents.length; completed++) {
+      const agents = model.agents.map((node, index) => ({
+        ...node,
+        status: index < completed ? ("completed" as const) : ("waiting" as const),
+      }))
+      expect(mstockProgress({ ...model, agents }, false)).toBe(Math.round((completed / 6) * 100))
+      expect(mstockProgress({ ...model, agents }, true)).toBeLessThanOrEqual(100)
+    }
+    expect(mstockProgress(model, true)).toBe(100)
+  })
+  test("old three-worker runs retain their conversations and reports", () => {
+    const data = mstockFixture(true, false)
+    const files = mergeSessionArtifactFiles({
+      artifacts: [],
+      paths: data.filenames.map((filename) => `${data.rootPath}/${filename}`),
+      rootSessionId: data.root.id,
+    })
+    const model = mstockWorkbench({ rootId: data.root.id, transcripts: data.transcripts, files, selected: "overview" })
+    expect(model.agents.filter((node) => node.status === "completed")).toHaveLength(3)
+    expect(model.agents.filter((node) => node.status === "waiting")).toHaveLength(2)
+    expect(
+      model.agents
+        .filter((node) => node.status === "completed")
+        .every((node) => node.markdown.includes("执行专家结论")),
+    ).toBe(true)
+    expect(model.textReportPath).toBe(`${data.rootPath}/20-comparison-report.md`)
+    expect(model.visualReportPath).toBe(`${data.rootPath}/40-comparison-report.html`)
+    expect(model.stats.tokenCount).toBe(165)
+  })
   test("identity uses structured mentions, never the title or a child session", () => {
     const data = mstockFixture()
     const root = data.transcripts[0]

@@ -25,6 +25,8 @@ export const ZHENGQI_DAG_LEVELS = [
   ["zhengqi-visit-intel/report-chief-writer"],
   ["zhengqi-visit-intel/evidence-verify-officer"],
   ["zhengqi-visit-intel/report-visual-designer"],
+  ["zhengqi-visit-intel/html-renderer"],
+  ["zhengqi-visit-intel/pdf-exporter"],
 ] as const
 
 export const ZHENGQI_DAG_EDGES = ZHENGQI_DAG_LEVELS.slice(0, -1).map(

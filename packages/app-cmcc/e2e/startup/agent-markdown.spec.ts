@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises"
 import type { Message, Part, Session } from "@opencode-ai/sdk/v2"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { MSTOCK_LEAD_AGENT, MSTOCK_MEMBERS } from "../../src/pages/session/mstock/config"
+import { cmccExpertMembers } from "../../src/utils/cmcc-expert-members"
 import { setupGeneralChat } from "./general-chat.fixture"
 import { setupHomePage, homeDirectory } from "./home-fixture"
 import { fixture } from "../smoke/session-timeline.fixture"
@@ -256,6 +257,82 @@ async function narrow(page: Page, width: number) {
 
 async function clipboardText(page: Page) {
   return page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, "\n"))
+}
+
+for (const id of ["deepinsight", "deeptrading", "deepinspect", "zhengqi-visit-intel", "mstock"] as const) {
+  const team = teams.find((team) => team.id === id)!
+  const members = cmccExpertMembers(id).filter((member) => member.role !== "lead")
+  const label = {
+    deepinsight: "DeepInsight DAG",
+    deeptrading: "DeepTrading DAG",
+    deepinspect: "DeepInspect DAG",
+    "zhengqi-visit-intel": "政企分析 DAG",
+    mstock: "多股对比 DAG",
+  }[id]
+  for (const member of members.filter((member) => ["阿染", "阿墨"].includes(member.name)))
+    for (const width of [1440, 390])
+      test(`${id} delivery member ${member.name} has an avatar and selectable conversation at ${width}`, async ({
+        page,
+        baseURL,
+      }, info) => {
+        await page.setViewportSize({ width, height: 1000 })
+        const data = await prepare(page, { ...team, member: member.id })
+        await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+        await narrow(page, width)
+        await expect(page.locator('[data-component="workbench-expert-header"] img')).toHaveCount(1)
+        if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+        const dag = page.getByRole("region", { name: label, exact: true })
+        await expect(dag).toBeVisible()
+        if (id !== "deepinsight") await expect(page.getByText(`${members.length} 位`, { exact: true })).toBeVisible()
+        await expect(dag.getByRole("button")).toHaveCount(members.length)
+        await expect(dag.getByText("阿稿", { exact: true })).toHaveCount(0)
+        await expect(dag.locator("img")).toHaveCount(members.length)
+        await expect
+          .poll(() =>
+            dag
+              .locator("img")
+              .evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0)),
+          )
+          .toBe(true)
+        for (const expected of members)
+          await expect(
+            dag.getByRole("button", { name: new RegExp(`${expected.profession}.*${expected.name}`) }),
+          ).toHaveCount(1)
+        const bounds = await dag.getByRole("button").evaluateAll((buttons) =>
+          buttons.map((button) => {
+            const rect = button.getBoundingClientRect()
+            return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+          }),
+        )
+        for (let index = 0; index < bounds.length; index++)
+          for (const other of bounds.slice(index + 1)) {
+            const current = bounds[index]
+            expect(
+              current.right <= other.left ||
+                other.right <= current.left ||
+                current.bottom <= other.top ||
+                other.bottom <= current.top,
+            ).toBe(true)
+          }
+        const delivery = dag.getByRole("button", { name: new RegExp(`${member.profession}.*${member.name}`) })
+        await expect(delivery).toHaveAttribute("data-status", "completed")
+        await delivery.click()
+        await expect(delivery).toHaveAttribute("data-selected", "")
+        await page.screenshot({ path: info.outputPath("delivery-team.png") })
+        if (width < 760) await page.getByRole("tab", { name: "分析内容", exact: true }).press("Enter")
+        const response = page
+          .locator('[data-component="workbench-response"]')
+          .filter({ has: page.locator(`[data-workbench-message="${data.child.id}-a"]`) })
+        await expect(response).toBeVisible()
+        await expect(response.locator('[data-component="workbench-expert-header"]')).toContainText(member.name)
+        await expect(response.locator('[data-component="workbench-expert-header"] img')).toHaveCount(1)
+        await expect(response.getByRole("button", { name: "复制全部回复", exact: true })).toBeVisible()
+        await page.reload()
+        await expect(page.locator('[data-component="session-composer"]')).toBeVisible()
+        if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+        await expect(dag.getByRole("button")).toHaveCount(members.length)
+        expect(data.errors).toEqual([])
+      })
 }
 
 for (const team of teams) {
