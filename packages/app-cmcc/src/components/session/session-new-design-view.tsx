@@ -1,5 +1,4 @@
 import { children, Show, type JSX } from "solid-js"
-import jiutianLogo from "@/assets/home-v6/jiutian-logo.optimized.webp"
 import "./session-new-design-view.css"
 
 export function NewSessionComposerLoading() {
@@ -32,7 +31,7 @@ export function NewSessionDesignView(props: { children: JSX.Element; footer?: JS
     >
       <div class="cmcc-home-heading">
         <div class="cmcc-home-brand">
-          <img src={jiutianLogo} alt="九天" />
+          <img src="/brand/logo.svg" alt="九天" />
           <h1>DeepInsight深度洞察</h1>
         </div>
         <p>您的智能研究助理，一键式深度研究与自动化科研，赋能AI+产业洞察</p>

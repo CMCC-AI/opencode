@@ -1,7 +1,6 @@
 import { Icon } from "@opencode-ai/ui/icon"
 import { createEffect, createMemo, For, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
-import jiutianLogo from "@/assets/home-v6/jiutian-logo.optimized.webp"
 import deeplensQr from "@/assets/deeplens/qr-code.png"
 import homeScreen from "@/assets/deeplens/screens/home.webp"
 import analysisOverviewScreen from "@/assets/deeplens/screens/analysis-overview.webp"
@@ -256,7 +255,7 @@ export function CmccDeepLensFrame(props: { active: boolean }) {
         >
           <header class="brand-header">
             <div class="brand-lockup">
-              <img src={jiutianLogo} alt="九天" class="brand-symbol" />
+              <img src="/brand/logo.svg" alt="九天" class="brand-symbol" />
               <div class="product-name">
                 <span>DeepLens</span>
                 <strong>拍照即懂</strong>

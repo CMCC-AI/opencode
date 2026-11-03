@@ -3,3 +3,4 @@ packages/core/src/database/migration.gen.ts linguist-generated
 *.sh text eol=lf
 script/deploy/quota.env.example text eol=lf
 packages/app-cmcc/e2e/startup/fixtures/preview-chinese-multipage.pdf binary
+packages/app-cmcc/public/brand/*.svg -text
