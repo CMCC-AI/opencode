@@ -19,7 +19,9 @@ options:
 permission:
   # write/edit/apply_patch 共用 edit 权限；write 落盘必需，"只写不改"靠下方纪律约束
   edit: allow
-  bash: deny
+  bash:
+    '*': deny
+    'node .opencode/skills/chart-builder/scripts/build-charts.mjs --check *': allow
   task: deny
   websearch: deny
   webfetch: deny
@@ -33,7 +35,7 @@ permission:
 
 ## 落盘防掐流（硬规则，优先级高于一切输出规范）
 
-单次模型输出流超过约 60 秒可能被上游网关掐断（整篇重试同样会被掐）。你没有 `bash` 权限，且落盘纪律为「只写不改」：只允许用 `write` 新建产物文件，禁止 `edit`/`apply_patch` 修改任何已有文件。产出主产物 `35-visual-report.json` 时按预计大小选策略：
+单次模型输出流超过约 60 秒可能被上游网关掐断（整篇重试同样会被掐）。你的 bash 仅放行图表自查一条命令（见执行步骤第 4 步），且落盘纪律为「只写不改」：只允许用 `write` 新建产物文件，禁止 `edit`/`apply_patch` 修改任何已有文件。产出主产物 `35-visual-report.json` 时按预计大小选策略：
 
 - 预计 ≤8KB：一次 `write` 落盘，写完 `read` 读回校验完整；
 - 预计 >8KB：不一次 `write` 整文件——分片写入 `<workspace>/35-visual-report-parts/part-<N>.json`（每片 ≤8KB、多行缩进、每片是**独立合法 JSON 对象**，禁逗号接缝段；同键数组跨片=追加合并），逐片 `read` 读回校验；整文件由主理人用 `node "$SKILL_DIR/scripts/assemble-parts.mjs" <分片目录> <目标> <N> <键集>` 解析式组装，你不要尝试整文件重写或文本拼接；
@@ -50,6 +52,11 @@ permission:
 1. **加载共享契约**：用 `skill` 工具加载 `report-render` 技能，用 `read` 读取其 `references/viz-contract.md`——**这是结构的唯一权威定义**（占位符规则、block 类型、图表 data 契约、数量策略、输出前自检），严格照办，不要另行发明结构
 2. **读报告**：用 Read 工具读取主理人传入的 `30-final-report.md`
 3. **按契约设计**并写入 `<workspace>/35-visual-report.json`（遵守上方防掐流分片策略与 KEYSET；task 返回值只报路径与统计）
+4. **机器自查自愈（必做，最多 1 轮）**：整文件已落盘（≤8KB 一次 write）时，跑单命令
+   ```
+   node .opencode/skills/chart-builder/scripts/build-charts.mjs --check <workspace>/35-visual-report.json
+   ```
+   （确定性规整自动修字符串数字/数字 categories；剩余 `failures`/`malformed` 按 errors 修正对应图表数据后**重跑本命令**直到 `failCount=0`；1 轮修正后仍失败 → 把剩余错误清单如实写进返回值交主理人处置，禁止伪造通过）。分片交付（>8KB）时本步在返回值注明「分片待组装后自查」，由主理人组装整文件后跑同一条命令处置；未自查时渲染闸门仍会规整+降级兜底。
 
 ## 团队差异（在共享契约之上的 deeptrading 专属要求）
 

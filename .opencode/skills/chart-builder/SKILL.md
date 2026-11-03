@@ -1,6 +1,8 @@
 ---
 name: chart-builder
 description: Validate flat chart data from LLMs and assemble deterministic ECharts options. Use in any expert-team report pipeline (generate-time self-check or render-time gate) so invalid charts are dropped with reasons instead of breaking HTML/PDF rendering.
+metadata:
+  version: 2.6.0
 ---
 
 # 统一图表校验与组装（chart-builder）
@@ -36,21 +38,22 @@ description: Validate flat chart data from LLMs and assemble deterministic EChar
 
 ## CLI
 
-生成阶段自查自纠（数组模式，有失败时退出码 1）：
+三种模式：
 
 ```bash
+# ① 生成阶段自查自纠（无副作用，不写回；有失败时退出码 1）——生成方产完图表数据后先跑，按 failures 修正后重跑至 failCount=0
+node <BASE>/scripts/build-charts.mjs --check <visual-report.json> [--palette "#a,#b,..."]
+
+# ② 渲染阶段就地处理（--visual 模式，坏图优先降级为 table block、无法降级才丢弃，退出码恒 0，管道不中断）
+node <BASE>/scripts/build-charts.mjs --visual <visual-report.json> [--palette "#a,#b,..."]
+
+# ③ 数组模式（直接校验图表数组；有失败时退出码 1）
 node <BASE>/scripts/build-charts.mjs <charts.json | -> [--palette "#a,#b,..."]
 ```
 
-stdout 输出结果 JSON（`results[].ok / option / errors`、`okCount / failCount`），stderr 输出人类可读摘要。子代理生成图表数据后可先跑一次，按 `errors` 修正后重试。
+`--check` 输出逐图结果 JSON（`okCount/failCount/failures[{title,errors}]/malformed`）；`--visual` 就地把 visual-report JSON（支持顶层 `sections` 或 `report.sections`）里 chart block 的扁平 `data` 校验、组装 option 并写回——**校验失败的图降级为 table block**（扁平数据转表格，数据零丢失，标题加"已降级为数据表"后缀），连 series 都没有可呈现数据的才整块丢弃并在日志报出标题与原因。
 
-渲染阶段就地处理（`--visual` 模式，坏图表丢弃但退出码恒为 0，管道不中断）：
-
-```bash
-node <BASE>/scripts/build-charts.mjs --visual <visual-report.json> [--palette "#a,#b,..."]
-```
-
-就地把 visual-report JSON（支持顶层 `sections` 或 `report.sections`）里 chart block 的扁平 `data` 校验、组装 option 并写回；校验失败的图表整块丢弃并在日志报出标题与原因。
+**确定性规整（先于一切校验）**：纯数字字符串（如 `"104.9"`）自动转数字、数字 `categories` 自动转字符串——语义不变的错误直接修掉，不进 errors；所有模式统一生效。
 
 `--palette` 覆盖默认色板（逗号分隔十六进制色值）；各团队传入自己的视觉规范即可，模型无法触碰颜色。
 
