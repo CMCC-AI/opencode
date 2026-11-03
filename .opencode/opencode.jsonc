@@ -1,9 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "zhipuai/glm-5.3",
   "disabled_providers": [
     "alibaba",
     "zai",
-    "zhipuai",
+    "zhipuai-coding-plan",
     "zai-coding-plan",
     "moonshotai",
     "kimi-code-plan-cn",
@@ -11,67 +12,24 @@
     "kimi-for-coding",
   ],
   "provider": {
-    "alibaba-cn": {
-      "name": "阿里云百炼",
-      "models": {
-        "qwen3.8-max": {
-          "name": "Qwen3.8 Max",
-          "reasoning": true,
-          "attachment": true,
-          "tool_call": true,
-        },
-        "qwen3.7-plus": {
-          "name": "Qwen3.7 Plus",
-          "reasoning": true,
-          "attachment": true,
-          "tool_call": true,
-        },
-        "qwen3.7-flash": {
-          "name": "Qwen3.7 Flash",
-          "reasoning": true,
-          "attachment": true,
-          "tool_call": true,
-        },
-        "qwen3.6-plus": {
-          "name": "Qwen3.6 Plus",
-          "reasoning": true,
-          "attachment": true,
-          "tool_call": true,
-        },
-        "qwen3-coder-plus": {
-          "name": "Qwen3 Coder Plus",
-          "reasoning": true,
-          "tool_call": true,
-        },
-        "qwen3-coder-flash": {
-          "name": "Qwen3 Coder Flash",
-          "reasoning": true,
-          "tool_call": true,
-        },
-        "kimi-k2.6": {
-          "name": "Kimi K2.6",
-          "reasoning": true,
-          "attachment": true,
-          "tool_call": true,
-        },
-        "kimi-k2.5": {
-          "name": "Kimi K2.5",
-          "reasoning": true,
-          "attachment": true,
-          "tool_call": true,
-        },
-        "kimi-k2-thinking": {
-          "name": "Kimi K2 Thinking",
-          "reasoning": true,
-          "tool_call": true,
-        },
-        "deepseek-v4-pro": {
-          "name": "DeepSeek V4 Pro",
-          "reasoning": true,
-          "tool_call": true,
-        },
+    "deepseek-cmcc": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "CMCC",
+      "env": ["CMCC_API_KEY"],
+      "options": {
+        "baseURL": "http://123.57.26.236:18000/v1"
       },
+      "models": {
+        "deepseek-v4-flash-0731": {
+          "name": "DeepSeek V4 Flash",
+          "reasoning": true,
+          "tool_call": true
+        }
+      }
     },
+    "moonshotai-cn": {
+      "whitelist": ["kimi-k3"]
+    }
   },
   "permission": {},
   "references": {
