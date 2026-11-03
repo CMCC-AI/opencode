@@ -153,7 +153,7 @@ function snapshot(input: CaseInput): DockApiCaseSnapshot {
 async function prepare(
   page: Page,
   input: CaseInput,
-  options: { fileError?: boolean; inspectionHtml?: boolean; wordReport?: boolean; pdfReport?: boolean; duplicateReports?: boolean } = {},
+  options: { fileError?: boolean; inspectionHtml?: boolean; wordReport?: boolean; pdfReport?: boolean; duplicateReports?: boolean; uploads?: "legacy" | "current" } = {},
 ) {
   const apiRequests: string[] = []
   const errors: string[] = []
@@ -167,6 +167,23 @@ async function prepare(
     if (window === window.top) localStorage.setItem("dockapi.accessToken", "case-ui-test-token")
   })
   const snap = snapshot(input)
+  if (options.uploads) {
+    const message = snap.sessions[0].messages[0]
+    for (let index = 1; index <= 7; index++) {
+      const filename = `巡察 报告${index}（材料）.docx`
+      const path = `attachments/上传 资料/${filename}`
+      message.parts.push({
+        id: `upload-${index}`,
+        messageID: message.info.id,
+        sessionID: message.info.sessionID,
+        type: "file",
+        filename,
+        mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        url: `${options.uploads === "legacy" ? "file://" : ""}case://artifacts/${path.split("/").map(encodeURIComponent).join("/")}?opencode-attachment=reference`,
+      })
+      snap.artifacts.push({ path, size: 100, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
+    }
+  }
   const pdfBuffer = options.pdfReport ? await readFile(new URL("../startup/fixtures/preview-chinese-multipage.pdf", import.meta.url)) : undefined
   if (pdfBuffer) snap.artifacts.push({ path: "preview.pdf", size: pdfBuffer.length, contentType: "application/pdf" })
   const wordArchive = options.wordReport ? new JSZip() : undefined
@@ -292,6 +309,26 @@ async function prepare(
   await page.goto(`/cases/${input.category}`)
   await expect(page.getByText(`测试案例-${input.category}`, { exact: true })).toBeVisible({ timeout: 60000 })
   return { errors, apiRequests, fileRequests }
+}
+
+for (const uploads of ["legacy", "current"] as const) {
+  test(`case attachment cards preserve seven ${uploads} uploads`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const state = await prepare(page, cases[0], { uploads })
+    const cards = page.locator('[data-component="workbench-attachments"]')
+    await expect(cards).toBeVisible()
+    for (let index = 1; index <= 7; index++)
+      await expect(cards.getByText(`巡察 报告${index}（材料）.docx`, { exact: true })).toBeVisible()
+    await expect(cards.locator('[title]')).toHaveCount(7)
+    await page.getByText("案例原始查询", { exact: true }).scrollIntoViewIfNeeded()
+    await page.screenshot({ path: info.outputPath("attachment-cards.png") })
+    await page.reload()
+    await expect(cards.locator('[title]')).toHaveCount(7)
+    await page.getByRole("button", { name: "文件", exact: true }).click()
+    await expect(page.getByRole("button", { name: /巡察 报告1（材料）.docx 未知来源/ })).toBeVisible()
+    expect(state.errors).toEqual([])
+    expect(state.apiRequests.some((request) => /POST .*session.*(prompt|message)/.test(request))).toBe(false)
+  })
 }
 
 test("case HTML renders local Markdown and formulas while downloading original bytes", async ({ page }, info) => {

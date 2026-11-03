@@ -41,11 +41,11 @@ export function extractWorkbenchMessages(
 ): WorkbenchMessage[] {
   return [...messages].sort(compareMessage).flatMap((message) => {
     const text = joinTextParts(parts[message.id] ?? [])
-    const attachments = (parts[message.id] ?? []).flatMap((part) =>
-      part.type === "file" && isAttachmentReference(part.url)
-        ? [{ filename: part.filename ?? "附件", mime: part.mime, url: part.url }]
-        : [],
-    )
+    const attachments = (parts[message.id] ?? []).flatMap((part) => {
+      if (part.type !== "file") return []
+      const url = workbenchAttachmentUrl(part.url)
+      return url ? [{ filename: part.filename ?? "附件", mime: part.mime, url }] : []
+    })
     if (!text.trim() && !attachments.length) return []
     return [
       {
@@ -65,6 +65,25 @@ export function extractWorkbenchMessages(
       },
     ]
   })
+}
+
+function workbenchAttachmentUrl(value: string) {
+  if (isAttachmentReference(value)) return value
+  // Old snapshots replaced the path but left the file:// prefix. This is display-only;
+  // case references must never become live session attachment references.
+  const candidate = value.startsWith("file://case://") ? value.slice("file://".length) : value
+  if (!URL.canParse(candidate)) return
+  const url = new URL(candidate)
+  if (
+    url.protocol !== "case:" ||
+    !["artifacts", "workspace"].includes(url.host) ||
+    url.username ||
+    url.password ||
+    url.pathname.length <= 1 ||
+    url.searchParams.get("opencode-attachment") !== "reference"
+  )
+    return
+  return url.href
 }
 
 export function completedExpertElapsed(node: Pick<AgentNodeView, "status" | "startedAt" | "completedAt">) {

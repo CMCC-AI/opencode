@@ -56,6 +56,47 @@ const text = (id: string, messageID: string, value: string): Part => ({
 })
 
 describe("agent workbench session adapter", () => {
+  test.each(["case://artifacts/", "file://case://artifacts/", "case://workspace/", "file://case://workspace/"])(
+    "shows seven saved upload cards with %s without treating them as live files",
+    (prefix) => {
+      const files = Array.from(
+        { length: 7 },
+        (_, index): Extract<Part, { type: "file" }> => ({
+          id: `upload-${index}`,
+          sessionID: "root",
+          messageID: "u",
+          type: "file",
+          mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          filename: `巡察 报告${index + 1}（材料）.docx`,
+          url: `${prefix}attachments/${encodeURIComponent("上传 资料")}/${encodeURIComponent(`巡察 报告${index + 1}（材料）.docx`)}?opencode-attachment=reference`,
+        }),
+      )
+      const before = structuredClone(files)
+      const [message] = extractWorkbenchMessages([user("u", "root")], { u: [text("q", "u", "分析附件"), ...files] })
+      expect(message.text).toBe("分析附件")
+      expect(message.attachments?.map((file) => file.filename)).toEqual(files.map((file) => file.filename ?? "附件"))
+      expect(message.attachments?.every((file) => new URL(file.url).protocol === "case:")).toBe(true)
+      expect(files).toEqual(before)
+    },
+  )
+
+  test.each([
+    "case://artifacts/report.docx",
+    "case://other/report.docx?opencode-attachment=reference",
+    "case://user@artifacts/report.docx?opencode-attachment=reference",
+    "case://artifacts/?opencode-attachment=reference",
+    "https://example.com/report.docx?opencode-attachment=reference",
+    "data:text/plain,case://artifacts/report.docx?opencode-attachment=reference",
+  ])("does not turn unsupported case URLs into upload cards: %s", (url) => {
+    const [message] = extractWorkbenchMessages([user("u", "root")], {
+      u: [
+        text("q", "u", "问题"),
+        { id: "f", sessionID: "root", messageID: "u", type: "file", mime: "text/plain", url },
+      ],
+    })
+    expect(message.attachments).toBeUndefined()
+  })
+
   test("shows new upload cards without adding attachment text or changing historical messages", () => {
     const reference = "file:///repo/runs/one/attachments/report.docx?opencode-attachment=reference"
     const messages = extractWorkbenchMessages([user("new", "root"), user("old", "root")], {
