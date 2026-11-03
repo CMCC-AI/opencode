@@ -12,7 +12,7 @@
   width: max(100vw, calc(100dvh * 1672 / 941));
   aspect-ratio: 1672 / 941;
   transform: translate(-50%, -50%);
-  background: url("../assets/auth/startup-loading.webp") center / 100% 100% no-repeat;
+  background: url("../assets/auth/startup-loading-background.webp") center / 100% 100% no-repeat;
 }
 
 .app-loading-logo {
@@ -21,7 +21,48 @@
   left: calc(776 / 1672 * 100%);
   display: block;
   width: calc(130 / 1672 * 100%);
-  aspect-ratio: 6643 / 7487;
+  height: auto;
+  aspect-ratio: 262 / 294;
+  object-fit: contain;
+}
+
+.app-loading-title,
+.app-loading-label {
+  position: absolute;
+  left: 50%;
+  display: flex;
+  justify-content: space-between;
+  max-width: calc(100vw - 40px);
+  margin: 0;
+  transform: translateX(-50%);
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.app-loading-title {
+  top: calc(494 / 941 * 100%);
+  width: 244px;
+  color: #292d3c;
+  font:
+    500 32px / 1.25 "Segoe UI",
+    "Microsoft YaHei",
+    Arial,
+    sans-serif;
+}
+
+.app-loading-label {
+  top: calc(620 / 941 * 100%);
+  width: 144px;
+  color: #969faf;
+  font:
+    400 18px / 1.5 "Microsoft YaHei",
+    Arial,
+    sans-serif;
+}
+
+.app-loading-title > span,
+.app-loading-label > span {
+  flex: none;
 }
 
 /* Anchor the animation to the dots in the reference image at every viewport size. */
@@ -86,5 +127,17 @@
 @media (prefers-reduced-motion: reduce) {
   .app-loading-dots > span::after {
     animation: none;
+  }
+}
+
+@media (max-height: 520px) {
+  .app-loading-title {
+    width: 152px;
+    font-size: 20px;
+  }
+
+  .app-loading-label {
+    width: 112px;
+    font-size: 14px;
   }
 }

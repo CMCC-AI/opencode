@@ -7,8 +7,8 @@
       content="width=device-width, initial-scale=1, interactive-widget=resizes-content, viewport-fit=cover"
     />
     <title>九天DeepInsight</title>
-    <link rel="preload" as="image" href="/src/assets/auth/startup-loading.webp" fetchpriority="high" />
-    <link rel="preload" as="image" href="/src/assets/auth/startup-loading-logo.webp" fetchpriority="high" />
+    <link rel="preload" as="image" href="/brand/startup-loading.svg" fetchpriority="high" />
+    <link rel="preload" as="image" href="/src/assets/auth/startup-loading-background.webp" fetchpriority="high" />
     <link rel="stylesheet" href="/src/components/app-loading.css" />
     <link rel="icon" type="image/svg+xml" href="/brand/logo.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-v3.png" />
@@ -44,8 +44,22 @@
         aria-busy="true"
       >
         <div class="app-loading-scene" aria-hidden="true">
-          <img class="app-loading-logo" src="/src/assets/auth/startup-loading-logo.webp" alt="" />
+          <img
+            class="app-loading-logo"
+            src="/brand/startup-loading.svg"
+            width="262"
+            height="294"
+            fetchpriority="high"
+            alt=""
+          />
+          <p class="app-loading-title" aria-label="DeepInsight">
+            <span>D</span><span>e</span><span>e</span><span>p</span><span>I</span><span>n</span><span>s</span
+            ><span>i</span><span>g</span><span>h</span><span>t</span>
+          </p>
           <div class="app-loading-dots"><span></span><span></span><span></span></div>
+          <p class="app-loading-label" aria-label="系统加载中...">
+            <span>系</span><span>统</span><span>加</span><span>载</span><span>中</span><span>...</span>
+          </p>
         </div>
       </div>
     </div>

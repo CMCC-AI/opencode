@@ -34,9 +34,9 @@ describe("MobileAI brand assets", () => {
     expect(layout).not.toContain("jiutian-sidebar-logo.optimized.webp")
     const index = await readFile(new URL("index.html", root), "utf8")
     expect(index).toContain('rel="icon" type="image/svg+xml" href="/brand/logo.svg"')
-    expect(index).toContain('src="/src/assets/auth/startup-loading-logo.webp"')
+    expect(index).toContain('src="/brand/startup-loading.svg"')
     expect(await readFile(new URL("src/components/app-loading.tsx", root), "utf8")).toContain(
-      "startup-loading-logo.optimized.webp",
+      'src="/brand/startup-loading.svg"',
     )
   })
 
