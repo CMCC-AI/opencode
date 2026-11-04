@@ -26,10 +26,14 @@ const summary = injectChartOptions(visual.sections || [], {
 });
 await writeFile(visualPath, JSON.stringify(visual, null, 2) + "\n", "utf8");
 process.stdout.write(`图表校验：${summary.kept}/${summary.total} 张通过`);
+if (summary.degraded && summary.degraded.length) {
+  process.stdout.write(`，${summary.degraded.length} 张降级为数据表（数据保留）：\n`);
+  for (const d of summary.degraded) process.stdout.write(`  - 「${d.title}」：${d.errors.join("；")}\n`);
+}
 if (summary.dropped.length) {
   process.stdout.write(`，已丢弃 ${summary.dropped.length} 张：\n`);
   for (const dropped of summary.dropped) process.stdout.write(`  - 「${dropped.title}」：${dropped.errors.join("；")}\n`);
-} else {
+} else if (!summary.degraded || !summary.degraded.length) {
   process.stdout.write("\n");
 }
 if (summary.total && !summary.kept) {
