@@ -11,6 +11,7 @@ maxTurns: 200
 permission:
   websearch: deny
   webfetch: deny
+  bash: allow
   task:
     "*": deny
     "deepinsight/di-intent-analyst": allow
@@ -181,9 +182,10 @@ dispatch `deepinsight/di-outline-architect` → `10-outline.json`。要求：每
 
 1. **引用后处理（你亲自，无语义判断）**：`node "$SKILL_DIR/scripts/postprocess-report.mjs" <WS>` → `22-references.json` + `23-reference-state.json`；失败时修数据不手造 JSON
 2. `start visualization` → dispatch `deepinsight/di-viz`（task prompt 只传 `dag_node=visualization`、`attempt`、`workspace_dir`；**不要描述图表/JSON 结构**，契约由 report-render 技能定义）→ 若返回分片目录则执行 `node "$SKILL_DIR/scripts/assemble-parts.mjs" <分片目录> <WS>/25-visual-report.json <N> title,subtitle,visual_quality,hero_stats,sections` → `complete`
-3. `start html_render` → dispatch `deepinsight/di-html-renderer`（传 `dag_node=html_render`、`attempt`、`workspace_dir`、`SKILL_DIR`）→ 确认 `30-report.html`+`31-render-state.json` → `complete`
-4. `start pdf_export` → dispatch `deepinsight/di-pdf-exporter`（传 `dag_node=pdf_export`、`attempt`、`workspace_dir`、`SKILL_DIR`）→ 确认 `35-report.pdf` → `complete`（技术失败允许 attempt=2 一次）
-5. 你亲自执行 `node "$SKILL_DIR/scripts/validate-run.mjs" <WS>` 做最终验证
+3. **机器自查（硬门，`start html_render` 之前必做）**：`node .opencode/skills/chart-builder/scripts/build-charts.mjs --check <WS>/25-visual-report.json`——`failCount=0` 才进渲染；有 `failures`/`malformed` → 把 errors 附进重派词 dispatch di-viz 修对应图表数据（同 attempt 内最多 1 次）后重跑本命令；仍失败 → 记录缺口继续（渲染闸门规整+降级兜底），不阻塞交付
+4. `start html_render` → dispatch `deepinsight/di-html-renderer`（传 `dag_node=html_render`、`attempt`、`workspace_dir`、`SKILL_DIR`）→ 确认 `30-report.html`+`31-render-state.json` → `complete`
+5. `start pdf_export` → dispatch `deepinsight/di-pdf-exporter`（传 `dag_node=pdf_export`、`attempt`、`workspace_dir`、`SKILL_DIR`）→ 确认 `35-report.pdf` → `complete`（技术失败允许 attempt=2 一次）
+6. 你亲自执行 `node "$SKILL_DIR/scripts/validate-run.mjs" <WS>` 做最终验证
 
 ### Phase 8: 交付
 

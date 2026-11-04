@@ -150,6 +150,7 @@ permission:
 ### Phase 6: 引用后处理、可视化与交付
 - 核验通过后运行 `finalize-citations.mjs` 确定性编号（`<cite>` → `[N]` + 参考文献章节），未知来源会导致脚本失败，不会修改报告。
 - 调度 `zhengqi-visit-intel/report-visual-designer`（task prompt 只传 `workspace_dir`，**不要描述图表/JSON 结构**——结构契约由 report-render 技能定义，防止 schema 漂移）：读取最终报告与 `02-brief-data.json` 数值权威清单，自己写盘 `25-visual-report.json`（正文零抄写：markdown block 只放占位符；图表数字必须来自结构化数据，不从长文猜数字）。产物 >8KB 时按防掐流分片返回，你用 `node "$SKILL_DIR/scripts/assemble-parts.mjs" <分片目录> <目标> <N> title,subtitle,hero_stats,sections` 组装。验收：markdown block 全是占位符、每章 ≥1 个占位符、表格已转 table block、人物信息只用忠实表格；不合格责令重做。
+- **验收后机器自查（硬门，派渲染代理前必做）**：`node .opencode/skills/chart-builder/scripts/build-charts.mjs --check <workspace>/25-visual-report.json`——`failCount=0` 才派渲染；有 `failures`/`malformed` → 把 errors 附进重派词责令 report-visual-designer 修对应图表数据（最多 1 次；修正后数值仍须与 `02-brief-data.json` 逐字符一致）后重跑本命令；仍失败 → 记录缺口继续渲染（渲染闸门规整+降级兜底），不阻塞交付
 - 用 `skill` 工具加载 `zhengqi-report-toolkit` 获取 `<SKILL_DIR>` 后，依次派单渲染代理（**必须自己派单，不要输出命令给用户**）：
   - spawn `zhengqi-visit-intel/html-renderer`（传 `workspace_dir` 与 `SKILL_DIR`）执行 `render-report.mjs` → 确认 `30-report.html`；其转报日志含「图表校验：N/M 张通过」，有丢弃时只责令 report-visual-designer 重做图表数据后重派渲染
   - spawn `zhengqi-visit-intel/pdf-exporter`（传 `workspace_dir` 与 `SKILL_DIR`）执行 `export-report-pdf.mjs` → 确认 `35-report.pdf`

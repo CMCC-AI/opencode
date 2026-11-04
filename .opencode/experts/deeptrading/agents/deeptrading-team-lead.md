@@ -196,7 +196,13 @@ dt-report-writer 产出的 `30-final-report.md` 里引用是 `<cite>URL</cite>` 
 spawn `deeptrading/dt-viz`（task prompt 只传 `workspace_dir` 与产物路径，**不要描述图表/JSON 结构**——结构契约由 report-render 技能定义，防止 schema 漂移）：
 - 可视化专家读取 `30-final-report.md`，按共享契约自己写盘 `35-visual-report.json`（正文零抄写：markdown block 只放占位符，表格转 table block）；产物 >8KB 时按防掐流分片返回，你用 `node "$SKILL_DIR/scripts/assemble-parts.mjs" <分片目录> <目标> <N> title,subtitle,hero_stats,sections` 组装
 
-主理人验收 `35-visual-report.json`：markdown block 全部是占位符（无正文原文混入）、每章至少 1 个占位符、报告里的表格都已转 table block；不合格则要求 dt-viz 重做，不得自行放行。
+主理人验收 `35-visual-report.json`：markdown block 全部是占位符（无正文原文混入）、每章至少 1 个占位符、报告里的表格都已转 table block；不合格则要求 dt-viz 重做，不得自行放行。验收后、进入渲染前**必跑机器自查（硬门）**（分片交付时在 assemble-parts 组装出整文件后执行）：
+
+```
+node .opencode/skills/chart-builder/scripts/build-charts.mjs --check <workspace>/35-visual-report.json
+```
+
+`failCount=0` 才进入渲染；有 `failures`/`malformed` → 把 errors 附进重派词责令 dt-viz 修对应图表数据（最多 1 次）后重跑本命令；仍失败 → 记录缺口继续渲染（渲染闸门会规整+降级兜底），不阻塞交付。
 
 然后用 `skill` 工具加载 `deeptrading-pipeline` skill 获取 `<SKILL_DIR>`，spawn `deeptrading/dt-html-renderer`（传 `workspace_dir` 与 `SKILL_DIR`）执行渲染（**必须自己派单，不要输出命令给用户**）：
 - 渲染代理回转的日志含「正文回填 N 个占位符」与「图表校验：N/M 张通过」：有图表被丢弃时（dt-viz 的图表 data 不符合契约），只责令 dt-viz 重做图表数据后重派渲染，正文块无需重做
