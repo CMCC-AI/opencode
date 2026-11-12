@@ -12,6 +12,9 @@ import pkg from "../package.json"
 import { normalizeServerUrl, ServerConnection } from "./context/server"
 import { DockApiProvider } from "@/context/dockapi"
 import { DockApiAuthGate } from "@/components/dockapi-auth-gate"
+import { lazy, Show, Suspense } from "solid-js"
+
+const AdminApp = lazy(() => import("@/pages/admin/app"))
 
 const DEFAULT_SERVER_URL_KEY = "opencode.settings.dat:defaultServerUrl"
 const SERVER_URL_PARAM = "server"
@@ -180,7 +183,8 @@ if (root instanceof HTMLElement) {
     (configuredUsername && configuredPassword !== undefined
       ? { username: configuredUsername, password: configuredPassword }
       : undefined)
-  const defaultUrl = getDefaultUrl()
+  const admin = location.pathname === "/admin" || location.pathname.startsWith("/admin/")
+  const defaultUrl = admin ? getCurrentUrl() : getDefaultUrl()
   clearLaunchParams()
   const servers = Array.from(new Set([getCurrentUrl(), defaultUrl])).map(
     (url): ServerConnection.Http => ({
@@ -197,14 +201,23 @@ if (root instanceof HTMLElement) {
     () => (
       <PlatformProvider value={platform}>
         <AppBaseProviders>
-          <DockApiProvider>
-            <DockApiAuthGate>
-              <AppInterface
-                defaultServer={ServerConnection.Key.make(defaultUrl)}
-                canonicalLocalServer={ServerConnection.Key.make(defaultUrl)}
-                servers={servers}
-              />
-            </DockApiAuthGate>
+          <DockApiProvider loadHistory={!admin}>
+            <Show
+              when={admin}
+              fallback={
+                <DockApiAuthGate>
+                  <AppInterface
+                    defaultServer={ServerConnection.Key.make(defaultUrl)}
+                    canonicalLocalServer={ServerConnection.Key.make(defaultUrl)}
+                    servers={servers}
+                  />
+                </DockApiAuthGate>
+              }
+            >
+              <Suspense fallback={<main class="p-8" role="status">正在加载管理平台...</main>}>
+                <AdminApp />
+              </Suspense>
+            </Show>
           </DockApiProvider>
         </AppBaseProviders>
       </PlatformProvider>

@@ -25,7 +25,8 @@ async function setup(page: Page, allowed = true) {
       json: {
         code: 200,
         data: {
-          user: { id: 1, name: "测试用户", enabled: true, casePublishAllowed: allowed },
+          user: { id: 1, name: "测试用户", enabled: true, casePublishAllowed: allowed,
+            userType: allowed ? "admin" : "user", caseManagementAllowed: allowed, caseDeleteAllowed: allowed },
           workspace: { id: 1, workspaceKey: "home-sizing-test", directoryPath: "C:/home-sizing-test", status: "READY" },
         },
       },
@@ -132,6 +133,59 @@ async function setup(page: Page, allowed = true) {
   })
   return requests
 }
+
+test("global case editors maintain unpublished cases without admin or permanent delete access", async ({ page }) => {
+  await setup(page)
+  await page.route("**/api/user/profile", (route) => route.fulfill({ json: { code: 200, data: {
+    user: { id: 7, name: "案例维护用户", enabled: true, userType: "user", casePublishAllowed: true, caseManagementAllowed: true, caseDeleteAllowed: false },
+    workspace: { id: 1, workspaceKey: "home-sizing-test", directoryPath: "C:/home-sizing-test", status: "READY" },
+  } } }))
+  await page.route("**/api/dockapi/case-management**", (route) => {
+    const path = new URL(route.request().url()).pathname
+    return route.fulfill({ json: { code: 200, data: path.endsWith("/categories") ? [{ code: "deep-research", label: "通用深度研究" }] : {
+      items: [{ source: "langgraph", caseCode: code, caseName: "已下架快速案例", caseDescription: "待维护", category: "deep-research", caseTag: "通用深度研究", publishStatus: "unpublished", publishedAt: "2026-11-12T08:00:00", updatedAt: "2026-11-12T08:00:00" }], total: 1, page: 1, size: 24,
+    } } })
+  })
+  await page.goto("/cases")
+  await expect(page.getByRole("button", { name: /删除案例 / })).toHaveCount(0)
+  await page.getByRole("button", { name: "案例维护", exact: true }).click()
+  await expect(page.getByText("已下架快速案例", { exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "上架已下架快速案例", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: /永久删除/ })).toHaveCount(0)
+  await page.getByRole("button", { name: "返回案例集", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "精选案例", exact: true })).toBeVisible()
+})
+
+test("revoking admin type closes both delete dialogs while keeping explicit case maintenance", async ({ page }) => {
+  await setup(page)
+  let administrator = true
+  await page.route("**/api/user/profile", (route) => route.fulfill({ json: { code: 200, data: {
+    user: { id: 1, name: "权限变更用户", enabled: true, userType: administrator ? "admin" : "user", casePublishAllowed: true, caseManagementAllowed: true, caseDeleteAllowed: administrator },
+    workspace: { id: 1, workspaceKey: "home-sizing-test", directoryPath: "C:/home-sizing-test", status: "READY" },
+  } } }))
+  await page.route("**/api/dockapi/case-management**", (route) => route.fulfill({ json: { code: 200, data:
+    new URL(route.request().url()).pathname.endsWith("/categories") ? [{ code: "deep-research", label: "通用深度研究" }] : {
+      items: [{ source: "opencode", caseCode: code, caseName: "待维护案例", category: "deep-research", caseTag: "通用深度研究", publishStatus: "published", publishedAt: "2026-11-12T08:00:00", updatedAt: "2026-11-12T08:00:00" }], total: 1, page: 1, size: 24,
+    } } }))
+  await page.goto("/cases")
+  await page.getByRole("button", { name: "删除案例 深度案例", exact: true }).click()
+  await expect(page.getByRole("dialog", { name: "删除案例", exact: true })).toBeVisible()
+  administrator = false
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")))
+  await expect(page.getByRole("dialog", { name: "删除案例", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /删除案例 / })).toHaveCount(0)
+  administrator = true
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")))
+  await expect(page.getByRole("button", { name: "删除案例 深度案例", exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "案例维护", exact: true }).click()
+  await page.getByRole("button", { name: "永久删除待维护案例", exact: true }).click()
+  await expect(page.getByRole("dialog", { name: "永久删除案例", exact: true })).toBeVisible()
+  administrator = false
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")))
+  await expect(page.getByRole("dialog", { name: "永久删除案例", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "永久删除待维护案例", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "编辑待维护案例", exact: true })).toBeVisible()
+})
 
 test("mixed same-code cards open the right snapshots and quick same-task uses unified home", async ({ page }, info) => {
   const requests = await setup(page)

@@ -1,5 +1,5 @@
 import { Icon } from "@opencode-ai/ui/icon"
-import { For, Show, createEffect, on, onCleanup, onMount } from "solid-js"
+import { For, Show, Suspense, lazy, createEffect, on, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useNavigate } from "@solidjs/router"
 import type { DockApiCaseGroup, DockApiCatalogCaseSummary } from "@/context/dockapi"
@@ -21,6 +21,7 @@ import type { ResearchDetail } from "./general-deepinsight/model"
 import "./cases/card-loading.css"
 
 type SortOrder = "latest" | "oldest"
+const CaseManagementPanel = lazy(() => import("./admin/cases").then((module) => ({ default: module.CaseManagementPanel })))
 type CaseOpening = { caseCode: string; phase: "loading" | "error"; error?: string }
 
 const CASE_CATEGORY_ARTWORK: Record<string, { background: string; title?: string; viewBox: string }> = {
@@ -52,6 +53,7 @@ export function CmccCasesRoute() {
     from: "",
     to: "",
     filterOpen: false,
+    maintenance: false,
     deleteCase: undefined as DockApiCatalogCaseSummary | undefined,
     opening: undefined as CaseOpening | undefined,
   })
@@ -237,12 +239,14 @@ export function CmccCasesRoute() {
   const hasCases = () =>
     filtered() ? state.items.length > 0 : state.overview.some((group) => group.items.length > 0)
   const canManageCases = () => cmccCaseManagementAllowed(dockapi.user?.casePublishAllowed)
+  const canDeleteCases = () => dockapi.user?.caseDeleteAllowed === true
   const requestDelete = (value: DockApiCatalogCaseSummary) => {
     cancelOpening()
     setState("deleteCase", value)
   }
 
   return (
+    <Show when={state.maintenance && canManageCases()} fallback={
     <main class="relative size-full overflow-x-hidden overflow-y-auto bg-[#fbfcff]" data-page="cmcc-cases"
       onKeyDown={(event) => { if (event.key === "Escape" && state.opening) cancelOpening() }}>
       <CmccPageBackground />
@@ -253,6 +257,7 @@ export function CmccCasesRoute() {
             沉淀真实研究成果，快速查看 Deep Research 与 AI+产业洞察的完整交付
           </p>
           <div class="relative mt-4 flex items-center gap-3">
+            <Show when={canManageCases()}><button type="button" class="h-9 shrink-0 rounded-[6px] border border-[#d1d9ef] bg-white px-3 text-[13px] text-[#48546b]" onClick={() => { cancelOpening(); setState("maintenance", true) }}>案例维护</button></Show>
             <label class="flex h-11 w-[400px] max-w-[calc(100%-56px)] items-center rounded-full border border-[#d1d9ef] bg-white px-4 text-[#9ba4b8] focus-within:border-[#8eabef]">
               <input
                 type="search"
@@ -338,7 +343,7 @@ export function CmccCasesRoute() {
                     onClick={() => void openCase(item)}
                     opening={openingFor(cmccCaseKey(item))}
                     onCancel={cancelOpening}
-                    onDelete={canManageCases() ? () => requestDelete(item) : undefined}
+                    onDelete={canDeleteCases() ? () => requestDelete(item) : undefined}
                   />
                 )}
               </For>
@@ -350,7 +355,7 @@ export function CmccCasesRoute() {
               opening={openingFor}
               cancelOpening={cancelOpening}
               viewMore={(category) => setState("category", category)}
-              remove={canManageCases() ? requestDelete : undefined}
+              remove={canDeleteCases() ? requestDelete : undefined}
             />
           </Show>
           <div ref={(element) => { sentinel = element; observer?.observe(element) }} class="h-px" />
@@ -368,6 +373,7 @@ export function CmccCasesRoute() {
         }}
       />
     </main>
+    }><Suspense fallback={<div class="p-8" role="status">正在加载案例维护...</div>}><div class="size-full overflow-auto bg-white"><CaseManagementPanel embedded onBack={() => setState("maintenance", false)} /></div></Suspense></Show>
   )
 }
 

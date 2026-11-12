@@ -591,6 +591,13 @@ function CmccSidebar() {
                     <Icon name="sliders" class="size-4 shrink-0" />
                     <DropdownMenu.ItemLabel>Token 额度</DropdownMenu.ItemLabel>
                   </DropdownMenu.Item>
+                  <Show when={dockapi.user?.userType === "admin"}>
+                    <DropdownMenu.Item class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)]"
+                      onSelect={() => window.location.assign("/admin")}>
+                      <Icon name="sliders" class="size-4 shrink-0" />
+                      <DropdownMenu.ItemLabel>管理平台</DropdownMenu.ItemLabel>
+                    </DropdownMenu.Item>
+                  </Show>
                   <DropdownMenu.Item
                     class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)] data-[highlighted]:text-[#4f46e5]"
                     onSelect={() => void dockapi.auth.logout()}

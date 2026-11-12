@@ -15,7 +15,7 @@ let workspace
 
 before(async () => {
   workspace = await mkdtemp(path.join(tmpdir(), "opencode-deploy-quota-test-"))
-  for (const directory of ["script/deploy", "mock-bin", ".deploy", ".opencode/experts", ".opencode/skills", "packages/opencode/dist/opencode-linux-x64-baseline/bin"])
+  for (const directory of ["script/deploy", "mock-bin", ".deploy", ".opencode/experts", ".opencode/skills", "packages/opencode/dist/opencode-linux-x64-baseline/bin", "packages/opencode/dist/opencode-linux-x64-baseline/web"])
     await mkdir(path.join(workspace, directory), { recursive: true })
   for (const file of ["deploy_to_server.sh", "script/deploy/install-single-server.sh", "script/deploy/quota-env.sh", "script/deploy/opencode-cmcc.jsonc"])
     await copyFile(path.join(root, file), path.join(workspace, file))
@@ -23,6 +23,8 @@ before(async () => {
   await writeFile(path.join(workspace, binary, "bin/opencode"), "test-only OpenCode binary\n")
   await writeFile(path.join(workspace, binary, "bin/deepxiv-proxy"), "test-only proxy binary\n")
   await writeFile(path.join(workspace, binary, "DEEPXIV_URL"), "http://public.invalid:3100/\n")
+  await writeFile(path.join(workspace, binary, "web/index.html"), "<html>test-only frontend</html>\n")
+  await writeFile(path.join(workspace, binary, "web/admin-headers.conf"), "add_header X-Content-Type-Options nosniff;\n")
   const mock = `#!/usr/bin/env bash
 set -euo pipefail
 command_name=\${0##*/}

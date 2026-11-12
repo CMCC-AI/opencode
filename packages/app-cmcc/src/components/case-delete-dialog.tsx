@@ -1,5 +1,5 @@
 import { Icon } from "@opencode-ai/ui/icon"
-import { Show } from "solid-js"
+import { createEffect, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Portal } from "solid-js/web"
 import type { DockApiCatalogCaseSummary } from "@/context/dockapi"
@@ -13,6 +13,9 @@ export function CaseDeleteDialog(props: {
 }) {
   const dockapi = useDockApi()
   const [state, setState] = createStore({ deleting: false })
+  createEffect(() => {
+    if (props.value && dockapi.user?.caseDeleteAllowed !== true && !state.deleting) props.onClose()
+  })
 
   const close = () => {
     if (state.deleting) return
@@ -21,7 +24,7 @@ export function CaseDeleteDialog(props: {
 
   const remove = async () => {
     const value = props.value
-    if (!value || state.deleting) return
+    if (!value || state.deleting || dockapi.user?.caseDeleteAllowed !== true) return
     setState("deleting", true)
     await (value.source === "langgraph"
       ? dockapi.research.request(`/api/dockapi/general-deepinsight/cases/${encodeURIComponent(value.caseCode)}`, { method: "DELETE" })

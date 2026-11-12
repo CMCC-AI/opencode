@@ -34,6 +34,10 @@ export type DockApiUser = {
   phone: string
   enabled: boolean
   casePublishAllowed: boolean
+  userType?: "user" | "admin"
+  vip?: boolean
+  caseManagementAllowed?: boolean
+  caseDeleteAllowed?: boolean
 }
 
 export type DockApiWorkspace = {
@@ -60,6 +64,7 @@ export type DockApiCaseSummary = {
   source?: "opencode"
   caseCode: string
   caseName: string
+  caseDescription?: string | null
   caseTag: string
   category: string
   categoryLabel: string
@@ -263,7 +268,7 @@ async function readResponse<T>(response: Response) {
 
 export const { use: useDockApi, provider: DockApiProvider } = createSimpleContext({
   name: "DockApi",
-  init: () => {
+  init: (props: { loadHistory?: boolean }) => {
     const platform = usePlatform()
     const [state, setState] = createStore({
       status: "loading" as AuthStatus,
@@ -276,6 +281,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
 
     let authEpoch = 0
     let refreshRequest: Promise<void> | undefined
+    let profileRequest: Promise<void> | undefined
     const caseOverview = createCaseListCache<DockApiCaseOverview>()
     const caseLists = createCaseListCache<DockApiCaseList>()
     const caseHandoff = createCaseHandoff<DockApiLoadedCase>()
@@ -370,6 +376,9 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
         return authorizedFetch(path, init, false)
       }
+      if (response.status === 403 && path !== "/api/user/profile") {
+        await reloadProfile().catch(() => undefined)
+      }
       return response
     }
 
@@ -379,6 +388,22 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       const result = await readResponse<T>(response)
       if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
       return result
+    }
+
+    const reloadProfile = () => {
+      if (profileRequest) return profileRequest
+      profileRequest = request<UserProfileResponse>("/api/user/profile")
+        .then((profile) => {
+          const previous = state.user
+          const changed = previous?.id !== profile.user.id || previous?.userType !== profile.user.userType
+            || previous?.casePublishAllowed !== profile.user.casePublishAllowed
+            || previous?.caseDeleteAllowed !== profile.user.caseDeleteAllowed
+            || previous?.caseManagementAllowed !== profile.user.caseManagementAllowed
+          setState({ user: profile.user, workspace: profile.workspace })
+          if (changed) clearCaseCache()
+        })
+        .finally(() => { profileRequest = undefined })
+      return profileRequest
     }
 
     const loadSessions = async () => {
@@ -412,7 +437,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         if (epoch !== authEpoch) return
         setState({ user: profile.user, workspace: profile.workspace })
         setState("status", "authenticated")
-        await loadSessionsSafely()
+        if (props.loadHistory !== false) await loadSessionsSafely()
       } catch (error) {
         if (epoch !== authEpoch) return
         if (error instanceof DockApiError && error.status === 401) {
@@ -445,6 +470,11 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       }
       window.addEventListener("storage", sync)
       window.addEventListener(CMCC_CASES_UPDATED_EVENT, clearCaseCache)
+      const focus = () => {
+        if (state.status === "authenticated") void reloadProfile().catch(() => undefined)
+      }
+      window.addEventListener("focus", focus)
+      onCleanup(() => window.removeEventListener("focus", focus))
       onCleanup(() => window.removeEventListener("storage", sync))
       onCleanup(() => window.removeEventListener(CMCC_CASES_UPDATED_EVENT, clearCaseCache))
       void restore()
@@ -466,6 +496,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       },
       auth: {
         refresh,
+        profile: reloadProfile,
         async login(input: { phone: string; password: string }) {
           const epoch = ++authEpoch
           const auth = await fetch(`${dockApiBaseUrl()}/api/auth/login`, {
@@ -476,7 +507,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
           saveTokens(auth)
           setState("status", "authenticated")
-          await loadSessionsSafely()
+          if (props.loadHistory !== false) await loadSessionsSafely()
         },
         register(input: { name: string; phone: string; password: string }) {
           return fetch(`${dockApiBaseUrl()}/api/auth/register`, {

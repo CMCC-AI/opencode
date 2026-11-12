@@ -166,6 +166,10 @@ if [[ ! -f $release_dir/deepxiv.env ]]; then
   echo "DeepXiv proxy environment is missing: $release_dir/deepxiv.env" >&2
   exit 1
 fi
+if [[ ! -s $release_dir/web/index.html || ! -s $release_dir/web/admin-headers.conf ]]; then
+  echo "Standalone frontend assets are missing: $release_dir/web" >&2
+  exit 1
+fi
 # Validate before overwriting the old env file, switching releases or touching services.
 quota_env=$(quota_resolve "$quota_input" /etc/opencode-cmcc/quota.env /etc/opencode-cmcc/opencode.env /etc/systemd/system/opencode-cmcc.service)
 install -d -m 0755 "$install_root/releases" "$target" "$workspace_root"
@@ -176,6 +180,10 @@ install -d -o "$service_user" -g "$service_user" -m 0750 \
   "$data_root/cache"
 install -o root -g root -m 0755 "$release_dir/opencode" "$target/opencode"
 install -o root -g root -m 0755 "$release_dir/deepxiv-proxy" "$target/deepxiv-proxy"
+install -d -o root -g root -m 0755 "$target/web"
+cp -a "$release_dir/web/." "$target/web/"
+chown -R root:root "$target/web"
+chmod -R a+rX "$target/web"
 install -d -o root -g root -m 0755 "$target/.opencode"
 cp -a "$release_dir/.opencode/." "$target/.opencode/"
 chown -R root:root "$target/.opencode"
@@ -212,6 +220,12 @@ fi
 
 systemctl is-active --quiet opencode-cmcc.service
 systemctl is-active --quiet opencode-cmcc-deepxiv.service
+
+# Refresh the build-specific admin CSP only after the paired release is healthy.
+if command -v nginx >/dev/null 2>&1 && systemctl is-active --quiet nginx; then
+  nginx -t
+  systemctl reload nginx
+fi
 
 current=$(readlink -f "$install_root/current")
 kept=1

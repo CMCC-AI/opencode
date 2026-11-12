@@ -21,7 +21,7 @@ import type {
   DeepTradingArtifactContent,
 } from "@/pages/session/deeptrading/workbench-context"
 import { cmccArtifactWorkspace, cmccEnsureWorkspace, cmccRememberConversationWorkspace } from "@/utils/cmcc-workspace"
-import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByAgentType, cmccCaseManagementAllowed } from "@/utils/cmcc-cases"
+import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByAgentType } from "@/utils/cmcc-cases"
 import { Persist, persisted } from "@/utils/persist"
 import { showToast } from "@/utils/toast"
 import { CASE_REPLAY_DURATION_MS, caseReplayFrame, compileCaseReplay } from "./replay"
@@ -164,7 +164,7 @@ function CaseDetailContent(props: { value: LoadedCase }) {
         </small>
       </span>
       <span class="rounded-full bg-[#edf3ff] px-2.5 py-1 text-[11px] text-[#3d73d8]">案例快照</span>
-      <Show when={cmccCaseManagementAllowed(dockapi.user?.casePublishAllowed)}>
+      <Show when={dockapi.user?.caseDeleteAllowed === true}>
         <button
           type="button"
           title="删除案例"

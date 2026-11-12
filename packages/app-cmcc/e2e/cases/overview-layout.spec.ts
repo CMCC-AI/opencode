@@ -35,7 +35,8 @@ async function prepare(page: Page, scienceCount = 4, canManage = false) {
       route.fulfill({ json: { code: 200, message: "ok", data }, headers: { "access-control-allow-origin": "*" } })
     if (url.pathname === "/api/user/profile")
       return json({
-        user: { id: 999, name: "布局测试", phone: "", enabled: true, casePublishAllowed: canManage },
+        user: { id: 999, name: "布局测试", phone: "", enabled: true, casePublishAllowed: canManage,
+          userType: canManage ? "admin" : "user", caseManagementAllowed: canManage, caseDeleteAllowed: canManage },
         workspace: { id: 999, workspaceKey: "test", directoryPath: fixture.directory, status: "READY" },
       })
     if (url.pathname === "/api/dockapi/cases/overview") return json({ groups })
@@ -288,7 +289,7 @@ test("list does not load case detail chunks and returning displays cache before 
 
   const pending = Promise.withResolvers<void>()
   let revalidating = false
-  await page.route("**/api/dockapi/cases/overview", async (route) => {
+  await page.route(/\/api\/dockapi\/cases\/overview(?:\?.*)?$/, async (route) => {
     revalidating = true
     await pending.promise
     await route.fulfill({
