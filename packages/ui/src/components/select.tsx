@@ -20,6 +20,7 @@ export type SelectProps<T> = Omit<ComponentProps<typeof Kobalte<T>>, "value" | "
   triggerStyle?: JSX.CSSProperties
   triggerVariant?: "settings"
   triggerProps?: Record<string, string | number | boolean | undefined>
+  portalMount?: HTMLElement
 }
 
 export function Select<T>(props: SelectProps<T> & Omit<ButtonProps, "children">) {
@@ -40,6 +41,7 @@ export function Select<T>(props: SelectProps<T> & Omit<ButtonProps, "children">)
     "triggerStyle",
     "triggerVariant",
     "triggerProps",
+    "portalMount",
   ])
 
   const state = {
@@ -157,7 +159,7 @@ export function Select<T>(props: SelectProps<T> & Omit<ButtonProps, "children">)
           <Icon name={local.triggerVariant === "settings" ? "selector" : "chevron-down"} size="small" />
         </Kobalte.Icon>
       </Kobalte.Trigger>
-      <Kobalte.Portal>
+      <Kobalte.Portal mount={local.portalMount}>
         <Kobalte.Content
           classList={{
             ...local.classList,

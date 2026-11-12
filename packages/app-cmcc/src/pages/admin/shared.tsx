@@ -1,6 +1,44 @@
 import { Icon } from "@opencode-ai/ui/icon"
+import { Select } from "@opencode-ai/ui/select"
+import { createStore } from "solid-js/store"
 import { type ComponentProps, type ParentProps, onCleanup, onMount, Show } from "solid-js"
 import { Portal } from "solid-js/web"
+
+export function AdminSelect(props: {
+  label: string
+  value: string
+  options: { value: string; label: string }[]
+  disabled?: boolean
+  onChange: (value: string) => void
+}) {
+  let element!: HTMLDivElement
+  const [state, setState] = createStore({ mount: undefined as HTMLElement | undefined })
+  // Native modal dialogs make body-level portals inert; keep their popups inside the dialog.
+  onMount(() => setState("mount", element.closest("dialog") ?? document.body))
+  return (
+    <div ref={element} class="admin-select-field">
+      <Show when={state.mount} keyed>
+        {(mount) => (
+          <Select
+            class="admin-select"
+            options={props.options}
+            current={props.options.find((item) => item.value === props.value)}
+            value={(item) => `option:${item.value}`}
+            label={(item) => item.label}
+            placeholder={props.label}
+            disabled={props.disabled}
+            disallowEmptySelection
+            portalMount={mount}
+            triggerProps={{ "aria-label": props.label, "data-value": props.value, type: "button" }}
+            onSelect={(item) => {
+              if (item) props.onChange(item.value)
+            }}
+          />
+        )}
+      </Show>
+    </div>
+  )
+}
 
 export function ToolButton(props: {
   label: string

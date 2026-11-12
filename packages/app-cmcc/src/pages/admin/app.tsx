@@ -2,6 +2,8 @@ import { Show, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
 import { A, Navigate, Route, Router } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
+import loginBackground from "@/assets/auth/login-bg.optimized.webp"
 import { useDockApi } from "@/context/dockapi"
 import { AdminError } from "./shared"
 import { AdminUsers } from "./users"
@@ -33,39 +35,48 @@ export default function AdminApp() {
         when={dockapi.status !== "loading"}
         fallback={
           <main class="admin-gate" role="status">
-            正在验证登录...
+            <img class="admin-gate-logo" src="/brand/logo.svg" alt="" width="48" height="48" />
+            <span>正在验证登录...</span>
           </main>
         }
       >
         <Show
           when={dockapi.status === "authenticated"}
           fallback={
-            <main class="admin-gate">
-              <section class="admin-login">
-                <Icon name="shield" class="admin-login-mark" />
-                <h1>DeepInsight 管理平台</h1>
+            <main class="admin-gate admin-login-gate">
+              <img class="admin-login-background" src={loginBackground} alt="" fetchpriority="high" />
+              <a class="admin-login-brand" href="/app" aria-label="DeepInsight 业务端">
+                <img src="/brand/mobileai-horizontal.svg" alt="移动智能 MobileAI" width="140" height="52" />
+              </a>
+              <section class="admin-login" aria-labelledby="admin-login-title">
+                <header class="admin-login-heading">
+                  <img src="/brand/logo.svg" alt="" width="36" height="36" />
+                  <h1 id="admin-login-title">
+                    <span>DeepInsight</span> <span>管理平台</span>
+                  </h1>
+                </header>
                 <form onSubmit={submit}>
-                  <label>
-                    账号或手机号
-                    <input
-                      autocomplete="username"
-                      required
-                      maxlength={32}
-                      value={form.phone}
-                      onInput={(event) => setForm("phone", event.currentTarget.value)}
-                    />
-                  </label>
-                  <label>
-                    密码
-                    <input
-                      type="password"
-                      autocomplete="current-password"
-                      required
-                      maxlength={32}
-                      value={form.password}
-                      onInput={(event) => setForm("password", event.currentTarget.value)}
-                    />
-                  </label>
+                  <input
+                    class="admin-login-input"
+                    aria-label="账号或手机号"
+                    placeholder="请输入您的账号或手机号"
+                    autocomplete="username"
+                    required
+                    maxlength={32}
+                    value={form.phone}
+                    onInput={(event) => setForm("phone", event.currentTarget.value)}
+                  />
+                  <input
+                    class="admin-login-input"
+                    aria-label="密码"
+                    placeholder="请输入您的密码"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                    maxlength={32}
+                    value={form.password}
+                    onInput={(event) => setForm("password", event.currentTarget.value)}
+                  />
                   <AdminError error={form.error} />
                   <button class="primary" disabled={form.pending}>
                     {form.pending ? "登录中..." : "登录"}
@@ -80,6 +91,7 @@ export default function AdminApp() {
             when={dockapi.user?.userType === "admin" || dockapi.user?.userType === "super_admin"}
             fallback={
               <main class="admin-gate">
+                <img class="admin-gate-logo" src="/brand/logo.svg" alt="" width="48" height="48" />
                 <h1>当前账号无管理权限</h1>
                 <div class="admin-actions">
                   <a href="/app">返回业务端</a>
@@ -93,9 +105,11 @@ export default function AdminApp() {
                 <div class="admin-shell">
                   <aside class="admin-sidebar">
                     <a class="admin-brand" href="/admin/users">
-                      <Icon name="shield" />
-                      <strong>DeepInsight</strong>
-                      <span>管理平台</span>
+                      <img src="/brand/mobileai-horizontal.svg" alt="移动智能 MobileAI" width="108" height="40" />
+                      <span class="admin-brand-copy">
+                        <strong>深度洞察</strong>
+                        <span>管理平台</span>
+                      </span>
                     </a>
                     <nav aria-label="管理导航">
                       <A href="/admin/users" activeClass="selected">
@@ -108,15 +122,27 @@ export default function AdminApp() {
                       </A>
                     </nav>
                     <div class="admin-account">
-                      <span>{dockapi.user?.name}</span>
-                      <a href="/app">
-                        <Icon name="arrow-left" />
-                        返回业务端
-                      </a>
-                      <button onClick={() => void dockapi.auth.logout()}>
-                        <Icon name="enter" />
-                        退出登录
-                      </button>
+                      <DropdownMenu gutter={8} placement="top-start" modal={false}>
+                        <DropdownMenu.Trigger class="admin-user-trigger" aria-label={dockapi.user?.name ?? "用户菜单"}>
+                          <span class="admin-user-avatar" aria-hidden="true">
+                            {dockapi.user?.name.slice(0, 1) || "用"}
+                          </span>
+                          <span class="admin-user-name">{dockapi.user?.name}</span>
+                          <Icon name="chevron-down" class="admin-user-chevron" />
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content class="admin-account-menu">
+                            <DropdownMenu.Item onSelect={() => window.location.assign("/app")}>
+                              <Icon name="dot-grid" />
+                              <DropdownMenu.ItemLabel>返回业务端</DropdownMenu.ItemLabel>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item onSelect={() => void dockapi.auth.logout()}>
+                              <Icon name="enter" class="admin-exit-icon" />
+                              <DropdownMenu.ItemLabel>退出登录</DropdownMenu.ItemLabel>
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu>
                     </div>
                   </aside>
                   <main class="admin-main">{props.children}</main>

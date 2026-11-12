@@ -2,7 +2,7 @@ import { For, Show, createEffect, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useDockApi } from "@/context/dockapi"
 import { managementApi, type CaseCategory, type ManagedCase } from "./api"
-import { AdminError, AdminModal, Pagination, ToolButton, formatAdminTime } from "./shared"
+import { AdminError, AdminModal, AdminSelect, Pagination, ToolButton, formatAdminTime } from "./shared"
 import "./admin.css"
 
 export function CaseManagementPanel(props: { embedded?: boolean; onBack?: () => void }) {
@@ -95,7 +95,6 @@ export function CaseManagementPanel(props: { embedded?: boolean; onBack?: () => 
           </Show>
           <h1>案例管理</h1>
         </div>
-        <ToolButton label="刷新案例" icon="reset" disabled={state.loading} onClick={reload} />
       </header>
       <form class="admin-toolbar" onSubmit={(event) => event.preventDefault()}>
         <input
@@ -105,36 +104,39 @@ export function CaseManagementPanel(props: { embedded?: boolean; onBack?: () => 
           value={state.keyword}
           onInput={(event) => setState({ keyword: event.currentTarget.value, page: 1 })}
         />
-        <select
-          aria-label="案例来源筛选"
+        <AdminSelect
+          label="案例来源筛选"
           value={state.source}
-          onChange={(event) => setState({ source: event.currentTarget.value, page: 1 })}
-        >
-          <option value="">全部来源</option>
-          <option value="opencode">OpenCode</option>
-          <option value="langgraph">LangGraph</option>
-        </select>
-        <select
-          aria-label="维护案例分类"
+          options={[
+            { value: "", label: "全部来源" },
+            { value: "opencode", label: "OpenCode" },
+            { value: "langgraph", label: "LangGraph" },
+          ]}
+          onChange={(value) => setState({ source: value, page: 1 })}
+        />
+        <AdminSelect
+          label="维护案例分类"
           value={state.category}
-          onChange={(event) => setState({ category: event.currentTarget.value, page: 1 })}
-        >
-          <option value="">全部分类</option>
-          <For each={state.categories}>{(category) => <option value={category.code}>{category.label}</option>}</For>
-        </select>
-        <select
-          aria-label="上下架状态筛选"
+          options={[
+            { value: "", label: "全部分类" },
+            ...state.categories.map((item) => ({ value: item.code, label: item.label })),
+          ]}
+          onChange={(value) => setState({ category: value, page: 1 })}
+        />
+        <AdminSelect
+          label="上下架状态筛选"
           value={state.status}
-          onChange={(event) => setState({ status: event.currentTarget.value, page: 1 })}
-        >
-          <option value="">全部状态</option>
-          <option value="published">已上架</option>
-          <option value="unpublished">已下架</option>
-        </select>
+          options={[
+            { value: "", label: "全部状态" },
+            { value: "published", label: "已上架" },
+            { value: "unpublished", label: "已下架" },
+          ]}
+          onChange={(value) => setState({ status: value, page: 1 })}
+        />
       </form>
       <AdminError error={state.error} retry={reload} />
       <div class="admin-table-wrap" aria-busy={state.loading}>
-        <table>
+        <table class="admin-cases-table">
           <thead>
             <tr>
               <th>案例</th>
@@ -150,19 +152,15 @@ export function CaseManagementPanel(props: { embedded?: boolean; onBack?: () => 
               {(item) => (
                 <tr>
                   <td class="admin-case-cell">
-                    <strong>{item.caseName}</strong>
+                    <strong title={item.caseName}>{item.caseName}</strong>
                     <Show when={item.caseDescription}>
                       <small>{item.caseDescription}</small>
                     </Show>
                   </td>
                   <td>{item.source === "langgraph" ? "LangGraph" : "OpenCode"}</td>
                   <td>{item.caseTag}</td>
-                  <td>
-                    <span class="admin-status" classList={{ muted: item.publishStatus !== "published" }}>
-                      {item.publishStatus === "published" ? "已上架" : "已下架"}
-                    </span>
-                  </td>
-                  <td>{formatAdminTime(item.publishedAt)}</td>
+                  <td>{item.publishStatus === "published" ? "已上架" : "已下架"}</td>
+                  <td class="admin-time-cell">{formatAdminTime(item.publishedAt)}</td>
                   <td>
                     <div class="admin-actions">
                       <ToolButton
@@ -340,13 +338,18 @@ function CaseEditor(props: {
             </label>
             <label>
               分类
-              <select
+              <AdminSelect
+                label="分类"
                 value={state.category}
-                disabled={props.item.source === "langgraph" || props.item.agentType === "mstock"}
-                onChange={(event) => setState("category", event.currentTarget.value)}
-              >
-                <For each={props.categories}>{(item) => <option value={item.code}>{item.label}</option>}</For>
-              </select>
+                disabled={
+                  state.pending ||
+                  state.loading ||
+                  props.item.source === "langgraph" ||
+                  props.item.agentType === "mstock"
+                }
+                options={props.categories.map((item) => ({ value: item.code, label: item.label }))}
+                onChange={(value) => setState("category", value)}
+              />
             </label>
             <label>
               案例封面

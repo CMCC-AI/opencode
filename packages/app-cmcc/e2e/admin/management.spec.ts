@@ -2,6 +2,15 @@ import { expect, test, type Page } from "@playwright/test"
 
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL, video: "off" })
 
+function selectControl(page: Page, label: string) {
+  return page.getByRole("button", { name: new RegExp(`^${label}(?: |$)`) })
+}
+
+async function choose(page: Page, label: string, option: string) {
+  await selectControl(page, label).click()
+  await page.getByRole("option", { name: option, exact: true }).click()
+}
+
 async function prepare(
   page: Page,
   input: {
@@ -66,9 +75,14 @@ async function prepare(
       updatedAt: "2026-11-12T08:00:00",
     },
   ]
-  const requests: { path: string; method: string; body: string }[] = []
+  const requests: { path: string; query: string; method: string; body: string }[] = []
   page.on("request", (request) =>
-    requests.push({ path: new URL(request.url()).pathname, method: request.method(), body: request.postData() ?? "" }),
+    requests.push({
+      path: new URL(request.url()).pathname,
+      query: new URL(request.url()).search,
+      method: request.method(),
+      body: request.postData() ?? "",
+    }),
   )
   await page.addInitScript((authenticated) => {
     if (!authenticated) return
@@ -172,7 +186,7 @@ test("super admin opens without research service and assigns independent adminis
   await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: "用户配置 · 测试用户" })
   await expect(dialog.getByText("1,200", { exact: true })).toBeVisible()
-  await dialog.getByLabel("用户类型", { exact: true }).selectOption("admin")
+  await choose(page, "用户类型", "管理员")
   await expect(dialog.getByLabel("VIP 用户")).not.toBeChecked()
   await dialog.getByRole("button", { name: "保存配置" }).click()
   await expect(dialog).not.toBeVisible()
@@ -249,7 +263,7 @@ test("quota errors stay inside user dialog and mobile layout does not overflow",
   const dialog = page.getByRole("dialog")
   await expect(dialog.getByRole("alert")).toContainText("额度暂不可用")
   await dialog.getByRole("button", { name: "重试", exact: true }).click()
-  await expect(dialog.getByLabel("用户类型", { exact: true })).toBeVisible()
+  await expect(selectControl(page, "用户类型")).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath("admin-user-mobile.png"), fullPage: true })
 })
@@ -289,7 +303,7 @@ test("ordinary admin configures ordinary users without administrator assignment"
   await page.goto("/admin/users")
   await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
   const dialog = page.getByRole("dialog")
-  await expect(dialog.getByLabel("用户类型", { exact: true })).toBeDisabled()
+  await expect(selectControl(page, "用户类型")).toBeDisabled()
   await dialog.getByLabel("VIP 用户").check()
   await dialog.getByLabel("案例全局授权").check()
   await dialog.getByLabel("账号启用").uncheck()
@@ -340,8 +354,8 @@ test("fixed admin login accepts an account name and protects its enabled state a
   expect(JSON.parse(login.body).phone).toBe("admin")
   await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
   const dialog = page.getByRole("dialog")
-  await expect(dialog.getByLabel("用户类型", { exact: true })).toHaveValue("super_admin")
-  await expect(dialog.getByLabel("用户类型", { exact: true })).toBeDisabled()
+  await expect(selectControl(page, "用户类型")).toHaveAttribute("data-value", "super_admin")
+  await expect(selectControl(page, "用户类型")).toBeDisabled()
   await expect(dialog.getByLabel("账号启用")).toBeDisabled()
   await expect(dialog.getByLabel("VIP 用户")).not.toBeChecked()
   await expect(dialog.getByRole("button", { name: "重置密码", exact: true })).toBeEnabled()
@@ -353,11 +367,11 @@ test("losing super admin privileges removes assignment from an already open form
   await page.goto("/admin/users")
   await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
   const dialog = page.getByRole("dialog")
-  await dialog.getByLabel("用户类型", { exact: true }).selectOption("admin")
+  await choose(page, "用户类型", "管理员")
   fixture.user.userType = "admin"
   await page.evaluate(() => window.dispatchEvent(new Event("focus")))
-  await expect(dialog.getByLabel("用户类型", { exact: true })).toBeDisabled()
-  await expect(dialog.getByLabel("用户类型", { exact: true })).toHaveValue("user")
+  await expect(selectControl(page, "用户类型")).toBeDisabled()
+  await expect(selectControl(page, "用户类型")).toHaveAttribute("data-value", "user")
   await dialog.getByLabel("VIP 用户").check()
   await dialog.getByRole("button", { name: "保存配置", exact: true }).click()
   const patch = fixture.requests.find((item) => item.method === "PATCH")!
@@ -378,8 +392,344 @@ test("a user promoted elsewhere becomes read-only after a rejected stale update"
   )
   await dialog.getByLabel("VIP 用户").check()
   await dialog.getByRole("button", { name: "保存配置", exact: true }).click()
-  await expect(dialog.getByLabel("用户类型", { exact: true })).toHaveValue("admin")
+  await expect(selectControl(page, "用户类型")).toHaveAttribute("data-value", "admin")
   await expect(dialog.getByLabel("VIP 用户")).toBeDisabled()
   await expect(dialog.getByRole("button", { name: "保存配置", exact: true })).toHaveCount(0)
   await expect(dialog.getByRole("button", { name: "重置密码", exact: true })).toHaveCount(0)
+})
+
+for (const width of [1440, 390, 320]) {
+  test(`management login reuses business branding without overflow at ${width}px`, async ({ page }, testInfo) => {
+    const fixture = await prepare(page, { authenticated: false, superAdministrator: true })
+    await page.setViewportSize({ width, height: width === 1440 ? 900 : 740 })
+    await page.goto("/admin/cases")
+    const login = page.locator(".admin-login")
+    await expect(login.getByRole("heading", { name: "DeepInsight 管理平台", exact: true })).toBeVisible()
+    await expect(page.locator(".admin-login-brand img")).toHaveAttribute("src", "/brand/mobileai-horizontal.svg")
+    await expect(page.locator(".admin-login-heading img")).toHaveAttribute("src", "/brand/logo.svg")
+    await expect(page.locator(".admin-login-background")).toHaveAttribute("src", /login-bg.*[.]webp$/)
+    const images = page.locator(".admin-login-gate img")
+    await expect
+      .poll(() =>
+        images.evaluateAll((items) =>
+          items.every(
+            (item) =>
+              item instanceof HTMLImageElement && item.complete && item.naturalWidth > 0 && item.naturalHeight > 0,
+          ),
+        ),
+      )
+      .toBe(true)
+    await expect(login.getByRole("button", { name: "登录", exact: true })).toHaveCSS("color", "rgb(255, 255, 255)")
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+    const formBox = await login.boundingBox()
+    const headingBox = await login.getByRole("heading").boundingBox()
+    expect(headingBox!.x).toBeGreaterThanOrEqual(formBox!.x)
+    expect(headingBox!.x + headingBox!.width).toBeLessThanOrEqual(formBox!.x + formBox!.width)
+    await page.screenshot({ path: testInfo.outputPath("management-login.png"), fullPage: true })
+    expect(
+      fixture.requests.filter(
+        (item) => item.path.startsWith("/api/admin/") || /health|provider|\/session|\/event/.test(item.path),
+      ),
+    ).toEqual([])
+  })
+}
+
+for (const width of [1440, 390]) {
+  for (const section of ["users", "cases"] as const) {
+    test(`branded ${section} workspace and table stay aligned at ${width}px`, async ({ page }, testInfo) => {
+      const fixture = await prepare(page, { superAdministrator: true })
+      fixture.user.name = "管理用户名称用于验证窄屏换行"
+      await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 })
+      await page.goto(`/admin/${section}`)
+      await expect(page.locator(".admin-brand img")).toHaveAttribute("src", "/brand/mobileai-horizontal.svg")
+      await expect
+        .poll(() =>
+          page
+            .locator(".admin-brand img")
+            .evaluate((item) => item instanceof HTMLImageElement && item.complete && item.naturalWidth > 0),
+        )
+        .toBe(true)
+      await expect(page.locator(".admin-sidebar")).toHaveCSS("background-image", /linear-gradient/)
+      await expect(
+        page.getByRole("link", { name: section === "users" ? "用户管理" : "案例管理", exact: true }),
+      ).toHaveClass(/selected/)
+      await expect(page.getByRole("button", { name: fixture.user.name, exact: true })).toBeVisible()
+      await expect(page.locator("tbody tr").first()).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+      if (width === 390)
+        expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1)).toBe(true)
+      const heading = page.getByRole("heading", { name: section === "users" ? "用户管理" : "案例管理", exact: true })
+      const table = page.locator(".admin-table-wrap")
+      if (width === 390) {
+        const before = await heading.boundingBox()
+        const scrolled = await table.evaluate((element) => {
+          element.scrollLeft = 120
+          return element.scrollLeft
+        })
+        expect(scrolled).toBeGreaterThan(0)
+        expect((await heading.boundingBox())!.x).toBe(before!.x)
+        await table.evaluate((element) => {
+          element.scrollLeft = 0
+        })
+      }
+      await page.screenshot({ path: testInfo.outputPath("branded-workspace.png"), fullPage: true })
+      if (section === "users") await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
+      if (section === "cases") await page.getByRole("button", { name: "编辑深度案例", exact: true }).click()
+      const dialog = page.getByRole("dialog")
+      await expect(dialog).toBeVisible()
+      await expect(dialog.locator("header")).toHaveCSS("background-color", "rgb(238, 243, 255)")
+      await expect(
+        dialog.getByRole("button", { name: section === "users" ? "保存配置" : "保存修改", exact: true }),
+      ).toHaveCSS("color", "rgb(255, 255, 255)")
+      const box = await dialog.boundingBox()
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+      await page.screenshot({ path: testInfo.outputPath("branded-editor.png"), fullPage: true })
+      await dialog.getByRole("button", { name: "取消", exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+      expect(fixture.requests.some((item) => /health|provider|\/session|\/event|\/config/.test(item.path))).toBe(false)
+    })
+  }
+}
+
+test("management login inputs match business inputs and return text has no arrow", async ({ page }) => {
+  await prepare(page, { authenticated: false })
+  const style = (element: Element) => {
+    const css = getComputedStyle(element)
+    return {
+      height: css.height,
+      radius: css.borderRadius,
+      border: css.borderTopColor,
+      background: css.backgroundColor,
+      paddingLeft: css.paddingLeft,
+      paddingRight: css.paddingRight,
+      fontSize: css.fontSize,
+      fontFamily: css.fontFamily,
+      lineHeight: css.lineHeight,
+      color: css.color,
+      shadow: css.boxShadow,
+      placeholder: getComputedStyle(element, "::placeholder").color,
+    }
+  }
+  await page.goto("/app")
+  const business = page.getByLabel("手机号", { exact: true })
+  await expect(business).toBeVisible()
+  const normal = await business.evaluate(style)
+  await business.click()
+  await business.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined))),
+  )
+  const focused = await business.evaluate(style)
+  await page.goto("/admin")
+  const account = page.getByLabel("账号或手机号", { exact: true })
+  await expect(account).toBeVisible()
+  expect(await account.evaluate(style)).toEqual(normal)
+  await account.click()
+  await account.evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined))),
+  )
+  expect(await account.evaluate(style)).toEqual(focused)
+  await expect(page.getByLabel("密码", { exact: true })).toHaveAttribute("placeholder", "请输入您的密码")
+  await expect(page.locator(".admin-login > a")).toHaveText("返回业务端")
+  await expect(page.locator(".admin-login > a svg")).toHaveCount(0)
+})
+
+for (const width of [1440, 390]) {
+  test(`account actions open from the user name and support dismissal at ${width}px`, async ({ page }, testInfo) => {
+    await prepare(page)
+    await page.setViewportSize({ width, height: 844 })
+    await page.goto("/admin/users")
+    const trigger = page.getByRole("button", { name: "管理用户", exact: true })
+    await expect(page.locator(".admin-account").getByText("返回业务端", { exact: true })).toHaveCount(0)
+    await expect(page.getByRole("menu")).toHaveCount(0)
+    await trigger.click()
+    const menu = page.getByRole("menu")
+    await expect(menu.getByRole("menuitem")).toHaveText(["返回业务端", "退出登录"])
+    await expect(menu).toHaveCSS("opacity", "1")
+    const box = await menu.boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+    await page.screenshot({ path: testInfo.outputPath("account-menu.png"), fullPage: true })
+    await page.keyboard.press("Escape")
+    await expect(menu).toHaveCount(0)
+    await expect(trigger).toBeFocused()
+    await trigger.press("Enter")
+    await expect(menu).toBeVisible()
+    await expect(menu).toHaveCSS("opacity", "1")
+    const viewport = page.viewportSize()!
+    const opened = await menu.boundingBox()
+    const outside = { x: viewport.width - 8, y: viewport.height - 8 }
+    expect(outside.x > opened!.x + opened!.width || outside.y > opened!.y + opened!.height).toBe(true)
+    await page.mouse.click(outside.x, outside.y)
+    await expect(menu).toHaveCount(0)
+  })
+}
+
+test("returning to business through the account menu keeps login", async ({ page }) => {
+  const fixture = await prepare(page)
+  await page.route("**/app", (route) =>
+    route.fulfill({ contentType: "text/html", body: "<!doctype html><h1>业务端</h1>" }),
+  )
+  await page.goto("/admin/users")
+  await page.getByRole("button", { name: "管理用户", exact: true }).click()
+  await page.getByRole("menuitem", { name: "返回业务端", exact: true }).click()
+  await expect(page).toHaveURL(/\/app$/)
+  expect(await page.evaluate(() => localStorage.getItem("dockapi.accessToken"))).toBe("test-admin-access")
+  expect(fixture.requests.some((item) => item.path === "/api/auth/logout")).toBe(false)
+})
+
+test("account menu logout revokes login and returns to the management login form", async ({ page }) => {
+  const fixture = await prepare(page)
+  await page.goto("/admin/cases")
+  await page.getByRole("button", { name: "管理用户", exact: true }).click()
+  await page.getByRole("menuitem", { name: "退出登录", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "DeepInsight 管理平台", exact: true })).toBeVisible()
+  expect(fixture.requests.filter((item) => item.path === "/api/auth/logout")).toHaveLength(1)
+  expect(await page.evaluate(() => localStorage.getItem("dockapi.accessToken"))).toBe(null)
+})
+
+test("rounded user filters retain API values without manual refresh", async ({ page }, testInfo) => {
+  const fixture = await prepare(page)
+  await page.goto("/admin/users")
+  await expect(page.getByRole("button", { name: "刷新用户", exact: true })).toHaveCount(0)
+  await selectControl(page, "用户类型筛选").click()
+  await expect(page.locator('.admin-select[data-component="select-content"]')).toHaveCSS("border-radius", "8px")
+  await expect(page.locator('.admin-select[data-component="select-content"]')).toHaveCSS("opacity", "1")
+  await expect(page.getByRole("option", { name: "全部类型", exact: true })).toHaveAttribute("aria-selected", "true")
+  await page.screenshot({ path: testInfo.outputPath("rounded-filter.png"), fullPage: true })
+  await page.getByRole("option", { name: "管理员", exact: true }).click()
+  await choose(page, "VIP筛选", "VIP")
+  await choose(page, "账号状态筛选", "已停用")
+  await choose(page, "案例授权筛选", "有案例权限")
+  await expect
+    .poll(() => {
+      const query = new URLSearchParams(
+        fixture.requests.filter((item) => item.path === "/api/admin/users").at(-1)?.query,
+      )
+      return [
+        query.get("userType"),
+        query.get("vip"),
+        query.get("enabled"),
+        query.get("caseManagementAllowed"),
+        query.get("page"),
+      ]
+    })
+    .toEqual(["admin", "true", "false", "true", "1"])
+  await choose(page, "用户类型筛选", "全部类型")
+  await expect
+    .poll(() =>
+      new URLSearchParams(fixture.requests.filter((item) => item.path === "/api/admin/users").at(-1)?.query).has(
+        "userType",
+      ),
+    )
+    .toBe(false)
+})
+
+test("case filter and category popup work inside the native editor dialog", async ({ page }, testInfo) => {
+  const fixture = await prepare(page)
+  await page.goto("/admin/cases")
+  await expect(page.getByRole("button", { name: "刷新案例", exact: true })).toHaveCount(0)
+  await choose(page, "案例来源筛选", "OpenCode")
+  await expect(page.getByText("快速案例", { exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "编辑深度案例", exact: true }).click()
+  const dialog = page.getByRole("dialog", { name: "编辑案例", exact: true })
+  await selectControl(page, "分类").click()
+  const list = page.getByRole("listbox")
+  await expect(list).toBeVisible()
+  await expect(dialog.locator('.admin-select[data-component="select-content"]')).toHaveCSS("opacity", "1")
+  expect(await list.evaluate((element) => !!element.closest("dialog"))).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath("dialog-category-popup.png"), fullPage: true })
+  await page.keyboard.press("Escape")
+  await expect(list).toHaveCount(0)
+  await expect(dialog).toBeVisible()
+  await choose(page, "分类", "通用深度研究")
+  await dialog.getByRole("button", { name: "保存修改", exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(
+    fixture.requests.filter((item) => item.path === "/api/dockapi/case-management" && item.method === "GET").length,
+  ).toBeGreaterThan(1)
+})
+
+test("pagination and filter reset still load data after removing refresh actions", async ({ page }) => {
+  await prepare(page)
+  const pages: number[] = []
+  await page.route(/\/api\/admin\/users(?:\?.*)?$/, (route) => {
+    const page = Number(new URL(route.request().url()).searchParams.get("page") ?? 1)
+    pages.push(page)
+    return route.fulfill({
+      json: {
+        code: 200,
+        data: {
+          items: Array.from({ length: page === 1 ? 20 : 1 }, (_, index) => ({
+            id: page * 100 + index,
+            name: `分页用户${index + 1}`,
+            phone: `test-${index + 1}`,
+            enabled: true,
+            userType: "user",
+            vip: false,
+            caseManagementAllowed: false,
+            caseManagementGranted: false,
+            caseDeleteAllowed: false,
+            createdAt: "2026-11-12T08:00:00",
+            updatedAt: "2026-11-12T08:00:00",
+          })),
+          total: 21,
+          page,
+          size: 20,
+        },
+      },
+    })
+  })
+  await page.goto("/admin/users")
+  await expect(page.locator("tbody tr")).toHaveCount(20)
+  await page.getByRole("button", { name: "下一页", exact: true }).click()
+  await expect(page.locator("tbody tr")).toHaveCount(1)
+  await choose(page, "VIP筛选", "VIP")
+  await expect(page.locator("tbody tr")).toHaveCount(20)
+  expect(pages.slice(-2)).toEqual([2, 1])
+})
+
+test("user type VIP and enabled status are plain table text", async ({ page }, testInfo) => {
+  const fixture = await prepare(page, { superAdministrator: true })
+  Object.assign(fixture.managed, { userType: "admin", vip: true, enabled: false })
+  await page.goto("/admin/users")
+  const row = page.locator("tbody tr").filter({ hasText: fixture.managed.phone })
+  await expect(row).toBeVisible()
+  const color = await row
+    .locator("td")
+    .nth(1)
+    .evaluate((element) => getComputedStyle(element).color)
+  for (const value of ["管理员", "VIP", "已停用"]) {
+    const cell = row.getByRole("cell", { name: value, exact: true })
+    await expect(cell).toHaveCSS("color", color)
+    await expect(cell).toHaveCSS("background-color", "rgba(0, 0, 0, 0)")
+    expect(await cell.evaluate((element) => element.childElementCount)).toBe(0)
+  }
+  await page.screenshot({ path: testInfo.outputPath("plain-user-metadata.png"), fullPage: true })
+  Object.assign(fixture.managed, { userType: "user", vip: false, enabled: true })
+  await page.reload()
+  await expect(row.getByRole("cell", { name: "普通用户", exact: true })).toHaveText("普通用户")
+  await expect(row.getByRole("cell", { name: "已启用", exact: true })).toHaveCSS("color", color)
+  expect(
+    await row.getByRole("cell", { name: "普通用户", exact: true }).evaluate((element) => element.childElementCount),
+  ).toBe(0)
+})
+
+test("published and unpublished cases use the same plain status text", async ({ page }, testInfo) => {
+  const fixture = await prepare(page)
+  fixture.cases[1].publishStatus = "unpublished"
+  await page.goto("/admin/cases")
+  for (const item of fixture.cases) {
+    const row = page.locator("tbody tr").filter({ hasText: item.caseName })
+    const cell = row.getByRole("cell", { name: item.publishStatus === "published" ? "已上架" : "已下架", exact: true })
+    await expect(cell).toBeVisible()
+    const color = await row
+      .locator("td")
+      .nth(1)
+      .evaluate((element) => getComputedStyle(element).color)
+    await expect(cell).toHaveCSS("color", color)
+    await expect(cell).toHaveCSS("background-color", "rgba(0, 0, 0, 0)")
+    expect(await cell.evaluate((element) => element.childElementCount)).toBe(0)
+  }
+  await page.screenshot({ path: testInfo.outputPath("plain-case-status.png"), fullPage: true })
 })

@@ -3,7 +3,7 @@ import { createStore } from "solid-js/store"
 import { DockApiError, useDockApi } from "@/context/dockapi"
 import type { TokenQuotaSnapshot } from "@/utils/token-quota"
 import { canManageUser, managementApi, userTypeLabel, type ManagedUser, type UserConfiguration } from "./api"
-import { AdminError, AdminModal, Pagination, ToolButton, formatAdminTime } from "./shared"
+import { AdminError, AdminModal, AdminSelect, Pagination, ToolButton, formatAdminTime } from "./shared"
 
 export function AdminUsers() {
   const dockapi = useDockApi()
@@ -63,7 +63,6 @@ export function AdminUsers() {
     <section class="admin-content" data-page="admin-users">
       <header class="admin-page-title">
         <h1>用户管理</h1>
-        <ToolButton label="刷新用户" icon="reset" disabled={state.loading} onClick={reload} />
       </header>
       <form class="admin-toolbar" onSubmit={(event) => event.preventDefault()}>
         <input
@@ -73,47 +72,51 @@ export function AdminUsers() {
           value={state.keyword}
           onInput={(event) => setState({ keyword: event.currentTarget.value, page: 1 })}
         />
-        <select
-          aria-label="用户类型筛选"
+        <AdminSelect
+          label="用户类型筛选"
           value={state.userType}
-          onChange={(event) => setState({ userType: event.currentTarget.value, page: 1 })}
-        >
-          <option value="">全部类型</option>
-          <option value="user">普通用户</option>
-          <option value="admin">管理员</option>
-          <option value="super_admin">超级管理员</option>
-        </select>
-        <select
-          aria-label="VIP筛选"
+          options={[
+            { value: "", label: "全部类型" },
+            { value: "user", label: "普通用户" },
+            { value: "admin", label: "管理员" },
+            { value: "super_admin", label: "超级管理员" },
+          ]}
+          onChange={(value) => setState({ userType: value, page: 1 })}
+        />
+        <AdminSelect
+          label="VIP筛选"
           value={state.vip}
-          onChange={(event) => setState({ vip: event.currentTarget.value, page: 1 })}
-        >
-          <option value="">全部权益</option>
-          <option value="true">VIP</option>
-          <option value="false">非 VIP</option>
-        </select>
-        <select
-          aria-label="账号状态筛选"
+          options={[
+            { value: "", label: "全部权益" },
+            { value: "true", label: "VIP" },
+            { value: "false", label: "非 VIP" },
+          ]}
+          onChange={(value) => setState({ vip: value, page: 1 })}
+        />
+        <AdminSelect
+          label="账号状态筛选"
           value={state.enabled}
-          onChange={(event) => setState({ enabled: event.currentTarget.value, page: 1 })}
-        >
-          <option value="">全部账号状态</option>
-          <option value="true">已启用</option>
-          <option value="false">已停用</option>
-        </select>
-        <select
-          aria-label="案例授权筛选"
+          options={[
+            { value: "", label: "全部账号状态" },
+            { value: "true", label: "已启用" },
+            { value: "false", label: "已停用" },
+          ]}
+          onChange={(value) => setState({ enabled: value, page: 1 })}
+        />
+        <AdminSelect
+          label="案例授权筛选"
           value={state.cases}
-          onChange={(event) => setState({ cases: event.currentTarget.value, page: 1 })}
-        >
-          <option value="">全部案例权限</option>
-          <option value="true">有案例权限</option>
-          <option value="false">无案例权限</option>
-        </select>
+          options={[
+            { value: "", label: "全部案例权限" },
+            { value: "true", label: "有案例权限" },
+            { value: "false", label: "无案例权限" },
+          ]}
+          onChange={(value) => setState({ cases: value, page: 1 })}
+        />
       </form>
       <AdminError error={state.error} retry={reload} />
       <div class="admin-table-wrap" aria-busy={state.loading}>
-        <table>
+        <table class="admin-users-table">
           <thead>
             <tr>
               <th>用户</th>
@@ -131,19 +134,22 @@ export function AdminUsers() {
               {(user) => (
                 <tr>
                   <td>
-                    <strong>{user.name}</strong>
-                    <small>#{user.id}</small>
+                    <div class="admin-user-cell">
+                      <span class="admin-table-avatar" aria-hidden="true">
+                        {user.name.slice(0, 1) || "用"}
+                      </span>
+                      <div class="admin-cell-copy">
+                        <strong title={user.name}>{user.name}</strong>
+                        <small>#{user.id}</small>
+                      </div>
+                    </div>
                   </td>
                   <td>{user.phone}</td>
                   <td>{userTypeLabel(user.userType)}</td>
                   <td>{user.vip ? "VIP" : "--"}</td>
                   <td>{user.caseManagementAllowed ? "全局" : "无"}</td>
-                  <td>
-                    <span class="admin-status" classList={{ muted: !user.enabled }}>
-                      {user.enabled ? "已启用" : "已停用"}
-                    </span>
-                  </td>
-                  <td>{formatAdminTime(user.createdAt)}</td>
+                  <td>{user.enabled ? "已启用" : "已停用"}</td>
+                  <td class="admin-time-cell">{formatAdminTime(user.createdAt)}</td>
                   <td>
                     <ToolButton
                       label={`${canManageUser(dockapi.user?.userType, user.userType) ? "配置" : "查看"}${user.name}`}
@@ -307,18 +313,20 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
           <fieldset disabled={state.pending || state.loading || !editable()}>
             <label>
               用户类型
-              <select
-                aria-label="用户类型"
-                disabled={!assignable()}
+              <AdminSelect
+                label="用户类型"
+                disabled={state.pending || state.loading || !editable() || !assignable()}
                 value={state.userType}
-                onChange={(event) => setState("userType", event.currentTarget.value as ManagedUser["userType"])}
-              >
-                <option value="user">普通用户</option>
-                <option value="admin">管理员</option>
-                <Show when={protectedAccount()}>
-                  <option value="super_admin">超级管理员</option>
-                </Show>
-              </select>
+                options={
+                  protectedAccount()
+                    ? [{ value: "super_admin", label: "超级管理员" }]
+                    : [
+                        { value: "user", label: "普通用户" },
+                        { value: "admin", label: "管理员" },
+                      ]
+                }
+                onChange={(value) => setState("userType", value as ManagedUser["userType"])}
+              />
             </label>
             <label class="admin-check">
               <input
