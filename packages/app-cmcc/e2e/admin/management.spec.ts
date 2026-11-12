@@ -4,14 +4,21 @@ test.use({ channel: process.env.PLAYWRIGHT_CHANNEL, video: "off" })
 
 async function prepare(
   page: Page,
-  input: { authenticated?: boolean; administrator?: boolean; failQuota?: boolean; failSave?: boolean } = {},
+  input: {
+    authenticated?: boolean
+    administrator?: boolean
+    superAdministrator?: boolean
+    targetType?: "user" | "admin" | "super_admin"
+    failQuota?: boolean
+    failSave?: boolean
+  } = {},
 ) {
   const user = {
     id: 1,
     name: "管理用户",
-    phone: "13800000001",
+    phone: input.superAdministrator ? "admin" : "13800000001",
     enabled: true,
-    userType: input.administrator === false ? "user" : "admin",
+    userType: input.administrator === false ? "user" : input.superAdministrator ? "super_admin" : "admin",
     vip: false,
     casePublishAllowed: true,
     caseManagementAllowed: true,
@@ -23,7 +30,7 @@ async function prepare(
     name: "测试用户",
     phone: "13800000007",
     enabled: true,
-    userType: "user",
+    userType: input.targetType ?? "user",
     vip: false,
     caseManagementGranted: false,
     caseManagementAllowed: false,
@@ -156,8 +163,10 @@ async function prepare(
   return { requests, managed, cases, user }
 }
 
-test("admin opens without research service and updates independent user settings", async ({ page }, testInfo) => {
-  const fixture = await prepare(page)
+test("super admin opens without research service and assigns independent administrator settings", async ({
+  page,
+}, testInfo) => {
+  const fixture = await prepare(page, { superAdministrator: true })
   await page.goto("/admin")
   await expect(page.getByRole("heading", { name: "用户管理", exact: true })).toBeVisible()
   await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
@@ -192,7 +201,7 @@ test("admin login has no registration and returns to requested cases page", asyn
   await page.goto("/admin/cases")
   await expect(page.getByRole("heading", { name: "DeepInsight 管理平台" })).toBeVisible()
   await expect(page.getByText("注册", { exact: true })).toHaveCount(0)
-  await page.getByLabel("手机号", { exact: true }).fill("13800000001")
+  await page.getByLabel("账号或手机号", { exact: true }).fill("13800000001")
   await page.getByLabel("密码", { exact: true }).fill("test-password")
   await page.getByRole("button", { name: "登录", exact: true }).click()
   await expect(page.getByRole("heading", { name: "案例管理", exact: true })).toBeVisible()
@@ -273,4 +282,104 @@ test("late administrative responses cannot survive an account change", async ({ 
   } finally {
     pending.resolve()
   }
+})
+
+test("ordinary admin configures ordinary users without administrator assignment", async ({ page }, testInfo) => {
+  const fixture = await prepare(page)
+  await page.goto("/admin/users")
+  await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.getByLabel("用户类型", { exact: true })).toBeDisabled()
+  await dialog.getByLabel("VIP 用户").check()
+  await dialog.getByLabel("案例全局授权").check()
+  await dialog.getByLabel("账号启用").uncheck()
+  await dialog.getByRole("button", { name: "保存配置", exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  const update = fixture.requests.find((item) => item.method === "PATCH")!
+  expect(JSON.parse(update.body)).toEqual({ userType: "user", vip: true, enabled: false, caseManagementGranted: true })
+  await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
+  await dialog.getByRole("button", { name: "重置密码", exact: true }).click()
+  await dialog.getByLabel("新密码", { exact: true }).fill("test-only-reset-password")
+  await dialog.getByRole("button", { name: "确认操作", exact: true }).click()
+  await expect(dialog.getByText("操作成功，原登录会话已失效", { exact: true })).toBeVisible()
+  await dialog.getByRole("button", { name: "退出全部会话", exact: true }).click()
+  await dialog.getByRole("button", { name: "确认操作", exact: true }).click()
+  await expect(dialog.getByRole("button", { name: "确认操作", exact: true })).toHaveCount(0)
+  expect(fixture.requests.filter((item) => item.path.endsWith("/reset-password"))).toHaveLength(1)
+  expect(fixture.requests.filter((item) => item.path.endsWith("/revoke-sessions"))).toHaveLength(1)
+  await page.screenshot({ path: testInfo.outputPath("ordinary-admin-user.png"), fullPage: true })
+})
+
+for (const targetType of ["admin", "super_admin"] as const) {
+  test(`ordinary admin can only view ${targetType} accounts`, async ({ page }, testInfo) => {
+    const fixture = await prepare(page, { targetType })
+    await page.goto("/admin/users")
+    await expect(page.getByRole("button", { name: "配置测试用户", exact: true })).toHaveCount(0)
+    await page.getByRole("button", { name: "查看测试用户", exact: true }).click()
+    const dialog = page.getByRole("dialog")
+    await expect(dialog.getByLabel("VIP 用户")).toBeDisabled()
+    await expect(dialog.getByLabel("账号启用")).toBeDisabled()
+    await expect(dialog.getByRole("button", { name: "保存配置", exact: true })).toHaveCount(0)
+    await expect(dialog.getByRole("button", { name: "重置密码", exact: true })).toHaveCount(0)
+    await expect(dialog.getByRole("button", { name: "退出全部会话", exact: true })).toHaveCount(0)
+    expect(fixture.requests.filter((item) => item.method === "POST" || item.method === "PATCH")).toEqual([])
+    await page.screenshot({ path: testInfo.outputPath("readonly-administrator.png"), fullPage: true })
+  })
+}
+
+test("fixed admin login accepts an account name and protects its enabled state and type", async ({
+  page,
+}, testInfo) => {
+  const fixture = await prepare(page, { authenticated: false, superAdministrator: true, targetType: "super_admin" })
+  await page.goto("/admin")
+  await page.getByLabel("账号或手机号", { exact: true }).fill("admin")
+  await page.getByLabel("密码", { exact: true }).fill("test-only-initial-password")
+  await page.getByRole("button", { name: "登录", exact: true }).click()
+  await expect(page.getByRole("heading", { name: "用户管理", exact: true })).toBeVisible()
+  const login = fixture.requests.find((item) => item.path === "/api/auth/login")!
+  expect(JSON.parse(login.body).phone).toBe("admin")
+  await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.getByLabel("用户类型", { exact: true })).toHaveValue("super_admin")
+  await expect(dialog.getByLabel("用户类型", { exact: true })).toBeDisabled()
+  await expect(dialog.getByLabel("账号启用")).toBeDisabled()
+  await expect(dialog.getByLabel("VIP 用户")).not.toBeChecked()
+  await expect(dialog.getByRole("button", { name: "重置密码", exact: true })).toBeEnabled()
+  await page.screenshot({ path: testInfo.outputPath("protected-super-admin.png"), fullPage: true })
+})
+
+test("losing super admin privileges removes assignment from an already open form", async ({ page }) => {
+  const fixture = await prepare(page, { superAdministrator: true })
+  await page.goto("/admin/users")
+  await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
+  const dialog = page.getByRole("dialog")
+  await dialog.getByLabel("用户类型", { exact: true }).selectOption("admin")
+  fixture.user.userType = "admin"
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")))
+  await expect(dialog.getByLabel("用户类型", { exact: true })).toBeDisabled()
+  await expect(dialog.getByLabel("用户类型", { exact: true })).toHaveValue("user")
+  await dialog.getByLabel("VIP 用户").check()
+  await dialog.getByRole("button", { name: "保存配置", exact: true }).click()
+  const patch = fixture.requests.find((item) => item.method === "PATCH")!
+  expect(JSON.parse(patch.body).userType).toBe("user")
+})
+
+test("a user promoted elsewhere becomes read-only after a rejected stale update", async ({ page }) => {
+  const fixture = await prepare(page)
+  await page.goto("/admin/users")
+  await page.getByRole("button", { name: "配置测试用户", exact: true }).click()
+  const dialog = page.getByRole("dialog")
+  await expect(dialog.getByLabel("VIP 用户")).toBeEnabled()
+  fixture.managed.userType = "admin"
+  await page.route("**/api/admin/users/7", (route) =>
+    route.request().method() === "PATCH"
+      ? route.fulfill({ status: 403, json: { code: 403, message: "普通管理员只能操作普通用户，不能操作管理员账号" } })
+      : route.fallback(),
+  )
+  await dialog.getByLabel("VIP 用户").check()
+  await dialog.getByRole("button", { name: "保存配置", exact: true }).click()
+  await expect(dialog.getByLabel("用户类型", { exact: true })).toHaveValue("admin")
+  await expect(dialog.getByLabel("VIP 用户")).toBeDisabled()
+  await expect(dialog.getByRole("button", { name: "保存配置", exact: true })).toHaveCount(0)
+  await expect(dialog.getByRole("button", { name: "重置密码", exact: true })).toHaveCount(0)
 })

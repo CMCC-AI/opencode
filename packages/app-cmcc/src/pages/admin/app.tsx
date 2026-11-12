@@ -46,7 +46,7 @@ export default function AdminApp() {
                 <h1>DeepInsight 管理平台</h1>
                 <form onSubmit={submit}>
                   <label>
-                    手机号
+                    账号或手机号
                     <input
                       autocomplete="username"
                       required
@@ -77,7 +77,7 @@ export default function AdminApp() {
           }
         >
           <Show
-            when={dockapi.user?.userType === "admin"}
+            when={dockapi.user?.userType === "admin" || dockapi.user?.userType === "super_admin"}
             fallback={
               <main class="admin-gate">
                 <h1>当前账号无管理权限</h1>

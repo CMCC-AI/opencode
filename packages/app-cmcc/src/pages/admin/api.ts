@@ -1,4 +1,4 @@
-import type { useDockApi } from "@/context/dockapi"
+import type { DockApiUser, useDockApi } from "@/context/dockapi"
 import type { TokenQuotaSnapshot } from "@/utils/token-quota"
 import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
 
@@ -7,7 +7,7 @@ export type ManagedUser = {
   name: string
   phone: string
   enabled: boolean
-  userType: "user" | "admin"
+  userType: "user" | "admin" | "super_admin"
   vip: boolean
   caseManagementGranted: boolean
   caseManagementAllowed: boolean
@@ -31,6 +31,14 @@ export type ManagedCase = {
 export type ManagedPage<T> = { items: T[]; total: number; page: number; size: number }
 export type CaseCategory = { code: string; label: string }
 export type UserConfiguration = Pick<ManagedUser, "userType" | "vip" | "enabled" | "caseManagementGranted">
+
+export function canManageUser(actor: DockApiUser["userType"], target: ManagedUser["userType"]) {
+  return actor === "super_admin" || (actor === "admin" && target === "user")
+}
+
+export function userTypeLabel(type: ManagedUser["userType"]) {
+  return { user: "普通用户", admin: "管理员", super_admin: "超级管理员" }[type]
+}
 
 export function queryPath(path: string, input: Record<string, string | number | boolean | undefined>) {
   const params = new URLSearchParams()

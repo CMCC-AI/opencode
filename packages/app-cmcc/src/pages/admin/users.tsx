@@ -1,8 +1,8 @@
 import { For, Show, createEffect, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
-import { useDockApi } from "@/context/dockapi"
+import { DockApiError, useDockApi } from "@/context/dockapi"
 import type { TokenQuotaSnapshot } from "@/utils/token-quota"
-import { managementApi, type ManagedUser, type UserConfiguration } from "./api"
+import { canManageUser, managementApi, userTypeLabel, type ManagedUser, type UserConfiguration } from "./api"
 import { AdminError, AdminModal, Pagination, ToolButton, formatAdminTime } from "./shared"
 
 export function AdminUsers() {
@@ -69,7 +69,7 @@ export function AdminUsers() {
         <input
           type="search"
           aria-label="搜索用户"
-          placeholder="姓名或手机号"
+          placeholder="姓名、账号或手机号"
           value={state.keyword}
           onInput={(event) => setState({ keyword: event.currentTarget.value, page: 1 })}
         />
@@ -81,6 +81,7 @@ export function AdminUsers() {
           <option value="">全部类型</option>
           <option value="user">普通用户</option>
           <option value="admin">管理员</option>
+          <option value="super_admin">超级管理员</option>
         </select>
         <select
           aria-label="VIP筛选"
@@ -116,7 +117,7 @@ export function AdminUsers() {
           <thead>
             <tr>
               <th>用户</th>
-              <th>手机号</th>
+              <th>账号／手机号</th>
               <th>用户类型</th>
               <th>VIP</th>
               <th>案例权限</th>
@@ -134,7 +135,7 @@ export function AdminUsers() {
                     <small>#{user.id}</small>
                   </td>
                   <td>{user.phone}</td>
-                  <td>{user.userType === "admin" ? "管理员" : "普通用户"}</td>
+                  <td>{userTypeLabel(user.userType)}</td>
                   <td>{user.vip ? "VIP" : "--"}</td>
                   <td>{user.caseManagementAllowed ? "全局" : "无"}</td>
                   <td>
@@ -145,8 +146,8 @@ export function AdminUsers() {
                   <td>{formatAdminTime(user.createdAt)}</td>
                   <td>
                     <ToolButton
-                      label={`配置${user.name}`}
-                      icon="edit-small-2"
+                      label={`${canManageUser(dockapi.user?.userType, user.userType) ? "配置" : "查看"}${user.name}`}
+                      icon={canManageUser(dockapi.user?.userType, user.userType) ? "edit-small-2" : "eye"}
                       onClick={() => setState("selected", user)}
                     />
                   </td>
@@ -191,6 +192,7 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
   const api = managementApi(dockapi)
   const [state, setState] = createStore({
     userType: props.user.userType,
+    persistedType: props.user.userType,
     vip: props.user.vip,
     enabled: props.user.enabled,
     caseManagementGranted: props.user.caseManagementGranted,
@@ -204,6 +206,13 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
     action: "" as "" | "revoke" | "password",
   })
   let active = true
+  const editable = () => canManageUser(dockapi.user?.userType, state.persistedType)
+  const assignable = () => dockapi.user?.userType === "super_admin" && state.persistedType !== "super_admin"
+  const protectedAccount = () => state.persistedType === "super_admin"
+  createEffect(() => {
+    if (!assignable()) setState("userType", state.persistedType)
+    if (!editable()) setState({ action: "", password: "" })
+  })
   onCleanup(() => {
     active = false
   })
@@ -218,13 +227,15 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
         if (active) setState("quotaError", error instanceof Error ? error.message : "额度读取失败")
       })
   }
-  onMount(() => {
-    void api
+  const loadUser = () => {
+    setState("loading", true)
+    return api
       .user(props.user.id)
       .then((value) => {
         if (active)
           setState({
             userType: value.userType,
+            persistedType: value.userType,
             vip: value.vip,
             enabled: value.enabled,
             caseManagementGranted: value.caseManagementGranted,
@@ -236,11 +247,14 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
       .finally(() => {
         if (active) setState("loading", false)
       })
+  }
+  onMount(() => {
+    void loadUser()
     quota()
   })
   const save = async (event: SubmitEvent) => {
     event.preventDefault()
-    if (state.pending || state.loading) return
+    if (state.pending || state.loading || !editable()) return
     setState({ pending: true, error: "", notice: "" })
     const input: UserConfiguration = {
       userType: state.userType,
@@ -254,12 +268,13 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
       if (active) props.onSaved()
     } catch (error) {
       if (active) setState("error", error instanceof Error ? error.message : "保存失败")
+      if (active && error instanceof DockApiError && error.status === 403) void loadUser()
     } finally {
       if (active) setState("pending", false)
     }
   }
   const confirm = async () => {
-    if (state.pending) return
+    if (state.pending || !editable()) return
     setState({ pending: true, error: "", notice: "" })
     try {
       if (state.action === "password") await api.resetPassword(props.user.id, state.password)
@@ -271,6 +286,7 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
       if (active) setState({ action: "", password: "", notice: "操作成功，原登录会话已失效" })
     } catch (error) {
       if (active) setState("error", error instanceof Error ? error.message : "操作失败")
+      if (active && error instanceof DockApiError && error.status === 403) void loadUser()
     } finally {
       if (active) setState("pending", false)
     }
@@ -288,16 +304,20 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
               {state.notice}
             </p>
           </Show>
-          <fieldset disabled={state.pending || state.loading}>
+          <fieldset disabled={state.pending || state.loading || !editable()}>
             <label>
               用户类型
               <select
                 aria-label="用户类型"
+                disabled={!assignable()}
                 value={state.userType}
                 onChange={(event) => setState("userType", event.currentTarget.value as ManagedUser["userType"])}
               >
                 <option value="user">普通用户</option>
                 <option value="admin">管理员</option>
+                <Show when={protectedAccount()}>
+                  <option value="super_admin">超级管理员</option>
+                </Show>
               </select>
             </label>
             <label class="admin-check">
@@ -312,6 +332,7 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
               <input
                 type="checkbox"
                 checked={state.enabled}
+                disabled={protectedAccount()}
                 onChange={(event) => setState("enabled", event.currentTarget.checked)}
               />
               账号启用
@@ -362,67 +383,79 @@ function UserEditor(props: { user: ManagedUser; onClose: () => void; onSaved: ()
               )}
             </Show>
           </section>
-          <section class="admin-form-section">
-            <h3>账号安全</h3>
-            <div class="admin-actions">
-              <button
-                type="button"
-                disabled={state.pending}
-                onClick={() => setState({ action: "password", password: "", error: "" })}
-              >
-                重置密码
-              </button>
-              <button type="button" disabled={state.pending} onClick={() => setState({ action: "revoke", error: "" })}>
-                退出全部会话
-              </button>
-            </div>
-            <Show when={state.action}>
-              <div class="admin-confirm">
-                <p>
-                  {state.action === "password"
-                    ? "重置密码将使该用户全部原登录失效。"
-                    : "确定退出该用户全部登录会话吗？"}
-                </p>
-                <Show when={state.action === "password"}>
-                  <label>
-                    新密码
-                    <input
-                      type="password"
-                      autocomplete="new-password"
-                      minlength={6}
-                      maxlength={32}
-                      value={state.password}
-                      onInput={(event) => setState("password", event.currentTarget.value)}
-                    />
-                  </label>
-                </Show>
-                <div class="admin-actions">
-                  <button type="button" disabled={state.pending} onClick={() => setState({ action: "", password: "" })}>
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    class="danger"
-                    disabled={
-                      state.pending ||
-                      (state.action === "password" && (state.password.length < 6 || state.password.length > 32))
-                    }
-                    onClick={() => void confirm()}
-                  >
-                    确认操作
-                  </button>
-                </div>
+          <Show when={editable()}>
+            <section class="admin-form-section">
+              <h3>账号安全</h3>
+              <div class="admin-actions">
+                <button
+                  type="button"
+                  disabled={state.pending}
+                  onClick={() => setState({ action: "password", password: "", error: "" })}
+                >
+                  重置密码
+                </button>
+                <button
+                  type="button"
+                  disabled={state.pending}
+                  onClick={() => setState({ action: "revoke", error: "" })}
+                >
+                  退出全部会话
+                </button>
               </div>
-            </Show>
-          </section>
+              <Show when={state.action}>
+                <div class="admin-confirm">
+                  <p>
+                    {state.action === "password"
+                      ? "重置密码将使该用户全部原登录失效。"
+                      : "确定退出该用户全部登录会话吗？"}
+                  </p>
+                  <Show when={state.action === "password"}>
+                    <label>
+                      新密码
+                      <input
+                        type="password"
+                        autocomplete="new-password"
+                        minlength={6}
+                        maxlength={32}
+                        value={state.password}
+                        onInput={(event) => setState("password", event.currentTarget.value)}
+                      />
+                    </label>
+                  </Show>
+                  <div class="admin-actions">
+                    <button
+                      type="button"
+                      disabled={state.pending}
+                      onClick={() => setState({ action: "", password: "" })}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      class="danger"
+                      disabled={
+                        state.pending ||
+                        (state.action === "password" && (state.password.length < 6 || state.password.length > 32))
+                      }
+                      onClick={() => void confirm()}
+                    >
+                      确认操作
+                    </button>
+                  </div>
+                </div>
+              </Show>
+            </section>
+          </Show>
         </div>
         <footer>
           <button type="button" disabled={state.pending} onClick={props.onClose}>
             取消
           </button>
-          <button class="primary" disabled={state.pending || state.loading}>
-            {state.pending ? "处理中..." : "保存配置"}
-          </button>
+          <Show when={editable()}>
+            <button class="primary" disabled={state.pending || state.loading}>
+              {state.pending ? "处理中..." : "保存配置"}
+            </button>
+          </Show>
         </footer>
       </form>
     </AdminModal>

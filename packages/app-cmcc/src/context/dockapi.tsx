@@ -34,7 +34,7 @@ export type DockApiUser = {
   phone: string
   enabled: boolean
   casePublishAllowed: boolean
-  userType?: "user" | "admin"
+  userType?: "user" | "admin" | "super_admin"
   vip?: boolean
   caseManagementAllowed?: boolean
   caseDeleteAllowed?: boolean

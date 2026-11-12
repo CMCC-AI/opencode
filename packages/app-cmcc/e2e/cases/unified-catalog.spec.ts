@@ -244,3 +244,33 @@ test("non-publishers cannot manage either case source and old links still open",
   await page.getByRole("button", { name: "返回案例集", exact: true }).click()
   await expect(page).toHaveURL(/\/cases$/)
 })
+
+test("super admin keeps the business admin entry and case permissions", async ({ page }) => {
+  await setup(page)
+  await page.route("**/api/user/profile", (route) =>
+    route.fulfill({
+      json: {
+        code: 200,
+        data: {
+          user: {
+            id: 9,
+            name: "超级管理员",
+            phone: "admin",
+            enabled: true,
+            userType: "super_admin",
+            vip: false,
+            casePublishAllowed: true,
+            caseManagementAllowed: true,
+            caseDeleteAllowed: true,
+          },
+          workspace: { id: 9, workspaceKey: "home-sizing-test", directoryPath: "C:/home-sizing-test", status: "READY" },
+        },
+      },
+    }),
+  )
+  await page.goto("/cases")
+  await expect(page.getByRole("button", { name: "案例维护", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "删除案例 深度案例", exact: true })).toBeVisible()
+  await page.getByRole("button", { name: /超级管理员/ }).click()
+  await expect(page.getByRole("menuitem", { name: "管理平台", exact: true })).toBeVisible()
+})
