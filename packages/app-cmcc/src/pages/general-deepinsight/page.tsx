@@ -1,7 +1,7 @@
 import { createEffect, createMemo, For, lazy, onCleanup, Show, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
-import { Icon } from "@opencode-ai/ui/icon"
+import { CasePublishForm } from "@/components/case-publish-dialog"
 import { useDockApi } from "@/context/dockapi"
 import { useLayout } from "@/context/layout"
 import { useTabs } from "@/context/tabs"
@@ -18,7 +18,7 @@ import {
 } from "./model"
 import { ResearchResultView } from "./result-view"
 import { useResearchHome } from "./research-home"
-import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
+import { CMCC_CASES_UPDATED_EVENT, cmccCaseCategoryByCode } from "@/utils/cmcc-cases"
 import { takeResearchCase, takeResearchDraft } from "./handoff"
 import "./research.css"
 import "./home-composer.css"
@@ -48,9 +48,6 @@ export default function ResearchPage() {
     countdown: 60,
     edit: false,
     publish: false,
-    caseName: "",
-    caseDescription: "",
-    cover: undefined as File | undefined,
     tick: Date.now(),
     small: window.matchMedia("(max-width:767px)").matches,
   })
@@ -226,7 +223,7 @@ export default function ResearchPage() {
   createEffect(() => {
     if (search.publish !== "1" || !state.detail || !completed() || readOnly() || !dockapi.user?.casePublishAllowed)
       return
-    setState({ publish: true, caseName: state.detail.session.title })
+    setState("publish", true)
     setSearch({ publish: undefined }, { replace: true })
   })
   // History rename/delete refreshes only this product; it never reloads the whole app.
@@ -345,19 +342,6 @@ export default function ResearchPage() {
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
-  const publish = () =>
-    action(async () => {
-      if (!state.cover) throw new Error("请选择案例封面")
-      const form = new FormData()
-      form.append("caseName", state.caseName)
-      form.append("caseDescription", state.caseDescription)
-      form.append("coverFile", state.cover)
-      await request(`/cases/from-session/${params.id}`, { method: "POST", body: form })
-      setState("publish", false)
-      dockapi.cases.invalidate()
-      window.dispatchEvent(new Event(CMCC_CASES_UPDATED_EVENT))
-      showToast({ title: "案例已发布", variant: "success" })
-    })
   const interrupt = () => (
     <div class="chat-input-container plan-card-host">
       <div class="interrupt-card plan-confirmation-card">
@@ -521,50 +505,23 @@ export default function ResearchPage() {
           }
         />
       </Show>
-      <Show when={state.publish}>
-        <div class="research-modal-backdrop">
-          <section class="research-modal" role="dialog" aria-modal="true" aria-label="发布研究案例">
-            <header>
-              <h2>添加至案例库</h2>
-              <button title="关闭" disabled={state.busy} onClick={() => setState("publish", false)}>
-                <Icon name="close" />
-              </button>
-            </header>
-            <label>
-              案例名称
-              <input
-                value={state.caseName}
-                maxLength={255}
-                onInput={(event) => setState("caseName", event.currentTarget.value)}
-              />
-            </label>
-            <label>
-              案例说明
-              <textarea
-                value={state.caseDescription}
-                maxLength={255}
-                onInput={(event) => setState("caseDescription", event.currentTarget.value)}
-              />
-            </label>
-            <label>
-              案例封面
-              <input
-                type="file"
-                accept="image/png,image/jpeg"
-                onChange={(event) => setState("cover", event.currentTarget.files?.[0])}
-              />
-            </label>
-            <div class="research-actions">
-              <button
-                class="primary"
-                disabled={state.busy || !state.cover || !state.caseName.trim()}
-                onClick={() => void publish()}
-              >
-                确认发布
-              </button>
-            </div>
-          </section>
-        </div>
+      <Show when={state.publish && state.detail && !readOnly() && dockapi.user?.casePublishAllowed}>
+        <CasePublishForm
+          caseName={state.detail!.session.title}
+          caseTag={cmccCaseCategoryByCode("deep-research")!.label}
+          fixedCategory
+          coverAccept="image/png,image/jpeg"
+          maxCoverBytes={6 * 1024 * 1024}
+          onPublish={async (input) => {
+            const form = new FormData()
+            form.append("caseName", input.caseName)
+            form.append("coverFile", input.coverFile)
+            await request(`/cases/from-session/${params.id}`, { method: "POST", body: form })
+            dockapi.cases.invalidate()
+            window.dispatchEvent(new Event(CMCC_CASES_UPDATED_EVENT))
+          }}
+          onClose={() => setState("publish", false)}
+        />
       </Show>
     </div>
   )
