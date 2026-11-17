@@ -123,8 +123,11 @@ assert_not_contains "$deployer_source" "--insecure"
 assert_contains "$deployer_source" 'upload_quota_config'
 assert_contains "$deployer_source" 'unset OPENCODE_DOCKAPI_QUOTA_ENABLED OPENCODE_DOCKAPI_URL DOCKAPI_QUOTA_SERVICE_TOKEN'
 assert_contains "$installer_source" 'quota_resolve "$quota_input" /etc/opencode-cmcc/quota.env /etc/opencode-cmcc/opencode.env'
-assert_contains "$installer_source" 'systemctl reload nginx'
-assert_contains "$installer_source" 'nginx -t'
-assert_contains "$installer_source" '$release_dir/web/index.html'
+assert_not_contains "$installer_source" 'nginx'
+assert_not_contains "$installer_source" '$release_dir/web'
+assert_not_contains "$installer_source" '$target/web'
+assert_not_contains "$deployer_source" '/web'
+assert_not_contains "$deployer_source" 'static-ui.mjs'
+assert_not_contains "$deployer_source" 'admin-headers.conf'
 
 echo "install-single-server tests passed"

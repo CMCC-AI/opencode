@@ -15,16 +15,26 @@ let workspace
 
 before(async () => {
   workspace = await mkdtemp(path.join(tmpdir(), "opencode-deploy-quota-test-"))
-  for (const directory of ["script/deploy", "mock-bin", ".deploy", ".opencode/experts", ".opencode/skills", "packages/opencode/dist/opencode-linux-x64-baseline/bin", "packages/opencode/dist/opencode-linux-x64-baseline/web"])
+  for (const directory of [
+    "script/deploy",
+    "mock-bin",
+    ".deploy",
+    ".opencode/experts",
+    ".opencode/skills",
+    "packages/opencode/dist/opencode-linux-x64-baseline/bin",
+  ])
     await mkdir(path.join(workspace, directory), { recursive: true })
-  for (const file of ["deploy_to_server.sh", "script/deploy/install-single-server.sh", "script/deploy/quota-env.sh", "script/deploy/opencode-cmcc.jsonc"])
+  for (const file of [
+    "deploy_to_server.sh",
+    "script/deploy/install-single-server.sh",
+    "script/deploy/quota-env.sh",
+    "script/deploy/opencode-cmcc.jsonc",
+  ])
     await copyFile(path.join(root, file), path.join(workspace, file))
   const binary = "packages/opencode/dist/opencode-linux-x64-baseline"
   await writeFile(path.join(workspace, binary, "bin/opencode"), "test-only OpenCode binary\n")
   await writeFile(path.join(workspace, binary, "bin/deepxiv-proxy"), "test-only proxy binary\n")
   await writeFile(path.join(workspace, binary, "DEEPXIV_URL"), "http://public.invalid:3100/\n")
-  await writeFile(path.join(workspace, binary, "web/index.html"), "<html>test-only frontend</html>\n")
-  await writeFile(path.join(workspace, binary, "web/admin-headers.conf"), "add_header X-Content-Type-Options nosniff;\n")
   const mock = `#!/usr/bin/env bash
 set -euo pipefail
 command_name=\${0##*/}
@@ -68,7 +78,12 @@ async function deploy(name, options = {}) {
   const installed = path.join(workspace, `${name}.installed.log`)
   await writeFile(log, "")
   const env = { ...process.env }
-  for (const key of ["OPENCODE_QUOTA_ENV_FILE", "OPENCODE_DOCKAPI_QUOTA_ENABLED", "OPENCODE_DOCKAPI_URL", "DOCKAPI_QUOTA_SERVICE_TOKEN"])
+  for (const key of [
+    "OPENCODE_QUOTA_ENV_FILE",
+    "OPENCODE_DOCKAPI_QUOTA_ENABLED",
+    "OPENCODE_DOCKAPI_URL",
+    "DOCKAPI_QUOTA_SERVICE_TOKEN",
+  ])
     delete env[key]
   Object.assign(env, {
     DEPLOY_HOST: "test-user@deployment.invalid",
@@ -87,12 +102,21 @@ async function deploy(name, options = {}) {
     MOCK_DELTA: options.delta ? "1" : "0",
     ...options.env,
   })
-  const task = run(bash, ["--noprofile", "--norc", "-c", `
+  const task = run(
+    bash,
+    [
+      "--noprofile",
+      "--norc",
+      "-c",
+      `
 export PATH=/usr/bin:/bin:$PATH
 if command -v cygpath >/dev/null 2>&1; then MOCK_BIN=$(cygpath -u "$MOCK_BIN"); fi
 export PATH="$MOCK_BIN:$PATH"
 exec bash --noprofile --norc ./deploy_to_server.sh
-`], { cwd: workspace, env, windowsHide: true, timeout: 180000, maxBuffer: 1024 * 1024 })
+`,
+    ],
+    { cwd: workspace, env, windowsHide: true, timeout: 180000, maxBuffer: 1024 * 1024 },
+  )
   task.child.stdin.end()
   const result = await task
   const commands = await readFile(log, "utf8")
@@ -103,22 +127,63 @@ exec bash --noprofile --norc ./deploy_to_server.sh
 
 async function assertBundleHasNoSecret(name) {
   const archive = path.join(workspace, ".deploy", `opencode-cmcc-${name}-x86_64.tar.gz`)
-  const task = run(bash, ["--noprofile", "--norc", "-c", `
+  const task = run(
+    bash,
+    [
+      "--noprofile",
+      "--norc",
+      "-c",
+      `
 export PATH=/usr/bin:/bin:$PATH
 if command -v cygpath >/dev/null 2>&1; then QUOTA_TEST_ARCHIVE=$(cygpath -u "$QUOTA_TEST_ARCHIVE"); fi
 tar --force-local -xOzf "$QUOTA_TEST_ARCHIVE"
-`], {
-    env: { ...process.env, QUOTA_TEST_ARCHIVE: archive }, windowsHide: true, timeout: 30000, maxBuffer: 2 * 1024 * 1024,
-  })
+`,
+    ],
+    {
+      env: { ...process.env, QUOTA_TEST_ARCHIVE: archive },
+      windowsHide: true,
+      timeout: 30000,
+      maxBuffer: 2 * 1024 * 1024,
+    },
+  )
   task.child.stdin.end()
   const result = await task
   assert.ok(!result.stdout.includes(secret), "the secret was included in an offline bundle")
   assert.match(result.stdout, /quota_validate/)
 }
 
+test("deployment packages the embedded frontend without a separate web directory", async () => {
+  const result = await deploy("proxy-frontend", { env: { DEPLOY_BUILD_ONLY: "1" } })
+  assert.match(result.stdout, /Creating offline bundle/)
+  const archive = path.join(workspace, ".deploy", "opencode-cmcc-proxy-frontend-x86_64.tar.gz")
+  const task = run(
+    bash,
+    [
+      "--noprofile",
+      "--norc",
+      "-c",
+      `
+export PATH=/usr/bin:/bin:$PATH
+if command -v cygpath >/dev/null 2>&1; then QUOTA_TEST_ARCHIVE=$(cygpath -u "$QUOTA_TEST_ARCHIVE"); fi
+tar --force-local -tzf "$QUOTA_TEST_ARCHIVE"
+`,
+    ],
+    { env: { ...process.env, QUOTA_TEST_ARCHIVE: archive }, windowsHide: true, timeout: 30000 },
+  )
+  task.child.stdin.end()
+  const contents = (await task).stdout
+  assert.match(contents, /^\.\/opencode$/m)
+  assert.ok(!contents.includes("web/"))
+  assert.ok(!contents.includes("admin-headers.conf"))
+  assert.ok(!result.commands.includes("ssh "))
+})
+
 test("bundle deployment uploads private quota config over SSH stdin, not in the bundle", async () => {
   const file = path.join(workspace, ".deploy", "quota.env")
-  await writeFile(file, `OPENCODE_DOCKAPI_QUOTA_ENABLED=true\nOPENCODE_DOCKAPI_URL=http://127.0.0.1:8081\nDOCKAPI_QUOTA_SERVICE_TOKEN=${secret}\n`)
+  await writeFile(
+    file,
+    `OPENCODE_DOCKAPI_QUOTA_ENABLED=true\nOPENCODE_DOCKAPI_URL=http://127.0.0.1:8081\nDOCKAPI_QUOTA_SERVICE_TOKEN=${secret}\n`,
+  )
   const result = await deploy("quota-bundle")
   assert.match(await readFile(result.capture, "utf8"), /OPENCODE_DOCKAPI_QUOTA_ENABLED="true"/)
   assert.ok((await readFile(result.capture, "utf8")).includes(secret))
@@ -144,12 +209,14 @@ test("absent local settings preserve server quota configuration", async () => {
 })
 
 test("explicit environment enables quota and build-only artifacts still contain no secret", async () => {
-  const result = await deploy("quota-offline", { env: {
-    DEPLOY_BUILD_ONLY: "1",
-    OPENCODE_DOCKAPI_QUOTA_ENABLED: "true",
-    OPENCODE_DOCKAPI_URL: "http://dockapi.internal:8081",
-    DOCKAPI_QUOTA_SERVICE_TOKEN: secret,
-  } })
+  const result = await deploy("quota-offline", {
+    env: {
+      DEPLOY_BUILD_ONLY: "1",
+      OPENCODE_DOCKAPI_QUOTA_ENABLED: "true",
+      OPENCODE_DOCKAPI_URL: "http://dockapi.internal:8081",
+      DOCKAPI_QUOTA_SERVICE_TOKEN: secret,
+    },
+  })
   assert.ok(!result.commands.includes("ssh "))
   assert.match(result.stdout, /Quota secrets are not included/)
   await assertBundleHasNoSecret("quota-offline")
@@ -157,7 +224,11 @@ test("explicit environment enables quota and build-only artifacts still contain 
 
 test("invalid or missing explicit quota configuration fails before any SSH call", async () => {
   for (const env of [
-    { OPENCODE_DOCKAPI_QUOTA_ENABLED: "true", OPENCODE_DOCKAPI_URL: "http://localhost:8081", DOCKAPI_QUOTA_SERVICE_TOKEN: "short" },
+    {
+      OPENCODE_DOCKAPI_QUOTA_ENABLED: "true",
+      OPENCODE_DOCKAPI_URL: "http://localhost:8081",
+      DOCKAPI_QUOTA_SERVICE_TOKEN: "short",
+    },
     { OPENCODE_QUOTA_ENV_FILE: path.join(workspace, "absent.env") },
   ]) {
     await assert.rejects(deploy("quota-invalid", { env }))

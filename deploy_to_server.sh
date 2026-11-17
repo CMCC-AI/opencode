@@ -241,12 +241,6 @@ if [[ ${DEPLOY_SKIP_BUILD:-0} != 1 ]]; then
     --outfile="$root/packages/opencode/dist/$target/bin/deepxiv-proxy" \
     "$root/packages/app-cmcc/scripts/run-deepxiv-proxy.ts"
   printf '%s\n' "$deepxiv_url" >"$root/packages/opencode/dist/$target/DEEPXIV_URL"
-  # Keep standalone static assets paired with the binary that embeds the same build.
-  install -d -m 0755 "$root/packages/opencode/dist/$target/web"
-  cp -a "$root/packages/app-cmcc/dist/." "$root/packages/opencode/dist/$target/web/"
-  bun "$root/script/deploy/static-ui.mjs" \
-    "$root/packages/opencode/dist/$target/web/index.html" \
-    "$root/packages/opencode/dist/$target/web/admin-headers.conf"
 fi
 
 if [[ ! -s $root/packages/opencode/dist/$target/bin/opencode ]]; then
@@ -255,10 +249,6 @@ if [[ ! -s $root/packages/opencode/dist/$target/bin/opencode ]]; then
 fi
 if [[ ! -s $root/packages/opencode/dist/$target/bin/deepxiv-proxy ]]; then
   echo "Missing build output: packages/opencode/dist/$target/bin/deepxiv-proxy" >&2
-  exit 1
-fi
-if [[ ! -s $root/packages/opencode/dist/$target/web/index.html || ! -s $root/packages/opencode/dist/$target/web/admin-headers.conf ]]; then
-  echo "Paired frontend assets are missing; rebuild without DEPLOY_SKIP_BUILD" >&2
   exit 1
 fi
 if [[ ! -f $root/packages/opencode/dist/$target/DEEPXIV_URL ]] || \
@@ -271,7 +261,6 @@ stage=$(mktemp -d "${TMPDIR:-/tmp}/opencode-cmcc.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 install -m 0755 "$root/packages/opencode/dist/$target/bin/opencode" "$stage/opencode"
 install -m 0755 "$root/packages/opencode/dist/$target/bin/deepxiv-proxy" "$stage/deepxiv-proxy"
-cp -a "$root/packages/opencode/dist/$target/web" "$stage/web"
 install -m 0755 "$root/script/deploy/install-single-server.sh" "$stage/install-single-server.sh"
 install -m 0644 "$root/script/deploy/quota-env.sh" "$stage/quota-env.sh"
 install -d -m 0755 "$stage/.opencode"
