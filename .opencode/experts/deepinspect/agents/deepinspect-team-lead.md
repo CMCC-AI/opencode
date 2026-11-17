@@ -275,7 +275,13 @@ permission:
 - `subagent_type`: `deepinspect/viz-specialist`
 - `prompt`: "workspace_dir: <path>\nresearch_topic: <主题>\ncurrent_date: <date>"（**不要描述图表/JSON 结构**——契约由 report-render 技能定义）
 
-阿绘会基于归并统计数据为报告生成图表，自己写入 `25-visual-report.json`（>8KB 分片时你用 `node <BASE>/scripts/assemble-parts.mjs <分片目录> <目标> <N> title,subtitle,hero_stats,sections` 组装）。主理人校验该文件可被 JSON 解析、非空 `sections`；不得把 task 返回内容重新整理、改写或另存为第二种 schema。
+阿绘会基于归并统计数据为报告生成图表，自己写入 `25-visual-report.json`（>8KB 分片时你用 `node <BASE>/scripts/assemble-parts.mjs <分片目录> <目标> <N> title,subtitle,hero_stats,sections` 组装）。主理人校验该文件可被 JSON 解析、非空 `sections`；不得把 task 返回内容重新整理、改写或另存为第二种 schema。校验后、进入渲染前**必跑机器自查（硬门）**（分片交付时在组装出整文件后执行）：
+
+```
+node .opencode/skills/chart-builder/scripts/build-charts.mjs --check <workspace>/25-visual-report.json
+```
+
+`failCount=0` 才进入渲染；有 `failures`/`malformed` → 把 errors 附进重派词责令 viz-specialist 修对应图表数据（最多 1 次）后重跑本命令；仍失败 → 记录缺口继续渲染（渲染闸门会规整+降级兜底），不阻塞交付。
 
 ### Phase 8b: HTML/PDF 渲染（薄壳渲染代理）
 

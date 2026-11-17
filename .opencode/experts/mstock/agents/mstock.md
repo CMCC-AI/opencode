@@ -231,6 +231,14 @@ ms-visualizer 会读 `20-comparison-report.md`，自己写入 `30-visual-report.
 - 包含 ≥4 个 `"type":"chart"` block
 - 第七章 section 有"明确投资建议"的 callout
 
+**机器自查（硬门，进入阶段 4 渲染前必做；分片交付时在 assemble-parts 组装出整文件后执行）**：
+
+```
+node .opencode/skills/chart-builder/scripts/build-charts.mjs --check <workspace>/30-visual-report.json
+```
+
+`failCount=0` 才进入阶段 4；有 `failures`/`malformed` → 把 errors 附进重派词责令 ms-visualizer 修对应图表数据（最多 1 次）后重跑本命令；仍失败 → 记录缺口继续渲染（渲染闸门规整+降级兜底），不阻塞交付。
+
 **JSON 解析失败兜底**：ms-visualizer 偶尔用 ```json 代码块包裹输出，去掉包裹再解析。连续 2 次失败则降级为单 section + 单 markdown block（content 为整份 `20-comparison-report.md`）。
 
 ## 阶段 4：HTML 渲染
