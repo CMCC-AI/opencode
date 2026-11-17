@@ -2,7 +2,14 @@ import { For, Show, createEffect, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { DockApiError, useDockApi } from "@/context/dockapi"
 import type { TokenQuotaSnapshot } from "@/utils/token-quota"
-import { canManageUser, managementApi, userTypeLabel, type ManagedUser, type UserConfiguration } from "./api"
+import {
+  canManageUser,
+  managementApi,
+  managementPageSize,
+  userTypeLabel,
+  type ManagedUser,
+  type UserConfiguration,
+} from "./api"
 import { AdminError, AdminModal, AdminSelect, Pagination, ToolButton, formatAdminTime } from "./shared"
 
 export function AdminUsers() {
@@ -34,7 +41,7 @@ export function AdminUsers() {
       enabled: state.enabled,
       caseManagementAllowed: state.cases,
       page: state.page,
-      size: 20,
+      size: managementPageSize,
     }
     state.revision
     dockapi.user?.id
@@ -44,7 +51,7 @@ export function AdminUsers() {
       .users(input)
       .then((result) => {
         if (current !== generation) return
-        const page = Math.max(1, Math.ceil(result.total / 20))
+        const page = Math.max(1, Math.ceil(result.total / input.size))
         if (input.page > page) {
           setState("page", page)
           return
@@ -172,7 +179,7 @@ export function AdminUsers() {
       </div>
       <Pagination
         page={state.page}
-        size={20}
+        size={managementPageSize}
         total={state.total}
         pending={state.loading}
         onChange={(page) => setState("page", page)}

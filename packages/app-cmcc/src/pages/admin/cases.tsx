@@ -1,7 +1,7 @@
 import { For, Show, createEffect, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useDockApi } from "@/context/dockapi"
-import { managementApi, type CaseCategory, type ManagedCase } from "./api"
+import { managementApi, managementPageSize, type CaseCategory, type ManagedCase } from "./api"
 import { AdminError, AdminModal, AdminSelect, Pagination, ToolButton, formatAdminTime } from "./shared"
 import "./admin.css"
 
@@ -46,7 +46,7 @@ export function CaseManagementPanel(props: { embedded?: boolean; onBack?: () => 
       category: state.category,
       publishStatus: state.status,
       page: state.page,
-      size: 24,
+      size: managementPageSize,
     }
     dockapi.user?.id
     state.revision
@@ -56,7 +56,7 @@ export function CaseManagementPanel(props: { embedded?: boolean; onBack?: () => 
       .cases(input)
       .then((value) => {
         if (current !== generation) return
-        const page = Math.max(1, Math.ceil(value.total / 24))
+        const page = Math.max(1, Math.ceil(value.total / input.size))
         if (input.page > page) {
           setState("page", page)
           return
@@ -198,7 +198,7 @@ export function CaseManagementPanel(props: { embedded?: boolean; onBack?: () => 
       </div>
       <Pagination
         page={state.page}
-        size={24}
+        size={managementPageSize}
         total={state.total}
         pending={state.loading}
         onChange={(page) => setState("page", page)}

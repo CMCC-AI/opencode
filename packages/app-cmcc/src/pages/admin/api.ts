@@ -2,6 +2,8 @@ import type { DockApiUser, useDockApi } from "@/context/dockapi"
 import type { TokenQuotaSnapshot } from "@/utils/token-quota"
 import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
 
+export const managementPageSize = 10
+
 export type ManagedUser = {
   id: number
   name: string

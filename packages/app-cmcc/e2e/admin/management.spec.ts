@@ -112,7 +112,7 @@ async function prepare(
         items: !term || managed.name.includes(term) || managed.phone.includes(term) ? [managed] : [],
         total: !term || managed.name.includes(term) || managed.phone.includes(term) ? 1 : 0,
         page: 1,
-        size: 20,
+        size: Number(url.searchParams.get("size")),
       })
     }
     if (path === "/api/admin/users/7/token-quota") {
@@ -150,7 +150,7 @@ async function prepare(
           (!url.searchParams.get("source") || item.source === url.searchParams.get("source")) &&
           (!url.searchParams.get("publishStatus") || item.publishStatus === url.searchParams.get("publishStatus")),
       )
-      return ok({ items, total: items.length, page: 1, size: 24 })
+      return ok({ items, total: items.length, page: 1, size: Number(url.searchParams.get("size")) })
     }
     const item = cases.find((item) => path.includes(`/case-management/${item.source}/${item.caseCode}`))
     if (item && path.endsWith("/cover"))
@@ -651,43 +651,134 @@ test("case filter and category popup work inside the native editor dialog", asyn
 })
 
 test("pagination and filter reset still load data after removing refresh actions", async ({ page }) => {
-  await prepare(page)
+  const fixture = await prepare(page)
+  const users = Array.from({ length: 21 }, (_, index) => ({
+    ...fixture.managed,
+    id: index + 100,
+    name: `分页用户${index + 1}`,
+    phone: `test-${index + 1}`,
+    vip: index % 2 === 0,
+  }))
   const pages: number[] = []
   await page.route(/\/api\/admin\/users(?:\?.*)?$/, (route) => {
-    const page = Number(new URL(route.request().url()).searchParams.get("page") ?? 1)
+    const params = new URL(route.request().url()).searchParams
+    const page = Number(params.get("page"))
+    const size = Number(params.get("size"))
+    expect(size).toBe(10)
     pages.push(page)
+    const items = users.filter((user) => params.get("vip") !== "true" || user.vip)
     return route.fulfill({
       json: {
         code: 200,
         data: {
-          items: Array.from({ length: page === 1 ? 20 : 1 }, (_, index) => ({
-            id: page * 100 + index,
-            name: `分页用户${index + 1}`,
-            phone: `test-${index + 1}`,
-            enabled: true,
-            userType: "user",
-            vip: false,
-            caseManagementAllowed: false,
-            caseManagementGranted: false,
-            caseDeleteAllowed: false,
-            createdAt: "2026-11-12T08:00:00",
-            updatedAt: "2026-11-12T08:00:00",
-          })),
-          total: 21,
+          items: items.slice((page - 1) * size, page * size),
+          total: items.length,
           page,
-          size: 20,
+          size,
         },
       },
     })
   })
   await page.goto("/admin/users")
-  await expect(page.locator("tbody tr")).toHaveCount(20)
+  await expect(page.locator("tbody tr")).toHaveCount(10)
+  await expect(page.locator(".admin-pagination")).toContainText("第 1 / 3 页")
+  await expect(page.getByRole("button", { name: "上一页", exact: true })).toBeDisabled()
+  await page.getByRole("button", { name: "下一页", exact: true }).click()
+  await expect(page.locator("tbody tr")).toHaveCount(10)
+  await expect(page.locator("tbody tr").first()).toContainText("分页用户11")
   await page.getByRole("button", { name: "下一页", exact: true }).click()
   await expect(page.locator("tbody tr")).toHaveCount(1)
+  await expect(page.locator(".admin-pagination")).toContainText("第 3 / 3 页")
+  await expect(page.getByRole("button", { name: "下一页", exact: true })).toBeDisabled()
   await choose(page, "VIP筛选", "VIP")
-  await expect(page.locator("tbody tr")).toHaveCount(20)
-  expect(pages.slice(-2)).toEqual([2, 1])
+  await expect(page.locator("tbody tr")).toHaveCount(10)
+  await expect(page.locator(".admin-pagination")).toContainText("第 1 / 2 页")
+  expect(pages.slice(-2)).toEqual([3, 1])
 })
+
+test("case management pages ten mixed-source cases and resets filters to the first page", async ({ page }) => {
+  const fixture = await prepare(page)
+  const cases = Array.from({ length: 21 }, (_, index) => ({
+    ...fixture.cases[index % 2],
+    caseCode: `case-${index + 1}`,
+    caseName: `分页案例${index + 1}`,
+  }))
+  const pages: number[] = []
+  await page.route(/\/api\/dockapi\/case-management(?:\?.*)?$/, (route) => {
+    const params = new URL(route.request().url()).searchParams
+    const page = Number(params.get("page"))
+    const size = Number(params.get("size"))
+    expect(size).toBe(10)
+    pages.push(page)
+    const items = cases.filter((item) => !params.get("source") || item.source === params.get("source"))
+    return route.fulfill({
+      json: {
+        code: 200,
+        data: { items: items.slice((page - 1) * size, page * size), total: items.length, page, size },
+      },
+    })
+  })
+  await page.goto("/admin/cases")
+  await expect(page.locator("tbody tr")).toHaveCount(10)
+  await expect(page.locator(".admin-pagination")).toContainText("第 1 / 3 页")
+  await page.getByRole("button", { name: "下一页", exact: true }).click()
+  await expect(page.locator("tbody tr").first()).toContainText("分页案例11")
+  await page.getByRole("button", { name: "下一页", exact: true }).click()
+  await expect(page.locator("tbody tr")).toHaveCount(1)
+  await expect(page.getByRole("button", { name: "下一页", exact: true })).toBeDisabled()
+  await choose(page, "案例来源筛选", "LangGraph")
+  await expect(page.locator("tbody tr")).toHaveCount(10)
+  await expect(page.locator(".admin-pagination")).toContainText("第 1 / 1 页")
+  expect(pages.slice(-2)).toEqual([3, 1])
+})
+
+for (const viewport of [
+  { width: 1440, height: 720 },
+  { width: 390, height: 780 },
+  { width: 320, height: 640 },
+]) {
+  for (const area of ["users", "cases"] as const) {
+    test(`${area} table scrolls without hiding pagination at ${viewport.width}px`, async ({ page }, testInfo) => {
+      await page.setViewportSize(viewport)
+      const fixture = await prepare(page)
+      const items = Array.from({ length: 10 }, (_, index) =>
+        area === "users"
+          ? { ...fixture.managed, id: index + 100, name: `滚动用户${index + 1}` }
+          : {
+              ...fixture.cases[index % 2],
+              caseCode: `scroll-${index + 1}`,
+              caseName: `滚动案例${index + 1}`,
+              caseDescription: "用于验证长说明的列表滚动，分页按钮应保持可见。".repeat(3),
+            },
+      )
+      const endpoint = area === "users" ? /\/api\/admin\/users(?:\?.*)?$/ : /\/api\/dockapi\/case-management(?:\?.*)?$/
+      await page.route(endpoint, (route) =>
+        route.fulfill({ json: { code: 200, data: { items, total: 10, page: 1, size: 10 } } }),
+      )
+      await page.goto(`/admin/${area}`)
+      await expect(page.locator("tbody tr")).toHaveCount(10)
+      const table = page.locator(".admin-table-wrap")
+      await expect.poll(() => table.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+      const footer = page.locator(".admin-pagination")
+      const bounds = await footer.boundingBox()
+      expect(bounds).not.toBeNull()
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height)
+      await table.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+      })
+      expect(await table.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+      await expect(page.locator("tbody tr").last()).toBeInViewport()
+      await expect(footer).toBeInViewport()
+      if (viewport.width < 768) {
+        await table.evaluate((element) => {
+          element.scrollLeft = element.scrollWidth
+        })
+        expect(await table.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
+      }
+      await page.screenshot({ path: testInfo.outputPath(`${area}-table-scroll.png`) })
+    })
+  }
+}
 
 test("user type VIP and enabled status are plain table text", async ({ page }, testInfo) => {
   const fixture = await prepare(page, { superAdministrator: true })
