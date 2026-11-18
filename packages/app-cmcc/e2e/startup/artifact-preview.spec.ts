@@ -109,6 +109,64 @@ async function openRight(page: Page) {
   await expect(page.getByRole("button", { name: /^产出/ })).toBeVisible()
 }
 
+test("general chat side panel keeps its actions and file preview at narrow widths", async ({ page, baseURL }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  const data = await setup(page)
+  data.files["report.md"].bytes = Buffer.from(
+    "## 研究材料整理\n\n### 分析步骤\n\n1. 核对输入材料和引用来源。\n2. 整理关键事实，标记待核对项。\n\n| 项目 | 状态 |\n| --- | --- |\n| 材料完整性 | 已核对 |\n| 引用来源 | 待复核 |",
+  )
+  await page.goto(data.href(baseURL!))
+  await openRight(page)
+  const panel = page.locator("#review-panel")
+  const artifact = panel.getByRole("button", { name: /^产出/ })
+  const toggle = page.getByRole("button", { name: "隐藏右栏" })
+  await panel.getByRole("button", { name: /^计划/ }).click()
+  await expect(panel.getByText("暂无计划", { exact: true })).toBeVisible()
+  await panel.getByRole("button", { name: "浏览器", exact: true }).click()
+  await expect(panel.getByRole("textbox", { name: "URL" })).toBeVisible()
+  await panel.getByRole("button", { name: /^审查/ }).click()
+  await expect(panel.getByRole("button", { name: /^审查/ })).toHaveAttribute("data-selected", "")
+  await artifact.click()
+  await panel.getByRole("button", { name: /report.md/ }).first().click()
+  const report = panel.getByRole("heading", { name: "研究材料整理", exact: true })
+  await expect(report).toBeVisible()
+  const baseline = process.env.CMCC_SIDE_PANEL_BASELINE === "1"
+  if (!baseline) {
+    await expect(toggle).toHaveCSS("border-radius", "8px")
+    await expect(toggle.locator("use")).toHaveAttribute("href", /#close$/)
+    await expect.poll(() => toggle.locator("svg").evaluate((el: SVGSVGElement) => el.getBBox().width)).toBeGreaterThan(0)
+    await expect(artifact).toHaveCSS("background-color", "rgb(237, 244, 255)")
+    await expect(artifact.locator(".cmcc-side-count")).toHaveCSS("border-radius", "999px")
+    await expect(panel.locator("[data-cmcc-artifact-tab][data-selected]")).toHaveCSS("border-radius", "8px")
+    await expect(panel.locator(".cmcc-side-preview")).toHaveCSS("background-color", "rgb(255, 255, 255)")
+  }
+  await panel.screenshot({ path: info.outputPath(baseline ? "right-panel-before.png" : "right-panel.png") })
+  const download = page.waitForEvent("download")
+  await panel.getByRole("button", { name: "下载", exact: true }).click()
+  expect(await readFile((await (await download).path())!)).toEqual(data.files["report.md"].bytes)
+  await page.setViewportSize({ width: 1024, height: 900 })
+  const divider = page.locator('[data-cmcc-general-chat] [role="separator"][aria-orientation="vertical"]')
+  const handle = (await divider.boundingBox())!
+  const width = (await panel.boundingBox())!.width
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(handle.x + handle.width / 2 + width - 300, handle.y + handle.height / 2, { steps: 8 })
+  await page.mouse.up()
+  await expect.poll(() => panel.evaluate((el) => el.clientWidth)).toBe(320)
+  await expect(report).toBeVisible()
+  const review = (await panel.getByRole("button", { name: /^审查/ }).boundingBox())!
+  expect(review.x + review.width).toBeLessThan((await toggle.boundingBox())!.x)
+  if (!baseline) await panel.screenshot({ path: info.outputPath("right-panel-narrow.png") })
+  await panel.getByRole("button", { name: "返回", exact: true }).click()
+  await expect(report).toHaveCount(0)
+  await toggle.click()
+  await expect(panel).toHaveAttribute("aria-hidden", "true")
+  if (!baseline) await expect(page.getByRole("button", { name: "展开右栏" }).locator("use")).toHaveAttribute("href", /#open$/)
+  await openRight(page)
+  expect(data.errors).toEqual([])
+})
+
 test("PDF renders original files without native reader chrome under strict frame CSP", async ({
   page,
   baseURL,

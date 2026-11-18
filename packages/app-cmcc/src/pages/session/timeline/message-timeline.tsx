@@ -1620,6 +1620,7 @@ export function MessageTimeline(props: {
                           <MenuV2.Trigger
                             as={IconButtonV2}
                             icon={<IconV2 name="outline-dots" />}
+                            data-slot="session-title-menu"
                             variant="ghost-muted"
                             size="large"
                             state={share.open || title.pendingShare ? "pressed" : undefined}

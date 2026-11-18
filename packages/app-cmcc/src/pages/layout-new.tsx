@@ -469,10 +469,10 @@ function CmccSidebar() {
                 />
               )} />
           </div>
-          <div class="cmcc-sidebar-footer mt-auto shrink-0 border-t px-3 py-3.5">
+          <div class="cmcc-sidebar-footer mt-auto shrink-0 border-t px-3 py-2">
             <DropdownMenu gutter={8} placement="top-start">
-              <DropdownMenu.Trigger aria-label={dockapi.user?.name || "账号菜单"} title={rail() ? dockapi.user?.name || "账号菜单" : undefined} class="cmcc-account-trigger mb-2 flex h-9 w-full min-w-0 items-center gap-2 rounded-[8px] px-2 text-14-medium">
-                <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-12-medium text-blue-700">
+              <DropdownMenu.Trigger aria-label={dockapi.user?.name || "账号菜单"} title={rail() ? dockapi.user?.name || "账号菜单" : undefined} class="cmcc-account-trigger flex h-9 w-full min-w-0 items-center gap-2 rounded-[8px] px-2 text-14-medium">
+                <span class="cmcc-account-avatar flex size-7 shrink-0 items-center justify-center rounded-full text-12-medium">
                   {dockapi.user?.name.slice(0, 1) || "用"}
                 </span>
                 <Show when={!rail()}>

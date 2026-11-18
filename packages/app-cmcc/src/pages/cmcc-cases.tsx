@@ -5,7 +5,6 @@ import { useNavigate } from "@solidjs/router"
 import type { DockApiCaseGroup, DockApiCatalogCaseSummary } from "@/context/dockapi"
 import { dockApiUrl, useDockApi } from "@/context/dockapi"
 import { CaseDeleteDialog } from "@/components/case-delete-dialog"
-import { CmccPageBackground } from "@/components/cmcc-page-background"
 import {
   CMCC_CASES_UPDATED_EVENT,
   CMCC_CASE_CATEGORIES,
@@ -247,17 +246,16 @@ export function CmccCasesRoute() {
 
   return (
     <Show when={state.maintenance && canManageCases()} fallback={
-    <main class="relative size-full overflow-x-hidden overflow-y-auto bg-[#fbfcff]" data-page="cmcc-cases"
+    <main class="relative size-full overflow-x-hidden overflow-y-auto bg-[var(--cmcc-home-background)]" data-page="cmcc-cases"
       onKeyDown={(event) => { if (event.key === "Escape" && state.opening) cancelOpening() }}>
-      <CmccPageBackground />
       <div class="relative mx-auto w-full max-w-[1320px] px-6 pb-12 pt-10 max-sm:px-4 max-sm:pt-6">
         <header class="relative z-30">
-          <h1 class="text-[30px] font-semibold leading-10 text-[#6d42ef]">精选案例</h1>
+          <h1 class="text-[30px] font-semibold leading-10 text-[#4d73b4]">精选案例</h1>
           <p class="mt-1 text-[17px] leading-7 text-[#596176] max-sm:text-[14px]">
             沉淀真实研究成果，快速查看 Deep Research 与 AI+产业洞察的完整交付
           </p>
           <div class="relative mt-4 flex items-center gap-3">
-            <Show when={canManageCases()}><button type="button" class="h-9 shrink-0 rounded-[6px] border border-[#d1d9ef] bg-white px-3 text-[13px] text-[#48546b]" onClick={() => { cancelOpening(); setState("maintenance", true) }}>案例维护</button></Show>
+            <Show when={canManageCases()}><button type="button" hidden class="h-9 shrink-0 rounded-[6px] border border-[#d1d9ef] bg-white px-3 text-[13px] text-[#48546b]" onClick={() => { cancelOpening(); setState("maintenance", true) }}>案例维护</button></Show>
             <label class="flex h-11 w-[400px] max-w-[calc(100%-56px)] items-center rounded-full border border-[#d1d9ef] bg-white px-4 text-[#9ba4b8] focus-within:border-[#8eabef]">
               <input
                 type="search"
@@ -420,7 +418,7 @@ function OverviewGroups(props: {
       </Show>
       <Show when={others().length}>
         <div class="mt-6 flex min-w-0 items-baseline gap-3">
-          <h2 class="shrink-0 text-[15px] font-semibold text-[#6038e4]">AI+产业洞察</h2>
+          <h2 class="shrink-0 text-[15px] font-semibold text-[#4d73b4]">AI+产业洞察</h2>
           <p class="truncate text-[14px] text-[#596176]">垂类专家团专业化研究</p>
         </div>
       </Show>
@@ -513,7 +511,7 @@ function CaseSectionHeading(props: { category: string }) {
   const category = () => cmccCaseCategoryByCode(props.category)
   return (
     <div class="flex min-w-0 items-baseline gap-3">
-      <h2 class="shrink-0 text-[15px] font-semibold text-[#6038e4]">{category()?.label}</h2>
+      <h2 class="shrink-0 text-[15px] font-semibold text-[#4d73b4]">{category()?.label}</h2>
       <p class="truncate text-[14px] text-[#596176]">{category()?.description}</p>
     </div>
   )

@@ -5,6 +5,8 @@
   --v2-border-border-active: #4e80d9;
   --v2-icon-icon-muted: #6a83a7;
   --text-interactive-base: #2563b9;
+  --cmcc-side-accent: #3566a3;
+  --cmcc-side-tint: #edf4ff;
   background: #f6f9ff;
   color: #243551;
 }
@@ -15,6 +17,16 @@
 
 .cmcc-general-chat [data-slot="session-title-child"] {
   color: #244b7c;
+  font-weight: 600;
+}
+
+.cmcc-general-chat [data-session-title] [data-slot="session-title-menu"] {
+  --v2-icon-icon-muted: var(--cmcc-side-accent);
+  --v2-icon-icon-base: var(--cmcc-side-accent);
+  --v2-overlay-simple-overlay-hover: #e4eefc;
+  --v2-overlay-simple-overlay-pressed: #dce9fb;
+  border-radius: 8px;
+  background-color: var(--cmcc-side-tint);
 }
 
 .cmcc-general-chat [data-component="tabs"] > [data-slot="tabs-list"] {
@@ -148,6 +160,103 @@
 .cmcc-general-chat [data-component="session-composer-text"] {
   font-size: 16px;
   line-height: 26px;
+}
+
+.cmcc-general-chat .cmcc-side-toggle {
+  border-radius: 8px;
+  color: var(--cmcc-side-accent);
+}
+
+.cmcc-general-chat .cmcc-side-tabs {
+  padding-inline-end: 52px;
+  border-color: var(--v2-border-border-base);
+  scrollbar-width: thin;
+}
+
+.cmcc-general-chat .cmcc-side-tab {
+  flex: none;
+  gap: 4px;
+  padding-inline: 8px;
+  border-radius: 8px;
+  color: #536785;
+  white-space: nowrap;
+}
+
+.cmcc-general-chat :is(.cmcc-side-toggle:hover, .cmcc-side-toggle[data-pressed], .cmcc-side-tab:hover, .cmcc-side-tab[data-selected]) {
+  background: var(--cmcc-side-tint);
+  color: var(--cmcc-side-accent);
+}
+
+.cmcc-general-chat .cmcc-side-count {
+  min-width: 18px;
+  padding-inline: 4px;
+  border-radius: 999px;
+  background: #f2f5fa;
+  color: #576e91;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.cmcc-general-chat .cmcc-side-tab[data-selected] .cmcc-side-count {
+  background: #dce9fb;
+  color: var(--cmcc-side-accent);
+}
+
+.cmcc-general-chat :is([data-cmcc-artifact-tabs], .cmcc-side-browser-bar) {
+  border-color: var(--v2-border-border-base);
+  background: #f5f8fd;
+}
+
+.cmcc-general-chat [data-cmcc-artifact-tabs] {
+  padding-inline: 12px;
+}
+
+.cmcc-general-chat [data-cmcc-artifact-tab] {
+  border-color: transparent;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.cmcc-general-chat [data-cmcc-artifact-tab]:is(:hover, [data-selected]) {
+  border-color: #c5d7f0;
+  background: #fff;
+  color: var(--cmcc-side-accent);
+}
+
+.cmcc-general-chat .cmcc-side-file-mark {
+  border-radius: 4px;
+  background: #e3edfd;
+  color: var(--cmcc-side-accent);
+}
+
+.cmcc-general-chat :is(.cmcc-side-file-row, .cmcc-side-action, .cmcc-side-browser-action) {
+  border-radius: 8px;
+}
+
+.cmcc-general-chat .cmcc-side-action {
+  background: #f2f6fb;
+  color: #465d7b;
+}
+
+.cmcc-general-chat .cmcc-side-download {
+  background: var(--cmcc-side-tint);
+  color: var(--cmcc-side-accent);
+}
+
+.cmcc-general-chat :is(.cmcc-side-action, .cmcc-side-browser-action, .cmcc-side-file-row):enabled:hover {
+  background: #e4eefc;
+  color: var(--cmcc-side-accent);
+}
+
+.cmcc-general-chat :is(.cmcc-side-preview, .cmcc-side-plan-item, .cmcc-side-browser-bar input) {
+  border-color: var(--v2-border-border-base);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.cmcc-general-chat :is(.cmcc-side-tab, .cmcc-side-action, .cmcc-side-file-row, .cmcc-side-browser-bar input):focus-visible {
+  outline: 2px solid var(--v2-border-border-active);
+  outline-offset: -2px;
 }
 
 @media (max-width: 640px) {

@@ -69,6 +69,7 @@ import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { syncSessionModel } from "@/pages/session/session-model-helpers"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import rightPanelIcons from "@/assets/chat/right-panel-icons.svg?url&no-inline"
 import { DeepInsightResultsPanel } from "@/pages/session/deepinsight/deepinsight-results-panel"
 import { DeepInsightSessionView } from "@/pages/session/deepinsight/deepinsight-session-view"
 import { shouldUseDeepInsightPage } from "@/pages/session/deepinsight/page-selection"
@@ -1870,14 +1871,23 @@ export default function Page() {
           <button
             type="button"
             class="absolute right-3 top-2 z-50 flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-icon-icon-muted transition-[background-color,color] duration-150 hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-border-border-active data-[pressed]:bg-v2-overlay-simple-overlay-hover data-[pressed]:text-v2-icon-icon-base disabled:pointer-events-none disabled:opacity-35"
+            classList={{ "cmcc-side-toggle": generalChat() }}
             data-pressed={view().reviewPanel.opened() ? "" : undefined}
             title={view().reviewPanel.opened() ? "隐藏右栏" : "展开右栏"}
             aria-label={view().reviewPanel.opened() ? "隐藏右栏" : "展开右栏"}
+            aria-controls="review-panel"
             aria-pressed={view().reviewPanel.opened()}
             disabled={!params.id}
             onClick={toggleCmccRightPanel}
           >
-            <Icon name={view().reviewPanel.opened() ? "layout-right-full" : "layout-right"} class="size-4" />
+            <Show
+              when={generalChat()}
+              fallback={<Icon name={view().reviewPanel.opened() ? "layout-right-full" : "layout-right"} class="size-4" />}
+            >
+              <svg viewBox="0 0 24 24" class="size-5" aria-hidden="true">
+                <use href={`${rightPanelIcons}#${view().reviewPanel.opened() ? "close" : "open"}`} width="24" height="24" />
+              </svg>
+            </Show>
           </button>
         </Show>
         <div

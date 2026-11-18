@@ -168,6 +168,11 @@
   color: #43474f;
 }
 
+.cmcc-account-avatar {
+  background: #e8f1ff;
+  color: #3566a3;
+}
+
 .cmcc-account-trigger:hover,
 .cmcc-account-trigger[data-expanded] {
   background: #f3f5f8;

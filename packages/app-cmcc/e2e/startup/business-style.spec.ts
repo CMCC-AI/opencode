@@ -39,6 +39,35 @@ test("home applies the neutral and blue style without changing its controls", as
   await page.screenshot({ path: info.outputPath("home-rail.png") })
 })
 
+test("the compact account footer keeps its blue avatar and menu when the sidebar folds", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await setupHomePage(page)
+  await page.goto("/app")
+  const sidebar = page.getByRole("complementary", { name: "CMCC conversations" })
+  const footer = sidebar.locator(".cmcc-sidebar-footer")
+  const account = footer.getByRole("button", { name: "Home sizing test", exact: true })
+  const avatar = account.locator(".cmcc-account-avatar")
+
+  await expect(footer).toHaveCSS("height", "53px")
+  await expect(account).toHaveCSS("height", "36px")
+  await expect(avatar).toHaveCSS("background-color", "rgb(232, 241, 255)")
+  await expect(avatar).toHaveCSS("color", "rgb(53, 102, 163)")
+  await expect(avatar).toHaveText("H")
+  await footer.screenshot({ path: info.outputPath("account-footer.png") })
+
+  for (const folded of [false, true]) {
+    if (folded) {
+      await sidebar.getByRole("button", { name: "隐藏左栏" }).click()
+      await expect(sidebar).toHaveCSS("width", "64px")
+      await expect(avatar).toBeVisible()
+    }
+    await account.click()
+    await expect(page.getByRole("menuitem", { name: "Token 额度", exact: true })).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(account).toHaveAttribute("aria-expanded", "false")
+  }
+})
+
 test("new chat stays prominent and actionable in the sidebar rail", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await setupHomePage(page, { models: true })

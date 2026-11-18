@@ -969,18 +969,18 @@ function CmccAssistantPanel(props: {
 
   return (
     <div class="flex size-full min-w-0 flex-col bg-v2-background-bg-base">
-      <div class="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-v2-border-border-base bg-v2-background-bg-base px-3">
+      <div class="cmcc-side-tabs sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-v2-border-border-base bg-v2-background-bg-base px-3">
         <For each={tabs()}>
           {(tab) => (
             <button
               type="button"
-              class="flex h-8 min-w-0 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
+              class="cmcc-side-tab flex h-8 min-w-0 items-center gap-1.5 rounded-[6px] px-2.5 text-[13px] leading-4 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base"
               data-selected={props.active === tab.id ? "" : undefined}
               onClick={() => props.setActive(tab.id)}
             >
               <span>{tab.label}</span>
               <Show when={tab.count !== undefined}>
-                <span class="text-[11px] leading-4 text-v2-text-text-faint">{tab.count}</span>
+                <span class="cmcc-side-count text-[11px] leading-4 text-v2-text-text-faint">{tab.count}</span>
               </Show>
             </button>
           )}
@@ -1081,7 +1081,7 @@ function CmccArtifactTabs(props: {
                 onClick={() => props.open(path)}
               >
                 <span
-                  class="flex size-4 shrink-0 items-center justify-center rounded-[3px] text-[8px] font-semibold uppercase text-white"
+                  class="cmcc-side-file-mark flex size-4 shrink-0 items-center justify-center rounded-[3px] text-[8px] font-semibold uppercase text-white"
                   classList={{
                     "bg-blue-500": extension() === "doc" || extension() === "docx",
                     "bg-green-600": extension() === "xls" || extension() === "xlsx",
@@ -1122,7 +1122,7 @@ function CmccPlanPanel(props: { todos: Todo[] }) {
         <div class="space-y-2">
           <For each={props.todos}>
             {(todo, index) => (
-              <div class="rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2.5">
+              <div class="cmcc-side-plan-item rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01 px-3 py-2.5">
                 <div class="flex items-start gap-2">
                   <div
                     class="mt-1 size-2 rounded-full bg-v2-icon-icon-muted data-[state=completed]:bg-success data-[state=in_progress]:bg-v2-border-border-active data-[state=cancelled]:bg-v2-text-text-faint"
@@ -1249,7 +1249,7 @@ function CmccArtifactsPanel(props: {
                   <button
                     type="button"
                     disabled={downloading() !== undefined}
-                    class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover disabled:cursor-not-allowed disabled:opacity-50"
+                    class="cmcc-side-action cmcc-side-download h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={downloadAll}
                   >
                     {downloading() === "all" ? "正在打包..." : `全部下载（${downloadable().length}）`}
@@ -1261,7 +1261,7 @@ function CmccArtifactsPanel(props: {
                   {(item) => (
                     <button
                       type="button"
-                      class="flex w-full min-w-0 items-center gap-2 rounded-[6px] px-2 py-1.5 text-left hover:bg-v2-overlay-simple-overlay-hover"
+                      class="cmcc-side-file-row flex w-full min-w-0 items-center gap-2 rounded-[6px] px-2 py-1.5 text-left hover:bg-v2-overlay-simple-overlay-hover"
                       title={item.path}
                       onClick={() => props.openArtifact(item.path)}
                       onContextMenu={(event) => {
@@ -1269,7 +1269,7 @@ function CmccArtifactsPanel(props: {
                         setContextMenu({ artifact: item, x: event.clientX, y: event.clientY })
                       }}
                     >
-                      <div class="flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-v2-border-border-active text-[9px] font-medium uppercase text-white">
+                      <div class="cmcc-side-file-mark flex size-4 shrink-0 items-center justify-center rounded-[4px] bg-v2-border-border-active text-[9px] font-medium uppercase text-white">
                         {fileName(item.path).split(".").at(-1)?.slice(0, 1) ?? "F"}
                       </div>
                       <div class="min-w-0 flex-1">
@@ -1287,7 +1287,7 @@ function CmccArtifactsPanel(props: {
               <div class="mb-3 flex items-center gap-2">
                 <button
                   type="button"
-                  class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+                  class="cmcc-side-action h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
                   onClick={props.clearActiveArtifact}
                 >
                   返回
@@ -1301,13 +1301,13 @@ function CmccArtifactsPanel(props: {
                 <button
                   type="button"
                   disabled={item().status === "deleted" || downloading() !== undefined}
-                  class="h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  class="cmcc-side-action cmcc-side-download h-8 shrink-0 rounded-[6px] bg-v2-background-bg-layer-03 px-2.5 text-[13px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => download(item().path)}
                 >
                   {downloading() === item().path ? "下载中..." : "下载"}
                 </button>
               </div>
-              <div class="min-h-0 flex-1 overflow-hidden rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01">
+              <div class="cmcc-side-preview min-h-0 flex-1 overflow-hidden rounded-[6px] border border-v2-border-border-base bg-v2-background-bg-layer-01">
                 <Switch>
                   <Match when={state()?.loaded}>
                     <Show when={state()?.content}>
@@ -1346,11 +1346,11 @@ function CmccBrowserPanel(props: {
   close: () => void
 }) {
   const buttonClass =
-    "flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-v2-text-text-muted"
+    "cmcc-side-browser-action flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-v2-text-text-muted"
 
   return (
     <div class="flex h-full min-h-0 flex-col">
-      <div class="flex h-12 shrink-0 items-center gap-1 border-b border-v2-border-border-base bg-v2-background-bg-base px-3">
+      <div class="cmcc-side-browser-bar flex h-12 shrink-0 items-center gap-1 border-b border-v2-border-border-base bg-v2-background-bg-base px-3">
         <IconButton
           icon="arrow-left"
           variant="ghost"

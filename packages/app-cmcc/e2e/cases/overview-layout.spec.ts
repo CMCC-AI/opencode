@@ -144,6 +144,13 @@ for (const width of [1440, 1280, 768, 767, 390]) {
     const errors: string[] = []
     page.on("pageerror", (error) => errors.push(error.message))
     await prepare(page)
+    const catalog = page.locator('[data-page="cmcc-cases"]')
+    const shellBackground = await page.locator(".cmcc-shell").evaluate((el) => getComputedStyle(el).backgroundColor)
+    await expect(catalog).toHaveCSS("background-color", shellBackground)
+    await expect(catalog.locator("[data-cmcc-page-background]")).toHaveCount(0)
+    for (const name of ["精选案例", "通用深度研究", "AI+产业洞察"]) {
+      await expect(catalog.getByRole("heading", { name, exact: true })).toHaveCSS("color", "rgb(77, 115, 180)")
+    }
     await expectCompactCards(page)
     const general = page.locator('[data-case-group="deep-research"]')
     const science = page.locator('[data-case-group="science"]')
