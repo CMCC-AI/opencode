@@ -6,7 +6,7 @@ export function NewSessionComposerLoading() {
     <div
       role="status"
       aria-label="正在准备对话"
-      class="flex h-[200px] w-full flex-col justify-between rounded-[24px] border-2 border-[#5b4fd7]/50 bg-white px-4 py-3 md:h-40"
+      class="cmcc-home-composer-surface flex h-[200px] w-full flex-col justify-between px-4 py-3 md:h-40"
     >
       <div aria-hidden="true" class="h-3 w-48 max-w-full rounded bg-surface-base" />
       <div aria-hidden="true" class="h-3 w-24 rounded bg-surface-base" />
@@ -27,7 +27,7 @@ export function NewSessionDesignView(props: { children: JSX.Element; footer?: JS
   return (
     <div
       data-component="session-new-design"
-      class="cmcc-home relative grid size-full min-h-0 min-w-0 justify-items-center overflow-y-auto bg-white"
+      class="cmcc-home relative grid size-full min-h-0 min-w-0 justify-items-center overflow-y-auto"
     >
       <div class="cmcc-home-heading">
         <div class="cmcc-home-brand">

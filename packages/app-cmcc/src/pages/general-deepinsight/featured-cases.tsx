@@ -82,7 +82,7 @@ export function ResearchFeaturedCases(props: {
       </div>
       <dialog
         ref={dialog}
-        class="featured-dialog-mask"
+        class="cmcc-modal-overlay featured-dialog-mask"
         aria-labelledby="research-featured-dialog-title"
         onCancel={() => setState("more", false)}
         onClose={() => setState("more", false)}
@@ -90,7 +90,7 @@ export function ResearchFeaturedCases(props: {
           if (event.target === dialog && !props.loadingCase) setState("more", false)
         }}
       >
-        <div class="featured-dialog">
+        <div class="cmcc-dialog-surface featured-dialog">
           <div class="featured-dialog-header">
             <h3 id="research-featured-dialog-title">更多精选案例</h3>
             <button

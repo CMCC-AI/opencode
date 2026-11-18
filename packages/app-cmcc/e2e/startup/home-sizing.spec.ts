@@ -30,6 +30,9 @@ for (const viewport of [
         .toBeLessThanOrEqual(1)
     }
     await page.evaluate(() => document.fonts.ready)
+    await page.locator(".cmcc-page-content").evaluate((element) =>
+      Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined))),
+    )
     const metrics = await page.evaluate(
       ({ home, composer, editor }) => {
         const bounds = (selector: string) => {
@@ -69,6 +72,7 @@ for (const viewport of [
     expect(metrics.composer.x).toBeGreaterThanOrEqual(0)
     expect(metrics.composer.x + metrics.composer.width).toBeLessThanOrEqual(viewport.width)
     expect(metrics.title.y + metrics.title.height).toBeLessThanOrEqual(metrics.subtitle.y)
+    expect(metrics.title.height).toBeLessThanOrEqual(Number.parseFloat(metrics.title.font) * 1.25 + 6)
     expect(metrics.subtitle.y + metrics.subtitle.height).toBeLessThanOrEqual(metrics.composer.y)
     expect(metrics.editor.font).toBe("17px")
     expect(metrics.editor.y).toBeGreaterThanOrEqual(metrics.composer.y)
@@ -76,8 +80,8 @@ for (const viewport of [
     await expect(page.locator(`${home} [data-action="prompt-model"]`)).toHaveCSS("font-size", "15px")
     await expect(page.getByRole("button", { name: "执行", exact: true })).toBeVisible()
     if (viewport.width >= 1440) {
-      expect(metrics.title.font).toBe("43px")
-      expect(metrics.subtitle.font).toBe("27px")
+      expect(metrics.title.font).toBe("38px")
+      expect(metrics.subtitle.font).toBe("18px")
       expect(metrics.logo.height).toBe(58)
       expect(metrics.composer.width).toBe(900)
       await expect(page.locator('aside img[alt="深度洞察"]')).toHaveCSS("height", "44px")

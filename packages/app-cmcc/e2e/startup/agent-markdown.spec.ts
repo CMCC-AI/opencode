@@ -8,6 +8,7 @@ import { setupGeneralChat } from "./general-chat.fixture"
 import { setupHomePage, homeDirectory } from "./home-fixture"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
+import { expectTeamPanelResize, expectTeamStatIcons, expectTeamSurfaceColors } from "../utils/workbench-surfaces"
 import { previewFiles } from "./preview-files.fixture"
 import { htmlReportFixture, htmlReportPreview, serveReportRuntime } from "./html-report.fixture"
 
@@ -257,6 +258,111 @@ async function narrow(page: Page, width: number) {
 
 async function clipboardText(page: Page) {
   return page.evaluate(async () => (await navigator.clipboard.readText()).replace(/\r\n/g, "\n"))
+}
+
+for (const width of [1440, 390]) {
+  test(`file type icons do not read file bodies at ${width}`, async ({ page, baseURL }, info) => {
+    const before = process.env.MARKDOWN_PHASE === "file-icons-list-before"
+    await page.setViewportSize({ width, height: 1000 })
+    const data = await prepare(page, teams[0])
+    const directory = "runs/markdown-style"
+    const files = {
+      "附件.PDF": "pdf",
+      "材料.docx": "word",
+      "表格.csv": "sheet",
+      "演示.pptx": "presentation",
+      "笔记.md": "markdown",
+      "说明.txt": "file",
+      "页面.html": "html",
+      "数据.json": "json",
+      "图片.webp": "image",
+      "打包.tar.gz": "archive",
+      "未识别.bin": "file",
+      说明文件: "file",
+    }
+    const names = Object.keys(files)
+    const requests: string[] = []
+    const iconRequests: string[] = []
+    page.on("request", (request) => {
+      const url = new URL(request.url())
+      if (/\/file\/(content|preview|download)$/.test(url.pathname)) {
+        const filename = url.searchParams.get("path")?.split("/").at(-1)
+        if (filename && names.includes(filename)) requests.push(url.pathname)
+      }
+      if (/\/artifact-file-icons-[^/]+\.svg$/.test(url.pathname)) iconRequests.push(url.pathname)
+    })
+    const report = "20-report.md"
+    await page.route("**/file?*", (route) =>
+      route.fulfill({
+        json: new URL(route.request().url()).searchParams.get("path") === directory
+          ? [report, ...names].map(name => ({
+              name,
+              path: `${directory}/${name}`,
+              absolute: `${homeDirectory}/${directory}/${name}`,
+              type: "file",
+              ignored: false,
+            }))
+          : [],
+      }),
+    )
+    await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+    await narrow(page, width)
+    if (width < 768) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+    expect(iconRequests).toEqual([])
+    await page.getByRole("button", { name: "文件", exact: true }).click()
+    const results = page.locator(".workbench-results")
+    await expect(results.locator("article")).toHaveCount(names.length + 1)
+    for (const [name, kind] of Object.entries(files)) {
+      const row = results.locator("article").filter({ has: page.getByText(name, { exact: true }) })
+      await expect(row).toBeAttached()
+      if (before) continue
+      const icon = row.locator(`[data-artifact-file-icon="${kind}"]`)
+      await expect(icon).toHaveAttribute("aria-hidden", "true")
+      await expect.poll(() => icon.locator("use").evaluate((use: SVGUseElement) => use.getBBox().width)).toBeGreaterThan(0)
+    }
+    await expect(results.locator("article").first()).toBeVisible()
+    await results.screenshot({ path: info.outputPath("file-list.png") })
+    expect(requests).toEqual([])
+    expect(iconRequests).toHaveLength(before ? 0 : 1)
+    console.log(`FILE_ICON_REQUESTS ${JSON.stringify({ width, fileCount: names.length + 1, fileBodies: requests.length, iconRequests: iconRequests.length })}`)
+    const file = results.getByRole("button", { name: /^说明\.txt/ })
+    await file.click()
+    await expect(results.getByRole("button", { name: "返回", exact: true })).toBeVisible()
+    expect(requests).toEqual(["/file/content"])
+    expect(data.errors).toEqual([])
+  })
+}
+
+async function expectCardGeometryUnchanged(page: Page) {
+  const result = await page.evaluate(() => {
+    const sheet = [...document.styleSheets].find((sheet) =>
+      [...sheet.cssRules].some(
+        (rule) => rule instanceof CSSStyleRule && rule.selectorText.includes("[data-workbench-stats]"),
+      ),
+    )
+    if (!sheet) throw new Error("Missing workbench card stylesheet")
+    const decorations = [...sheet.cssRules]
+      .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule && rule.selectorText.startsWith("[") && rule.selectorText.includes("workbench") && !!rule.style.borderRadius)
+      .map(rule => ({ rule, selector: rule.selectorText }))
+    const elements = [
+      ...document.querySelectorAll(
+        '[data-component="workbench-response-card"], [data-workbench-stats] > div, [data-workbench-team-panel], [data-workbench-agent-strip], section[aria-label$="DAG"] button',
+      ),
+    ]
+    const measure = () =>
+      elements.map((element) => {
+        const bounds = element.getBoundingClientRect()
+        return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+      })
+    const rounded = measure()
+    try {
+      for (const { rule } of decorations) rule.selectorText = ":not(*)"
+      return { rounded, original: measure() }
+    } finally {
+      for (const { rule, selector } of decorations) rule.selectorText = selector
+    }
+  })
+  expect(result.rounded).toEqual(result.original)
 }
 
 for (const id of ["deepinsight", "deeptrading", "deepinspect", "zhengqi-visit-intel", "mstock"] as const) {
@@ -604,6 +710,107 @@ for (const team of teams) {
 
 for (const width of [1440, 390]) {
   for (const team of teams) {
+    test(`${team.id} rounded workbench surfaces preserve layout at ${width}`, async ({ page, baseURL }, info) => {
+      await page.setViewportSize({ width, height: 1000 })
+      const data = await prepare(page, team)
+      const started = performance.now()
+      await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+      await narrow(page, width)
+      const response = page.locator('[data-component="workbench-response-card"]').first()
+      const strip = page.locator("nav.deeptrading-scrollbar")
+      await expect(response).toBeVisible()
+      await expect(strip).toBeVisible()
+      await expect(response.locator("[data-markdown-table]")).toHaveCount(2)
+      await page.evaluate(() => document.fonts.ready)
+      await page
+        .locator(".cmcc-page-content")
+        .evaluate((element) =>
+          Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined))),
+        )
+      await page
+        .locator(".deeptrading-scrollbar")
+        .filter({ has: response })
+        .evaluate((element) => {
+          element.scrollTop = 0
+        })
+      const metrics = (element: Element) => {
+        const bounds = element.getBoundingClientRect()
+        const css = getComputedStyle(element)
+        return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, radius: css.borderRadius }
+      }
+      const conversation = { response: await response.evaluate(metrics), strip: await strip.evaluate(metrics) }
+      const readyMs = performance.now() - started
+      await expect(strip.locator("../..")).toHaveCSS("background-color", "rgb(252, 252, 253)")
+      if (process.env.CMCC_CARD_BASELINE !== "1") {
+        await expect(response).toHaveCSS("border-radius", "20px")
+        await expect(strip).toHaveCSS("border-radius", "20px")
+        await expect(strip.getByRole("button").first()).toHaveCSS("border-radius", "12px")
+        await expectCardGeometryUnchanged(page)
+      }
+      await expect
+        .poll(() =>
+          strip.locator("img").evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0)),
+        )
+        .toBe(true)
+      await page.screenshot({ path: info.outputPath("rounded-workbench.png") })
+      if (width < 760) await page.getByRole("tab", { name: "分析结果", exact: true }).click()
+      const stats = page.locator('section[aria-label$="统计"]')
+      const panel = page.locator('section[aria-label$="统计"] + div')
+      const dag = page.locator('section[aria-label$="DAG"]')
+      const results = page.locator(".workbench-results")
+      await expect(results).toHaveCSS("background-color", "rgb(252, 252, 253)")
+      const body = results.locator(":scope > nav + div")
+      await expect(body).toHaveCSS("padding-bottom", "0px")
+      const area = (await results.boundingBox())!
+      const teamArea = (await body.locator(":scope > div").first().boundingBox())!
+      expect(teamArea.y + teamArea.height).toBeCloseTo(area.y + area.height, 0)
+      await expect(stats.locator(":scope > div")).toHaveCount(4)
+      await expect(dag).toBeVisible()
+      await expect
+        .poll(() =>
+          dag.locator("img").evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0)),
+        )
+        .toBe(true)
+      if (process.env.CMCC_CARD_BASELINE !== "1") {
+        await expectTeamSurfaceColors(page)
+        await expectTeamStatIcons(page)
+        await expect(stats.locator(":scope > div").first()).toHaveCSS("border-radius", "16px")
+        await expect(panel).toHaveCSS("border-radius", "20px")
+        await expectCardGeometryUnchanged(page)
+      }
+      const result = {
+        team: team.id,
+        width,
+        readyMs,
+        ...conversation,
+        stats: await stats.locator(":scope > div").evaluateAll((elements) =>
+          elements.map((element) => {
+            const bounds = element.getBoundingClientRect()
+            return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+          }),
+        ),
+        panel: await panel.evaluate(metrics),
+        nodes: await dag.getByRole("button").evaluateAll((elements) =>
+          elements.map((element) => {
+            const bounds = element.getBoundingClientRect()
+            return {
+              x: bounds.x,
+              y: bounds.y,
+              width: bounds.width,
+              height: bounds.height,
+              radius: getComputedStyle(element).borderRadius,
+            }
+          }),
+        ),
+      }
+      console.log(`CARD_METRICS ${JSON.stringify(result)}`)
+      await info.attach("card-metrics", { body: JSON.stringify(result, null, 2), contentType: "application/json" })
+      await page.screenshot({ path: info.outputPath("rounded-team.png") })
+      await expectTeamPanelResize(page)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
+      expect(data.errors).toEqual([])
+    })
+
     test(`${team.id} Markdown in overview, expert and report at ${width}`, async ({ page, baseURL }, info) => {
       await page.setViewportSize({ width, height: 1000 })
       const data = await prepare(page, team)
@@ -700,10 +907,12 @@ for (const width of [1440, 390]) {
     await expect(footer.locator("time")).toHaveCount(1)
     await expect(footer.locator("span", { hasText: /^markdown-model$/ })).toHaveCount(1)
     await expect(footer.locator("span", { hasText: /^second-model$/ })).toHaveCount(1)
+    await first.getByText("第三段分析结论。", { exact: true }).hover()
     await footer.getByRole("button", { name: "复制全部回复", exact: true }).click()
     expect(await clipboardText(page)).toBe(`${markdown}\n\n第二段独立分析。\n\n第三段分析结论。`)
     await footer.evaluate((node) => node.scrollIntoView({ block: "center" }))
     await page.screenshot({ path: info.outputPath("overview-footer.png") })
+    await second.getByText("只属于第二轮的回复。", { exact: true }).hover()
     await second.getByRole("button", { name: "复制全部回复", exact: true }).click()
     expect(await clipboardText(page)).toBe("只属于第二轮的回复。")
     const firstHeader = first.locator('[data-component="workbench-expert-header"]')
@@ -728,6 +937,7 @@ for (const width of [1440, 390]) {
     expect(
       await expert.locator("header img").evaluate((node) => ({ width: node.clientWidth, height: node.clientHeight })),
     ).toEqual(avatarSize)
+    await expert.getByText("第三段分析结论。", { exact: true }).hover()
     await expert.getByRole("button", { name: "复制全部回复", exact: true }).click()
     expect(await clipboardText(page)).toBe(`${markdown}\n\n第二段独立分析。\n\n第三段分析结论。`)
     await expect(expert.getByRole("button", { name: "已复制", exact: true })).toBeVisible()
@@ -753,6 +963,78 @@ for (const width of [1440, 390]) {
     if (!baseline) expect(await styles(content)).toEqual(reference)
     await expect(page.locator('[data-cmcc-general-chat="true"]')).toHaveCount(0)
     expect(data.errors).toEqual([])
+  })
+}
+
+for (const touch of [false, true]) {
+  test.describe(`feedback actions with ${touch ? "touch" : "mouse"}`, () => {
+    test.use({ hasTouch: touch, viewport: { width: touch ? 390 : 1440, height: 1000 } })
+    test("reveal one reply footer and independently toggle its vote", async ({ page, baseURL }, info) => {
+      const data = await prepare(page, teams[1], true)
+      await page.goto(`/server/${base64Encode(baseURL!)}/session/${data.root.id}`)
+      await narrow(page, touch ? 390 : 1440)
+      const turns = page.locator("[data-workbench-turn]")
+      await expect(turns).toHaveCount(2)
+      const reply = turns.last().locator('[data-component="workbench-response"] .workbench-message-group')
+      const card = reply.locator('[data-component="workbench-response-card"]')
+      const footer = reply.locator("footer")
+      const up = footer.getByRole("button", { name: "点赞", exact: true })
+      const down = footer.getByRole("button", { name: "点踩", exact: true })
+      const copy = footer.getByRole("button", { name: "复制全部回复" })
+      const question = turns.last().locator('[data-role="user"]')
+      const bubble = question.locator('[data-component="workbench-query-bubble"]')
+      const user = question.locator("footer")
+      await expect(user.getByRole("button")).toHaveCount(1)
+      const copyQuestion = user.getByRole("button", { name: "复制消息" })
+      await expect(copyQuestion).toHaveAttribute("data-variant", "ghost")
+      await expect(user.locator("time")).toHaveCount(1)
+      await expect(user).not.toContainText("markdown-model")
+      await page.mouse.move(0, 0)
+      await expect(user).toHaveCSS("opacity", "0")
+      if (touch) await bubble.tap()
+      else await bubble.hover()
+      await expect(user).toHaveCSS("opacity", "1")
+      await expect(copyQuestion).toHaveCSS("box-shadow", "none")
+      await question.screenshot({ path: info.outputPath("question-footer.png") })
+      if (touch) await copyQuestion.tap()
+      else await copyQuestion.click()
+      await expect(user.getByRole("button", { name: "已复制" })).toBeVisible()
+      await card.scrollIntoViewIfNeeded()
+      await page.mouse.move(0, 0)
+      await expect(footer).toHaveCSS("opacity", "0")
+      const height = await reply.evaluate(el => el.offsetHeight)
+      if (touch) await card.tap()
+      else await card.hover()
+      await expect(footer).toHaveCSS("opacity", "1")
+      await expect(user).toHaveCSS("opacity", "0")
+      await expect(copy).toHaveCSS("box-shadow", "none")
+      expect(await footer.getByRole("button").evaluateAll(buttons => buttons.map(button => button.getAttribute("aria-label"))))
+        .toEqual(["点赞", "点踩", "复制全部回复"])
+      const press = (button: Locator) => touch ? button.tap() : button.click()
+      await press(up)
+      await expect(up).toHaveAttribute("aria-pressed", "true")
+      await expect(up.locator("svg")).toHaveCSS("fill", "rgb(85, 94, 107)")
+      await expect(turns.first().getByRole("button", { name: "点赞", exact: true })).toHaveAttribute("aria-pressed", "false")
+      await page.screenshot({ path: info.outputPath("feedback.png") })
+      await press(down)
+      await expect(up).toHaveAttribute("aria-pressed", "false")
+      await expect(down).toHaveAttribute("aria-pressed", "true")
+      await press(down)
+      await expect(down).toHaveAttribute("aria-pressed", "false")
+      if (touch) await bubble.tap()
+      else await page.mouse.move(0, 0)
+      await expect(footer).toHaveCSS("opacity", "0")
+      expect(await reply.evaluate(el => el.offsetHeight)).toBe(height)
+      if (!touch) {
+        await card.focus()
+        await page.keyboard.press("Tab")
+        await expect(footer).toHaveCSS("opacity", "1")
+        await expect(up).toBeFocused()
+        await page.keyboard.press("Space")
+        await expect(up).toHaveAttribute("aria-pressed", "true")
+      }
+      expect(data.errors).toEqual([])
+    })
   })
 }
 
@@ -792,6 +1074,7 @@ for (const team of teams) {
     )
     await expect(response.getByText("已完成", { exact: true })).toBeVisible()
     await expect(response.locator("footer")).toHaveCount(1)
+    await response.getByText("后续流式补充结论。", { exact: true }).hover()
     await copy.click()
     expect(await clipboardText(page)).toBe(part.text)
     expect(data.errors).toEqual([])

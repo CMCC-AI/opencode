@@ -1,5 +1,6 @@
 import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { Icon } from "@opencode-ai/ui/icon"
+import { WorkbenchFileIcon } from "../agent-workbench/artifact-file-icon"
 import { For, Match, Show, Switch, createEffect, createMemo, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { SessionArtifactPreview } from "@/components/session-artifact-preview"
@@ -83,7 +84,7 @@ function LiveDeepTradingFilesTab() {
                 {(artifact) => (
                   <article class="flex min-w-0 items-center gap-3 rounded-[8px] border border-[#e0e4eb] bg-white p-3">
                     <span class="flex size-9 shrink-0 items-center justify-center rounded-[7px] bg-[#eef2fa] text-[#5970aa]">
-                      <Icon name="file-tree" class="size-4" />
+                      <WorkbenchFileIcon filename={artifact.filename} />
                     </span>
                     <button
                       type="button"
@@ -184,7 +185,7 @@ export function DeepTradingTextReportTab() {
         />
       }
     >
-      <div class="deeptrading-scrollbar h-full min-h-0 overflow-y-auto bg-[#f7f8fb] px-4 py-4">
+      <div class="deeptrading-scrollbar h-full min-h-0 overflow-y-auto px-4 py-4">
         <div class="mx-auto w-full max-w-[860px] rounded-[8px] border border-[#e0e4eb] bg-white px-5 py-5 sm:px-7">
           <Markdown
             text={context.replay.textReportMarkdown()}
@@ -252,7 +253,7 @@ function SnapshotDeepTradingFilesTab(props: { source: DeepTradingArtifactSource 
                 {(artifact) => (
                   <article class="flex min-w-0 items-center gap-3 rounded-[8px] border border-[#e0e4eb] bg-white p-3">
                     <span class="flex size-9 shrink-0 items-center justify-center rounded-[7px] bg-[#eef2fa] text-[#5970aa]">
-                      <Icon name="file-tree" class="size-4" />
+                      <WorkbenchFileIcon filename={artifact.filename} />
                     </span>
                     <button type="button" class="min-w-0 flex-1 text-left" onClick={() => setState("selectedPath", artifact.path)}>
                       <strong class="block truncate text-[12px] font-medium leading-5 text-[#333a49]">{artifact.label ?? artifact.filename}</strong>
@@ -332,7 +333,7 @@ function ReportFileShell(props: {
   children: (content: NonNullable<ReturnType<ReturnType<typeof useFile>["get"]>["content"]>) => JSX.Element
 }) {
   return (
-    <div class="deeptrading-scrollbar h-full min-h-0 overflow-y-auto bg-[#f7f8fb] px-4 py-4">
+    <div class="deeptrading-scrollbar h-full min-h-0 overflow-y-auto px-4 py-4">
       <Show when={props.path} fallback={<ReportEmpty title={props.emptyTitle} description={props.emptyDescription} />}>
         <Switch>
           <Match when={props.state?.loaded && props.state.content}>{props.children(props.state!.content!)}</Match>

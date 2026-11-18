@@ -2,10 +2,12 @@ import type { Session } from "@opencode-ai/sdk/v2/client"
 import { ContextMenu } from "@opencode-ai/ui/context-menu"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/icon"
-import { createEffect, createMemo, For, onCleanup, Show, Suspense, untrack, type ParentProps } from "solid-js"
+import { createMediaQuery } from "@solid-primitives/media"
+import { createEffect, createMemo, onCleanup, Show, Suspense, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { DebugBar } from "@/components/debug-bar"
+import sidebarIconsUrl from "@/assets/sidebar/menu-icons.svg?url"
 import { useSettingsDialog } from "@/components/settings-dialog"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { CasePublishDialog } from "@/components/case-publish-dialog"
@@ -44,6 +46,9 @@ import { ResearchHistory } from "@/pages/general-deepinsight/history"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
 import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
 import { NewSessionLoading } from "@/components/session/session-new-design-view"
+import { createPageMotion } from "@/components/cmcc-motion"
+import "@/components/cmcc-overlays.css"
+import "./layout-new.css"
 
 const SIDEBAR_MIN_WIDTH = 280
 const SIDEBAR_MAX_WIDTH = 420
@@ -61,6 +66,12 @@ export default function NewLayout(props: ParentProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const layout = useLayout()
+  let pageContent: HTMLDivElement | undefined
+  createPageMotion(
+    () => `${location.pathname}:${location.query.draftId ?? ""}`,
+    () => pageContent,
+    () => location.pathname !== "/app" && location.pathname !== "/new-session",
+  )
   const [persistentViews, setPersistentViews] = createStore({
     deepLensMounted: isDeepLensPath(location.pathname),
   })
@@ -82,67 +93,16 @@ export default function NewLayout(props: ParentProps) {
 
   return (
     <div
-      class="relative bg-v2-background-bg-deep flex-1 min-h-0 min-w-0 flex flex-col select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text"
+      class="cmcc-shell relative flex-1 min-h-0 min-w-0 flex flex-col select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text"
       style={{
         "padding-top": "env(safe-area-inset-top, 0px)",
         "padding-bottom": "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      <CmccTopControls />
       <main class="flex-1 min-h-0 min-w-0 overflow-hidden flex items-stretch contain-strict">
         <CmccSidebar />
         <section class="relative min-h-0 min-w-0 flex flex-1 flex-col overflow-hidden bg-white">
-          <svg
-            aria-hidden="true"
-            class="pointer-events-none absolute inset-0 size-full"
-            viewBox="0 0 1160 900"
-            fill="none"
-            preserveAspectRatio="none"
-          >
-            <rect width="1160" height="900" fill="white" />
-            <g opacity="0.1" filter="url(#cmcc-content-yellow-glow)">
-              <ellipse cx="982.5" cy="174" rx="180.5" ry="180" fill="#fdffa3" />
-            </g>
-            <g opacity="0.2" filter="url(#cmcc-content-blue-glow)">
-              <circle cx="1002.27" cy="745.205" r="197.838" fill="#a3d4ff" />
-            </g>
-            <g opacity="0.1" filter="url(#cmcc-content-pink-glow)">
-              <circle cx="166.187" cy="204.128" r="198.043" fill="#e689dd" />
-            </g>
-            <defs>
-              <filter
-                id="cmcc-content-yellow-glow"
-                x="502"
-                y="-306"
-                width="961"
-                height="960"
-                filterUnits="userSpaceOnUse"
-              >
-                <feGaussianBlur stdDeviation="150" />
-              </filter>
-              <filter
-                id="cmcc-content-blue-glow"
-                x="504.43"
-                y="247.367"
-                width="995.675"
-                height="995.676"
-                filterUnits="userSpaceOnUse"
-              >
-                <feGaussianBlur stdDeviation="150" />
-              </filter>
-              <filter
-                id="cmcc-content-pink-glow"
-                x="-411.856"
-                y="-373.914"
-                width="1156.09"
-                height="1156.09"
-                filterUnits="userSpaceOnUse"
-              >
-                <feGaussianBlur stdDeviation="190" />
-              </filter>
-            </defs>
-          </svg>
-          <div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
+          <div ref={pageContent} class="cmcc-page-content relative flex min-h-0 min-w-0 flex-1 flex-col">
             <Suspense
               fallback={
                 <Show when={location.pathname === "/app" || location.pathname === "/new-session"}>
@@ -164,109 +124,13 @@ export default function NewLayout(props: ParentProps) {
   )
 }
 
-function CmccTopControls() {
-  const navigate = useNavigate()
-  const layout = useLayout()
-  const location = useLocation()
-  const server = useServer()
-  const serverSDK = useServerSDK()
-  const dockapi = useDockApi()
-  const tabs = useTabs()
-  const activeSessionPath = createMemo(() => (location.pathname.includes("/session/") ? location.pathname : undefined))
-  const [history, setHistory] = createStore({
-    stack: [] as string[],
-    index: -1,
-  })
-  const canBack = createMemo(() => history.index > 0)
-  const canForward = createMemo(() => history.index >= 0 && history.index < history.stack.length - 1)
-
-  createEffect(() => {
-    const path = activeSessionPath()
-    if (!path) return
-
-    const snapshot = untrack(() => ({
-      index: history.index,
-      stack: history.stack.slice(),
-    }))
-    if (snapshot.stack[snapshot.index] === path) return
-
-    const base = snapshot.index >= 0 ? snapshot.stack.slice(0, snapshot.index + 1) : []
-    setHistory({
-      stack: [...base, path],
-      index: base.length,
-    })
-  })
-
-  const toggleSidebar = () => {
-    if (layout.sidebar.opened()) {
-      layout.sidebar.close()
-      return
-    }
-    layout.sidebar.open()
-  }
-
-  const openNewSession = () => {
-    const directory = dockapi.workspace?.directoryPath
-    const artifactDirectory = cmccArtifactWorkspace(directory)
-    if (!directory || !artifactDirectory || !tabs.ready()) return
-
-    tabs.newDraft({ server: server.key, directory, artifactDirectory })
-    cmccRememberConversationWorkspace(directory)
-    server.projects.touch(directory)
-    void cmccEnsureWorkspace(
-      artifactDirectory,
-      (path) => serverSDK().client.file.createDirectory({ path }, { throwOnError: true }),
-      serverSDK().scope,
-    ).catch((error) => {
-      showToast({
-        title: "无法准备会话产物目录",
-        description: error instanceof Error ? error.message : String(error),
-        variant: "error",
-      })
-    })
-  }
-
-  const switchSession = (direction: "back" | "forward") => {
-    const snapshot = {
-      index: history.index,
-      stack: history.stack.slice(),
-    }
-    const index = snapshot.index + (direction === "back" ? -1 : 1)
-    const next = snapshot.stack[index]
-    if (!next) return
-    setHistory("index", index)
-    navigate(next)
-  }
-
-  return (
-    <div class="pointer-events-auto absolute left-3 top-2 z-50 flex h-8 items-center gap-1">
-      <CmccTopControlButton
-        icon={layout.sidebar.opened() ? "layout-left-full" : "layout-left"}
-        label={layout.sidebar.opened() ? "隐藏左栏" : "展开左栏"}
-        pressed={layout.sidebar.opened()}
-        onClick={toggleSidebar}
-      />
-      <CmccTopControlButton
-        icon="arrow-left"
-        label="后退"
-        disabled={!canBack()}
-        onClick={() => switchSession("back")}
-      />
-      <CmccTopControlButton
-        icon="arrow-right"
-        label="前进"
-        disabled={!canForward()}
-        onClick={() => switchSession("forward")}
-      />
-      <Show when={!layout.sidebar.opened()}>
-        <CmccTopControlButton icon="new-session" label="新建会话" onClick={() => void openNewSession()} />
-      </Show>
-    </div>
-  )
-}
-
 function CmccSidebar() {
   const layout = useLayout()
+  const desktop = createMediaQuery("(min-width: 768px)")
+  const expanded = layout.sidebar.opened
+  const rail = () => desktop() && !expanded()
+  let brandToggle!: HTMLButtonElement
+  let mobileOpener: HTMLButtonElement | undefined
   const location = useLocation()
   const navigate = useNavigate()
   const server = useServer()
@@ -330,11 +194,8 @@ function CmccSidebar() {
     if (typeof window === "undefined") return SIDEBAR_MAX_WIDTH
     return Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, window.innerWidth - SIDEBAR_MAIN_MIN_WIDTH))
   })
-  const width = createMemo(() => {
-    if (!layout.sidebar.opened()) return 0
-    return Math.min(sidebarMaxWidth(), Math.max(SIDEBAR_MIN_WIDTH, layout.sidebar.width()))
-  })
-  const visible = createMemo(() => layout.sidebar.opened() || drag.active)
+  const expandedWidth = createMemo(() => Math.min(sidebarMaxWidth(), Math.max(SIDEBAR_MIN_WIDTH, layout.sidebar.width())))
+  const width = () => expanded() ? expandedWidth() : rail() ? 64 : 0
 
   let previousUserSelect = ""
   let previousCursor = ""
@@ -369,7 +230,7 @@ function CmccSidebar() {
     setDrag({
       active: true,
       startX: event.clientX,
-      startWidth: layout.sidebar.opened() ? width() : 0,
+      startWidth: width(),
     })
     window.addEventListener("pointermove", moveDrag)
     window.addEventListener("pointerup", stopDrag)
@@ -468,37 +329,79 @@ function CmccSidebar() {
 
   return (
     <>
+      <Show when={!expanded() && !desktop()}>
+        <button
+          ref={mobileOpener}
+          type="button"
+          class="cmcc-sidebar-toggle absolute left-3 top-2 z-50"
+          aria-label="展开左栏"
+          title="展开左栏"
+          aria-expanded={false}
+          aria-controls="cmcc-business-sidebar"
+          onClick={() => {
+            layout.sidebar.open()
+            brandToggle.focus()
+          }}
+        >
+          <img src="/brand/logo.svg" alt="" class="size-6 object-contain" />
+        </button>
+      </Show>
       <aside
+        id="cmcc-business-sidebar"
         aria-label="CMCC conversations"
-        aria-hidden={!visible()}
-        inert={!visible()}
-        class="h-full shrink-0 overflow-hidden border-r border-[#c7d2fe] bg-[linear-gradient(180deg,#e0e7ff_0%,#ede9fe_50%,#f5f3ff_100%)] shadow-[4px_0_16px_rgba(49,46,129,0.08)]"
+        aria-hidden={!expanded() && !desktop()}
+        inert={!expanded() && !desktop()}
+        data-rail={rail() ? "" : undefined}
+        class="cmcc-sidebar shrink-0 overflow-hidden"
         classList={{
           "transition-[width] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none":
             !drag.active,
-          "pointer-events-none": !visible(),
         }}
-        style={{ width: `${width()}px` }}
+        style={{ width: `${width()}px`, "--sidebar-expanded-width": `${expandedWidth()}px` }}
       >
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
-          <div class="flex items-center gap-2.5 px-4 pb-4 pt-12">
-            <img
-              src="/brand/mobileai-horizontal.svg"
-              alt="深度洞察"
-              class="h-11 w-auto max-w-[101px] shrink-0 object-contain"
-            />
-            <span class="text-[16px] font-semibold text-[#1a1a2e]">深度洞察</span>
+          <div class="cmcc-sidebar-brand flex shrink-0 items-center gap-2.5 px-4 py-4">
+            <Show when={!rail()}>
+              <img
+                src="/brand/mobileai-horizontal.svg"
+                alt="深度洞察"
+                class="h-11 w-auto max-w-[101px] shrink-0 object-contain"
+              />
+              <span class="whitespace-nowrap text-[16px] font-semibold text-[#1a1a2e]">深度洞察</span>
+            </Show>
+            <button
+              ref={brandToggle}
+              type="button"
+              class="cmcc-sidebar-toggle"
+              aria-label={expanded() ? "隐藏左栏" : "展开左栏"}
+              title={expanded() ? "隐藏左栏" : "展开左栏"}
+              aria-expanded={expanded()}
+              aria-controls="cmcc-business-sidebar"
+              onClick={() => {
+                layout.sidebar.toggle()
+                if (!desktop() && !expanded()) mobileOpener?.focus()
+              }}
+            >
+              <Show when={rail()} fallback={<Icon name="chevron-left" />}>
+                <img src="/brand/logo.svg" alt="" class="size-7 object-contain" />
+              </Show>
+            </button>
           </div>
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-3">
-            <CmccSidebarAction icon="new-session" label="新对话" onClick={() => void openNewSession()} />
             <CmccSidebarAction
-              icon="glasses"
+              icon="new-chat"
+              label="新对话"
+              active={location.pathname === "/new-session" && !tabs.store.some((tab) => tab.type === "draft" && tab.researchMode && location.search.includes(tab.draftID))}
+              onClick={() => void openNewSession()}
+            />
+            <CmccSidebarAction
+              icon="research"
               label="深度研究"
               onClick={() => void summonDeepInsight()}
               active={location.pathname.startsWith("/general-deepinsight") || tabs.store.some((tab) => tab.type === "draft" && tab.researchMode && location.search.includes(tab.draftID))}
             />
             <CmccSidebarAction
-              icon="mcp"
+              icon="industry"
               label="产业洞察"
               active={
                 location.pathname === "/expert" ||
@@ -509,37 +412,37 @@ function CmccSidebar() {
               onClick={() => navigate("/expert")}
             />
             <CmccSidebarAction
-              icon="brain"
+              icon="wiki"
               label="AI Wiki"
               active={location.pathname === "/knowledge" || location.pathname.startsWith("/knowledge/")}
               onClick={() => navigate("/knowledge")}
             />
             <CmccSidebarAction
-              icon="branch"
+              icon="track"
               label="DeepTrack 行业追踪"
               active={location.pathname === "/expert/workspace"}
               onClick={() => navigate("/expert/workspace")}
             />
             <CmccSidebarAction
-              icon="photo"
+              icon="lens"
               label="DeepLens 拍照即懂"
               active={isDeepLensPath(location.pathname)}
               onClick={() => navigate("/deeplens")}
             />
             <CmccSidebarAction
-              icon="archive"
+              icon="cases"
               label="案例库"
               active={location.pathname === "/cases" || location.pathname.startsWith("/cases/")}
               onClick={() => navigate("/cases")}
             />
           </nav>
-          <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-4 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#c7d2fe] [&::-webkit-scrollbar]:w-1">
-            <CmccSidebarSection
-              label="历史任务"
-              actionLabel="新对话"
-              action={() => void openNewSession()}
-              actionIcon="new-session"
-            />
+          <div class="cmcc-sidebar-section mx-3 mt-2 flex shrink-0 items-center justify-between border-t px-1 pb-1 pt-2">
+            <span class="text-[14px] font-semibold">历史任务</span>
+            <button type="button" class="cmcc-sidebar-toggle" title="新对话" aria-label="新对话" onClick={openNewSession}>
+              <span aria-hidden="true" class="text-[14px] font-normal leading-none">+</span>
+            </button>
+          </div>
+          <div class="cmcc-sidebar-history min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             <ResearchHistory sessions={conversations()} renderOpenCode={(session) => (
                 <CmccSessionRow
                   session={session}
@@ -566,17 +469,19 @@ function CmccSidebar() {
                 />
               )} />
           </div>
-          <div class="shrink-0 border-t border-[rgba(99,102,241,0.10)] px-3 py-3.5">
+          <div class="cmcc-sidebar-footer mt-auto shrink-0 border-t px-3 py-3.5">
             <DropdownMenu gutter={8} placement="top-start">
-              <DropdownMenu.Trigger class="mb-2 flex h-9 w-full min-w-0 items-center gap-2 rounded-[8px] px-2 text-14-medium text-[#4a4a6a] outline-none hover:bg-[rgba(99,102,241,0.06)] focus-visible:ring-2 focus-visible:ring-[#818cf8] data-[expanded]:bg-[rgba(99,102,241,0.08)]">
+              <DropdownMenu.Trigger aria-label={dockapi.user?.name || "账号菜单"} title={rail() ? dockapi.user?.name || "账号菜单" : undefined} class="cmcc-account-trigger mb-2 flex h-9 w-full min-w-0 items-center gap-2 rounded-[8px] px-2 text-14-medium">
                 <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-12-medium text-blue-700">
                   {dockapi.user?.name.slice(0, 1) || "用"}
                 </span>
-                <span class="min-w-0 flex-1 truncate text-left">{dockapi.user?.name}</span>
-                <Icon name="chevron-down" class="size-4 shrink-0 text-[#7c7fbd]" />
+                <Show when={!rail()}>
+                  <span class="min-w-0 flex-1 truncate text-left">{dockapi.user?.name}</span>
+                  <Icon name="chevron-down" class="size-4 shrink-0 text-[#8a909a]" />
+                </Show>
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content class="w-[calc(var(--kb-popper-anchor-width)-8px)] min-w-[220px] rounded-[12px] border border-[rgba(99,102,241,0.14)] bg-white p-1.5 text-[#4a4a6a] shadow-[0_12px_32px_rgba(49,46,129,0.18)] outline-none">
+                <DropdownMenu.Content class="cmcc-account-menu w-[calc(var(--kb-popper-anchor-width)-8px)] min-w-[220px] rounded-[8px] border bg-white p-1.5 outline-none">
                   <DropdownMenu.Item
                     class="flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-3 text-14-medium outline-none data-[highlighted]:bg-[rgba(99,102,241,0.08)] data-[highlighted]:text-[#4f46e5]"
                     onSelect={() => window.location.assign("/landing/index.html")}
@@ -614,7 +519,8 @@ function CmccSidebar() {
       <div
         role="separator"
         aria-orientation="vertical"
-        class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-transparent hover:before:bg-[#a5b4fc]"
+        hidden={!desktop()}
+        class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-6 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-transparent hover:before:bg-[#a5b4fc]"
         onPointerDown={startDrag}
       />
       <CasePublishDialog
@@ -626,31 +532,8 @@ function CmccSidebar() {
   )
 }
 
-function CmccTopControlButton(props: {
-  icon: Parameters<typeof Icon>[0]["name"]
-  label: string
-  pressed?: boolean
-  disabled?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      class="flex size-8 shrink-0 items-center justify-center rounded-[6px] text-v2-icon-icon-muted transition-[background-color,color] duration-150 hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-icon-icon-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-v2-border-border-active disabled:pointer-events-none disabled:opacity-35 data-[pressed]:bg-v2-overlay-simple-overlay-hover data-[pressed]:text-v2-icon-icon-base"
-      data-pressed={props.pressed ? "" : undefined}
-      title={props.label}
-      aria-label={props.label}
-      aria-pressed={props.pressed}
-      disabled={props.disabled}
-      onClick={props.onClick}
-    >
-      <Icon name={props.icon} class="size-4" />
-    </button>
-  )
-}
-
 function CmccSidebarAction(props: {
-  icon: Parameters<typeof Icon>[0]["name"]
+  icon: "new-chat" | "research" | "industry" | "wiki" | "track" | "lens" | "cases"
   label: string
   active?: boolean
   onClick?: () => void
@@ -658,38 +541,19 @@ function CmccSidebarAction(props: {
   return (
     <button
       type="button"
-      class="flex h-9 w-full min-w-0 items-center gap-2.5 rounded-[8px] px-3 text-left text-14-medium text-[#4a4a6a] transition-colors duration-150 hover:bg-[rgba(99,102,241,0.08)] hover:text-[#4f46e5] disabled:opacity-50 data-[selected]:bg-[rgba(99,102,241,0.12)] data-[selected]:font-medium data-[selected]:text-[#4f46e5]"
+      class="cmcc-sidebar-action flex h-9 w-full min-w-0 items-center gap-2.5 rounded-[8px] px-3 text-left text-14-medium transition-colors duration-150 disabled:opacity-50"
+      aria-label={props.label}
+      title={props.label}
       onClick={props.onClick}
       disabled={!props.onClick}
+      data-primary={props.icon === "new-chat" ? "" : undefined}
       data-selected={props.active ? "" : undefined}
     >
-      <Icon name={props.icon} class="size-4 shrink-0" />
+      <svg aria-hidden="true" class="size-5 shrink-0" viewBox="0 0 20 20">
+        <use href={`${sidebarIconsUrl}#${props.icon}`} width="20" height="20" />
+      </svg>
       <span class="min-w-0 truncate">{props.label}</span>
     </button>
-  )
-}
-
-function CmccSidebarSection(props: {
-  label: string
-  actionLabel?: string
-  actionIcon?: Parameters<typeof Icon>[0]["name"]
-  action?: () => void
-}) {
-  return (
-    <div class="mb-1.5 mt-4 flex h-7 items-center gap-2 px-1 text-[12px] font-medium text-[#7c7fbd] first:mt-0">
-      <span class="min-w-0 flex-1 truncate">{props.label}</span>
-      <Show when={props.action && props.actionIcon && props.actionLabel}>
-        <button
-          type="button"
-          class="flex size-6 shrink-0 items-center justify-center rounded-[6px] text-[#8b8ec4] hover:bg-[rgba(99,102,241,0.10)] hover:text-[#4f46e5]"
-          title={props.actionLabel}
-          aria-label={props.actionLabel}
-          onClick={() => props.action?.()}
-        >
-          <Icon name={props.actionIcon!} class="size-3.5" />
-        </button>
-      </Show>
-    </div>
   )
 }
 

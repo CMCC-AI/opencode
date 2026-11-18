@@ -217,7 +217,7 @@ export default function ResearchComposer() {
           fallback={
             <form
               data-component="session-new-composer"
-              class="w-full rounded-[24px] border-2 border-[#5b4fd7]/50 bg-white shadow-[0_4px_20px_rgba(91,79,215,0.12)]"
+              class="cmcc-home-composer-surface w-full"
               onSubmit={(event) => {
                 event.preventDefault()
                 void submit(() => {})

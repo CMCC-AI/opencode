@@ -1,7 +1,6 @@
 .serial-agent-dag {
   min-height: 0;
   overflow: auto;
-  background: #f9fbff;
   container-type: inline-size;
 }
 

@@ -105,7 +105,7 @@ export function ReportArtifactPreview(props: {
   return (
     <Show when={selected()} fallback={props.empty}>
       {(artifact) => (
-        <div class="flex h-full min-h-0 flex-col overflow-hidden bg-[#f7f8fb] px-4 py-4">
+        <div class="flex h-full min-h-0 flex-col overflow-hidden bg-[var(--workbench-report-background,#f7f8fb)] px-4 py-4">
           <header class="mb-3 flex h-9 shrink-0 items-center gap-2">
             <div class="deeptrading-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto">
               <For each={reports()}>

@@ -74,7 +74,7 @@ export function SerialAgentDag(props: {
   return (
     <section
       aria-label={props.label}
-      class="serial-agent-dag deeptrading-scrollbar"
+      class="serial-agent-dag deeptrading-scrollbar bg-white"
       data-serial-dag
       data-layout={props.layout ?? "folded"}
       data-columns={columns()}

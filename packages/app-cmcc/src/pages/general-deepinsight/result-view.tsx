@@ -1,4 +1,4 @@
-import { createEffect, createMemo, For, Index, onCleanup, Show, untrack, type JSX } from "solid-js"
+import { batch, createEffect, createMemo, For, Index, onCleanup, Show, untrack, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Markdown } from "@opencode-ai/session-ui/markdown"
@@ -20,6 +20,7 @@ import {
 } from "./presentation"
 import { ReportBody, VisualReport } from "./visual"
 import { ThinkingTimeline } from "./thinking-view"
+import { WorkbenchReplayToolbar } from "../session/agent-workbench/replay-toolbar"
 import { showToast } from "@/utils/toast"
 import sendIcon from "@/assets/chat/send.svg"
 import "./reference.css"
@@ -159,8 +160,10 @@ export function ResearchResultView(props: {
       const progress = Math.min(1, (Date.now() - view.replayStarted) / 60000)
       setView("progress", progress)
       if (progress >= 1) {
-        stopReplay()
-        setView("mode", "report")
+        batch(() => {
+          stopReplay()
+          setView("mode", "report")
+        })
       }
     }, 100)
   }
@@ -921,26 +924,17 @@ export function ResearchResultView(props: {
         </div>
       </Show>
       <Show when={!props.editing && (view.mode === "report" || view.replaying) && canReplay()}>
-        <div class="replay-floating-bar">
-          <div class="replay-brand">
-            <span class="replay-logo">深</span>
-            <span>深度洞察</span>
-          </div>
-          <Show when={view.replaying}>
-            <div class="replay-status">
-              <span>{labels[activeNode()!] ?? "正在回放"}</span>
-              <div class="replay-progress-track">
-                <span style={{ width: `${Math.round(view.progress * 100)}%` }} />
-              </div>
-            </div>
-          </Show>
-          <button class="replay-btn" classList={{ active: view.replaying }} onClick={replay}>
-            {view.replaying ? "停止回放" : "看回放"}
-          </button>
-          <button class="replay-btn" onClick={props.onSame}>
-            做同款
-          </button>
-        </div>
+        <WorkbenchReplayToolbar
+          badge="深"
+          name="深度洞察"
+          preparing={false}
+          playing={view.replaying}
+          allowSameDuringReplay
+          stage={labels[activeNode()!] ?? "正在回放"}
+          progress={view.progress}
+          onReplay={replay}
+          onCreateSame={props.onSame}
+        />
       </Show>
     </div>
   )

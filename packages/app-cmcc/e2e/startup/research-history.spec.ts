@@ -169,6 +169,58 @@ for (const width of [1440, 390]) {
   })
 }
 
+for (const width of [1440, 390]) {
+  test(`sidebar keeps history controls fixed and restores the list at ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 680 })
+    await setup(page)
+    await page.goto("/app")
+    const sidebar = page.locator("#cmcc-business-sidebar")
+    const history = sidebar.locator(".cmcc-sidebar-history")
+    const heading = sidebar.getByText("历史任务", { exact: true })
+    const create = sidebar.locator(".cmcc-sidebar-section").getByRole("button", { name: "新对话" })
+    const account = sidebar.locator(".cmcc-account-trigger")
+    const nav = sidebar.getByRole("navigation")
+    await expect(history.locator('[data-component="cmcc-history-row"]')).toHaveCount(9)
+    await expect(page.getByRole("button", { name: /^(后退|前进|新建会话)$/ })).toHaveCount(0)
+    const controls = async () => [
+      await nav.boundingBox(),
+      await heading.boundingBox(),
+      await create.boundingBox(),
+      await account.boundingBox(),
+    ]
+    await page.evaluate(() => document.fonts.ready)
+    const before = await controls()
+    const offset = await history.evaluate((el) => (el.scrollTop = Math.min(80, el.scrollHeight - el.clientHeight)))
+    expect(offset).toBeGreaterThan(0)
+    expect(await controls()).toEqual(before)
+    await sidebar.screenshot({ path: info.outputPath("expanded.png") })
+    await sidebar.getByRole("button", { name: "隐藏左栏" }).click()
+    const opener = page.getByRole("button", { name: "展开左栏" })
+    await expect(opener.locator("img")).toHaveAttribute("src", "/brand/logo.svg")
+    if (width === 1440) {
+      await expect(sidebar).toHaveCSS("width", "64px")
+      await expect(nav.locator("button > span").first()).toBeHidden()
+      await expect(heading).toBeHidden()
+      await expect(history).toBeHidden()
+      await nav.getByRole("button", { name: "产业洞察" }).click()
+      await expect(page).toHaveURL(/\/expert$/)
+      await account.click()
+      await expect(page.getByRole("menuitem", { name: "Token 额度" })).toBeVisible()
+      await page.keyboard.press("Escape")
+      await expect(page.locator(".cmcc-account-menu")).toBeHidden()
+      await sidebar.screenshot({ path: info.outputPath("collapsed.png") })
+    } else {
+      await expect.poll(() => sidebar.evaluate((el) => el.getBoundingClientRect().width)).toBeLessThanOrEqual(1)
+      await expect(sidebar).toHaveAttribute("inert", "")
+    }
+    await opener.click()
+    await expect(heading).toBeVisible()
+    await expect.poll(() => history.evaluate((el) => el.scrollTop)).toBe(offset)
+    await create.click()
+    await expect(page).toHaveURL(/\/new-session\?.*draftId=/)
+  })
+}
+
 test("research history updates running status and preserves research menu actions", async ({ page }) => {
   const fixture = await setup(page)
   await page.goto("/app")

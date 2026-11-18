@@ -3,11 +3,13 @@ import { setupGeneralChat } from "./general-chat.fixture"
 
 test.use({ locale: "zh-CN" })
 const baseline = process.env.CMCC_CHAT_BASELINE === "1"
+const titlePrefix = "整理研究材料与分析步骤吧"
 
 for (const width of [1440, 390]) {
   test(`general chat presentation at ${width}`, async ({ page, baseURL }, info) => {
     await page.setViewportSize({ width, height: 900 })
     const data = await setupGeneralChat(page, { turns: 1 })
+    data.session.title = `${titlePrefix}，并核对引用来源`
     await page.goto(data.href(baseURL!))
     await expect(page.locator('[data-component="session-composer"]')).toBeVisible()
     if (width < 760) {
@@ -43,6 +45,26 @@ for (const width of [1440, 390]) {
     await page.screenshot({ path: info.outputPath(baseline ? "before.png" : "after.png") })
     if (baseline) return
     await expect(page.locator('[data-cmcc-general-chat="true"]')).toHaveCount(1)
+    const header = page.locator("[data-session-title]")
+    const logo = header.getByAltText("移动智能 MobileAI", { exact: true })
+    const title = header.locator('[data-slot="session-title-child"]')
+    await expect(header).toHaveCSS("height", "48px")
+    const background = await scroll.evaluate((el) => getComputedStyle(el.closest(".bg-v2-background-bg-base")!).backgroundColor)
+    await expect(header).toHaveCSS("background-color", background)
+    await expect.poll(() => logo.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
+    await expect(title).toHaveText(`${titlePrefix}...`)
+    await expect(title).toHaveAttribute("title", data.session.title)
+    const bounds = await header.evaluate((el) => {
+      const logo = el.querySelector("img")!.getBoundingClientRect()
+      const title = el.querySelector('[data-slot="session-title-child"]')!.getBoundingClientRect()
+      const more = el.querySelector("button")!.getBoundingClientRect()
+      return { logo: logo.right, titleLeft: title.left, titleRight: title.right, more: more.left }
+    })
+    expect(bounds.logo).toBeLessThan(bounds.titleLeft)
+    expect(bounds.titleRight).toBeLessThan(bounds.more)
+    await title.click()
+    await expect(title).toHaveValue(data.session.title)
+    await title.press("Escape")
     await expect(page.getByAltText("灵犀", { exact: true })).toHaveCount(1)
     await expect(page.getByAltText("用户", { exact: true })).toHaveCount(1)
     await expect(page.locator('[data-action="prompt-model-variant"]')).toHaveCount(0)
@@ -57,6 +79,8 @@ test("retains native controls outside general chat", async ({ page, baseURL }) =
   await page.goto(data.href(baseURL!))
   await expect(page.locator('[data-component="session-composer"]')).toBeVisible()
   await expect(page.locator('[data-cmcc-general-chat="true"]')).toHaveCount(0)
+  await expect(page.locator("[data-session-title]")).toHaveCSS("height", "64px")
+  await expect(page.locator("[data-session-title] img[src='/brand/mobileai-horizontal.svg']")).toHaveCount(0)
   await expect(page.getByAltText("灵犀", { exact: true })).toHaveCount(0)
   await expect(page.getByRole("button", { name: "查看上下文用量" })).toBeVisible()
   await expect(page.locator('[data-action="prompt-model-variant"]')).toBeVisible()
@@ -173,6 +197,20 @@ test("large histories remain virtualized", async ({ page, baseURL }, info) => {
   expect(metrics.rows).toBeLessThan(50)
   await info.attach("large-history-metrics", { body: JSON.stringify(metrics), contentType: "application/json" })
   expect(data.errors).toEqual([])
+})
+
+test("a linked message lands below the compact header and a 12-character title stays intact", async ({ page, baseURL }) => {
+  const data = await setupGeneralChat(page, { turns: 5 })
+  data.session.title = titlePrefix
+  const target = "message-msg_chat_1_user"
+  await page.goto(`${data.href(baseURL!)}#${target}`)
+  const header = page.locator("[data-session-title]")
+  await expect(header.getByRole("heading")).toHaveText(titlePrefix)
+  await expect.poll(() => header.evaluate((el, id) => {
+    const message = document.getElementById(id)?.getBoundingClientRect()
+    const viewport = el.closest(".scroll-view__viewport")?.getBoundingClientRect()
+    return !!message && !!viewport && message.top >= el.getBoundingClientRect().bottom && message.bottom <= viewport.bottom
+  }, target)).toBe(true)
 })
 
 test("tool records retain details and the right panel stays usable", async ({ page, baseURL }, info) => {

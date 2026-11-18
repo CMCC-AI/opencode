@@ -15,7 +15,6 @@ import expertLocation from "@/assets/experts/scene-14.optimized.webp"
 import expertResearch from "@/assets/experts/scene-17.optimized.webp"
 import expertHero from "@/assets/experts/scene-05.optimized.webp"
 import bannerBg from "@/assets/experts/banner.optimized.webp"
-import robotBtn from "@/assets/experts/robot-button.optimized.webp"
 import expertSkillResearch from "@/assets/experts/detail-skill-research.optimized.webp"
 import expertSkillReview from "@/assets/experts/detail-skill-review.optimized.webp"
 import expertSkillWriting from "@/assets/experts/detail-skill-writing.optimized.webp"
@@ -37,6 +36,8 @@ import {
   type TeamMember,
 } from "@/utils/cmcc-experts"
 import { showToast } from "@/utils/toast"
+import { createDialogMotion } from "@/components/cmcc-motion"
+import "./cmcc-experts.css"
 
 export { CMCC_EXPERTS, cmccExpertCenterHref, cmccExpertHref }
 
@@ -106,13 +107,13 @@ function FeaturedCarousel(props: { experts: TeamExpert[]; onOpen: (expert: TeamE
   onCleanup(() => clearInterval(timer))
 
   return (
-    <div class="relative mt-5 flex min-h-[240px] w-full overflow-hidden rounded-[16px] border border-[#d7def7] bg-[#fff] p-0 shadow-[0_8px_30px_rgba(67,66,116,0.06)] max-sm:min-h-[200px]">
+    <div class="cmcc-expert-banner relative mt-5 flex min-h-[240px] w-full overflow-hidden p-0 max-sm:min-h-[200px]">
       <img
         src={bannerBg}
         alt=""
-        class="pointer-events-none absolute inset-0 size-full object-cover"
+        class="pointer-events-none absolute inset-0 size-full object-cover opacity-60"
       />
-      <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/95 via-white/80 to-white/30" />
+      <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/95 via-white/80 to-white/20" />
 
       <div class="relative z-10 flex w-full flex-col px-7 pt-12 pb-5 max-sm:px-5 max-sm:pt-8">
         <div class="mb-5 flex gap-1.5">
@@ -120,26 +121,28 @@ function FeaturedCarousel(props: { experts: TeamExpert[]; onOpen: (expert: TeamE
             {(_, i) => (
               <button
                 type="button"
-                class="h-2 w-2 rounded-full border-0 bg-[#c4b5fd] p-0 transition-all"
-                classList={{ "w-5 bg-[#7c3aed]": i() === index() % total() }}
+                class="cmcc-expert-banner-dot"
+                aria-label={`查看${props.experts[i()].name}`}
+                aria-pressed={i() === index() % total()}
                 onClick={() => setIndex(i())}
               />
             )}
           </For>
         </div>
 
-        <div class="flex flex-1 items-center gap-6">
-          <div class="min-w-0 flex-1">
-            <div class="text-[22px] font-semibold leading-8 text-[#7c3aed]">{current().name}</div>
-            <p class="m-0 mt-1.5 line-clamp-2 text-[13px] leading-5 text-[#6b7280]">{current().description}</p>
+        <div class="flex flex-1 items-center gap-6 max-sm:flex-wrap max-sm:gap-4">
+          <div class="min-w-0 flex-1 max-sm:basis-full">
+            <div class="text-[22px] font-semibold leading-8 text-[#242a35] max-sm:text-[18px]">{current().name}</div>
+            <p class="m-0 mt-2 line-clamp-2 text-[13px] leading-6 text-[#777e89]">{current().description}</p>
           </div>
 
           <button
             type="button"
-            class="flex shrink-0 cursor-pointer flex-col items-center gap-1 border-0 bg-transparent p-0"
+            class="cmcc-expert-primary cmcc-expert-create"
             onClick={() => props.onOpen(current())}
           >
-            <img src={robotBtn} alt="" class="h-28 w-auto object-contain transition hover:scale-105" />
+            <Icon name="new-session" class="size-[18px]" />
+            创建任务
           </button>
         </div>
       </div>
@@ -153,14 +156,13 @@ export function CmccExpertCenterRoute() {
   const [active, setActive] = createSignal<CmccExpert>()
 
   return (
-    <div class="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfcff] text-[#2a155a]">
-      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(239,226,255,0.58),transparent_31%),radial-gradient(circle_at_82%_78%,rgba(220,239,255,0.62),transparent_34%)]" />
+    <div class="cmcc-expert-center relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
       <div class="relative mx-auto flex w-full max-w-[1320px] flex-col px-6 pb-10 pt-14 max-sm:px-4 max-sm:pt-8">
         <header class="w-full">
-          <h1 class="m-0 bg-gradient-to-r from-[#8800ff] to-[#2c5dff] bg-clip-text text-[32px] font-medium leading-10 tracking-[-0.5px] text-transparent max-sm:text-[28px]">
+          <h1 class="m-0 text-[28px] font-semibold leading-10 text-[#171c26] max-sm:text-[24px]">
             产业洞察专家团
           </h1>
-          <p class="m-0 mt-2 text-[16px] leading-6 text-[#3c4055] max-sm:text-[14px]">
+          <p class="m-0 mt-2 text-[14px] leading-6 text-[#858b95]">
             让 AI 进入真实产业场景，完成研究、判断与行动
           </p>
         </header>
@@ -168,8 +170,8 @@ export function CmccExpertCenterRoute() {
         <FeaturedCarousel experts={CMCC_TEAM_EXPERTS.filter((e) => e.id !== "deepinsight")} onOpen={(expert) => setActive(expert)} />
 
         <section class="mt-7 w-full">
-          <h2 class="m-0 text-[16px] font-medium leading-6 text-[#49386e]">AI + 产业洞察</h2>
-          <p class="m-0 mt-1 text-[14px] leading-5 text-[#49386e]/55">选择一个专家或专家团，进入专属工作台</p>
+          <h2 class="m-0 text-[16px] font-semibold leading-6 text-[#272d37]">AI + 产业洞察</h2>
+          <p class="m-0 mt-1 text-[13px] leading-5 text-[#858b95]">选择一个专家或专家团，进入专属工作台</p>
           <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <For each={INDUSTRY_EXPERTS}>
               {(expert) => <ExpertCard expert={expert} onClick={() => setActive(expert)} />}
@@ -265,20 +267,20 @@ function ExpertCard(props: { expert: CmccExpert; onClick: () => void }) {
   return (
     <button
       type="button"
-      class="group relative h-[200px] min-w-0 overflow-hidden rounded-[16px] border border-[#e6e8f4] bg-[linear-gradient(169deg,#e4eaff_3%,#f5f6fb_48%)] p-0 text-left shadow-[0_4px_8px_rgba(26,13,82,0.12)] transition hover:-translate-y-1 hover:border-[#c8cff0] hover:shadow-[0_14px_28px_rgba(67,66,116,0.16)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff] xl:h-[220px]"
+      class="cmcc-expert-card group relative h-[200px] min-w-0 overflow-hidden p-0 text-left xl:h-[220px]"
       onClick={props.onClick}
     >
       <img
         src={presentation.image}
         alt=""
-        class="pointer-events-none absolute inset-0 size-full object-cover transition duration-300 group-hover:scale-[1.035]"
+        class="cmcc-expert-art pointer-events-none absolute inset-0 size-full object-cover"
       />
-      <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#eef1ff] via-[#eef1ff]/72 to-transparent" />
-      <div class="relative z-10 flex h-full max-w-[78%] flex-col px-4 py-4">
-        <h3 class="m-0 text-[17px] font-medium leading-6 text-[#2a155a]">{presentation.eyebrow}</h3>
-        <p class="m-0 mt-0.5 line-clamp-2 text-[11px] leading-4 text-[#2a155a]/52">{presentation.summary}</p>
+      <div class="cmcc-expert-art-shade pointer-events-none absolute inset-0" />
+      <div class="relative z-10 flex h-full max-w-[86%] flex-col px-5 py-4">
+        <h3 class="m-0 text-[17px] font-semibold leading-6 text-[#272d37]">{presentation.eyebrow}</h3>
+        <p class="m-0 mt-1.5 line-clamp-2 text-[12px] leading-5 text-[#747c89]">{presentation.summary}</p>
         <div class="mt-auto flex min-w-0 items-center">
-          <span class="max-w-full truncate rounded-full bg-[linear-gradient(90deg,#eceaff,#dedcff)] px-2.5 py-1 text-[11px] leading-4 text-[#5b4cff]">
+          <span class="cmcc-expert-tag max-w-full truncate px-2.5 py-1 text-[11px] leading-4">
             {props.expert.name}
           </span>
         </div>
@@ -288,14 +290,22 @@ function ExpertCard(props: { expert: CmccExpert; onClick: () => void }) {
 }
 
 function GifDemoModal(props: { onClose: () => void }) {
+  const motion = createDialogMotion(props.onClose)
   return (
     <Portal>
       <div
-        class="fixed inset-0 z-[230] flex items-center justify-center bg-[#050112]/60 px-4 py-4 backdrop-blur-[2px]"
-        onClick={props.onClose}
+        class="cmcc-modal-overlay fixed inset-0 z-[230] flex items-center justify-center px-4 py-4"
+        style={motion.overlay()}
+        onClick={motion.close}
       >
         <div
           class="relative flex max-h-[90dvh] max-w-[420px] flex-col overflow-hidden rounded-[16px] bg-[#fff] shadow-[0_28px_90px_rgba(24,14,57,0.35)]"
+          role="dialog"
+          aria-modal="true"
+          aria-label="手机演示"
+          data-cmcc-dialog
+          inert={motion.closing()}
+          style={motion.content()}
           onClick={(event) => event.stopPropagation()}
         >
           <header class="flex h-12 shrink-0 items-center justify-between border-b border-[#edf0f7] px-5">
@@ -303,7 +313,7 @@ function GifDemoModal(props: { onClose: () => void }) {
             <button
               type="button"
               class="flex size-7 shrink-0 items-center justify-center rounded-[6px] text-[#697085] transition hover:bg-[#f3f5fa] hover:text-[#252839]"
-              onClick={props.onClose}
+              onClick={motion.close}
               aria-label="关闭演示"
             >
               <Icon name="close" class="size-3.5" />
@@ -325,6 +335,7 @@ function ExpertDetailDialog(props: {
   onSummon: (expert: TeamExpert, prompt?: string) => void
 }) {
   const navigate = useNavigate()
+  const motion = createDialogMotion(props.onClose)
   const presentation = createMemo(
     () =>
       EXPERT_PRESENTATION[props.expert.id] ?? {
@@ -348,11 +359,18 @@ function ExpertDetailDialog(props: {
   return (
     <Portal>
       <div
-        class="fixed inset-0 z-[220] flex items-center justify-center bg-[#050112]/40 px-4 py-4 backdrop-blur-[1px]"
-        onClick={props.onClose}
+        class="cmcc-modal-overlay fixed inset-0 z-[220] flex items-center justify-center px-4 py-4"
+        style={motion.overlay()}
+        onClick={motion.close}
       >
         <section
-          class="flex h-[600px] max-h-[calc(100dvh-32px)] w-full max-w-[800px] flex-col overflow-hidden rounded-[16px] bg-[#fff] text-[#1f2433] shadow-[0_28px_90px_rgba(24,14,57,0.28)]"
+          class="cmcc-expert-dialog flex h-[600px] max-h-[calc(100dvh-32px)] w-full max-w-[800px] flex-col overflow-hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label={presentation().eyebrow}
+          data-cmcc-dialog
+          inert={motion.closing()}
+          style={motion.content()}
           onClick={(event) => event.stopPropagation()}
         >
           <header class="flex h-16 shrink-0 items-center justify-between border-b border-[#edf0f7] px-6">
@@ -360,7 +378,7 @@ function ExpertDetailDialog(props: {
             <button
               type="button"
               class="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-[#697085] transition hover:bg-[#f3f5fa] hover:text-[#252839]"
-              onClick={props.onClose}
+              onClick={motion.close}
               aria-label="关闭专家详情"
             >
               <Icon name="close" class="size-4" />
@@ -368,13 +386,13 @@ function ExpertDetailDialog(props: {
           </header>
 
           <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-12 lg:px-[100px]">
-            <section class="relative h-[150px] overflow-hidden rounded-[16px] border border-[#e4e8f6] bg-[linear-gradient(145deg,#edf1ff_0%,#f7f8fd_100%)]">
+            <section class="cmcc-expert-summary relative min-h-[150px] overflow-hidden">
               <img src={presentation().image} alt="" class="absolute inset-0 size-full object-cover" />
-              <div class="absolute inset-0 bg-gradient-to-r from-[#eef2ff] via-[#eef2ff]/82 to-transparent" />
-              <div class="relative flex h-full max-w-[72%] flex-col px-6 py-5">
-                <h3 class="m-0 text-[18px] font-semibold leading-6 text-[#291759]">{presentation().eyebrow}</h3>
-                <p class="m-0 mt-1.5 line-clamp-2 text-[12px] leading-5 text-[#535a70]">{props.expert.description}</p>
-                <span class="mt-auto w-fit max-w-full truncate rounded-full bg-[linear-gradient(90deg,#eceaff,#dedcff)] px-3 py-1 text-[11px] leading-4 text-[#5b4cff]">
+              <div class="cmcc-expert-art-shade absolute inset-0" />
+              <div class="relative flex min-h-[150px] max-w-[86%] flex-col px-5 py-4">
+                <h3 class="m-0 text-[18px] font-semibold leading-6 text-[#272d37]">{presentation().eyebrow}</h3>
+                <p class="m-0 mt-1.5 line-clamp-2 text-[12px] leading-5 text-[#747c89]">{props.expert.description}</p>
+                <span class="cmcc-expert-tag mt-3 w-fit max-w-full truncate px-3 py-1 text-[11px] leading-4">
                   {props.expert.name}
                 </span>
               </div>
@@ -387,7 +405,7 @@ function ExpertDetailDialog(props: {
                   {(capability, index) => (
                     <button
                       type="button"
-                      class="group flex min-h-20 min-w-0 items-center gap-2 rounded-[8px] border border-[#edf0f7] bg-[#f9fbfe] px-2.5 py-2 text-left transition hover:-translate-y-0.5 hover:border-[#cbd4f5] hover:bg-[#fff] hover:shadow-[0_8px_20px_rgba(69,65,116,0.09)]"
+                      class="cmcc-expert-skill group flex min-h-20 min-w-0 items-center gap-2 px-2.5 py-2 text-left"
                       onClick={() => {
                         if (props.expert.kind === "team") {
                           props.onSummon(props.expert, props.expert.examples[index()] ?? props.expert.defaultPrompt)
@@ -421,14 +439,14 @@ function ExpertDetailDialog(props: {
 
           <footer class="flex h-[68px] shrink-0 items-center justify-end gap-3 border-t border-[#edf0f7] px-6 shadow-[0_-5px_16px_rgba(52,42,89,0.04)]" classList={{ "!gap-2 !px-3 sm:!gap-3 sm:!px-6 [&_button]:!px-2 [&_button]:whitespace-nowrap [&_button]:shrink-0 sm:[&_button]:!px-5": props.expert.id === "deeptrading" }}>
             <Show when={props.expert.id === "deeptrading"}>
-              <button type="button" class="mr-auto flex h-9 items-center justify-center gap-2 rounded-[8px] bg-[linear-gradient(90deg,#8758f5,#3b6dff)] px-5 text-[13px] font-medium text-[#fff] shadow-[0_6px_14px_rgba(120,95,245,0.25)] transition hover:brightness-105" onClick={() => { props.onClose(); navigate("/mstock") }}>
+              <button type="button" class="cmcc-expert-primary mr-auto h-9 px-5 text-[13px] font-medium" onClick={() => { props.onClose(); navigate("/mstock") }}>
                 <Icon name="fork" class="size-4" style={{ color: "#fff" }} />多股对比
               </button>
             </Show>
             <Show when={props.expert.id === "shoppers-pro"}>
               <button
                 type="button"
-                class="mr-auto flex h-9 items-center gap-1.5 rounded-[8px] border border-[#d7def7] bg-[#f8f9ff] px-4 text-[13px] font-medium text-[#5b4cff] transition hover:border-[#c4cff7] hover:bg-[#f0f2ff]"
+                class="cmcc-expert-secondary mr-auto flex h-9 items-center gap-1.5 px-4 text-[13px] font-medium"
                 onClick={() => setShowDemo(true)}
               >
                 <svg class="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="square">
@@ -442,8 +460,8 @@ function ExpertDetailDialog(props: {
             <div class="flex items-center gap-3">
               <button
                 type="button"
-                class="h-9 rounded-[8px] border border-[#637cff] bg-[#fff] px-5 text-[13px] font-medium text-[#536dff] transition hover:bg-[#f5f7ff]"
-                onClick={props.onClose}
+                class="cmcc-expert-secondary h-9 px-5 text-[13px] font-medium"
+                onClick={motion.close}
               >
                 取消
               </button>
@@ -452,7 +470,7 @@ function ExpertDetailDialog(props: {
                 fallback={
                   <button
                     type="button"
-                    class="flex h-9 items-center justify-center rounded-[8px] bg-[linear-gradient(90deg,#536dff,#8758f5)] px-5 text-[13px] font-medium text-[#fff] shadow-[0_6px_14px_rgba(92,91,241,0.22)] transition hover:brightness-105"
+                    class="cmcc-expert-primary h-9 px-5 text-[13px] font-medium"
                     onClick={() => props.onOpenExternal(props.expert as ExternalExpert)}
                   >
                     打开 {props.expert.name}
@@ -462,7 +480,7 @@ function ExpertDetailDialog(props: {
                 {(item) => (
                   <button
                     type="button"
-                    class="flex h-9 items-center justify-center rounded-[8px] bg-[linear-gradient(90deg,#8758f5,#3b6dff)] px-5 text-[13px] font-medium text-[#fff] shadow-[0_6px_14px_rgba(120,95,245,0.25)] transition hover:brightness-105"
+                    class="cmcc-expert-primary h-9 px-5 text-[13px] font-medium"
                     onClick={() => props.onSummon(item())}
                   >
                     召唤产业专家团

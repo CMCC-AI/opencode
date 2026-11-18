@@ -8,7 +8,7 @@
   font-size: 14px;
   letter-spacing: 0;
 }
-.general-research button:not(.cmcc-send-button) {
+.general-research button:not(.cmcc-send-button, :where(.workbench-replay-toolbar *)) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -22,15 +22,15 @@
   cursor: pointer;
   font: inherit;
 }
-.general-research button:not(.cmcc-send-button):hover {
+.general-research button:not(.cmcc-send-button, :where(.workbench-replay-toolbar *)):hover {
   border-color: #8ba9e5;
   background: #f1f6ff;
 }
-.general-research button:not(.cmcc-send-button):disabled {
+.general-research button:not(.cmcc-send-button, :where(.workbench-replay-toolbar *)):disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.general-research button:not(.cmcc-send-button):focus-visible {
+.general-research button:not(.cmcc-send-button, :where(.workbench-replay-toolbar *)):focus-visible {
   outline: 2px solid #4d7fe2;
   outline-offset: 2px;
 }

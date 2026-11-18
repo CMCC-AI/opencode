@@ -1,0 +1,32 @@
+[data-component="workbench-response-card"],
+[data-workbench-empty] {
+  border-radius: 20px;
+  border-color: #e5e9f0;
+  box-shadow: 0 4px 14px rgb(36 42 60 / 4%);
+}
+
+[data-component="workbench-query-bubble"] {
+  border-radius: 16px;
+}
+
+[data-workbench-stats] > div {
+  border-radius: 16px;
+  border-color: #e2e8f2;
+  box-shadow: 0 2px 8px rgb(45 68 112 / 3%);
+}
+
+[data-workbench-team-panel] {
+  border-radius: 20px;
+  border-color: #e2e7ef;
+  box-shadow: 0 3px 12px rgb(36 42 60 / 4%);
+}
+
+[data-workbench-agent-strip] {
+  border-radius: 20px;
+  border-color: #e3e7ef;
+  box-shadow: 0 8px 24px rgb(29 38 61 / 10%);
+}
+
+[data-workbench-agent-strip] > button {
+  border-radius: 12px;
+}

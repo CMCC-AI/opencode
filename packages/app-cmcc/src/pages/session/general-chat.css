@@ -10,8 +10,7 @@
 }
 
 .cmcc-general-chat [data-session-title] {
-  background: #f5f9ff;
-  box-shadow: inset 0 -1px #e2ebf7;
+  box-shadow: inset 0 -1px var(--v2-border-border-base);
 }
 
 .cmcc-general-chat [data-slot="session-title-child"] {

@@ -86,6 +86,8 @@ const emptyParts: PartType[] = []
 const emptyTools: ToolPart[] = []
 const emptyAssistantMessages: AssistantMessage[] = []
 const idle = { type: "idle" as const }
+const titleSegmenter =
+  typeof Intl.Segmenter === "function" ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : undefined
 
 type FramedTimelineRow = Exclude<TimelineRow.TimelineRow, { _tag: "TurnGap" }>
 type TimelineRowByTag<T extends TimelineRow.TimelineRow["_tag"]> = Extract<TimelineRow.TimelineRow, { _tag: T }>
@@ -326,7 +328,14 @@ export function MessageTimeline(props: {
     if (value) return value
     return language.t("command.session.new")
   })
+  const displayTitle = createMemo(() => {
+    const value = childTitle()
+    if (!props.generalChat || !value || value.length <= 12) return value
+    const chars = titleSegmenter ? Array.from(titleSegmenter.segment(value), (part) => part.segment) : Array.from(value)
+    return chars.length > 12 ? `${chars.slice(0, 12).join("")}...` : value
+  })
   const showHeader = createMemo(() => !!(titleValue() || parentID()))
+  const headerOffset = () => (showHeader() ? (props.generalChat ? 48 : 64) : 0)
   const projection = createTimelineProjection({
     messages: sessionMessages,
     userMessages: () => props.userMessages,
@@ -435,7 +444,7 @@ export function MessageTimeline(props: {
     followOnAppend: true,
     scrollEndThreshold: 80,
     get scrollMargin() {
-      return showHeader() ? 64 : 0
+      return headerOffset()
     },
     overscan: 50,
     paddingEnd: 64,
@@ -1293,7 +1302,7 @@ export function MessageTimeline(props: {
         data-timeline-key={props.rowKey}
         style={{
           position: "absolute",
-          top: `${item().start - (showHeader() ? 64 : 0)}px`,
+          top: `${item().start - headerOffset()}px`,
           left: "0",
           width: "100%",
           height: `${item().size}px`,
@@ -1394,16 +1403,21 @@ export function MessageTimeline(props: {
             data-session-title
             classList={{
               "sticky top-0 z-30": true,
+              "bg-v2-background-bg-base": props.generalChat,
               "bg-[linear-gradient(to_bottom,var(--v2-background-bg-base)_48px,transparent)]":
-                settings.general.newLayoutDesigns(),
+                settings.general.newLayoutDesigns() && !props.generalChat,
               "bg-[linear-gradient(to_bottom,var(--background-stronger)_48px,transparent)]":
                 !settings.general.newLayoutDesigns(),
               "w-full": true,
-              "pb-4": true,
-              "pr-3": !settings.general.newLayoutDesigns() || view().reviewPanel.opened(),
-              "pr-[56px]": settings.general.newLayoutDesigns() && !view().reviewPanel.opened(),
-              "pl-2": settings.general.newLayoutDesigns() && layout.sidebar.opened(),
-              "pl-[154px]": settings.general.newLayoutDesigns() && !layout.sidebar.opened(),
+              "pb-4": !props.generalChat,
+              "pr-3": props.generalChat || !settings.general.newLayoutDesigns() || view().reviewPanel.opened(),
+              "md:pr-14": props.generalChat && !view().reviewPanel.opened(),
+              "pr-[56px]": !props.generalChat && settings.general.newLayoutDesigns() && !view().reviewPanel.opened(),
+              "pl-3": props.generalChat && (layout.sidebar.opened() || settings.general.mobileTitlebarPosition() === "top"),
+              "pl-14 md:pl-3":
+                props.generalChat && !layout.sidebar.opened() && settings.general.mobileTitlebarPosition() === "bottom",
+              "pl-2": !props.generalChat && settings.general.newLayoutDesigns() && layout.sidebar.opened(),
+              "pl-[154px]": !props.generalChat && settings.general.newLayoutDesigns() && !layout.sidebar.opened(),
               "pl-2 md:pl-4": !settings.general.newLayoutDesigns(),
               "md:max-w-200 md:mx-auto 2xl:max-w-[1000px]": props.centered && !settings.general.newLayoutDesigns(),
             }}
@@ -1416,6 +1430,13 @@ export function MessageTimeline(props: {
                 }}
               >
                 <div class="flex items-center min-w-0 flex-1 w-full">
+                  <Show when={props.generalChat}>
+                    <img
+                      src="/brand/mobileai-horizontal.svg"
+                      alt="移动智能 MobileAI"
+                      class="mr-1 h-8 w-24 shrink-0 border-r border-v2-border-border-base pr-2 object-contain"
+                    />
+                  </Show>
                   <Show when={parentID()}>
                     <button
                       type="button"
@@ -1439,15 +1460,17 @@ export function MessageTimeline(props: {
                       fallback={
                         <h1
                           data-slot="session-title-child"
+                          title={props.generalChat ? childTitle() : undefined}
                           classList={{
                             "text-14-medium text-text-strong truncate": true,
+                            "min-w-0": props.generalChat,
                             "w-fit rounded-[6px] px-2 py-1 hover:bg-v2-overlay-simple-overlay-hover":
                               settings.general.newLayoutDesigns(),
                             "grow-1 min-w-0": !settings.general.newLayoutDesigns(),
                           }}
                           onClick={openTitleEditor}
                         >
-                          {childTitle()}
+                          {displayTitle()}
                         </h1>
                       }
                     >
@@ -1460,6 +1483,7 @@ export function MessageTimeline(props: {
                         disabled={titleMutation.isPending}
                         classList={{
                           "text-14-medium text-text-strong block": true,
+                           "min-w-0 max-w-full": props.generalChat,
                           "w-full flex-1 grow-1 min-w-0 pl-1 -ml-1 rounded-[6px]": !settings.general.newLayoutDesigns(),
                           "field-sizing-content self-start rounded-[6px] px-2 py-1 ":
                             settings.general.newLayoutDesigns(),

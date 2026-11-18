@@ -1,5 +1,6 @@
 import { Markdown } from "@opencode-ai/session-ui/markdown"
 import { Icon } from "@opencode-ai/ui/icon"
+import { WorkbenchFileIcon } from "../agent-workbench/artifact-file-icon"
 import { For, Match, Show, Switch, createEffect, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import { SessionArtifactPreview } from "@/components/session-artifact-preview"
@@ -79,7 +80,7 @@ export function DeepInsightFilesTab() {
                 {(artifact) => (
                   <article class="flex min-w-0 items-center gap-3 rounded-[8px] border border-[#e0e4eb] bg-white p-3">
                     <span class="flex size-9 shrink-0 items-center justify-center rounded-[7px] bg-[#eef2fa] text-[#5970aa]">
-                      <Icon name="file-tree" class="size-4" />
+                      <WorkbenchFileIcon filename={artifact.filename} />
                     </span>
                     <button
                       type="button"
@@ -180,7 +181,7 @@ export function DeepInsightTextReportTab() {
         />
       }
     >
-      <div class="deeptrading-scrollbar h-full min-h-0 overflow-y-auto bg-[#f7f8fb] px-4 py-4">
+      <div class="deeptrading-scrollbar h-full min-h-0 overflow-y-auto px-4 py-4">
         <div class="mx-auto w-full max-w-[860px] rounded-[8px] border border-[#e0e4eb] bg-white px-5 py-5 sm:px-7">
           <Markdown
             text={context.replay.textReportMarkdown()}

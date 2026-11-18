@@ -183,6 +183,46 @@ async function prepare(page: Page, initial = "completed", allowed = true, caseCo
   }
 }
 
+for (const width of [1440, 390]) {
+  test(`quick research collapses its replay toolbar without pausing playback at ${width}`, async ({ page }, info) => {
+    const data = await prepare(page)
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(width === 390 ? `/general-deepinsight/cases/${code}` : `/general-deepinsight/session/${id}`)
+    if (width === 390) await page.getByRole("button", { name: "研究结果", exact: true }).click()
+    const panel = page.locator(".right-panel")
+    const group = panel.getByRole("group", { name: "回放与同款操作" })
+    const play = group.getByRole("button", { name: "看回放", exact: true })
+    const collapse = group.getByRole("button", { name: "收起操作条" })
+    const expand = group.getByRole("button", { name: "展开操作条" })
+    await expect(play).toHaveCSS("border-radius", "18px")
+    const report = panel.locator(".report-view")
+    const reportSize = () => report.evaluate(el => [el.clientWidth, el.clientHeight])
+    const size = await reportSize()
+    await collapse.click()
+    await expect(group.getByRole("button")).toHaveCount(1)
+    await expect(expand).toHaveText("深")
+    expect(await reportSize()).toEqual(size)
+    const badge = (await group.boundingBox())!
+    const area = (await panel.boundingBox())!
+    expect(area.x + area.width - badge.x - badge.width).toBeCloseTo(8, 0)
+    await page.screenshot({ path: info.outputPath("quick-replay-collapsed.png") })
+    await expand.click()
+    await page.clock.install()
+    await play.click()
+    await collapse.click()
+    await page.clock.fastForward(30000)
+    await expand.click()
+    await expect(group.getByRole("button", { name: "停止回放" })).toBeVisible()
+    await expect(group.getByRole("button", { name: "做同款" })).toBeEnabled()
+    await collapse.click()
+    await page.clock.fastForward(31000)
+    await expect(expand).toBeVisible()
+    await expand.click()
+    await expect(play).toBeVisible()
+    expect(data.errors).toEqual([])
+  })
+}
+
 test("renders all five research progress icons from the built assets", async ({ page }, info) => {
   await prepare(page)
   await page.goto(`/general-deepinsight/session/${id}`)

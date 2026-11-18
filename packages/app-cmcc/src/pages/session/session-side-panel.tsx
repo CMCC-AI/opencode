@@ -634,6 +634,7 @@ export function SessionSidePanel(props: {
       >
         <Show when={open()}>
           <div
+            data-cmcc-side-panel
             class="size-full flex"
             classList={{
               "border-l border-border-weaker-base": !settings.general.newLayoutDesigns(),

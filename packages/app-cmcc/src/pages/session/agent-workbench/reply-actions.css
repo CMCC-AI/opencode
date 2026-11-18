@@ -1,0 +1,32 @@
+.workbench-message-group > footer {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.workbench-message-group:has(:focus-visible) > footer {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: hover) {
+  .workbench-message-group:hover > footer {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (hover: none) {
+  .workbench-message-group:focus-within > footer {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.workbench-message-group footer [data-slot="icon-svg"] {
+  color: #7a8292;
+}
+
+.workbench-message-group footer [aria-pressed="true"] [data-slot="icon-svg"] {
+  color: #555e6b;
+  fill: currentColor;
+}

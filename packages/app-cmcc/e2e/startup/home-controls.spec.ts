@@ -22,6 +22,9 @@ async function openHome(page: Page, width = 1440) {
   }
   await expect(page.locator(modelTrigger)).not.toBeDisabled()
   await page.evaluate(() => document.fonts.ready)
+  await page.locator(".cmcc-page-content").evaluate((element) =>
+    Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined))),
+  )
 }
 
 for (const width of [1440, 390, 320]) {
@@ -32,6 +35,9 @@ for (const width of [1440, 390, 320]) {
     const trigger = page.getByRole("button", { name: "打开更多操作" })
     await trigger.click()
     await expect(page.locator(menu)).toBeVisible()
+    await page.locator(".home-actions-popover").evaluate((element) =>
+      Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined))),
+    )
     expect(await page.locator(composer).boundingBox()).toEqual(before)
     expect(await page.locator(".cmcc-home-brand").boundingBox()).toEqual(title)
     const box = await page.locator(menu).boundingBox()
@@ -58,7 +64,8 @@ for (const width of [1440, 390, 320]) {
     expect(await page.locator(composer).boundingBox()).toEqual(before)
     await page.getByRole("button", { name: "关闭技能" }).click()
     await trigger.click()
-    await page.locator(".cmcc-home-brand").click()
+    // The floating menu can cover the heading on compact viewports.
+    await page.mouse.click(width - 16, 80)
     await expect(page.locator(menu)).toHaveCount(0)
     await trigger.focus()
     await page.keyboard.press("ArrowUp")

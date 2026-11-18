@@ -49,7 +49,7 @@ export function CaseDeleteDialog(props: {
       {(value) => (
         <Portal>
           <div
-            class="fixed inset-0 z-[620] flex items-center justify-center bg-[rgba(34,39,68,0.28)] p-5 backdrop-blur-[4px]"
+            class="cmcc-modal-overlay fixed inset-0 z-[620] flex items-center justify-center p-5"
             onPointerDown={(event) => {
               if (event.target === event.currentTarget) close()
             }}
@@ -58,7 +58,7 @@ export function CaseDeleteDialog(props: {
               role="dialog"
               aria-modal="true"
               aria-labelledby="case-delete-title"
-              class="isolate w-full max-w-[420px] overflow-hidden rounded-[8px] border border-[#cbd8f0] bg-[#f7f9ff] shadow-[0_22px_60px_rgba(46,66,110,0.20)]"
+              class="cmcc-dialog-surface isolate w-full max-w-[420px] overflow-hidden rounded-[8px] border border-[#cbd8f0] bg-[#f7f9ff] shadow-[0_22px_60px_rgba(46,66,110,0.20)]"
             >
               <header class="flex h-14 items-center justify-between border-b border-[#dbe4f3] bg-[#eef3ff] px-[18px]">
                 <h2 id="case-delete-title" class="text-[15px] font-semibold text-[#27334f]">

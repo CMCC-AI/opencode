@@ -6,6 +6,7 @@ import type { SessionPromptAsyncData } from "@opencode-ai/sdk/v2/client"
 import { mstockFixture } from "../../src/pages/session/mstock/fixtures"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
+import { expectTeamStatIcons } from "../utils/workbench-surfaces"
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL, video: "off" })
 
 type PromptRequest = NonNullable<SessionPromptAsyncData["body"]>
@@ -425,6 +426,14 @@ test("submission failure preserves inputs and reuses binding and message ID", as
   )
 })
 
+test("multi-stock snapshot shows four standard metric icons", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1920, height: 1000 })
+  await prepare(page)
+  await page.goto("/cases/mstock")
+  await expectTeamStatIcons(page)
+  await page.locator("[data-workbench-stats]").screenshot({ path: info.outputPath("mstock-stat-icons.png") })
+})
+
 test("finance snapshot selects mstock UI and do-same returns to empty form", async ({ page }) => {
   const state = await prepare(page)
   await page.goto("/cases/mstock")
@@ -636,6 +645,7 @@ for (const width of [1440, 390])
     await expect(cards).toHaveCount(1)
     const response = page.locator('[data-component="workbench-response"]')
     await expect(response.locator("footer")).toHaveCount(1)
+    await response.getByText("团长继续补充对比结论。", { exact: true }).hover()
     await response.getByRole("button", { name: "复制全部回复", exact: true }).click()
     expect((await page.evaluate(() => navigator.clipboard.readText())).replaceAll("\r\n", "\n")).toBe(leadText.text)
     await headers.first().scrollIntoViewIfNeeded()

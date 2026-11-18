@@ -1,4 +1,9 @@
+:root {
+  --cmcc-home-background: #fcfcfd;
+}
+
 .cmcc-home {
+  background: var(--cmcc-home-background);
   padding: 48px 40px;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(max-content, 1fr) auto minmax(0, 1fr);
@@ -18,7 +23,7 @@
   align-self: end;
   flex-direction: column;
   align-items: center;
-  padding-bottom: 60px;
+  padding-bottom: 48px;
   text-align: center;
 }
 
@@ -42,22 +47,41 @@
   min-width: 0;
   margin: 0 0 -6px;
   padding-bottom: 6px;
-  font-size: 43px;
-  font-weight: 500;
+  font-size: 38px;
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: 0;
-  background: linear-gradient(135deg, #1e3a8a 0%, #5b4fd7 50%, #9b59f0 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #171c26;
 }
 
 .cmcc-home-heading p {
   margin: 0;
-  font-size: 27px;
+  font-size: 18px;
   font-weight: 400;
   line-height: 1.5;
-  color: #9ca3af;
+  color: #7a808b;
+}
+
+.cmcc-home-composer-surface {
+  border: 1px solid #dfe2e7;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(25 35 50 / 4%);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.cmcc-home-composer-surface:focus-within {
+  border-color: #a5b5e9;
+  box-shadow:
+    0 0 0 2px rgb(79 106 214 / 5%),
+    0 3px 10px rgb(25 35 50 / 4%);
+}
+
+.cmcc-home [data-component="session-new-design-text"],
+.cmcc-home textarea::placeholder {
+  color: #969ba3;
 }
 
 .cmcc-home-composer {
@@ -105,30 +129,46 @@
 
 @container cmcc-home (max-width: 640px) {
   .cmcc-home-brand h1 {
-    font-size: 36px;
+    font-size: 32px;
   }
 
   .cmcc-home-heading p {
-    font-size: 23px;
+    font-size: 17px;
   }
 }
 
 @container cmcc-home (max-width: 480px) {
+  .cmcc-home [data-component="session-new-composer"] {
+    min-height: 200px;
+  }
+
   .cmcc-home-brand {
     flex-direction: column;
     gap: 10px;
   }
 
   .cmcc-home-brand h1 {
-    font-size: 32px;
+    font-size: 28px;
   }
 
   .cmcc-home-heading p {
-    font-size: 20px;
+    font-size: 16px;
   }
 
   .cmcc-home-heading {
     padding-bottom: 32px;
+  }
+}
+
+@container cmcc-home (max-width: 300px) {
+  .cmcc-home-brand h1 {
+    font-size: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmcc-home-composer-surface {
+    transition: none;
   }
 }
 

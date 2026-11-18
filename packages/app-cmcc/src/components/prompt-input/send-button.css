@@ -8,7 +8,8 @@
   border: 0;
   border-radius: 50%;
   padding: 0;
-  background: linear-gradient(135deg, #1e3a8a, #5b4fd7, #9b59f0);
+  background: #4f6ad6;
+  box-shadow: 0 2px 5px rgb(79 106 214 / 12%);
   color: #fff;
   cursor: pointer;
   transition:
@@ -18,8 +19,8 @@
 }
 
 .cmcc-send-button:hover:not(:disabled) {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgb(91 79 199 / 40%);
+  background: #435ec9;
+  box-shadow: 0 3px 8px rgb(79 106 214 / 20%);
 }
 
 .cmcc-send-button:focus-visible {

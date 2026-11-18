@@ -12,7 +12,7 @@
   font-weight: 400;
   color: #111827;
 }
-.general-research .general-research-result button {
+.general-research .general-research-result button:not(:where(.workbench-replay-toolbar *)) {
   min-height: 0;
   padding: 0;
   border: 0;
@@ -267,10 +267,5 @@
   }
   .general-research-result .right-panel .stat-value {
     font-size: 12px;
-  }
-  .general-research-result .right-panel .replay-floating-bar {
-    max-width: calc(100% - 20px);
-    padding: 8px;
-    gap: 7px;
   }
 }

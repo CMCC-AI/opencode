@@ -1,4 +1,6 @@
 import { Icon } from "@opencode-ai/ui/icon"
+import { WorkbenchStatCard } from "../agent-workbench/stat-card"
+import { WorkbenchTeamPanel } from "../agent-workbench/team-panel"
 import { formatCaseCharacterCount } from "@/utils/cmcc-cases"
 import { For, Match, Show, Switch, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js"
 import type { AgentNodeStatus } from "../agent-workbench/model"
@@ -17,164 +19,152 @@ export function DeepInsightTeamTab() {
     const reportLength = context.reportLength()
     return [
       {
-        key: "elapsed",
+        metric: "elapsed",
         label: "思考时间",
         value: formatElapsed(context.workbench().stats.elapsedMs),
-        icon: "brain" as const,
       },
       {
-        key: "tokens",
+        metric: "tokens",
         label: "消耗 token",
         value: tokenCount === undefined ? "--" : formatNumber(tokenCount),
-        icon: "code-lines" as const,
       },
       {
-        key: "report-length",
+        metric: "report-length",
         label: "报告篇幅",
         value:
           context.workbench().loading || reportLength === undefined ? "--" : formatCaseCharacterCount(reportLength),
-        icon: "file-tree" as const,
       },
       {
-        key: "sources",
+        metric: "sources",
         label: "信息源",
         value: context.sourceCount() === undefined ? "--" : `${formatNumber(context.sourceCount()!)} 篇`,
-        icon: "magnifying-glass" as const,
       },
-    ]
+    ] as const
   })
 
   return (
     <div class="flex size-full min-h-0 flex-col gap-3 px-3 py-3">
-      <section aria-label="DeepInsight 统计" class="grid grid-cols-4 gap-1.5">
-        <For each={stats()}>
-          {(stat) => (
-            <div class="flex min-h-[64px] min-w-0 items-center gap-1.5 rounded-[7px] border border-[#dce5f5] bg-[#f4f7fd] p-2">
-              <span class="flex size-7 shrink-0 items-center justify-center rounded-[6px] bg-[#dfe8fb] text-[#4969b4]">
-                <Icon name={stat.icon} class="size-3.5" />
-              </span>
-              <span class="min-w-0">
-                <span class="block break-words text-[10px] leading-4 text-[#7d8594]">{stat.label}</span>
-                <strong class="block break-words text-[13px] font-semibold leading-4 text-[#293142]">
-                  {stat.value}
-                </strong>
-              </span>
-            </div>
-          )}
-        </For>
+      <section data-workbench-stats aria-label="DeepInsight 统计" class="grid grid-cols-4 gap-1.5">
+        <For each={stats()}>{(stat) => <WorkbenchStatCard {...stat} />}</For>
       </section>
 
-      <div class="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_auto_minmax(0,1fr)] overflow-hidden rounded-[8px] border border-[#dfe4ed] bg-white">
-        <section
-          aria-label="DeepInsight DAG"
-          class="deeptrading-scrollbar min-h-0 overflow-y-auto bg-[#f9fbff] px-3 py-1"
-        >
-          <div ref={dagContainer} class="relative mx-auto h-full min-h-[432px] w-full max-w-[860px]">
-            <DagConnections
-              getContainer={() => dagContainer}
-              getNode={(agentId) => dagNodes.get(agentId)}
-              nodes={nodes()}
-            />
-            <div
-              class="relative z-10 grid h-full min-h-0"
-              style={{ "grid-template-rows": `repeat(${DEEPINSIGHT_DAG_LEVELS.length}, minmax(0, 1fr))` }}
-            >
-              <For each={DEEPINSIGHT_DAG_LEVELS}>
-                {(level) => (
-                  <div
-                    class="grid min-h-0 items-center gap-2"
-                    style={{ "grid-template-columns": `repeat(${level.length}, minmax(0, 1fr))` }}
-                  >
-                    <For each={level}>
-                      {(agentId) => {
-                        const node = createMemo(() => nodes().get(agentId))
-                        const upstream = DEEPINSIGHT_DAG_EDGES.filter((edge) => edge[1] === agentId).length
-                        return (
-                          <button
-                            type="button"
-                            data-status={node()?.status ?? "waiting"}
-                            data-selected={context.selectedAgentId() === agentId ? "" : undefined}
-                            class="relative mx-auto flex h-[clamp(34px,78%,44px)] w-full max-w-[146px] min-w-0 items-center gap-1.5 rounded-full border border-[#cfdaee] bg-white px-1 py-1 text-left shadow-[0_2px_8px_rgba(45,68,112,0.06)] transition hover:border-[#8fa9df] hover:shadow-[0_4px_12px_rgba(45,68,112,0.10)] data-[selected]:border-[#6687d6] data-[selected]:bg-[#f1f5ff] data-[selected]:shadow-[0_0_0_2px_rgba(82,113,183,0.12)] data-[status=completed]:border-[#a9d8c2] data-[status=failed]:border-[#e6aaaa] data-[status=running]:border-[#91abe2]"
-                            title={`${node()?.profession ?? agentId} · ${node()?.name ?? agentId}${upstream ? ` · ${upstream} 个上游节点` : ""}`}
-                            ref={(element) => dagNodes.set(agentId, element)}
-                            onClick={() => context.selectAgent(agentId)}
-                          >
-                            <AgentAvatar src={deepInsightAvatar(agentId)} name={node()?.name ?? "?"} size="compact" />
-                            <span class="min-w-0 flex-1">
-                              <strong class="block truncate text-[10px] font-semibold leading-4 text-[#303746]">
-                                {node()?.profession ?? "等待会话"}
-                              </strong>
-                              <small class="block truncate text-[9px] leading-3 text-[#8992a3]">
-                                {node()?.name ?? agentId}
-                              </small>
-                            </span>
-                          </button>
-                        )
-                      }}
+      <WorkbenchTeamPanel
+        dagMinHeight={Math.max(432, DEEPINSIGHT_DAG_LEVELS.length * 42)}
+        dag={
+          <section
+            aria-label="DeepInsight DAG"
+            class="deeptrading-scrollbar min-h-0 overflow-y-auto bg-white px-3 py-1"
+          >
+            <div ref={dagContainer} class="relative mx-auto h-full min-h-[432px] w-full max-w-[860px]">
+              <DagConnections
+                getContainer={() => dagContainer}
+                getNode={(agentId) => dagNodes.get(agentId)}
+                nodes={nodes()}
+              />
+              <div
+                class="relative z-10 grid h-full min-h-0"
+                style={{ "grid-template-rows": `repeat(${DEEPINSIGHT_DAG_LEVELS.length}, minmax(0, 1fr))` }}
+              >
+                <For each={DEEPINSIGHT_DAG_LEVELS}>
+                  {(level) => (
+                    <div
+                      class="grid min-h-0 items-center gap-2"
+                      style={{ "grid-template-columns": `repeat(${level.length}, minmax(0, 1fr))` }}
+                    >
+                      <For each={level}>
+                        {(agentId) => {
+                          const node = createMemo(() => nodes().get(agentId))
+                          const upstream = DEEPINSIGHT_DAG_EDGES.filter((edge) => edge[1] === agentId).length
+                          return (
+                            <button
+                              type="button"
+                              data-status={node()?.status ?? "waiting"}
+                              data-selected={context.selectedAgentId() === agentId ? "" : undefined}
+                              class="relative mx-auto flex h-[clamp(34px,78%,44px)] w-full max-w-[146px] min-w-0 items-center gap-1.5 rounded-full border border-[#cfdaee] bg-white px-1 py-1 text-left shadow-[0_2px_8px_rgba(45,68,112,0.06)] transition hover:border-[#8fa9df] hover:shadow-[0_4px_12px_rgba(45,68,112,0.10)] data-[selected]:border-[#6687d6] data-[selected]:bg-[#f1f5ff] data-[selected]:shadow-[0_0_0_2px_rgba(82,113,183,0.12)] data-[status=completed]:border-[#a9d8c2] data-[status=failed]:border-[#e6aaaa] data-[status=running]:border-[#91abe2]"
+                              title={`${node()?.profession ?? agentId} · ${node()?.name ?? agentId}${upstream ? ` · ${upstream} 个上游节点` : ""}`}
+                              ref={(element) => dagNodes.set(agentId, element)}
+                              onClick={() => context.selectAgent(agentId)}
+                            >
+                              <AgentAvatar src={deepInsightAvatar(agentId)} name={node()?.name ?? "?"} size="compact" />
+                              <span class="min-w-0 flex-1">
+                                <strong class="block truncate text-[10px] font-semibold leading-4 text-[#303746]">
+                                  {node()?.profession ?? "等待会话"}
+                                </strong>
+                                <small class="block truncate text-[9px] leading-3 text-[#8992a3]">
+                                  {node()?.name ?? agentId}
+                                </small>
+                              </span>
+                            </button>
+                          )
+                        }}
+                      </For>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </div>
+          </section>
+
+        }
+        progress={
+          <section class="flex shrink-0 items-center gap-3 border-y border-[#e2e7f0] bg-[#fbfcff] px-4 py-2.5">
+            <h3 class="m-0 shrink-0 text-[12px] font-semibold leading-5 text-[#4563a5]">分析流程：</h3>
+            <div class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e7ebf4]">
+              <span
+                class="block h-full rounded-full bg-[#5878c8] transition-[width]"
+                style={{ width: `${context.progressPercent()}%` }}
+              />
+            </div>
+          </section>
+        }
+        details={
+          <section class="flex min-h-0 flex-col bg-white">
+            <header class="shrink-0 border-b border-[#edf0f5] px-4 py-2.5">
+              <h3 class="m-0 text-[13px] font-semibold leading-5 text-[#293142]">详情信息</h3>
+            </header>
+            <div class="deeptrading-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              <Switch>
+                <Match when={context.selectedAgentId() === "overview"}>
+                  <DetailEmpty>请选择上方一级专家查看二级 Agent 内容</DetailEmpty>
+                </Match>
+                <Match when={context.workbench().nestedAgentSessionsLoading}>
+                  <DetailEmpty>正在读取二级 Agent 内容</DetailEmpty>
+                </Match>
+                <Match when={context.workbench().nestedAgentSessionsError}>
+                  {(error) => <DetailEmpty>二级 Agent 内容加载失败：{error()}</DetailEmpty>}
+                </Match>
+                <Match when={context.workbench().nestedAgentSessions.length > 0}>
+                  <div class="space-y-2">
+                    <For each={context.workbench().nestedAgentSessions}>
+                      {(session) => (
+                        <div class="flex w-full min-w-0 items-center gap-2 rounded-[7px] border border-[#e3e7ef] bg-[#fafbfc] px-2.5 py-2">
+                          <span class="flex size-8 shrink-0 items-center justify-center rounded-[6px] bg-[#e7ecf7] text-[#5670ad]">
+                            <Icon name="fork" class="size-4" />
+                          </span>
+                          <span class="min-w-0 flex-1">
+                            <strong class="block break-words text-[12px] font-medium leading-4 text-[#343b4a]">
+                              {session.title}
+                            </strong>
+                            <Show when={session.agentId}>
+                              {(agentId) => (
+                                <small class="block break-all text-[10px] leading-4 text-[#8a91a0]">{agentId()}</small>
+                              )}
+                            </Show>
+                          </span>
+                          <StatusBadge status={session.status} />
+                        </div>
+                      )}
                     </For>
                   </div>
-                )}
-              </For>
+                </Match>
+                <Match when={true}>
+                  <DetailEmpty>当前专家暂无二级 Agent 内容</DetailEmpty>
+                </Match>
+              </Switch>
             </div>
-          </div>
-        </section>
-
-        <section class="flex shrink-0 items-center gap-3 border-y border-[#e2e7f0] bg-[#fbfcff] px-4 py-2.5">
-          <h3 class="m-0 shrink-0 text-[12px] font-semibold leading-5 text-[#4563a5]">分析流程：</h3>
-          <div class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e7ebf4]">
-            <span
-              class="block h-full rounded-full bg-[#5878c8] transition-[width]"
-              style={{ width: `${context.progressPercent()}%` }}
-            />
-          </div>
-        </section>
-
-        <section class="flex min-h-0 flex-col bg-white">
-          <header class="shrink-0 border-b border-[#edf0f5] px-4 py-2.5">
-            <h3 class="m-0 text-[13px] font-semibold leading-5 text-[#293142]">详情信息</h3>
-          </header>
-          <div class="deeptrading-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            <Switch>
-              <Match when={context.selectedAgentId() === "overview"}>
-                <DetailEmpty>请选择上方一级专家查看二级 Agent 内容</DetailEmpty>
-              </Match>
-              <Match when={context.workbench().nestedAgentSessionsLoading}>
-                <DetailEmpty>正在读取二级 Agent 内容</DetailEmpty>
-              </Match>
-              <Match when={context.workbench().nestedAgentSessionsError}>
-                {(error) => <DetailEmpty>二级 Agent 内容加载失败：{error()}</DetailEmpty>}
-              </Match>
-              <Match when={context.workbench().nestedAgentSessions.length > 0}>
-                <div class="space-y-2">
-                  <For each={context.workbench().nestedAgentSessions}>
-                    {(session) => (
-                      <div class="flex w-full min-w-0 items-center gap-2 rounded-[7px] border border-[#e3e7ef] bg-[#fafbfc] px-2.5 py-2">
-                        <span class="flex size-8 shrink-0 items-center justify-center rounded-[6px] bg-[#e7ecf7] text-[#5670ad]">
-                          <Icon name="fork" class="size-4" />
-                        </span>
-                        <span class="min-w-0 flex-1">
-                          <strong class="block break-words text-[12px] font-medium leading-4 text-[#343b4a]">
-                            {session.title}
-                          </strong>
-                          <Show when={session.agentId}>
-                            {(agentId) => (
-                              <small class="block break-all text-[10px] leading-4 text-[#8a91a0]">{agentId()}</small>
-                            )}
-                          </Show>
-                        </span>
-                        <StatusBadge status={session.status} />
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </Match>
-              <Match when={true}>
-                <DetailEmpty>当前专家暂无二级 Agent 内容</DetailEmpty>
-              </Match>
-            </Switch>
-          </div>
-        </section>
-      </div>
+          </section>
+        }
+      />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { For, Match, Show, Switch, createEffect } from "solid-js"
+import { WorkbenchReplayToolbar } from "../agent-workbench/replay-toolbar"
 import { createStore } from "solid-js/store"
 import { useDockApi } from "@/context/dockapi"
 import { useServer } from "@/context/server"
@@ -20,9 +21,6 @@ const TABS: Array<{ id: AiScienceTab; label: string }> = [
   { id: "text", label: "文字报告" },
   { id: "visual", label: "可视化报告" },
 ]
-
-const ACTION_BUTTON_CLASS =
-  "h-9 shrink-0 rounded-[18px] bg-[#eff6ff] px-3 text-[14px] font-bold text-[#3b82f6] shadow-[0_4px_10px_rgba(59,130,246,0.12)] transition hover:bg-[#e5efff] disabled:cursor-wait disabled:opacity-60 @min-[340px]:px-5"
 
 export function AiScienceResultsPanel(props: { onCreateSame?: () => void } = {}) {
   const context = useAiScienceWorkbench()
@@ -109,7 +107,7 @@ export function AiScienceResultsPanel(props: { onCreateSame?: () => void } = {})
   }
 
   return (
-    <div class="@container relative flex size-full min-w-0 flex-col bg-[#f7f8fb]">
+    <div class="workbench-results @container relative flex size-full min-w-0 flex-col">
       <nav
         class="flex h-12 shrink-0 items-end gap-1 border-b border-[#dfe3ea] bg-white px-3"
         aria-label="AI for Science 结果页签"
@@ -127,10 +125,10 @@ export function AiScienceResultsPanel(props: { onCreateSame?: () => void } = {})
           )}
         </For>
       </nav>
-      <div class="min-h-0 flex-1 overflow-hidden" classList={{ "pb-[72px]": showReplayBar() }}>
+      <div class="min-h-0 flex-1 overflow-hidden">
         <Switch>
           <Match when={state.active === "team"}>
-            <div class="size-full overflow-hidden bg-[#f7f8fb]">
+            <div class="size-full overflow-hidden">
               <AiScienceTeamTab />
             </div>
           </Match>
@@ -146,43 +144,16 @@ export function AiScienceResultsPanel(props: { onCreateSame?: () => void } = {})
         </Switch>
       </div>
       <Show when={showReplayBar()}>
-        <div class="pointer-events-none absolute inset-x-0 bottom-3 z-30 flex justify-center px-3">
-          <div class="pointer-events-auto flex max-w-full min-w-0 items-center gap-2.5 rounded-[18px] border border-[#dfe5ef] bg-white/95 px-2.5 py-2 shadow-[0_8px_24px_rgba(29,45,78,0.14)] backdrop-blur">
-            <div class="mr-0 flex shrink-0 items-center gap-2 whitespace-nowrap text-[13px] font-semibold text-[#2563eb] @min-[340px]:mr-2">
-              <span class="flex size-[26px] items-center justify-center rounded-[8px] bg-[#eff6ff] text-[14px] font-bold text-[#2563eb] shadow-[inset_0_0_0_1px_#bfdbfe]">
-                研
-              </span>
-              <strong class="hidden font-semibold @min-[340px]:inline">科研分析</strong>
-            </div>
-            <Show when={context.replay.isPreparing() || context.replay.isReplaying()}>
-              <div class="flex min-w-0 items-center gap-2 whitespace-nowrap text-[11px] text-[#6b7280]">
-                <span class="hidden @min-[390px]:inline">
-                  {context.replay.isPreparing() ? "准备回放" : replayStageLabel(context.replay.stage())}
-                </span>
-                <div class="h-[5px] w-12 overflow-hidden rounded-full bg-[#eef2ff] @min-[390px]:w-[72px]">
-                  <span
-                    class="block h-full rounded-full bg-gradient-to-r from-[#3b82f6] to-[#6366f1] transition-[width] duration-300"
-                    style={{ width: `${Math.round(context.replay.progress() * 100)}%` }}
-                  />
-                </div>
-              </div>
-            </Show>
-            <button
-              type="button"
-              disabled={context.replay.isPreparing()}
-              aria-pressed={context.replay.isReplaying()}
-              class={ACTION_BUTTON_CLASS}
-              onClick={toggleReplay}
-            >
-              {context.replay.isPreparing() ? "准备中" : context.replay.isReplaying() ? "停止回放" : "看回放"}
-            </button>
-            <Show when={!context.replay.isPreparing() && !context.replay.isReplaying()}>
-              <button type="button" class={ACTION_BUTTON_CLASS} onClick={createSame}>
-                做同款
-              </button>
-            </Show>
-          </div>
-        </div>
+        <WorkbenchReplayToolbar
+          badge="研"
+          name="科研分析"
+          preparing={context.replay.isPreparing()}
+          playing={context.replay.isReplaying()}
+          stage={replayStageLabel(context.replay.stage())}
+          progress={context.replay.progress()}
+          onReplay={toggleReplay}
+          onCreateSame={createSame}
+        />
       </Show>
     </div>
   )

@@ -1,4 +1,5 @@
 import { Icon } from "@opencode-ai/ui/icon"
+import { WorkbenchFileIcon } from "../agent-workbench/artifact-file-icon"
 import { For, Match, Show, Switch, createEffect, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import { SessionArtifactPreview } from "@/components/session-artifact-preview"
@@ -258,7 +259,7 @@ function ArtifactTree(props: {
               title={node.path}
               onClick={() => node.artifact && props.select(node.artifact)}
             >
-              <Icon name="code-lines" class="size-3.5 shrink-0 text-[#8090b1]" />
+              <WorkbenchFileIcon filename={node.name} compact />
               <span class="truncate">{node.name}</span>
             </button>
           }

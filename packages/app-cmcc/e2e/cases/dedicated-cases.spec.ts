@@ -3,6 +3,7 @@ import JSZip from "jszip"
 import { readFile } from "node:fs/promises"
 import type { DockApiCaseSnapshot } from "../../src/context/dockapi"
 import { mockOpenCodeServer } from "../utils/mock-server"
+import { expectTeamPanelResize, expectTeamStatIcons, expectTeamSurfaceColors } from "../utils/workbench-surfaces"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { htmlReportFixture, htmlReportPreview, serveReportRuntime } from "../startup/html-report.fixture"
 
@@ -311,6 +312,113 @@ async function prepare(
   return { errors, apiRequests, fileRequests }
 }
 
+for (const width of [1440, 390]) {
+  test(`science snapshot keeps rounded surfaces read-only at ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    const state = await prepare(page, cases.find((item) => item.category === "science")!)
+    await page.setViewportSize({ width, height: 1000 })
+    if (width < 760) await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+    await expect(page.locator('[data-component="workbench-response-card"]')).toHaveCSS("border-radius", "20px")
+    await expect(page.locator("[data-workbench-agent-strip]")).toHaveCSS("border-radius", "20px")
+    await expect(page.locator('[contenteditable="true"], textarea')).toHaveCount(0)
+    if (width < 760) await page.getByRole("button", { name: "分析结果", exact: true }).click()
+    await expectTeamSurfaceColors(page)
+    await expect(page.locator("[data-workbench-stats] > div").first()).toHaveCSS("border-radius", "16px")
+    await expect(page.locator("[data-workbench-team-panel]")).toHaveCSS("border-radius", "20px")
+    await page.screenshot({ path: info.outputPath("rounded-case.png") })
+    await expectTeamPanelResize(page)
+    expect(state.apiRequests).toEqual([])
+    expect(state.errors).toEqual([])
+  })
+}
+
+test("location snapshot uses the detail background for statistics and the serial DAG", async ({ page }, info) => {
+  await page.setViewportSize({ width: 2048, height: 1035 })
+  await prepare(page, {
+    type: "deepgeo",
+    lead: "deepgeo/deepgeo-team-lead",
+    member: "deepgeo/dg-task-governor",
+    category: "location",
+    experts: 11,
+  })
+  await expect(page.getByRole("region", { name: "位置分析 DAG" })).toBeVisible()
+  await expectTeamSurfaceColors(page)
+  await expectTeamStatIcons(page)
+  await page.locator(".workbench-results").screenshot({ path: info.outputPath("location-snapshot.png") })
+  const panel = page.locator("[data-workbench-team-panel]")
+  const dag = page.getByRole("region", { name: "位置分析 DAG" })
+  const separator = panel.getByRole("separator", { name: "调整图谱和详情高度" })
+  const edge = dag.locator("[data-edge]").first()
+  const before = await edge.getAttribute("d")
+  const bounds = (await separator.boundingBox())!
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(bounds.x + bounds.width / 2, 0, { steps: 5 })
+  await page.mouse.up()
+  await expect.poll(() => dag.evaluate(el => el.clientHeight)).toBe(160)
+  await expect.poll(() => dag.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true)
+  await expect(edge).not.toHaveAttribute("d", before!)
+  await dag.getByRole("button").last().click()
+  await page.locator(".workbench-results").screenshot({ path: info.outputPath("location-resized.png") })
+  await page.reload()
+  await expect(separator).toBeVisible()
+  await expect(panel).not.toHaveAttribute("data-team-panel-sized")
+})
+
+for (const width of [1440, 390]) {
+  test(`floating replay leaves the report and team accessible at ${width}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const state = await prepare(page, cases[0], { inspectionHtml: true })
+    await page.setViewportSize({ width, height: 900 })
+    if (width < 768) {
+      await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+      await page.getByRole("button", { name: "分析结果", exact: true }).click()
+    }
+    const results = page.locator(".workbench-results")
+    const toolbar = results.getByRole("group", { name: "回放与同款操作" })
+    await expect(toolbar).toBeVisible()
+    const dag = results.locator('section[aria-label$="DAG"]')
+    await dag.getByRole("button").last().click({ trial: true })
+    await page.route("**/case-preview/**/inspection.html*", route => route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: '<!doctype html><body style="text-align:center;margin:0"><main id="top" style="min-height:180vh">巡察 HTML 优先预览</main><a href="#top">报告末行</a></body>',
+    }))
+    await results.getByRole("button", { name: "可视化报告", exact: true }).click()
+    const frame = results.locator("iframe")
+    await expect(frame.contentFrame().getByText("巡察 HTML 优先预览")).toBeVisible()
+    const lastLine = frame.contentFrame().getByRole("link", { name: "报告末行" })
+    await lastLine.scrollIntoViewIfNeeded()
+    const viewport = (await frame.boundingBox())!
+    const dock = (await toolbar.boundingBox())!
+    const point = { x: dock.x + dock.width / 2, y: Math.min(viewport.y + viewport.height - 2, dock.y + dock.height / 2) }
+    expect(point.y).toBeGreaterThan(dock.y)
+    const hits = (selector: string) => page.evaluate(({ x, y, selector }) =>
+      Boolean(document.elementFromPoint(x, y)?.closest(selector)), { ...point, selector })
+    expect(await hits(".workbench-replay-toolbar")).toBe(true)
+    expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.tagName, {
+      x: viewport.x + 2, y: point.y,
+    })).toBe("IFRAME")
+    await page.screenshot({ path: info.outputPath("floating-report.png") })
+    await toolbar.getByRole("button", { name: "收起操作条" }).click()
+    const expand = toolbar.getByRole("button", { name: "展开操作条" })
+    await expect(toolbar.getByRole("button")).toHaveCount(1)
+    await expect(expand).toHaveText("巡")
+    await expect(expand).toBeFocused()
+    await expect(expand).toHaveAttribute("aria-expanded", "false")
+    const badge = (await toolbar.boundingBox())!
+    const panel = (await results.boundingBox())!
+    expect(badge.width).toBeLessThanOrEqual(40)
+    expect(panel.x + panel.width - badge.x - badge.width).toBeCloseTo(8, 0)
+    expect(await hits("iframe")).toBe(true)
+    expect(await frame.boundingBox()).toEqual(viewport)
+    await lastLine.click({ trial: true })
+    await page.screenshot({ path: info.outputPath("collapsed-report.png") })
+    await expand.press("Enter")
+    expect(await toolbar.boundingBox()).toEqual(dock)
+    expect(state.errors).toEqual([])
+  })
+}
+
 for (const uploads of ["legacy", "current"] as const) {
   test(`case attachment cards preserve seven ${uploads} uploads`, async ({ page }, info) => {
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -421,7 +529,9 @@ for (const category of ["deep-research", "finance"] as const) {
       : cases[4]
     const state = await prepare(page, input, { pdfReport: true })
     await page.getByRole("button", { name: "文件", exact: true }).click()
-    await page.getByRole("button", { name: /^preview.pdf/ }).click()
+    const row = page.locator(".workbench-results article").filter({ has: page.getByText("preview.pdf", { exact: true }) })
+    await expect(row.locator('[data-artifact-file-icon="pdf"]')).toBeVisible()
+    await row.getByRole("button", { name: /^preview.pdf/ }).click()
     const pdf = page.locator('[data-cmcc-pdf-preview]')
     await expect(pdf).toHaveAttribute("data-ready", "true")
     await expect(pdf.locator(".page")).toHaveCount(2)
@@ -659,6 +769,13 @@ test("snapshot report failure shows an error without repeated fetches", async ({
 
 test("science case switches between Markdown and a real DOCX snapshot", async ({ page }) => {
   const state = await prepare(page, cases[3], { wordReport: true })
+  await page.getByRole("button", { name: "文件", exact: true }).click()
+  const writing = page.getByRole("button", { name: /^writing/ })
+  await expect(writing).toHaveAttribute("aria-expanded", "false")
+  await expect(writing.locator("[data-artifact-file-icon]")).toHaveCount(0)
+  await writing.click()
+  await expect(page.getByRole("button", { name: "report.docx", exact: true }).locator('[data-artifact-file-icon="word"]')).toBeVisible()
+  await expect(page.getByRole("button", { name: "paper.md", exact: true }).locator('[data-artifact-file-icon="markdown"]')).toBeVisible()
   await page.getByRole("button", { name: "文字报告", exact: true }).click()
   await page.getByRole("button", { name: "report.docx", exact: true }).click()
   await expect(page.getByText("案例 Word 正文", { exact: true })).toBeVisible()
@@ -687,8 +804,11 @@ test("replay catches up, respects manual tabs and restores the completed snapsho
   await page.clock.install()
   await page.getByRole("button", { name: "看回放", exact: true }).click()
   await expect(page.getByText("报告篇幅", { exact: true }).locator("..").locator("strong")).toHaveText("0字")
+  await expect(page.getByRole("button", { name: "做同款", exact: true })).toHaveCount(0)
+  await page.getByRole("button", { name: "收起操作条" }).click()
   await page.getByRole("button", { name: "文件", exact: true }).click()
   await page.clock.fastForward(57000)
+  await page.getByRole("button", { name: "展开操作条" }).click()
   await expect(page.getByRole("button", { name: "文件", exact: true })).toHaveAttribute("data-selected", "")
   await expect(page.getByRole("button", { name: "停止回放", exact: true })).toBeVisible()
   await page.getByRole("button", { name: "分析团队", exact: true }).click()

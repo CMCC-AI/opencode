@@ -46,7 +46,7 @@ export function ShoppersSessionView() {
   )
 
   return (
-    <div class="relative flex size-full min-h-0 flex-col overflow-hidden bg-[#f7f8fb] text-[#202636]">
+    <div class="relative flex size-full min-h-0 flex-col overflow-hidden bg-[var(--cmcc-home-background)] text-[#202636]">
       <div
         ref={(element) => {
           scroller = element
@@ -147,6 +147,7 @@ function AgentStrip() {
   return (
     <div class="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center px-4">
       <nav
+        data-workbench-agent-strip
         aria-label="好买手推荐团队"
         class="deeptrading-scrollbar pointer-events-auto flex max-w-full gap-1.5 overflow-x-auto rounded-[8px] border border-[#dfe3eb] bg-[#f7f8fb] p-2 shadow-[0_10px_30px_rgba(29,38,61,0.14)]"
       >
@@ -181,7 +182,7 @@ function AgentStrip() {
 
 function EmptyPanel(props: { title: string; description: string }) {
   return (
-    <div class="flex min-h-52 flex-col items-center justify-center rounded-[8px] border border-dashed border-[#d9dde6] bg-white/70 px-6 text-center">
+    <div data-workbench-empty class="flex min-h-52 flex-col items-center justify-center rounded-[8px] border border-dashed border-[#d9dde6] bg-white/70 px-6 text-center">
       <strong class="text-[14px] font-medium text-[#424a5b]">{props.title}</strong>
       <span class="mt-1 text-[12px] leading-5 text-[#8a91a0]">{props.description}</span>
     </div>

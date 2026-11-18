@@ -8,6 +8,10 @@ import { showToast } from "@/utils/toast"
 import type { AgentNodeView, AgentWorkbench, WorkbenchMessage } from "./model"
 import { completedExpertElapsed } from "./session-adapter"
 import { groupWorkbenchMessages } from "./conversation-turns"
+import "./card-surfaces.css"
+import "./reply-actions.css"
+
+type Vote = "thumbs-up" | "thumbs-down"
 
 export function WorkbenchQuery(props: { workbench: AgentWorkbench; overview: boolean }) {
   const message = createMemo(() => props.workbench.overviewMessages?.find((item) => item.role === "user"))
@@ -38,6 +42,7 @@ export function WorkbenchConversation(props: {
       props.messages ?? (props.markdown ? [{ id: "legacy", role: "assistant" as const, text: props.markdown }] : []),
   )
   const turns = createMemo(() => groupWorkbenchMessages(messages()))
+  const [votes, setVotes] = createStore<Record<string, Vote | undefined>>({})
   return (
     <Show
       when={turns().length}
@@ -50,33 +55,44 @@ export function WorkbenchConversation(props: {
     >
       <div class="space-y-5" data-component="workbench-conversation">
         <Index each={turns()}>
-          {(turn) => (
-            <div class="min-w-0 space-y-5" data-workbench-turn={turn().id}>
-              <Show when={turn().user}>
-                {(user) => <WorkbenchMessagePanel message={user()} cacheKey={`${props.cacheKey}:${user().id}`} />}
-              </Show>
-              <section class="min-w-0" data-component="workbench-response">
-                <div data-component="workbench-expert-header">{props.header()}</div>
-                <Show when={turn().replies.length} fallback={props.empty}>
-                  <div
-                    data-component="workbench-response-card"
-                    class="w-full min-w-0 space-y-5 rounded-[8px] border border-[#e3e6ed] bg-white px-5 py-5 shadow-[0_2px_10px_rgba(36,42,60,0.04)] sm:px-7"
-                  >
-                    <Index each={turn().replies}>
-                      {(message) => (
-                        <WorkbenchMessagePanel
-                          message={message()}
-                          cacheKey={`${props.cacheKey}:${message().id}`}
-                          streaming={props.streaming && message().completedAt === undefined}
-                        />
-                      )}
-                    </Index>
-                  </div>
-                  <WorkbenchMessageFooter messages={turn().replies} cacheKey={`${props.cacheKey}:${turn().id}`} />
+          {(turn) => {
+            const replyKey = () => `${props.cacheKey}:${turn().id}`
+            return (
+              <div class="min-w-0 space-y-5" data-workbench-turn={turn().id}>
+                <Show when={turn().user}>
+                  {(user) => <WorkbenchMessagePanel message={user()} cacheKey={`${props.cacheKey}:${user().id}`} />}
                 </Show>
-              </section>
-            </div>
-          )}
+                <section class="min-w-0" data-component="workbench-response">
+                  <div data-component="workbench-expert-header">{props.header()}</div>
+                  <Show when={turn().replies.length} fallback={props.empty}>
+                    <div class="workbench-message-group">
+                      <div
+                        data-component="workbench-response-card"
+                        tabIndex={-1}
+                        class="w-full min-w-0 space-y-5 rounded-[8px] border border-[#e3e6ed] bg-white px-5 py-5 shadow-[0_2px_10px_rgba(36,42,60,0.04)] sm:px-7"
+                      >
+                        <Index each={turn().replies}>
+                          {(message) => (
+                            <WorkbenchMessagePanel
+                              message={message()}
+                              cacheKey={`${props.cacheKey}:${message().id}`}
+                              streaming={props.streaming && message().completedAt === undefined}
+                            />
+                          )}
+                        </Index>
+                      </div>
+                      <WorkbenchMessageFooter
+                        messages={turn().replies}
+                        cacheKey={replyKey()}
+                        vote={votes[replyKey()]}
+                        onVote={(vote) => setVotes(replyKey(), (current) => (current === vote ? undefined : vote))}
+                      />
+                    </div>
+                  </Show>
+                </section>
+              </div>
+            )
+          }}
         </Index>
       </div>
     </Show>
@@ -89,7 +105,9 @@ function WorkbenchMessagePanel(props: { message: WorkbenchMessage; cacheKey: str
       data-workbench-message={props.message.id}
       data-role={props.message.role}
       class="min-w-0"
-      classList={{ "flex flex-col items-end": props.message.role === "user" }}
+      classList={{
+        "workbench-message-group ml-auto flex w-fit max-w-[85%] flex-col items-end": props.message.role === "user",
+      }}
     >
       <Show
         when={props.message.role === "user"}
@@ -102,12 +120,20 @@ function WorkbenchMessagePanel(props: { message: WorkbenchMessage; cacheKey: str
           />
         }
       >
-        <div class="max-w-[85%] whitespace-pre-wrap break-words rounded-[8px] bg-[#e9ecf3] px-4 py-3 text-[14px] leading-6 text-[#323949]">
+        <div
+          data-component="workbench-query-bubble"
+          tabIndex={-1}
+          class="max-w-full whitespace-pre-wrap break-words rounded-[8px] bg-[#e9ecf3] px-4 py-3 text-[14px] leading-6 text-[#323949]"
+        >
           {props.message.text}
         </div>
       </Show>
       <Show when={props.message.attachments?.length}>
-        <div class="mt-2 flex max-w-[85%] flex-wrap justify-end gap-2" data-component="workbench-attachments">
+        <div
+          class="mt-2 flex flex-wrap justify-end gap-2"
+          classList={{ "max-w-full": props.message.role === "user", "max-w-[85%]": props.message.role !== "user" }}
+          data-component="workbench-attachments"
+        >
           <For each={props.message.attachments}>
             {(file) => (
               <div
@@ -128,7 +154,12 @@ function WorkbenchMessagePanel(props: { message: WorkbenchMessage; cacheKey: str
   )
 }
 
-function WorkbenchMessageFooter(props: { messages: WorkbenchMessage[]; cacheKey: string }) {
+function WorkbenchMessageFooter(props: {
+  messages: WorkbenchMessage[]
+  cacheKey: string
+  vote?: Vote
+  onVote?: (vote: Vote) => void
+}) {
   const [state, setState] = createStore({ copied: false })
   let timer: ReturnType<typeof setTimeout> | undefined
   onCleanup(() => clearTimeout(timer))
@@ -167,10 +198,32 @@ function WorkbenchMessageFooter(props: { messages: WorkbenchMessage[]; cacheKey:
       data-component="workbench-message-footer"
       class="mt-1 flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-[#7a8292]"
     >
+      <Show when={props.onVote}>
+        {(onVote) => (
+          <For each={["thumbs-up", "thumbs-down"] as const}>
+            {(vote) => {
+              const name = vote === "thumbs-up" ? "点赞" : "点踩"
+              return (
+                <Tooltip value={name}>
+                  <IconButton
+                    type="button"
+                    icon={vote}
+                    variant="ghost"
+                    aria-label={name}
+                    aria-pressed={props.vote === vote}
+                    onClick={() => onVote()(vote)}
+                  />
+                </Tooltip>
+              )
+            }}
+          </For>
+        )}
+      </Show>
       <Tooltip value={state.copied ? "已复制" : label()}>
         <IconButton
           type="button"
           icon={state.copied ? "check" : "copy"}
+          variant="ghost"
           aria-label={state.copied ? "已复制" : label()}
           onClick={() => void copy()}
         />

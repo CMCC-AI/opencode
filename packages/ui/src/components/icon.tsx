@@ -1,6 +1,10 @@
 import { onMount, splitProps, type ComponentProps } from "solid-js"
 
+const thumb = `<path d="M2 8.5h3.2v9H2zM7.2 8.5l2.9-3.6c.5-.6.8-1.4.8-2.2V2h.7c1.3 0 2.2 1.2 1.9 2.5l-.7 3.1h3.6c1.3 0 2.2 1.2 1.9 2.4l-1.4 6a2 2 0 0 1-2 1.5H9.7c-.9 0-1.7-.2-2.5-.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>`
+
 const icons = {
+  "thumbs-up": thumb,
+  "thumbs-down": `<g transform="rotate(180 10 10)">${thumb}</g>`,
   "align-right": `<path d="M12.292 6.04167L16.2503 9.99998L12.292 13.9583M2.91699 9.99998H15.6253M17.0837 3.75V16.25" stroke="currentColor" stroke-linecap="square"/>`,
   "arrow-up": `<path fill-rule="evenodd" clip-rule="evenodd" d="M9.99991 2.24121L16.0921 8.33343L15.2083 9.21731L10.6249 4.63397V17.5001H9.37492V4.63398L4.7916 9.21731L3.90771 8.33343L9.99991 2.24121Z" fill="currentColor"/>`,
   "arrow-left": `<path d="M8.33464 4.58398L2.91797 10.0007L8.33464 15.4173M3.33464 10.0007H17.0846" stroke="currentColor" stroke-linecap="square"/>`,

@@ -95,6 +95,9 @@ for (const mode of ["quick", "deep"] as const) {
       await page.setViewportSize({ width, height: 740 })
       const dialog = await openDialog(page, mode)
       await expect(dialog).toBeVisible()
+      await expect(dialog).toHaveCSS("transform", "none")
+      await expect(dialog.locator("..")).toHaveCSS("opacity", "1")
+      await expect(dialog).toHaveCSS("border-radius", "20px")
       await expect(dialog.getByText("点击上传封面图片", { exact: true })).toBeVisible()
       await expect(dialog.getByLabel("案例名称", { exact: true })).toHaveValue(
         mode === "quick" ? "快速研究发布测试" : "深度研究发布测试",

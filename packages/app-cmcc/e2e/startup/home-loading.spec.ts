@@ -66,6 +66,9 @@ for (const width of [1440, 390]) {
       await expect(heading(page)).toBeVisible()
       await expect(page.getByRole("status", { name: "正在准备对话" })).toBeVisible()
       await page.evaluate(() => document.fonts.ready)
+      await page.locator(".cmcc-page-content").evaluate((element) =>
+        Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined))),
+      )
       before = await page.locator(".cmcc-home-composer").boundingBox()
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
       await page.screenshot({ path: info.outputPath("homepage-loading.png") })

@@ -33,7 +33,7 @@ export function DedicatedCaseLayout(props: {
     )
   return (
     <div
-      class="flex size-full min-h-0 flex-col overflow-hidden bg-[#f7f8fb]"
+      class="flex size-full min-h-0 flex-col overflow-hidden bg-[var(--cmcc-home-background)]"
       classList={{ "max-md:pt-10": !!props.dagRows }}
     >
       {props.header}

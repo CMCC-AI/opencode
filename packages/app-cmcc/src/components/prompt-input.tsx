@@ -723,8 +723,18 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return getCursorPosition(editorRef)
   }
 
+  let restoreFocusFrame: number | undefined
+  const cancelFocusRestore = () => {
+    if (restoreFocusFrame === undefined) return
+    cancelAnimationFrame(restoreFocusFrame)
+    restoreFocusFrame = undefined
+  }
+  onCleanup(cancelFocusRestore)
+
   const restoreFocus = () => {
-    requestAnimationFrame(() => {
+    cancelFocusRestore()
+    restoreFocusFrame = requestAnimationFrame(() => {
+      restoreFocusFrame = undefined
       const cursor = prompt.cursor() ?? promptLength(prompt.current())
       editorRef.focus()
       setCursorPosition(editorRef, cursor)
@@ -1899,8 +1909,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               onSubmit={handleSubmit}
               classList={{
                 "group/prompt-input w-full bg-v2-background-bg-base": true,
-                "rounded-[24px] border-2 border-[#5b4fd7]/50 shadow-[0_4px_20px_rgba(91,79,215,0.12)] min-h-[140px]":
-                  newSession(),
+                "cmcc-home-composer-surface min-h-[140px]": newSession(),
                 "rounded-[16px] border border-[#2c5dff] shadow-[0_4px_8px_rgba(50,6,249,0.15)] min-h-[96px]":
                   !newSession(),
                 "border-icon-info-active border-dashed": store.draggingType !== null,
@@ -2036,6 +2045,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       loading={providersLoading()}
                       style={control()}
                       onOpen={() => {
+                        // An earlier menu's exit may have queued an editor focus for this frame.
+                        cancelFocusRestore()
                         setActions("panel", null)
                         closePopover()
                       }}

@@ -1,0 +1,48 @@
+.workbench-results {
+  --workbench-report-background: var(--cmcc-home-background);
+  background: var(--workbench-report-background);
+}
+
+.workbench-replay-anchor {
+  position: absolute;
+  z-index: 30;
+  inset-inline: 8px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.workbench-replay-anchor[data-collapsed] {
+  justify-content: flex-end;
+}
+
+.workbench-replay-anchor[data-collapsed] .workbench-replay-toolbar {
+  padding: 0;
+  border-radius: 10px;
+}
+
+.workbench-replay-toolbar button[aria-expanded="false"] {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workbench-replay-toolbar {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid #dfe5ef;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgb(29 45 78 / 9%);
+  pointer-events: auto;
+}

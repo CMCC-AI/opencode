@@ -5,6 +5,7 @@ import type { DockApiSession } from "@/context/dockapi"
 import { useDockApi } from "@/context/dockapi"
 import { CMCC_CASE_CATEGORIES, cmccCaseCategoryByAgentType } from "@/utils/cmcc-cases"
 import { showToast } from "@/utils/toast"
+import { createDialogMotion } from "./cmcc-motion"
 
 export function CasePublishDialog(props: { session?: DockApiSession; onClose: () => void; onPublished: () => void }) {
   const dockapi = useDockApi()
@@ -33,6 +34,7 @@ export function CasePublishForm(props: {
   onClose: () => void
   onPublished?: () => void
 }) {
+  const motion = createDialogMotion(props.onClose)
   const [form, setForm] = createStore({
     caseName: props.caseName,
     caseTag: props.caseTag,
@@ -55,8 +57,7 @@ export function CasePublishForm(props: {
 
   const close = () => {
     if (form.submitting) return
-    revokePreview()
-    props.onClose()
+    motion.close()
   }
 
   const selectCover = (event: Event) => {
@@ -82,7 +83,7 @@ export function CasePublishForm(props: {
   }
 
   const submit = async () => {
-    if (form.submitting) return
+    if (form.submitting || motion.closing()) return
     if (!form.coverFile) {
       showToast({ variant: "default", title: "请上传案例封面" })
       return
@@ -122,14 +123,14 @@ export function CasePublishForm(props: {
   }
 
   const closeAfterSubmit = () => {
-    revokePreview()
-    props.onClose()
+    motion.close()
   }
 
   return (
     <Portal>
       <div
-        class="fixed inset-0 z-[620] flex items-center justify-center bg-[rgba(34,39,68,0.28)] p-5 backdrop-blur-[4px]"
+        class="cmcc-modal-overlay fixed inset-0 z-[620] flex items-center justify-center p-5"
+        style={motion.overlay()}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) close()
         }}
@@ -138,6 +139,9 @@ export function CasePublishForm(props: {
           role="dialog"
           aria-modal="true"
           aria-labelledby="case-publish-title"
+          data-cmcc-dialog
+          inert={motion.closing()}
+          style={motion.content()}
           class="isolate max-h-[calc(100dvh-40px)] w-full max-w-[420px] overflow-y-auto rounded-[8px] border border-[#cbd8f0] bg-[#f7f9ff] opacity-100 shadow-[0_22px_60px_rgba(46,66,110,0.20)]"
         >
           <header class="flex h-14 items-center justify-between border-b border-[#dbe4f3] bg-[#eef3ff] px-[18px]">

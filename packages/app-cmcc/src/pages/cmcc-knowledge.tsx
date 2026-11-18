@@ -2144,12 +2144,12 @@ function ImportProgressDialog(props: {
 
   return (
     <div
-      class="fixed inset-0 z-[230] flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-[2px]"
+      class="cmcc-modal-overlay fixed inset-0 z-[230] flex items-center justify-center px-4 py-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="knowledge-import-title"
     >
-      <section class="w-full max-w-[440px] rounded-[14px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.34)]">
+      <section class="cmcc-dialog-surface w-full max-w-[440px] rounded-[14px] border border-v2-border-border-base bg-v2-background-bg-layer-01 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.34)]">
         <div class="flex items-start gap-3">
           <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0057ff]/10 text-[#0057ff]">
             <span class="size-5 animate-spin rounded-full border-2 border-current border-r-transparent" />

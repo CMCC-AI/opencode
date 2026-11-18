@@ -101,7 +101,7 @@ export function DeepTradingSplitLayout(props: {
   onCleanup(stopDrag)
 
   return (
-    <div ref={container} class="flex size-full min-h-0 overflow-hidden bg-[#f7f8fb]">
+    <div ref={container} class="flex size-full min-h-0 overflow-hidden bg-[var(--cmcc-home-background)]">
       <section class="flex h-full min-w-0 flex-1 flex-col overflow-hidden">{props.left}</section>
       <div
         role="separator"
@@ -117,7 +117,7 @@ export function DeepTradingSplitLayout(props: {
       />
       <aside
         aria-label={`${props.label ?? "DeepTrading"} 分析结果`}
-        class="h-full shrink-0 min-w-0 overflow-hidden bg-[#f7f8fb]"
+        class="h-full shrink-0 min-w-0 overflow-hidden"
         style={{ width: `${rightPercent()}%` }}
       >
         {props.right}
