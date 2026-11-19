@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 4 602 137" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="panel" x1="592.5" y1="-15.6938" x2="325.904" y2="-288.354" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f6f6f6"/>
+      <stop offset="1" stop-color="#fff"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="4" width="602" height="137" fill="url(#panel)"/>
+</svg>

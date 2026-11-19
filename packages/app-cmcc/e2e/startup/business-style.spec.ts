@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { expectPageBrandBar } from "../utils/expect-page-brand-bar"
 import { selectHomeTeam, setupHomePage } from "./home-fixture"
 
 test.use({ locale: "zh-CN" })
@@ -121,12 +122,31 @@ test("sidebar keeps its rounded edge when resized and folded", async ({ page }, 
   await expect(sidebar).toHaveCSS("width", `${before.width + delta}px`)
 })
 
-for (const width of [1440, 390, 320]) {
+for (const [width, height] of [[1440, 900], [1440, 768], [1024, 768], [390, 844]]) {
+  test(`Wiki and industry overview headings align at ${width}x${height}`, async ({ page }) => {
+    await page.setViewportSize({ width, height })
+    await page.emulateMedia({ reducedMotion: "reduce" })
+    await setupHomePage(page)
+
+    await page.goto("/expert")
+    const industry = page.getByRole("heading", { name: "产业洞察专家团", exact: true })
+    await expectPageBrandBar(page, industry)
+    const industryTop = (await industry.boundingBox())!.y
+
+    await page.goto("/knowledge")
+    const wiki = page.getByRole("heading", { name: "DeepInsight Wiki", exact: true })
+    await expectPageBrandBar(page, wiki)
+    expect((await wiki.boundingBox())!.y).toBeCloseTo(industryTop, 1)
+  })
+}
+
+for (const width of [1680, 1440, 1280, 390, 320]) {
   test(`expert cards and details retain their layout and actions at ${width}`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 })
     await setupHomePage(page, { models: true })
     await page.goto("/expert")
-    await expect(page.getByRole("heading", { name: "产业洞察专家团", exact: true })).toBeVisible()
+    const heading = page.getByRole("heading", { name: "产业洞察专家团", exact: true })
+    await expect(heading).toBeVisible()
     if (width < 760) {
       await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
       await expect
@@ -137,10 +157,47 @@ for (const width of [1440, 390, 320]) {
         )
         .toBeLessThanOrEqual(1)
     }
-    const cards = page.locator("button:has(h3)")
+    await expectPageBrandBar(page, heading)
+    const cards = page.locator(".cmcc-expert-card")
+    const banner = page.locator(".cmcc-expert-banner")
     await expect(cards).toHaveCount(6)
-    await expect(page.locator(".cmcc-expert-banner")).toHaveCSS("border-radius", "20px")
+    await expect(cards.getByRole("heading", { level: 3 })).toHaveText([
+      "AI + 财经",
+      "AI + 政企",
+      "AI + 科研",
+      "AI + 位置",
+      "AI + 推荐",
+      "AI + 巡察",
+    ])
+    await expect(banner).toHaveCSS("border-radius", "16px")
     await expect(cards.first()).toHaveCSS("border-radius", "16px")
+    const wide = width >= 1280
+    const badges = banner.locator("img.cmcc-expert-banner-badges")
+    await expect(cards.first().locator("img")).toHaveCSS("width", wide ? "72px" : "60px")
+    await expect(heading).toHaveCSS("font-size", wide ? "28.8px" : "24px")
+    await expect(banner).toHaveCSS("min-height", wide ? "192px" : "160px")
+    if (wide) {
+      await expect(badges).toBeVisible()
+      await expect(badges).toHaveAttribute("src", /overview-banner-badges.*\.svg/)
+      await expect.poll(() => badges.evaluate((img: HTMLImageElement) => img.complete && img.naturalHeight)).toBe(60)
+      const badgeBounds = (await badges.boundingBox())!
+      const descriptionBounds = (await banner.locator(".cmcc-expert-banner-copy p").boundingBox())!
+      expect(badgeBounds.width / badgeBounds.height).toBeCloseTo(379.014 / 60, 2)
+      expect(badgeBounds.y + badgeBounds.height).toBeLessThanOrEqual(descriptionBounds.y)
+      const center = page.locator(".cmcc-expert-center")
+      const available = await center.evaluate((el) => el.clientWidth)
+      expect((await banner.boundingBox())!.width).toBeCloseTo(Math.min(1094.4, available - 32), 0)
+      const firstRow = await cards.nth(0).boundingBox()
+      const third = await cards.nth(2).boundingBox()
+      const secondRow = await cards.nth(3).boundingBox()
+      const viewport = await center.boundingBox()
+      expect(third!.y).toBe(firstRow!.y)
+      expect(secondRow!.x).toBe(firstRow!.x)
+      expect(secondRow!.y).toBeGreaterThan(firstRow!.y + firstRow!.height)
+      expect(secondRow!.y + secondRow!.height).toBeLessThanOrEqual(viewport!.y + viewport!.height)
+    } else {
+      await expect(badges).toBeHidden()
+    }
     for (const card of await cards.all()) {
       await card.scrollIntoViewIfNeeded()
       const bounds = await card.boundingBox()
@@ -150,14 +207,32 @@ for (const width of [1440, 390, 320]) {
         .poll(() => card.locator("img").evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0))
         .toBe(true)
     }
-    await page.getByRole("heading", { name: "产业洞察专家团", exact: true }).scrollIntoViewIfNeeded()
+    await heading.scrollIntoViewIfNeeded()
     await page.screenshot({ path: info.outputPath("experts.png") })
 
-    await cards.filter({ hasText: "AI + 财经" }).click()
     const dialog = page.locator('section:has(> header [aria-label="关闭专家详情"])')
+    if (width === 1440) {
+      const researchSlide = banner.getByRole("button", { name: "查看AI for Science 科研专家团" })
+      await researchSlide.click()
+      await expect(researchSlide).toHaveAttribute("aria-pressed", "true")
+      await banner.getByRole("button", { name: "创建任务", exact: true }).click()
+      await expect(dialog).toHaveAccessibleName("AI + 科研")
+      await dialog.getByRole("button", { name: "取消", exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+    }
+    await cards.filter({ hasText: "AI + 财经" }).click()
     await expect(dialog).toBeVisible()
     await expect(dialog).toHaveCSS("transform", "none")
     await expect(dialog.locator("..")).toHaveCSS("opacity", "1")
+    await expect(dialog).toHaveCSS("border-radius", "16px")
+    await expect(dialog.locator(".cmcc-expert-summary-brand")).toHaveText("DeepTrading")
+    await expect(dialog.locator(".cmcc-expert-skill")).toHaveCount(3)
+    await expect(dialog.locator(".cmcc-expert-skill").first()).not.toHaveCSS("background-image", "none")
+    if (wide) {
+      await expect(dialog).toHaveCSS("width", "800px")
+      await expect(dialog).toHaveCSS("height", "600px")
+      await expect(dialog.locator(".cmcc-expert-summary")).toHaveCSS("width", "602px")
+    }
     await expect(dialog.getByRole("button", { name: "多股对比", exact: true })).toBeVisible()
     await expect(dialog.getByRole("button", { name: "召唤产业专家团", exact: true })).toBeVisible()
     const footer = await dialog.locator("footer").boundingBox()
@@ -174,8 +249,66 @@ for (const width of [1440, 390, 320]) {
     expect(buttons.every((button) => button.left >= bounds!.x && button.right <= bounds!.x + bounds!.width)).toBe(true)
     expect(buttons.every((button, index) => index === 0 || button.left >= buttons[index - 1].right)).toBe(true)
     await page.screenshot({ path: info.outputPath("expert-details.png") })
+    const scroll = dialog.locator(".cmcc-expert-dialog-scroll")
+    await scroll.evaluate((el) => { el.scrollTop = el.scrollHeight })
+    expect(await scroll.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+    expect(await dialog.locator("footer").boundingBox()).toEqual(footer)
     await dialog.getByRole("button", { name: "取消", exact: true }).click()
     await expect(dialog).toHaveCount(0)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
   })
 }
+
+test("industry teams share the task dialog while retaining their own branding and demo", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await setupHomePage(page, { models: true, teams: true })
+  await page.goto("/expert")
+  await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+  for (const [name, brand] of [
+    ["AI + 政企", "DeepEngage"],
+    ["AI + 科研", "AI for Science"],
+    ["AI + 位置", "DeepGeo"],
+    ["AI + 推荐", "Shoppers Pro"],
+    ["AI + 巡察", "DeepInspect"],
+  ]) {
+    await page.locator(".cmcc-expert-card").filter({ has: page.getByRole("heading", { name, exact: true }) }).click()
+    const dialog = page.getByRole("dialog", { name, exact: true })
+    await expect(dialog).toHaveCSS("border-radius", "16px")
+    await expect(dialog.locator(".cmcc-expert-summary-brand")).toHaveText(brand)
+    await expect(dialog.locator(".cmcc-expert-skill")).toHaveCount(3)
+    await expect(dialog.locator(".cmcc-expert-dialog-member").first()).toBeAttached()
+    await expect(dialog.getByRole("button", { name: "多股对比", exact: true })).toHaveCount(0)
+    const demo = dialog.getByRole("button", { name: "手机演示", exact: true })
+    if (brand === "Shoppers Pro") {
+      await demo.click()
+      const preview = page.getByRole("dialog", { name: "手机演示", exact: true })
+      await expect(preview.getByRole("img")).toBeVisible()
+      await preview.getByRole("button", { name: "关闭演示" }).click()
+      await expect(preview).toHaveCount(0)
+    } else {
+      await expect(demo).toHaveCount(0)
+    }
+    await dialog.getByRole("button", { name: "取消", exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+  }
+})
+
+test("finance task dialog still launches skill drafts and stock comparison", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await setupHomePage(page, { models: true, teams: true })
+  await page.goto("/expert")
+  const finance = page.locator(".cmcc-expert-card").filter({ has: page.getByRole("heading", { name: "AI + 财经", exact: true }) })
+  const dialog = page.getByRole("dialog", { name: "AI + 财经", exact: true })
+  await finance.click()
+  const skill = dialog.locator(".cmcc-expert-skill").first()
+  const example = await skill.getAttribute("title")
+  expect(example).toBeTruthy()
+  await skill.click()
+  await expect(page).toHaveURL(/\/new-session\?.*draftId=/)
+  await expect(page.locator('[data-component="prompt-input"]')).toHaveText(example!)
+
+  await page.getByRole("button", { name: "产业洞察", exact: true }).click()
+  await finance.click()
+  await dialog.getByRole("button", { name: "多股对比", exact: true }).click()
+  await expect(page).toHaveURL(/\/mstock$/)
+})

@@ -38,6 +38,7 @@ import {
 } from "@/pages/cmcc-knowledge-import"
 import { hasUserPrompt, isKnowledgeChatSession } from "@/pages/cmcc-knowledge-chat"
 import { createPromptInputController } from "@/pages/session/composer"
+import { CmccPageBrandBar } from "@/components/cmcc-page-brand-bar"
 import { Identifier } from "@/utils/id"
 import { Persist, persisted } from "@/utils/persist"
 import { authTokenFromCredentials } from "@/utils/server"
@@ -61,6 +62,7 @@ import {
   type KnowledgeNotebook,
 } from "@/utils/cmcc-knowledge"
 import "./cmcc-knowledge-home.css"
+import "./cmcc-overview-layout.css"
 
 type ChatMessage = { info: Message; parts: Part[] }
 type PreviewTab = { path: string; name: string }
@@ -273,12 +275,12 @@ export function CmccKnowledgeHomeRoute() {
   const openCreateDialog = () => setDialog("open", true)
 
   return (
-    <div class="size-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-[var(--cmcc-home-background)] text-[#202630]">
+    <div class="cmcc-overview-page size-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-[var(--cmcc-home-background)] text-[#202630]">
+      <CmccPageBrandBar>
+        <ProductIntroButton class="flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-[#526173] transition-colors hover:bg-[#edf4fc] hover:text-[#285da3]" />
+      </CmccPageBrandBar>
       <div class="cmcc-wiki-home mx-auto w-full max-w-[1160px] px-8 pb-12 max-sm:px-4">
-        <div class="flex min-h-12 justify-end pt-3">
-          <ProductIntroButton class="flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-[#526173] transition-colors hover:bg-[#edf4fc] hover:text-[#285da3]" />
-        </div>
-        <header class="cmcc-wiki-heading pb-5 pt-12 max-sm:pt-6">
+        <header class="cmcc-wiki-heading cmcc-overview-intro pb-5">
           <h1>DeepInsight Wiki</h1>
           <p>从原始材料到可对话的知识网络</p>
         </header>

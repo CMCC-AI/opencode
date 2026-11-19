@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { expectPageBrandBar } from "../utils/expect-page-brand-bar"
 import { homeDirectory, homeSession, homeTeam, selectHomeTeam, setupHomePage } from "./home-fixture"
 
 test.use({ locale: "zh-CN" })
@@ -67,28 +68,34 @@ test("login home and both sidebar entries open independent blank Deep Research d
   await setup(page)
   await page.goto("/app")
   const sidebar = page.getByRole("complementary", { name: "CMCC conversations" }).getByRole("navigation")
+  const heading = page.getByRole("heading", { name: "DeepInsight深度洞察", exact: true })
+  const composer = page.locator(".cmcc-home-composer")
   const drafts = new Set<string>()
   for (const entry of [undefined, "新对话", "深度研究"]) {
     if (entry) await sidebar.getByRole("button", { name: entry, exact: true }).click()
     await expect(homeTeam(page)).toHaveAccessibleName("切换专家团，当前：深度研究专家团")
+    await expectPageBrandBar(page, heading)
     await expect(mode(page, "深度")).toHaveAttribute("aria-pressed", "true")
     await expect(editor(page)).toHaveText("")
+    await expect(heading).toHaveCSS("font-size", "42.24px")
+    await expect(composer).toHaveCSS("width", "792px")
+    await expect(composer.locator(".cmcc-home-composer-surface")).toHaveCSS("min-height", "158.4px")
     drafts.add(new URL(page.url()).searchParams.get("draftId")!)
     await editor(page).fill("这个问题只属于当前草稿")
   }
   expect(drafts.size).toBe(3)
   await homeTeam(page).click()
   const menu = page.getByRole("menu", { name: "切换专家团" })
-  await expect(menu.getByRole("menuitem")).toHaveCount(8)
+  await expect(menu.getByRole("menuitem")).toHaveCount(7)
   await expect(menu.getByRole("menuitem", { name: "多股对比" })).toHaveCount(0)
+  await expect(menu.getByRole("menuitem", { name: "AI for Science 科研专家团", exact: true })).toHaveCount(0)
   for (const [name, asset] of [
     ["深度研究专家团", "deepinsight"],
     ["DeepTrading 财经分析专家团", "deeptrading"],
     ["Shoppers Pro 购买决策专家团", "shoppers-pro"],
     ["DeepInspect 巡察分析专家团", "deepinspect"],
-    ["DeepEngage谈参高拜专家团", "zhengqi-visit-intel"],
+    ["DeepEngage 谈参高拜专家团", "zhengqi-visit-intel"],
     ["DeepGeo 位置决策专家团", "deepgeo"],
-    ["AI for Science 科研专家团", "ai-for-science-team"],
     ["灵犀", "draft-lingxi"],
   ]) {
     const avatar = menu.getByRole("menuitem", { name, exact: true }).locator("img")
@@ -162,6 +169,15 @@ test("industry summons keep the example prompt and use the same switchable team 
   expect(page.url()).toBe(url)
 })
 
+test("AI for Science can still be summoned from industry insights", async ({ page }) => {
+  await setup(page)
+  await page.goto("/expert")
+  await page.getByRole("button").filter({ has: page.getByRole("heading", { name: "AI + 科研", exact: true }) }).click()
+  await page.getByRole("button", { name: "召唤产业专家团", exact: true }).click()
+  await expect(homeTeam(page)).toHaveAccessibleName("切换专家团，当前：AI for Science 科研专家团")
+  await expect(editor(page)).not.toHaveText("")
+})
+
 for (const width of [1440, 390]) {
   test(`unifies research modes and preserves the draft at ${width}`, async ({ page }, info) => {
     await page.setViewportSize({ width, height: 900 })
@@ -170,7 +186,13 @@ for (const width of [1440, 390]) {
     await page.getByRole("button", { name: "深度研究", exact: true }).click()
     await expect(editor(page)).toBeVisible()
     const url = page.url()
-    if (width === 390) await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+    const heading = page.getByRole("heading", { name: "DeepInsight深度洞察", exact: true })
+    if (width === 390) {
+      await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
+      await expect(heading).toHaveCSS("font-size", "28px")
+      await expect(page.locator(".cmcc-home-composer-surface")).toHaveCSS("min-height", "200px")
+    }
+    await expectPageBrandBar(page, heading)
     await expect(mode(page, "深度")).toHaveAttribute("aria-pressed", "true")
     await expect(page.getByRole("button", { name: "通用深度洞察", exact: true })).toHaveCount(0)
     await expect(page.getByRole("button", { name: "计划", exact: true })).toHaveCount(0)

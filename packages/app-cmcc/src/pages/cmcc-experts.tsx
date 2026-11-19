@@ -2,6 +2,7 @@ import { Navigate, useNavigate, useParams } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { Portal } from "solid-js/web"
+import { CmccPageBrandBar } from "@/components/cmcc-page-brand-bar"
 import { useServer } from "@/context/server"
 import { useDockApi } from "@/context/dockapi"
 import { useServerSDK } from "@/context/server-sdk"
@@ -14,10 +15,14 @@ import expertZhengqi from "@/assets/experts/scene-08.optimized.webp"
 import expertLocation from "@/assets/experts/scene-14.optimized.webp"
 import expertResearch from "@/assets/experts/scene-17.optimized.webp"
 import expertHero from "@/assets/experts/scene-05.optimized.webp"
-import bannerBg from "@/assets/experts/banner.optimized.webp"
-import expertSkillResearch from "@/assets/experts/detail-skill-research.optimized.webp"
-import expertSkillReview from "@/assets/experts/detail-skill-review.optimized.webp"
-import expertSkillWriting from "@/assets/experts/detail-skill-writing.optimized.webp"
+import overviewFinance from "@/assets/experts/overview-deeptrading.webp"
+import overviewZhengqi from "@/assets/experts/overview-zhengqi-visit-intel.webp"
+import overviewInspect from "@/assets/experts/overview-deepinspect.webp"
+import overviewRecommend from "@/assets/experts/overview-shoppers-pro.webp"
+import overviewResearch from "@/assets/experts/overview-ai-for-science-team.webp"
+import overviewLocation from "@/assets/experts/overview-deepgeo.webp"
+import overviewBannerBadges from "@/assets/experts/overview-banner-badges.svg"
+import overviewCreateTask from "@/assets/experts/overview-create-task.svg"
 import shoppersDemoGif from "@/assets/experts/shoppers-demo.optimized.webp"
 import {
   cmccArtifactWorkspace,
@@ -37,11 +42,12 @@ import {
 } from "@/utils/cmcc-experts"
 import { showToast } from "@/utils/toast"
 import { createDialogMotion } from "@/components/cmcc-motion"
+import "./cmcc-overview-layout.css"
 import "./cmcc-experts.css"
 
 export { CMCC_EXPERTS, cmccExpertCenterHref, cmccExpertHref }
 
-const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; image: string }> = {
+const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; image: string; overviewImage?: string }> = {
   chat: {
     eyebrow: "AI + 深度研究",
     summary: "把复杂问题拆解为可靠的研究、判断与行动",
@@ -56,37 +62,41 @@ const EXPERT_PRESENTATION: Record<string, { eyebrow: string; summary: string; im
     eyebrow: "AI + 财经",
     summary: "多智能体协作完成标的识别、四维分析与可视化报告",
     image: expertFinance,
+    overviewImage: overviewFinance,
   },
   "shoppers-pro": {
     eyebrow: "AI + 推荐",
     summary: "务实需求洞察、多平台比价、真实口碑分析，交付可点击的购买决策报告",
     image: expertHero,
+    overviewImage: overviewRecommend,
   },
   deepinspect: {
     eyebrow: "AI + 巡察",
     summary: "多智能体协作完成现场风险识别、问题归并与结构化巡察报告交付",
     image: expertIndustry,
+    overviewImage: overviewInspect,
   },
   "zhengqi-visit-intel": {
     eyebrow: "AI + 政企",
     summary: "融合内部门户数据与公开情报，交付可溯源的谈参高拜决策报告",
     image: expertZhengqi,
+    overviewImage: overviewZhengqi,
   },
   deepgeo: {
     eyebrow: "AI + 位置",
     summary: "把客流、客群、商业生态与财务数据转化为可复算的位置决策报告",
     image: expertLocation,
+    overviewImage: overviewLocation,
   },
   "ai-for-science-team": {
     eyebrow: "AI + 科研",
     summary: "文献综述、论文复现、实验设计与科研写作，交付可审计研究包",
     image: expertResearch,
+    overviewImage: overviewResearch,
   },
 }
 
-const EXPERT_SKILL_IMAGES = [expertSkillResearch, expertSkillReview, expertSkillWriting]
-// 3 列网格的固定排序：财经/政企/巡察 + 推荐/位置/科研
-const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "deepinspect", "shoppers-pro", "deepgeo", "ai-for-science-team"]
+const INDUSTRY_ORDER = ["deeptrading", "zhengqi-visit-intel", "ai-for-science-team", "deepgeo", "shoppers-pro", "deepinspect"]
 const INDUSTRY_EXPERTS = [
   ...INDUSTRY_ORDER.flatMap((id) => {
     const expert = CMCC_EXPERTS.find((item) => item.id === id)
@@ -107,44 +117,34 @@ function FeaturedCarousel(props: { experts: TeamExpert[]; onOpen: (expert: TeamE
   onCleanup(() => clearInterval(timer))
 
   return (
-    <div class="cmcc-expert-banner relative mt-5 flex min-h-[240px] w-full overflow-hidden p-0 max-sm:min-h-[200px]">
-      <img
-        src={bannerBg}
-        alt=""
-        class="pointer-events-none absolute inset-0 size-full object-cover opacity-60"
-      />
-      <div class="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/95 via-white/80 to-white/20" />
-
-      <div class="relative z-10 flex w-full flex-col px-7 pt-12 pb-5 max-sm:px-5 max-sm:pt-8">
-        <div class="mb-5 flex gap-1.5">
-          <For each={props.experts}>
-            {(_, i) => (
-              <button
-                type="button"
-                class="cmcc-expert-banner-dot"
-                aria-label={`查看${props.experts[i()].name}`}
-                aria-pressed={i() === index() % total()}
-                onClick={() => setIndex(i())}
-              />
-            )}
-          </For>
+    <div class="cmcc-expert-banner">
+      <div class="cmcc-expert-banner-dots">
+        <For each={props.experts}>
+          {(expert, i) => (
+            <button
+              type="button"
+              class="cmcc-expert-banner-dot"
+              aria-label={`查看${expert.name}`}
+              aria-pressed={i() === index() % total()}
+              onClick={() => setIndex(i())}
+            />
+          )}
+        </For>
+      </div>
+      <img class="cmcc-expert-banner-badges" src={overviewBannerBadges} alt="" width={379} height={60} />
+      <div class="cmcc-expert-banner-actions">
+        <div class="cmcc-expert-banner-copy">
+          <div class="cmcc-expert-banner-title">{current().name}</div>
+          <p class="line-clamp-2">{current().description}</p>
         </div>
-
-        <div class="flex flex-1 items-center gap-6 max-sm:flex-wrap max-sm:gap-4">
-          <div class="min-w-0 flex-1 max-sm:basis-full">
-            <div class="text-[22px] font-semibold leading-8 text-[#242a35] max-sm:text-[18px]">{current().name}</div>
-            <p class="m-0 mt-2 line-clamp-2 text-[13px] leading-6 text-[#777e89]">{current().description}</p>
-          </div>
-
-          <button
-            type="button"
-            class="cmcc-expert-primary cmcc-expert-create"
-            onClick={() => props.onOpen(current())}
-          >
-            <Icon name="new-session" class="size-[18px]" />
-            创建任务
-          </button>
-        </div>
+        <button
+          type="button"
+          aria-label="创建任务"
+          class="cmcc-expert-create"
+          onClick={() => props.onOpen(current())}
+        >
+          <img src={overviewCreateTask} alt="" width="142" height="48" />
+        </button>
       </div>
     </div>
   )
@@ -156,23 +156,20 @@ export function CmccExpertCenterRoute() {
   const [active, setActive] = createSignal<CmccExpert>()
 
   return (
-    <div class="cmcc-expert-center relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-      <div class="relative mx-auto flex w-full max-w-[1320px] flex-col px-6 pb-10 pt-14 max-sm:px-4 max-sm:pt-8">
-        <header class="w-full">
-          <h1 class="m-0 text-[28px] font-semibold leading-10 text-[#171c26] max-sm:text-[24px]">
-            产业洞察专家团
-          </h1>
-          <p class="m-0 mt-2 text-[14px] leading-6 text-[#858b95]">
-            让 AI 进入真实产业场景，完成研究、判断与行动
-          </p>
+    <div class="cmcc-expert-center cmcc-overview-page relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <CmccPageBrandBar />
+      <div class="cmcc-expert-content">
+        <header class="cmcc-expert-intro cmcc-overview-intro">
+          <h1>产业洞察专家团</h1>
+          <p>让 AI 进入真实产业场景，完成研究、判断与行动</p>
         </header>
 
         <FeaturedCarousel experts={CMCC_TEAM_EXPERTS.filter((e) => e.id !== "deepinsight")} onOpen={(expert) => setActive(expert)} />
 
-        <section class="mt-7 w-full">
-          <h2 class="m-0 text-[16px] font-semibold leading-6 text-[#272d37]">AI + 产业洞察</h2>
-          <p class="m-0 mt-1 text-[13px] leading-5 text-[#858b95]">选择一个专家或专家团，进入专属工作台</p>
-          <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section class="cmcc-expert-directory">
+          <h2>AI + 产业洞察</h2>
+          <p>选择一个专家或专家团，进入专属工作台</p>
+          <div class="cmcc-expert-grid">
             <For each={INDUSTRY_EXPERTS}>
               {(expert) => <ExpertCard expert={expert} onClick={() => setActive(expert)} />}
             </For>
@@ -262,28 +259,24 @@ function ExpertCard(props: { expert: CmccExpert; onClick: () => void }) {
     eyebrow: props.expert.name,
     summary: props.expert.description,
     image: expertGeneral,
+    overviewImage: undefined,
   }
 
   return (
     <button
       type="button"
-      class="cmcc-expert-card group relative h-[200px] min-w-0 overflow-hidden p-0 text-left xl:h-[220px]"
+      class="cmcc-expert-card"
       onClick={props.onClick}
     >
       <img
-        src={presentation.image}
+        src={presentation.overviewImage ?? presentation.image}
         alt=""
-        class="cmcc-expert-art pointer-events-none absolute inset-0 size-full object-cover"
+        width="60"
+        height="65"
       />
-      <div class="cmcc-expert-art-shade pointer-events-none absolute inset-0" />
-      <div class="relative z-10 flex h-full max-w-[86%] flex-col px-5 py-4">
-        <h3 class="m-0 text-[17px] font-semibold leading-6 text-[#272d37]">{presentation.eyebrow}</h3>
-        <p class="m-0 mt-1.5 line-clamp-2 text-[12px] leading-5 text-[#747c89]">{presentation.summary}</p>
-        <div class="mt-auto flex min-w-0 items-center">
-          <span class="cmcc-expert-tag max-w-full truncate px-2.5 py-1 text-[11px] leading-4">
-            {props.expert.name}
-          </span>
-        </div>
+      <div class="cmcc-expert-card-copy">
+        <h3>{presentation.eyebrow}</h3>
+        <p title={presentation.summary}>{presentation.summary}</p>
       </div>
     </button>
   )
@@ -342,8 +335,10 @@ function ExpertDetailDialog(props: {
         eyebrow: props.expert.name,
         summary: props.expert.description,
         image: expertGeneral,
+        overviewImage: undefined,
       },
   )
+  const brand = () => props.expert.name.replace(/\s+\p{Script=Han}.*$/u, "")
   const capabilities = createMemo(() =>
     props.expert.tags.slice(0, 3).map((tag, index) => ({
       title: tag,
@@ -351,7 +346,6 @@ function ExpertDetailDialog(props: {
         props.expert.kind === "team"
           ? (props.expert.examples[index] ?? props.expert.description)
           : props.expert.description,
-      image: EXPERT_SKILL_IMAGES[index] ?? expertSkillResearch,
     })),
   )
   const [showDemo, setShowDemo] = createSignal(false)
@@ -359,7 +353,7 @@ function ExpertDetailDialog(props: {
   return (
     <Portal>
       <div
-        class="cmcc-modal-overlay fixed inset-0 z-[220] flex items-center justify-center px-4 py-4"
+        class="cmcc-expert-task-overlay fixed inset-0 z-[220] flex items-center justify-center px-4 py-4"
         style={motion.overlay()}
         onClick={motion.close}
       >
@@ -373,80 +367,80 @@ function ExpertDetailDialog(props: {
           style={motion.content()}
           onClick={(event) => event.stopPropagation()}
         >
-          <header class="flex h-16 shrink-0 items-center justify-between border-b border-[#edf0f7] px-6">
-            <h2 class="m-0 truncate text-[16px] font-semibold leading-6 text-[#252839]">{presentation().eyebrow}</h2>
+          <header class="cmcc-expert-dialog-header">
+            <h2>{presentation().eyebrow}</h2>
             <button
               type="button"
-              class="flex size-8 shrink-0 items-center justify-center rounded-[8px] text-[#697085] transition hover:bg-[#f3f5fa] hover:text-[#252839]"
+              class="cmcc-expert-dialog-close"
               onClick={motion.close}
               aria-label="关闭专家详情"
             >
-              <Icon name="close" class="size-4" />
+              <Icon name="close" class="size-5" />
             </button>
           </header>
 
-          <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-12 lg:px-[100px]">
-            <section class="cmcc-expert-summary relative min-h-[150px] overflow-hidden">
-              <img src={presentation().image} alt="" class="absolute inset-0 size-full object-cover" />
-              <div class="cmcc-expert-art-shade absolute inset-0" />
-              <div class="relative flex min-h-[150px] max-w-[86%] flex-col px-5 py-4">
-                <h3 class="m-0 text-[18px] font-semibold leading-6 text-[#272d37]">{presentation().eyebrow}</h3>
-                <p class="m-0 mt-1.5 line-clamp-2 text-[12px] leading-5 text-[#747c89]">{props.expert.description}</p>
-                <span class="cmcc-expert-tag mt-3 w-fit max-w-full truncate px-3 py-1 text-[11px] leading-4">
-                  {props.expert.name}
-                </span>
-              </div>
-            </section>
+          <div class="cmcc-expert-dialog-scroll">
+            <div class="cmcc-expert-dialog-content">
+              <section class="cmcc-expert-summary">
+                <div class="cmcc-expert-summary-heading">
+                  <img src={presentation().overviewImage ?? presentation().image} alt="" width={51} height={55} />
+                  <h3>{presentation().eyebrow}</h3>
+                  <span class="cmcc-expert-summary-brand" title={props.expert.name}>
+                    <Icon name="circle-check" size="small" />
+                    {brand()}
+                  </span>
+                </div>
+                <p>{props.expert.description}</p>
+              </section>
 
-            <section class="mt-5">
-              <h3 class="m-0 text-[16px] font-medium leading-6 text-[#252839]">专家团技能:</h3>
-              <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <For each={capabilities()}>
-                  {(capability, index) => (
-                    <button
-                      type="button"
-                      class="cmcc-expert-skill group flex min-h-20 min-w-0 items-center gap-2 px-2.5 py-2 text-left"
-                      onClick={() => {
-                        if (props.expert.kind === "team") {
-                          props.onSummon(props.expert, props.expert.examples[index()] ?? props.expert.defaultPrompt)
-                          return
-                        }
-                        props.onOpenExternal(props.expert)
-                      }}
-                    >
-                      <img src={capability.image} alt="" class="size-[50px] shrink-0 object-contain transition group-hover:scale-105" />
-                      <span class="min-w-0">
-                        <span class="block truncate text-[13px] font-medium leading-5 text-[#252839]">{capability.title}</span>
-                        <span class="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-[#7c8398]">{capability.description}</span>
-                      </span>
-                    </button>
-                  )}
-                </For>
-              </div>
-            </section>
+              <section class="cmcc-expert-dialog-section">
+                <h3>专家团技能:</h3>
+                <div class="cmcc-expert-skill-grid">
+                  <For each={capabilities()}>
+                    {(capability, index) => (
+                      <button
+                        type="button"
+                        class="cmcc-expert-skill"
+                        title={capability.description}
+                        onClick={() => {
+                          if (props.expert.kind === "team") {
+                            props.onSummon(props.expert, props.expert.examples[index()] ?? props.expert.defaultPrompt)
+                            return
+                          }
+                          props.onOpenExternal(props.expert)
+                        }}
+                      >
+                        <span>{capability.title}</span>
+                        <span class="line-clamp-2">{capability.description}</span>
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </section>
 
-            <Show when={props.expert.kind === "team" ? props.expert : undefined}>
-              {(item) => (
-                <section class="mt-5">
-                  <h3 class="m-0 text-[16px] font-medium leading-6 text-[#252839]">专家协作:</h3>
-                  <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <For each={item().members.filter((m) => m.id !== "deeptrading/dt-trader")}>{(member) => <DialogMember member={member} />}</For>
-                  </div>
-                </section>
-              )}
-            </Show>
+              <Show when={props.expert.kind === "team" ? props.expert : undefined}>
+                {(item) => (
+                  <section class="cmcc-expert-dialog-section">
+                    <h3>专家协作:</h3>
+                    <div class="cmcc-expert-member-grid">
+                      <For each={item().members.filter((m) => m.id !== "deeptrading/dt-trader")}>{(member) => <DialogMember member={member} />}</For>
+                    </div>
+                  </section>
+                )}
+              </Show>
+            </div>
           </div>
 
-          <footer class="flex h-[68px] shrink-0 items-center justify-end gap-3 border-t border-[#edf0f7] px-6 shadow-[0_-5px_16px_rgba(52,42,89,0.04)]" classList={{ "!gap-2 !px-3 sm:!gap-3 sm:!px-6 [&_button]:!px-2 [&_button]:whitespace-nowrap [&_button]:shrink-0 sm:[&_button]:!px-5": props.expert.id === "deeptrading" }}>
+          <footer class="cmcc-expert-dialog-footer">
             <Show when={props.expert.id === "deeptrading"}>
-              <button type="button" class="cmcc-expert-primary mr-auto h-9 px-5 text-[13px] font-medium" onClick={() => { props.onClose(); navigate("/mstock") }}>
-                <Icon name="fork" class="size-4" style={{ color: "#fff" }} />多股对比
+              <button type="button" class="cmcc-expert-primary mr-auto" onClick={() => { props.onClose(); navigate("/mstock") }}>
+                多股对比
               </button>
             </Show>
             <Show when={props.expert.id === "shoppers-pro"}>
               <button
                 type="button"
-                class="cmcc-expert-secondary mr-auto flex h-9 items-center gap-1.5 px-4 text-[13px] font-medium"
+                class="cmcc-expert-secondary mr-auto"
                 onClick={() => setShowDemo(true)}
               >
                 <svg class="size-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="square">
@@ -457,10 +451,10 @@ function ExpertDetailDialog(props: {
                 手机演示
               </button>
             </Show>
-            <div class="flex items-center gap-3">
+            <div class="cmcc-expert-dialog-actions">
               <button
                 type="button"
-                class="cmcc-expert-secondary h-9 px-5 text-[13px] font-medium"
+                class="cmcc-expert-secondary"
                 onClick={motion.close}
               >
                 取消
@@ -470,7 +464,7 @@ function ExpertDetailDialog(props: {
                 fallback={
                   <button
                     type="button"
-                    class="cmcc-expert-primary h-9 px-5 text-[13px] font-medium"
+                    class="cmcc-expert-primary"
                     onClick={() => props.onOpenExternal(props.expert as ExternalExpert)}
                   >
                     打开 {props.expert.name}
@@ -480,7 +474,7 @@ function ExpertDetailDialog(props: {
                 {(item) => (
                   <button
                     type="button"
-                    class="cmcc-expert-primary h-9 px-5 text-[13px] font-medium"
+                    class="cmcc-expert-primary"
                     onClick={() => props.onSummon(item())}
                   >
                     召唤产业专家团
@@ -606,20 +600,20 @@ function DialogMember(props: { member: TeamMember }) {
   const avatar = createMemo(() => cmccMemberAvatarUrl(props.member))
 
   return (
-    <div class="flex min-w-0 items-center gap-2 rounded-full border border-[#e5e7ef] bg-[#fff] p-1 pr-3">
+    <div class="cmcc-expert-dialog-member">
       <Show
         when={avatar()}
         fallback={
-          <div class="flex size-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,#8d77ff,#536dff)] text-[12px] font-semibold text-[#fff] shadow-[0_3px_8px_rgba(83,109,255,0.2)]">
+          <div class="cmcc-expert-member-avatar cmcc-expert-member-initial">
             {props.member.name.slice(0, 1)}
           </div>
         }
       >
-        {(source) => <img src={source()} alt="" class="size-9 shrink-0 rounded-full object-cover" />}
+        {(source) => <img src={source()} alt="" class="cmcc-expert-member-avatar" />}
       </Show>
       <div class="min-w-0">
-        <div class="truncate text-[12px] font-medium leading-4 text-[#252839]">{props.member.profession}</div>
-        <div class="truncate text-[11px] leading-4 text-[#8b91a3]">{props.member.name}</div>
+        <div class="truncate text-[12px] font-medium leading-4 text-[#242635]" title={props.member.profession}>{props.member.profession}</div>
+        <div class="truncate text-[11px] leading-4 text-[#737780]" title={props.member.name}>{props.member.name}</div>
       </div>
     </div>
   )

@@ -5,6 +5,7 @@ import { useNavigate } from "@solidjs/router"
 import type { DockApiCaseGroup, DockApiCatalogCaseSummary } from "@/context/dockapi"
 import { dockApiUrl, useDockApi } from "@/context/dockapi"
 import { CaseDeleteDialog } from "@/components/case-delete-dialog"
+import { CmccPageBrandBar } from "@/components/cmcc-page-brand-bar"
 import {
   CMCC_CASES_UPDATED_EVENT,
   CMCC_CASE_CATEGORIES,
@@ -248,9 +249,10 @@ export function CmccCasesRoute() {
     <Show when={state.maintenance && canManageCases()} fallback={
     <main class="relative size-full overflow-x-hidden overflow-y-auto bg-[var(--cmcc-home-background)]" data-page="cmcc-cases"
       onKeyDown={(event) => { if (event.key === "Escape" && state.opening) cancelOpening() }}>
+      <CmccPageBrandBar />
       <div class="relative mx-auto w-full max-w-[1320px] px-6 pb-12 pt-10 max-sm:px-4 max-sm:pt-6">
         <header class="relative z-30">
-          <h1 class="text-[30px] font-semibold leading-10 text-[#4d73b4]">精选案例</h1>
+          <h1 class="text-[30px] [font-weight:700] leading-10 text-[#000000]">精选案例</h1>
           <p class="mt-1 text-[17px] leading-7 text-[#596176] max-sm:text-[14px]">
             沉淀真实研究成果，快速查看 Deep Research 与 AI+产业洞察的完整交付
           </p>
@@ -418,7 +420,7 @@ function OverviewGroups(props: {
       </Show>
       <Show when={others().length}>
         <div class="mt-6 flex min-w-0 items-baseline gap-3">
-          <h2 class="shrink-0 text-[15px] font-semibold text-[#4d73b4]">AI+产业洞察</h2>
+          <h2 class="shrink-0 text-[15px] [font-weight:700] text-[#000000]">AI+产业洞察</h2>
           <p class="truncate text-[14px] text-[#596176]">垂类专家团专业化研究</p>
         </div>
       </Show>
@@ -511,7 +513,7 @@ function CaseSectionHeading(props: { category: string }) {
   const category = () => cmccCaseCategoryByCode(props.category)
   return (
     <div class="flex min-w-0 items-baseline gap-3">
-      <h2 class="shrink-0 text-[15px] font-semibold text-[#4d73b4]">{category()?.label}</h2>
+      <h2 class="shrink-0 text-[15px] [font-weight:700] text-[#000000]">{category()?.label}</h2>
       <p class="truncate text-[14px] text-[#596176]">{category()?.description}</p>
     </div>
   )

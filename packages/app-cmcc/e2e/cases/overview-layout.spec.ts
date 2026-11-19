@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import { CMCC_CASE_CATEGORIES } from "../../src/utils/cmcc-cases"
 import { cmccHistoryProduct } from "../../src/utils/cmcc-history-product"
 import { fixture } from "../smoke/session-timeline.fixture"
+import { expectPageBrandBar } from "../utils/expect-page-brand-bar"
 import { mockOpenCodeServer } from "../utils/mock-server"
 
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL, video: "off" })
@@ -145,11 +146,14 @@ for (const width of [1440, 1280, 768, 767, 390]) {
     page.on("pageerror", (error) => errors.push(error.message))
     await prepare(page)
     const catalog = page.locator('[data-page="cmcc-cases"]')
+    await expectPageBrandBar(page, catalog.getByRole("heading", { name: "精选案例", exact: true }))
     const shellBackground = await page.locator(".cmcc-shell").evaluate((el) => getComputedStyle(el).backgroundColor)
     await expect(catalog).toHaveCSS("background-color", shellBackground)
     await expect(catalog.locator("[data-cmcc-page-background]")).toHaveCount(0)
     for (const name of ["精选案例", "通用深度研究", "AI+产业洞察"]) {
-      await expect(catalog.getByRole("heading", { name, exact: true })).toHaveCSS("color", "rgb(77, 115, 180)")
+      const heading = catalog.getByRole("heading", { name, exact: true })
+      await expect(heading).toHaveCSS("color", "rgb(0, 0, 0)")
+      await expect(heading).toHaveCSS("font-weight", "700")
     }
     await expectCompactCards(page)
     const general = page.locator('[data-case-group="deep-research"]')

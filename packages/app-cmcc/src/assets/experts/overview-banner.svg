@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 6 912 160" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="panel" x1="893.488" y1="-17" x2="594.099" y2="-414.195" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f6f6f6"/>
+      <stop offset="1" stop-color="white"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="6" width="912" height="160" fill="white"/>
+  <rect x="8" y="6" width="912" height="160" fill="#fdfdfb" fill-opacity=".7"/>
+  <rect x="8" y="6" width="912" height="160" fill="url(#panel)" fill-opacity=".7"/>
+</svg>

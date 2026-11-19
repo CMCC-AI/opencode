@@ -1,0 +1,25 @@
+.cmcc-overview-page {
+  container: cmcc-overview / inline-size;
+}
+
+.cmcc-overview-intro {
+  padding-block-start: clamp(64px, calc(100dvh - 756px), 144px);
+}
+
+@container cmcc-overview (width > 920px) {
+  .cmcc-overview-intro {
+    padding-block-start: clamp(56px, calc(100dvh - 792px), 108px);
+  }
+}
+
+@container cmcc-overview (max-width: 760px) {
+  .cmcc-overview-intro {
+    padding-block-start: 44px;
+  }
+}
+
+@container cmcc-overview (max-width: 540px) {
+  .cmcc-overview-intro {
+    padding-block-start: 28px;
+  }
+}

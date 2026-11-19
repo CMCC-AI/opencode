@@ -2,8 +2,11 @@ import { children, For, Show, type JSX } from "solid-js"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/icon"
 import lingxiAvatar from "@/assets/chat/draft-lingxi.png"
+import { CmccPageBrandBar } from "@/components/cmcc-page-brand-bar"
 import { CMCC_DEFAULT_RESEARCH_EXPERT, CMCC_TEAM_EXPERTS, type TeamExpert } from "@/utils/cmcc-experts"
 import "./session-new-design-view.css"
+
+const homeTeamChoices = CMCC_TEAM_EXPERTS.filter((team) => team.id !== "ai-for-science-team")
 
 const teamAvatars = import.meta.glob<string>("../../assets/chat/team-avatars/*.png", {
   eager: true,
@@ -70,6 +73,7 @@ export function NewSessionDesignView(props: {
       data-home-mode={props.onTeamChange || props.teamPicker || props.team?.id === CMCC_DEFAULT_RESEARCH_EXPERT.id ? "research" : "chat"}
       class="cmcc-home relative grid size-full min-h-0 min-w-0 justify-items-center overflow-y-auto"
     >
+      <CmccPageBrandBar />
       <div class="cmcc-home-heading">
         <div class="cmcc-home-greeting">
           <TeamAvatar team={props.team} />
@@ -83,7 +87,7 @@ export function NewSessionDesignView(props: {
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
                   <DropdownMenu.Content aria-label="切换专家团" class="cmcc-home-team-menu">
-                    <For each={CMCC_TEAM_EXPERTS}>{(team) => choice(team)}</For>
+                    <For each={homeTeamChoices}>{(team) => choice(team)}</For>
                     {choice()}
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>

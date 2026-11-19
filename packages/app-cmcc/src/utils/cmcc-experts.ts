@@ -122,7 +122,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
   {
     kind: "team",
     id: "zhengqi-visit-intel",
-    name: "DeepEngage谈参高拜专家团",
+    name: "DeepEngage 谈参高拜专家团",
     description:
       "融合内部门户数据与公开情报，产出可溯源的政企拜访决策报告：为何拜访、谈什么、争取什么共识。",
     leadAgent: "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",

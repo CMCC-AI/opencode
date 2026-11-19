@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { CMCC_KNOWLEDGE_STORAGE_KEY, cmccKnowledgeRoot } from "../../src/utils/cmcc-knowledge"
+import { expectPageBrandBar } from "../utils/expect-page-brand-bar"
 import { setupHomePage } from "./home-fixture"
 
 test.use({ locale: "zh-CN" })
@@ -57,6 +58,9 @@ for (const width of [1440, 1024, 390, 320]) {
       await page.getByRole("button", { name: "隐藏左栏" }).click()
       await expect(page.locator('aside[aria-label="CMCC conversations"]')).toHaveCSS("width", "0px")
     }
+    await expectPageBrandBar(page, title)
+    const introButton = page.locator(".cmcc-page-brandbar").getByRole("button", { name: "产品介绍", exact: true })
+    await expect(introButton).toBeVisible()
     const banner = page.getByRole("region", { name: "AI 知识库" })
     const recent = page.getByRole("region", { name: "最近打开笔记" })
     const bannerCreate = banner.getByRole("button", { name: "创建笔记", exact: true })
@@ -131,7 +135,7 @@ for (const width of [1440, 1024, 390, 320]) {
       await expect(recent.locator("article")).toHaveCount(11)
     }
 
-    await page.getByRole("button", { name: "产品介绍", exact: true }).click()
+    await introButton.click()
     const intro = page.locator('iframe[title="产品介绍"]')
     await expect(intro).toBeVisible()
     await expect(intro).toHaveAttribute("src", "/product-intro/index.html")
