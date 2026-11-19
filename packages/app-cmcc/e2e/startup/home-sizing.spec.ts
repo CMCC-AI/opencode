@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { setupHomePage } from "./home-fixture"
+import { selectHomeTeam, setupHomePage } from "./home-fixture"
 
 test.use({ locale: "zh-CN" })
 
@@ -29,6 +29,7 @@ for (const viewport of [
         )
         .toBeLessThanOrEqual(1)
     }
+    if (!baseline) await selectHomeTeam(page, "灵犀")
     await page.evaluate(() => document.fonts.ready)
     await page.locator(".cmcc-page-content").evaluate((element) =>
       Promise.all(element.getAnimations().map((animation) => animation.finished.catch(() => undefined))),
@@ -53,6 +54,7 @@ for (const viewport of [
             .getEntriesByType("paint")
             .map((entry) => ({ name: entry.name, startTime: entry.startTime })),
           title: bounds(`${home} h1`),
+          greeting: document.querySelector(".cmcc-home-greeting") ? bounds(".cmcc-home-greeting") : undefined,
           subtitle: bounds(`${home} p`),
           logo: bounds(`${home} img`),
           composer: bounds(composer),
@@ -74,16 +76,20 @@ for (const viewport of [
     expect(metrics.title.y + metrics.title.height).toBeLessThanOrEqual(metrics.subtitle.y)
     expect(metrics.title.height).toBeLessThanOrEqual(Number.parseFloat(metrics.title.font) * 1.25 + 6)
     expect(metrics.subtitle.y + metrics.subtitle.height).toBeLessThanOrEqual(metrics.composer.y)
-    expect(metrics.editor.font).toBe("17px")
+    expect(metrics.greeting!.x).toBeCloseTo(metrics.composer.x, 1)
+    expect(metrics.title.x).toBeCloseTo(metrics.composer.x, 1)
+    expect(metrics.subtitle.x).toBeCloseTo(metrics.composer.x, 1)
+    const wide = viewport.width >= 1440
+    expect(metrics.editor.font).toBe(wide ? "16.8px" : "14px")
     expect(metrics.editor.y).toBeGreaterThanOrEqual(metrics.composer.y)
-    expect(metrics.composer.height).toBe(viewport.width >= 760 ? 160 : 200)
+    expect(metrics.composer.height).toBe(wide ? 144 : 200)
     await expect(page.locator(`${home} [data-action="prompt-model"]`)).toHaveCSS("font-size", "15px")
     await expect(page.getByRole("button", { name: "执行", exact: true })).toBeVisible()
-    if (viewport.width >= 1440) {
-      expect(metrics.title.font).toBe("38px")
-      expect(metrics.subtitle.font).toBe("18px")
-      expect(metrics.logo.height).toBe(58)
-      expect(metrics.composer.width).toBe(900)
+    if (wide) {
+      expect(metrics.title.font).toBe("38.4px")
+      expect(metrics.subtitle.font).toBe("16.8px")
+      expect(metrics.logo.height).toBeCloseTo(43.2, 1)
+      expect(metrics.composer.width).toBe(720)
       await expect(page.locator('aside img[alt="深度洞察"]')).toHaveCSS("height", "44px")
     }
     await page.locator(editor).fill("请帮我分析这个研究主题，保留当前输入内容。")

@@ -50,7 +50,7 @@ import { usePlatform } from "@/context/platform"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
 import { RESEARCH_FILE_ACCEPT, type ResearchMode } from "@/pages/general-deepinsight/research-attachments"
-import { createPromptAttachments } from "./prompt-input/attachments"
+import { createPromptAttachments, type AttachmentStorage } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES, pickAttachmentFiles } from "./prompt-input/files"
 import { createAttachmentStorage } from "./prompt-input/upload-storage"
 import {
@@ -181,11 +181,12 @@ function createPersistedPromptInputHistory() {
 
 export interface PromptInputProps {
   research?: {
-    mode: ResearchMode
+    mode?: ResearchMode
     pending: boolean
     blocked: boolean
     changeMode: (mode: ResearchMode) => void
-    readAttachment: (file: File, relativePath?: string) => Promise<ImageAttachmentPart>
+    readAttachment: (file: File, relativePath?: string, storage?: AttachmentStorage) => Promise<ImageAttachmentPart>
+    onUploadPending?: (pending: boolean) => void
     removeAttachment: (id: string) => void
     submit: (deep: () => Promise<void> | void) => Promise<void>
   }
@@ -604,6 +605,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     setStore("popover", null)
     requestAnimationFrame(() => editorRef?.focus())
   }
+  createEffect(on(() => props.selectedExpertAgent, () => {
+    if (props.research && store.mode === "shell") setMode("normal")
+  }, { defer: true }))
 
   const shellModeKey = "mod+shift+x"
   const normalModeKey = "mod+shift+e"
@@ -1248,7 +1252,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     const shellMode = store.mode === "shell"
 
-    if (!shellMode && !props.research) {
+    if (!shellMode && !props.research?.mode) {
       const atMatch = rawText.substring(0, cursorPosition).match(/@(\S*)$/)
       const slashMatch = rawText.match(/^\/(\S*)$/)
 
@@ -1416,6 +1420,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     createPromptAttachments({
       disabled: () => !!props.research?.pending,
       read: props.research?.readAttachment,
+      useCustomReader: () => !selectedKnowledge(),
       prompt,
       editor: () => editorRef,
       dropTarget: () => attachmentDropRef,
@@ -1457,6 +1462,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         })
       },
     })
+  createEffect(() => props.research?.onUploadPending?.(uploadStatus.pending > 0))
+  onCleanup(() => props.research?.onUploadPending?.(false))
 
   const fileAttachmentInput = () => (
     <>
@@ -1525,7 +1532,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       onAbort: props.onAbort,
       onSubmit: props.onSubmit,
       selectedAgent: () => props.selectedExpertAgent,
-      literal: !!props.research,
+      get literal() { return !!props.research?.mode },
       knowledge: selectedKnowledge,
     })
 
@@ -1567,7 +1574,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       }
     }
 
-    if (!props.research && event.key === "!" && store.mode === "normal") {
+    if (!props.research?.mode && event.key === "!" && store.mode === "normal") {
       const cursorPosition = getCursorPosition(editorRef)
       if (cursorPosition === 0) {
         setStore("mode", "shell")
@@ -1717,7 +1724,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   )
 
   const designPlaceholder = () => {
-    if (props.research) return "请告诉您要研究的问题？"
+    if (props.research?.mode) return "请告诉您要研究的问题？"
     if (store.mode === "shell") return placeholder()
     if (newSession()) return "请告诉您要研究的问题？@召唤领域专家团，/调用技能与指令"
     return language.t("prompt.placeholder.simple")
@@ -1754,6 +1761,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }))
 
   const newSession = () => props.variant === "new-session"
+  const floatingCmccActions = () => newSession() || props.variant === "dock"
   const bindEditorRef = (el: HTMLDivElement) => {
     editorRef = el
     restoreEndOnFocus = true
@@ -1993,9 +2001,9 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               <div class="flex h-11 items-center px-2" classList={{ "home-composer-toolbar": newSession() }}>
                 <div class="flex min-w-0 flex-1 items-center gap-1">
                   {fileAttachmentInput()}
-                  <Show when={newSession()} fallback={cmccActionButton()}>
+                  <Show when={floatingCmccActions()} fallback={cmccActionButton()}>
                     <HomeActionsPopover
-                      open={!!actions.panel}
+                      open={newSession() ? !!actions.panel : actions.panel === "menu"}
                       menu={actions.panel === "menu"}
                       ref={(element) => (cmccPanelRef = element)}
                       content={cmccPanelContent()}
@@ -2010,12 +2018,12 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         data-action="prompt-selected-expert"
                         class="flex h-7 min-w-0 max-w-[210px] items-center gap-1.5 rounded-[7px] bg-v2-background-bg-layer-03 pr-1.5 pl-1 text-[13px] leading-4 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
                         style={buttons()}
-                        disabled={!!props.research}
+                        disabled={!!props.research?.mode || !!props.research?.pending || uploadStatus.pending > 0}
                         onClick={() => {
                           props.onSelectedExpertAgentChange?.(undefined)
                           restoreFocus()
                         }}
-                        aria-label={props.research ? expert().name : `移除${expert().name}`}
+                        aria-label={props.research?.mode ? expert().name : `移除${expert().name}`}
                       >
                         <Show
                           when={cmccTeamAvatarUrl(expert())}
@@ -2030,7 +2038,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                           )}
                         </Show>
                         <span class="min-w-0 truncate">{cmccExpertChineseName(expert())}</span>
-                        <Show when={!props.research}><Icon name="close" class="size-3.5 shrink-0 text-v2-icon-icon-muted" /></Show>
+                        <Show when={!props.research?.mode}><Icon name="close" class="size-3.5 shrink-0 text-v2-icon-icon-muted" /></Show>
                       </button>
                     )}
                   </Show>
@@ -2093,14 +2101,14 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     </div>
                   </Show>
                 </div>
-                <Show when={props.research}>
+                <Show when={props.research?.mode && props.research}>
                   {(research) => <div class="home-agent-control" role="group" aria-label="研究模式">
                     <For each={["quick", "deep"] as const}>{(mode) => <button type="button" aria-pressed={research().mode === mode}
                       disabled={research().pending || uploadStatus.pending > 0}
                       onClick={() => research().changeMode(mode)}>{mode === "quick" ? "快速" : "深度"}</button>}</For>
                   </div>}
                 </Show>
-                <Show when={!props.research && newSession() && showAgentControl()}>
+                <Show when={!props.research?.mode && newSession() && showAgentControl()}>
                   <HomeAgentControl
                     options={props.controls.agents.options}
                     current={props.controls.agents.current}
@@ -2123,7 +2131,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </TooltipV2>
               </div>
             </DockShellForm>
-            <Show when={!newSession() && actions.panel}>
+            <Show when={!newSession() && actions.panel && (actions.panel !== "menu" || !floatingCmccActions())}>
               <div
                 ref={(el) => (cmccPanelRef = el)}
                 class="mt-2 flex w-full min-w-0 justify-start"

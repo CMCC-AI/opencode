@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test"
+import { expect, type Page } from "@playwright/test"
 import { mockOpenCodeServer } from "../utils/mock-server"
 
 export const homeDirectory = "C:/home-sizing-test"
@@ -11,6 +11,26 @@ export const homeSession = {
   version: "v2",
   agent: "build",
   time: { created: 1, updated: 1 },
+}
+
+const teamLeads = [
+  "deepinsight/deepinsight-team-lead",
+  "deeptrading/deeptrading-team-lead",
+  "shoppers-pro/shoppers-pro-team-lead",
+  "deepinspect/deepinspect-team-lead",
+  "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",
+  "deepgeo/deepgeo-team-lead",
+  "ai-for-science-team/ai-for-science-team-team-lead",
+]
+
+export const homeTeam = (page: Page) => page.getByRole("button", { name: /^切换专家团，当前：/ })
+
+export async function selectHomeTeam(page: Page, name: string) {
+  const trigger = homeTeam(page)
+  await trigger.click()
+  await page.getByRole("menu", { name: "切换专家团" }).getByRole("menuitem", { name, exact: true }).click()
+  await expect(trigger).toHaveAccessibleName(`切换专家团，当前：${name}`)
+  await expect(trigger).toBeEnabled()
 }
 
 function provider(id: string, name: string, modelName: string) {
@@ -28,7 +48,7 @@ function provider(id: string, name: string, modelName: string) {
 
 export async function setupHomePage(
   page: Page,
-  options: { models?: boolean; history?: boolean; free?: boolean; duplicateModels?: boolean; bailian?: boolean } = {},
+  options: { models?: boolean; history?: boolean; free?: boolean; duplicateModels?: boolean; bailian?: boolean; teams?: boolean } = {},
 ) {
   await page.addInitScript(() => {
     if (window !== window.top) return
@@ -108,6 +128,7 @@ export async function setupHomePage(
           mode: "primary",
           model: options.bailian ? { providerID: "alibaba-cn", modelID: "glm-5.2" } : undefined,
         },
+        ...(options.teams ? teamLeads.map((name) => ({ name, mode: "primary" })) : []),
       ],
     }),
   )

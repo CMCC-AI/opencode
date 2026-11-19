@@ -1,4 +1,4 @@
-import { homeDirectory, homeSession, setupHomePage } from "../../startup/home-fixture"
+import { homeDirectory, homeSession, selectHomeTeam, setupHomePage } from "../../startup/home-fixture"
 import { benchmark, expect } from "../benchmark"
 
 benchmark.use({ locale: "zh-CN" })
@@ -36,6 +36,7 @@ benchmark("measures the first general-chat submission", async ({ page, report })
     return route.fulfill({ status: 204 })
   })
   await page.goto("/app")
+  await selectHomeTeam(page, "灵犀")
   await expect(page.locator('[data-action="prompt-model"]')).toBeEnabled()
   await page.locator('[data-component="prompt-input"]').fill("首次发送性能基线")
   start = performance.now()

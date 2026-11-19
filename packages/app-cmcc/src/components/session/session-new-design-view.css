@@ -3,10 +3,12 @@
 }
 
 .cmcc-home {
+  --cmcc-home-column-width: 600px;
+  --cmcc-home-intro-offset: 0px;
   background: var(--cmcc-home-background);
-  padding: 48px 40px;
+  padding: clamp(56px, calc(22dvh + var(--cmcc-home-intro-offset)), 240px) 40px 48px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(max-content, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   container: cmcc-home / inline-size;
   font-family:
     -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, "Helvetica Neue", Arial,
@@ -15,54 +17,123 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.cmcc-home[data-home-mode="research"] {
+  --cmcc-home-intro-offset: -24px;
+}
+
 .cmcc-home-heading {
-  display: flex;
   width: 100%;
-  max-width: 960px;
+  max-width: calc(var(--cmcc-home-column-width) * var(--cmcc-home-scale, 1));
   min-width: 0;
-  align-self: end;
-  flex-direction: column;
-  align-items: center;
-  padding-bottom: 48px;
-  text-align: center;
+  padding-bottom: calc(26px * var(--cmcc-home-scale, 1));
+  text-align: start;
 }
 
-.cmcc-home-brand {
+.cmcc-home-greeting {
   display: flex;
-  max-width: 100%;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: calc(8px * var(--cmcc-home-scale, 1));
+  min-height: calc(36px * var(--cmcc-home-scale, 1));
+  margin-bottom: calc(10px * var(--cmcc-home-scale, 1));
+  color: #747982;
+  font-size: calc(14px * var(--cmcc-home-scale, 1));
+  line-height: calc(20px * var(--cmcc-home-scale, 1));
 }
 
-.cmcc-home-brand img {
-  width: 58px;
-  height: 58px;
+.cmcc-home-greeting-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 4px;
+  min-width: 0;
+}
+
+.cmcc-home-team-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #edf4fc;
+  color: #3566a3;
+}
+
+.cmcc-home-greeting .cmcc-home-team-avatar {
+  width: calc(36px * var(--cmcc-home-scale, 1));
+  height: calc(36px * var(--cmcc-home-scale, 1));
+}
+
+.cmcc-home-team-avatar img {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  flex: 0 0 auto;
+}
+
+.cmcc-home-greeting strong {
+  color: #252a32;
+  font-weight: 500;
+}
+
+.cmcc-home-team-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 4px;
+  border-radius: 6px;
+  text-align: start;
+}
+
+.cmcc-home-team-trigger:hover:not(:disabled),
+.cmcc-home-team-trigger[aria-expanded="true"] {
+  background: #edf4fc;
+}
+
+.cmcc-home-team-menu {
+  z-index: 75;
+  width: min(280px, calc(100vw - 24px));
+  max-height: min(375px, var(--kb-popper-content-available-height, 70dvh));
+  overflow-y: auto;
+  padding: 5px;
+  border-radius: 8px;
+}
+
+.cmcc-home-team-menu .cmcc-home-team-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.cmcc-home-team-item .cmcc-home-team-avatar {
+  width: 26px;
+  height: 26px;
+}
+
+.cmcc-home-team-item[data-selected-team] {
+  background: #edf4fc;
 }
 
 .cmcc-home-brand h1 {
-  min-width: 0;
-  margin: 0 0 -6px;
-  padding-bottom: 6px;
-  font-size: 38px;
+  margin: 0;
+  font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: calc(32px * var(--cmcc-home-scale, 1));
   font-weight: 600;
   line-height: 1.25;
   letter-spacing: 0;
   color: #171c26;
 }
 
-.cmcc-home-heading p {
-  margin: 0;
-  font-size: 18px;
+.cmcc-home-heading > p {
+  margin: calc(8px * var(--cmcc-home-scale, 1)) 0 0;
+  font-size: calc(14px * var(--cmcc-home-scale, 1));
   font-weight: 400;
-  line-height: 1.5;
-  color: #7a808b;
+  line-height: calc(20px * var(--cmcc-home-scale, 1));
+  color: #737881;
 }
 
 .cmcc-home-composer-surface {
+  min-height: var(--cmcc-home-surface-height, 120px);
   border: 1px solid #dfe2e7;
   border-radius: 16px;
   background: #fff;
@@ -85,28 +156,26 @@
 }
 
 .cmcc-home-composer {
+  --cmcc-home-surface-height: calc(120px * var(--cmcc-home-scale, 1));
+  --cmcc-home-editor-height: calc(var(--cmcc-home-surface-height) - 46px);
   width: 100%;
-  max-width: 900px;
+  max-width: calc(var(--cmcc-home-column-width) * var(--cmcc-home-scale, 1));
   min-width: 0;
 }
 
-/* Scope the larger editor and controls to the homepage, not history or agent pages. */
-.cmcc-home [data-component="session-new-composer"] {
-  min-height: 160px;
-}
-
+/* Match the composer and its loading placeholder without changing session input sizes. */
 .cmcc-home [data-component="session-new-composer"] > div:has([data-component="prompt-input"]) {
-  min-height: 112px;
+  min-height: var(--cmcc-home-editor-height);
 }
 
 .cmcc-home [data-component="prompt-input"],
 .cmcc-home [data-component="session-new-design-text"] {
-  font-size: 17px;
-  line-height: 26px;
+  font-size: calc(14px * var(--cmcc-home-scale, 1));
+  line-height: calc(22px * var(--cmcc-home-scale, 1));
 }
 
 .cmcc-home [data-component="prompt-input"] {
-  min-height: 112px;
+  min-height: var(--cmcc-home-editor-height);
 }
 
 .cmcc-home [data-component="session-new-design-text"] {
@@ -127,36 +196,29 @@
   height: 32px;
 }
 
-@container cmcc-home (max-width: 640px) {
-  .cmcc-home-brand h1 {
-    font-size: 32px;
-  }
-
-  .cmcc-home-heading p {
-    font-size: 17px;
+@container cmcc-home (min-width: 720px) {
+  .cmcc-home-heading,
+  .cmcc-home-composer {
+    --cmcc-home-scale: 1.2;
   }
 }
 
 @container cmcc-home (max-width: 480px) {
-  .cmcc-home [data-component="session-new-composer"] {
-    min-height: 200px;
+  .cmcc-home-greeting {
+    min-height: 46px;
   }
 
-  .cmcc-home-brand {
-    flex-direction: column;
-    gap: 10px;
+  .cmcc-home-composer {
+    --cmcc-home-surface-height: 200px;
+    --cmcc-home-editor-height: 112px;
   }
 
   .cmcc-home-brand h1 {
     font-size: 28px;
   }
 
-  .cmcc-home-heading p {
-    font-size: 16px;
-  }
-
   .cmcc-home-heading {
-    padding-bottom: 32px;
+    padding-bottom: 22px;
   }
 }
 

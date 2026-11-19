@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import { base64Encode } from "@opencode-ai/core/util/encode"
-import { homeSession, setupHomePage } from "./home-fixture"
+import { homeSession, homeTeam, selectHomeTeam, setupHomePage } from "./home-fixture"
 
 test.use({ locale: "zh-CN" })
 const composer = '[data-component="session-new-composer"]'
@@ -9,17 +9,14 @@ const modelTrigger = '[data-action="prompt-model"]'
 
 async function openHome(page: Page, width = 1440) {
   await page.setViewportSize({ width, height: 900 })
-  await setupHomePage(page, { models: true })
+  await setupHomePage(page, { models: true, teams: true })
   await page.goto("/app")
   await expect(page.locator(composer)).toBeVisible()
   if (width < 760) {
     await page.getByRole("button", { name: "隐藏左栏" }).click()
-    await expect
-      .poll(() =>
-        page.locator('aside[aria-label="CMCC conversations"]').evaluate((node) => node.getBoundingClientRect().width),
-      )
-      .toBeLessThanOrEqual(1)
+    await expect(page.locator('aside[aria-label="CMCC conversations"]')).toHaveCSS("width", "0px")
   }
+  await selectHomeTeam(page, "灵犀")
   await expect(page.locator(modelTrigger)).not.toBeDisabled()
   await page.evaluate(() => document.fonts.ready)
   await page.locator(".cmcc-page-content").evaluate((element) =>
@@ -132,6 +129,7 @@ test("new drafts prefer Bailian Flash and retain manual model choices", async ({
     route.fulfill({ json: { model: "alibaba-cn/glm-5.2" } }),
   )
   await page.goto("/app")
+  await selectHomeTeam(page, "灵犀")
   await expect(page.locator(modelTrigger)).toContainText("Qwen3.7 Flash")
   await page.locator(modelTrigger).click()
   await expect(page.getByRole("menuitem", { name: "Free", exact: true })).toHaveCount(0)
@@ -277,6 +275,7 @@ for (const width of [1440, 390]) {
       await page.getByRole("button", { name: "打开更多操作" }).click()
       await page.getByRole("button", { name: "专家团", exact: true }).click()
       await page.getByRole("menuitem", { name, exact: true }).click()
+      await expect(homeTeam(page)).toBeEnabled()
       const expert = page.locator('[data-action="prompt-selected-expert"]')
       await expect(expert).toContainText(name)
       await expect(modes).toHaveCount(0)
@@ -284,7 +283,7 @@ for (const width of [1440, 390]) {
       await expect(page.locator(modelTrigger)).toBeVisible()
       await expect(editor).toHaveText("保留研究草稿")
       await page.screenshot({ path: info.outputPath("expert-draft.png") })
-      await expert.click()
+      await selectHomeTeam(page, "灵犀")
       await expect(modes).toBeVisible()
       await expect(modes.getByRole("button", { name: "计划", exact: true })).toHaveAttribute("aria-pressed", "true")
       await modes.getByRole("button", { name: "执行", exact: true }).click()
@@ -293,10 +292,11 @@ for (const width of [1440, 390]) {
       await page.getByRole("button", { name: "打开更多操作" }).click()
       await page.getByRole("button", { name: "专家团", exact: true }).click()
       await page.getByRole("menuitem", { name, exact: true }).click()
+      await expect(homeTeam(page)).toBeEnabled()
       await page.reload()
       await expect(expert).toContainText(name)
       await expect(modes).toHaveCount(0)
-      await expert.click()
+      await selectHomeTeam(page, "灵犀")
       await expect(modes).toBeVisible()
       await expect(editor).toHaveText("保留研究草稿")
     })
@@ -319,7 +319,6 @@ for (const width of [1440, 390]) {
     await expect(agent).toContainText("构建")
     await expect(page.locator(modelTrigger)).toBeVisible()
     await page.getByRole("button", { name: "打开更多操作" }).click()
-    await expect(page.locator('[data-component="cmcc-prompt-panels"]')).toBeVisible()
-    await expect(page.locator(".home-actions-popover")).toHaveCount(0)
+    await expect(page.locator(menu).getByRole("button", { name: "添加文件和图片" })).toBeVisible()
   })
 }

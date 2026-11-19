@@ -529,7 +529,7 @@ function useCmccExpertDraftLauncher() {
       return
     }
 
-    tabs.newDraft({ server: server.key, directory, artifactDirectory, expertID: expert.id }, prompt, {
+    tabs.newDraft({ server: server.key, directory, artifactDirectory, homeTeamPicker: true, expertID: expert.id }, prompt, {
       agent: expert.leadAgent,
     })
     cmccRememberConversationWorkspace(directory)

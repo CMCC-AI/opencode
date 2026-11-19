@@ -16,7 +16,7 @@ import { useLayout } from "@/context/layout"
 import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
-import { useTabs } from "@/context/tabs"
+import { useTabs, type DraftTab } from "@/context/tabs"
 import { setNavigate } from "@/utils/notification-click"
 import { sessionHref } from "@/utils/session-route"
 import { sessionTitle } from "@/utils/session-title"
@@ -41,10 +41,9 @@ import { cmccHistoryProduct, type CmccHistoryProduct } from "@/utils/cmcc-histor
 import { cmccHistoryTime } from "@/utils/cmcc-history-time"
 import { CmccHistoryRow } from "@/components/cmcc-history-row"
 import { mstockMention } from "@/pages/session/mstock/page-selection"
-import { useResearchHome } from "@/pages/general-deepinsight/research-home"
 import { ResearchHistory } from "@/pages/general-deepinsight/history"
 import { CmccDeepLensFrame, isDeepLensPath } from "./cmcc-deeplens"
-import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
+import { CMCC_DEFAULT_RESEARCH_EXPERT, CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
 import { NewSessionLoading } from "@/components/session/session-new-design-view"
 import { createPageMotion } from "@/components/cmcc-motion"
 import "@/components/cmcc-overlays.css"
@@ -66,6 +65,12 @@ export default function NewLayout(props: ParentProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const layout = useLayout()
+  const tabs = useTabs()
+  const loadingDraft = () => tabs.store.find((tab): tab is DraftTab => tab.type === "draft" && tab.draftID === location.query.draftId)
+  const loadingTeam = () => {
+    if (location.pathname === "/app") return CMCC_DEFAULT_RESEARCH_EXPERT
+    return CMCC_TEAM_EXPERTS.find((team) => team.id === loadingDraft()?.expertID)
+  }
   let pageContent: HTMLDivElement | undefined
   createPageMotion(
     () => `${location.pathname}:${location.query.draftId ?? ""}`,
@@ -106,7 +111,7 @@ export default function NewLayout(props: ParentProps) {
             <Suspense
               fallback={
                 <Show when={location.pathname === "/app" || location.pathname === "/new-session"}>
-                  <NewSessionLoading />
+                  <NewSessionLoading team={loadingTeam()} teamPicker={loadingDraft()?.homeTeamPicker} />
                 </Show>
               }
             >
@@ -244,7 +249,11 @@ function CmccSidebar() {
     const artifactDirectory = cmccArtifactWorkspace(current)
     if (!current || !artifactDirectory || !tabs.ready()) return
 
-    tabs.newDraft({ server: server.key, directory: current, artifactDirectory })
+    const expert = CMCC_DEFAULT_RESEARCH_EXPERT
+    tabs.newDraft({
+      server: server.key, directory: current, artifactDirectory, homeTeamPicker: true,
+      expertID: expert.id, agent: expert.leadAgent, researchMode: "deep",
+    })
     cmccRememberConversationWorkspace(current)
     server.projects.touch(current)
     void cmccEnsureWorkspace(
@@ -259,8 +268,6 @@ function CmccSidebar() {
       })
     })
   }
-
-  const summonDeepInsight = useResearchHome()
 
   const openSession = (session: Session) => {
     const notebook = cmccKnowledgeNotebookForSession(knowledgeNotebooks(), session)
@@ -397,7 +404,7 @@ function CmccSidebar() {
             <CmccSidebarAction
               icon="research"
               label="深度研究"
-              onClick={() => void summonDeepInsight()}
+              onClick={openNewSession}
               active={location.pathname.startsWith("/general-deepinsight") || tabs.store.some((tab) => tab.type === "draft" && tab.researchMode && location.search.includes(tab.draftID))}
             />
             <CmccSidebarAction

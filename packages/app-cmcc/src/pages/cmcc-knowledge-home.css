@@ -1,0 +1,300 @@
+.cmcc-wiki-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cmcc-wiki-heading h1 {
+  margin: 0;
+  color: #111;
+  font: 700 44px / 1.12 Arial, "Helvetica Neue", sans-serif;
+  letter-spacing: 0;
+}
+
+.cmcc-wiki-heading p {
+  margin: 0;
+  color: #72767c;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.cmcc-wiki-banner-region {
+  container: wiki-banner / inline-size;
+  display: flow-root;
+}
+
+.cmcc-wiki-banner-original {
+  position: relative;
+  display: none;
+  margin-block-start: -24px;
+  /* Align the 912-unit panel, letting its 8-unit SVG gutters extend outside. */
+  margin-inline: calc(-100% * 8 / 912);
+}
+
+.cmcc-wiki-banner-original > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cmcc-wiki-banner-hotspot {
+  position: absolute;
+  /* The button rectangle in the source SVG's 928 x 199 viewBox. */
+  left: calc(100% * 739 / 928);
+  top: calc(100% * 121 / 199);
+  width: calc(100% * 141 / 928);
+  height: calc(100% * 42 / 199);
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.cmcc-wiki-banner-hotspot:disabled {
+  background: rgb(248 249 252 / 45%);
+  cursor: wait;
+}
+
+@container wiki-banner (min-width: 800px) {
+  .cmcc-wiki-banner-original {
+    display: block;
+  }
+
+  .cmcc-wiki-banner-region .cmcc-wiki-banner {
+    display: none;
+  }
+}
+
+.cmcc-wiki-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 30px;
+  border: 1px solid #e0e5eb;
+  border-radius: 16px;
+  background: linear-gradient(130deg, #ffffff, #f4f6f8);
+  box-shadow: 0 4px 14px rgb(38 51 71 / 5%);
+}
+
+.cmcc-wiki-banner-copy {
+  flex: 1 1 408px;
+  min-width: 0;
+}
+
+.cmcc-wiki-banner-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 18px;
+  width: min(100%, 248px);
+  margin-inline-start: auto;
+}
+
+.cmcc-wiki-features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.cmcc-wiki-feature {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 29px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  background: #e9f4fb;
+  color: #31668e;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.cmcc-wiki-feature[data-tone="mint"] {
+  background: #e6f5ed;
+  color: #286545;
+}
+
+.cmcc-wiki-feature[data-tone="amber"] {
+  background: #fff4df;
+  color: #80581d;
+}
+
+.cmcc-wiki-feature [data-component="icon"] {
+  color: inherit;
+}
+
+.cmcc-wiki-banner-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 4px 16px 4px 5px;
+  border-radius: 22px;
+  background: linear-gradient(103deg, #2979ed, #1658d6);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: box-shadow 150ms ease, filter 150ms ease;
+}
+
+.cmcc-wiki-banner-create-icon {
+  display: grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background-color: #fff;
+}
+
+.cmcc-wiki-banner-create:hover:not(:disabled) {
+  box-shadow: 0 5px 14px rgb(21 89 215 / 21%);
+  filter: brightness(0.97);
+}
+
+.cmcc-wiki-notebooks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+  gap: 16px;
+}
+
+.cmcc-wiki-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 196px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e0e6ef;
+  border-radius: 16px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.cmcc-wiki-card:hover:not(:disabled) {
+  border-color: #c4d5ee;
+  box-shadow: 0 6px 18px rgb(45 69 102 / 9%);
+}
+
+.cmcc-wiki-home button:focus-visible {
+  outline: 2px solid #246dd6;
+  outline-offset: 2px;
+}
+
+.cmcc-wiki-create-card {
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #f7f8fa;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cmcc-wiki-banner-create:disabled,
+.cmcc-wiki-create-card:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.cmcc-wiki-create-artwork {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+/* The existing cover contains a baked-in label; show only its illustration. */
+.cmcc-wiki-create-artwork img {
+  position: absolute;
+  top: -43px;
+  left: 50%;
+  width: 245px;
+  max-width: none;
+  height: 200px;
+  transform: translateX(-50%);
+}
+
+.cmcc-wiki-note-card {
+  text-align: start;
+  background: #e9f2fc;
+}
+
+.cmcc-wiki-note-qa {
+  background: #e7f6f2;
+}
+
+.cmcc-wiki-note-copy {
+  display: block;
+  flex: none;
+  width: 100%;
+  padding: 12px 58px 9px 13px;
+}
+
+.cmcc-wiki-note-media {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cmcc-wiki-note-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cmcc-wiki-note-media .cmcc-wiki-spec-artwork {
+  inset-block-start: -91%;
+  height: 234%;
+  object-fit: fill;
+}
+
+.cmcc-wiki-note-footer {
+  flex: none;
+  width: 100%;
+  padding: 7px 12px;
+  overflow: hidden;
+  border-top: 1px solid #e5ebf1;
+  background: #fcfdff;
+  color: #596678;
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .cmcc-wiki-heading {
+    gap: 10px;
+  }
+
+  .cmcc-wiki-heading h1 {
+    font-size: 30px;
+  }
+
+  .cmcc-wiki-heading p {
+    font-size: 14px;
+  }
+
+  .cmcc-wiki-banner {
+    gap: 16px;
+    padding: 18px 16px;
+  }
+
+  .cmcc-wiki-banner-actions {
+    align-items: flex-start;
+    gap: 13px;
+    margin-inline-start: 0;
+  }
+
+  .cmcc-wiki-card {
+    height: 178px;
+  }
+}

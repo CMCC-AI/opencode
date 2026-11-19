@@ -3,6 +3,7 @@ import JSZip from "jszip"
 import { RESEARCH_UPDATED } from "../../src/pages/general-deepinsight/model"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { mockOpenCodeServer } from "../utils/mock-server"
+import { selectHomeTeam } from "../startup/home-fixture"
 import { prepareReferenceDeepInsight } from "./reference-deepinsight"
 import { discoveryPayload } from "./discovery.fixture"
 import { outlineFixture, thinkingFixture } from "./thinking.fixture"
@@ -1661,13 +1662,14 @@ test("whole research homepage reuses new conversation branding and geometry", as
   await page.setViewportSize({ width: 1440, height: 900 })
   const geometry = () =>
     page.locator('[data-component="session-new-design"]').evaluate((root) => {
+      const top = root.querySelector(".cmcc-home-heading")!.getBoundingClientRect().top
       const bounds = (selector: string) => {
         const element = root.querySelector(selector)!
         const rect = element.getBoundingClientRect()
         const style = getComputedStyle(element)
         return {
           x: rect.x,
-          y: rect.y,
+          y: rect.y - top,
           width: rect.width,
           height: rect.height,
           font: style.fontSize,
@@ -1677,7 +1679,7 @@ test("whole research homepage reuses new conversation branding and geometry", as
       return {
         background: getComputedStyle(root).backgroundColor,
         heading: bounds(".cmcc-home-heading"),
-        logo: bounds(".cmcc-home-brand img"),
+        avatar: bounds(".cmcc-home-greeting img"),
         title: bounds(".cmcc-home-brand h1"),
         subtitle: bounds(".cmcc-home-heading p"),
         composer: bounds(".cmcc-home-composer"),
@@ -1690,10 +1692,13 @@ test("whole research homepage reuses new conversation branding and geometry", as
     })
   await page.goto("/app")
   await expect(page.locator('[data-component="prompt-input"]')).toBeVisible()
+  await selectHomeTeam(page, "灵犀")
+  await expect(page.locator(".cmcc-home-greeting")).toContainText("灵犀")
   await page.evaluate(() => document.fonts.ready)
   const native = await geometry()
   await page.goto("/general-deepinsight")
   await expect(page.locator('[data-research-home] [data-component="prompt-input"]')).toBeVisible()
+  await expect(page.locator(".cmcc-home-greeting")).toContainText("深度研究专家团")
   await expect(page.locator(".featured-list")).toHaveCount(0)
   await page.evaluate(() => document.fonts.ready)
   expect(await geometry()).toEqual(native)

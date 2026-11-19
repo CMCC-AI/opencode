@@ -1,17 +1,19 @@
 import { For, Show, Suspense, createEffect, onCleanup, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useSearchParams } from "@solidjs/router"
+import { useQueryClient } from "@tanstack/solid-query"
 import { PromptInput, type PromptInputProps } from "@/components/prompt-input"
 import { PromptSendButton } from "@/components/prompt-input/send-button"
 import { HomeActionsPopover } from "@/components/prompt-input/home-controls"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { PromptImageAttachments } from "@/components/prompt-input/image-attachments"
-import { NewSessionComposerLoading } from "@/components/session/session-new-design-view"
+import { NewSessionComposerLoading, NewSessionDesignView } from "@/components/session/session-new-design-view"
+import { useSettingsCommand } from "@/components/settings-dialog"
 import { ModelsProvider, type ModelKey } from "@/context/models"
 import { PermissionProvider } from "@/context/permission"
 import { FileProvider } from "@/context/file"
-import { CommentsProvider } from "@/context/comments"
+import { CommentsProvider, useComments } from "@/context/comments"
 import { DirectoryDataProvider } from "@/pages/directory-layout"
 import { createAttachmentStorage } from "@/components/prompt-input/upload-storage"
 import { usePrompt } from "@/context/prompt"
@@ -21,9 +23,11 @@ import { useServerSync } from "@/context/server-sync"
 import { useTabs } from "@/context/tabs"
 import { createPromptInputController } from "@/pages/session/composer"
 import { useSessionKey } from "@/pages/session/session-layout"
-import { CMCC_TEAM_EXPERTS } from "@/utils/cmcc-experts"
+import { useComposerCommands } from "@/pages/session/use-composer-commands"
+import { CMCC_DEFAULT_RESEARCH_EXPERT, CMCC_TEAM_EXPERTS, cmccTeamExpertByAgent, type TeamExpert } from "@/utils/cmcc-experts"
 import { cmccEnsureWorkspace } from "@/utils/cmcc-workspace"
 import { cmccWorkspaceRelativePath } from "@/utils/cmcc-artifact-paths"
+import { pathKey } from "@/utils/path-key"
 import { showToast } from "@/utils/toast"
 import { createResearchAttachments, RESEARCH_FILE_ACCEPT, type ResearchMode } from "./research-attachments"
 import { RESEARCH_API, RESEARCH_UPDATED, type ResearchDetail } from "./model"
@@ -33,18 +37,21 @@ export default function ResearchComposer() {
   const dockapi = useDockApi()
   const tabs = useTabs()
   const sdk = useSDK()
+  const sync = useServerSync()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useSearchParams<{ draftId?: string; prompt?: string; agent?: string }>()
   const draftID = search.draftId!
   const draft = tabs.draft(draftID)
   const userID = dockapi.user?.id
   const scope = sdk().scope
   const directory = sdk().directory
-  const expert = CMCC_TEAM_EXPERTS.find((item) => item.id === "deepinsight")!
+  const expert = () => CMCC_TEAM_EXPERTS.find((item) => item.id === draft.expertID)
   const [state, setState] = createStore({
-    mode: draft.researchMode!,
+    mode: draft.researchMode ?? "deep",
     submitting: false,
     switching: false,
     uploading: false,
+    editorUploading: false,
     menu: false,
   })
   let selectedModel: ModelKey | undefined
@@ -98,6 +105,14 @@ export default function ResearchComposer() {
     valid,
     request,
     storage: () => storage,
+    existingOpenCode: (item) => {
+      if (item.mime.startsWith("image/") && item.dataUrl.startsWith(`data:${item.mime};`)) return true
+      if (!item.referenceUrl || !item.sourcePath) return false
+      const notebook = draft.knowledgeNotebook
+      if (notebook) return !!cmccWorkspaceRelativePath(notebook.directory, item.sourcePath)?.startsWith(`runs/${draftID}/attachments/`)
+      return !!draft.artifactDirectory &&
+        !!cmccWorkspaceRelativePath(draft.artifactDirectory, item.sourcePath)?.startsWith("attachments/")
+    },
     removeDeep: async (path) => {
       const relative = cmccWorkspaceRelativePath(directory, path)
       const prefix = cmccWorkspaceRelativePath(directory, draft.artifactDirectory ?? "")
@@ -114,11 +129,35 @@ export default function ResearchComposer() {
       })
   }
   const pending = () => state.submitting || state.switching || state.uploading || attachments.state.pending
+  const busy = () => pending() || state.editorUploading
   const changeMode = async (mode: ResearchMode) => {
-    if (pending() || mode === state.mode) return
+    if (busy() || mode === state.mode) return
     setState({ mode, switching: true, menu: false })
     tabs.updateDraft(draftID, { researchMode: mode })
     try {
+      await attachments.prepareAll()
+    } catch (cause) {
+      error(cause)
+    } finally {
+      if (valid()) setState("switching", false)
+    }
+  }
+  const selectTeam = async (team?: TeamExpert) => {
+    if (!valid() || busy() || team?.id === expert()?.id) return
+    if (draft.knowledgeNotebook) {
+      showToast({ title: "请先移除知识库引用，再切换专家团", variant: "error" })
+      return
+    }
+    setState({ switching: true, menu: false })
+    try {
+      if (team) {
+        const agents = await queryClient.ensureQueryData(sync().queryOptions.agents(pathKey(directory)))
+        if (!agents.some((agent) => agent.name === team.leadAgent)) throw new Error(`未加载「${team.name}」的专家团配置`)
+      }
+      if (!valid()) return
+      const researchMode = team?.id === CMCC_DEFAULT_RESEARCH_EXPERT.id ? "deep" : undefined
+      setState("mode", "deep")
+      tabs.updateDraft(draftID, { homeTeamPicker: true, expertID: team?.id, agent: team?.leadAgent, researchMode })
       await attachments.prepareAll()
     } catch (cause) {
       error(cause)
@@ -138,7 +177,7 @@ export default function ResearchComposer() {
     })
   })
   const submit = async (deepSubmit: () => Promise<void> | void) => {
-    if (pending() || !valid()) return
+    if (busy() || !valid()) return
     setState("submitting", true)
     try {
       const query = prompt
@@ -146,10 +185,10 @@ export default function ResearchComposer() {
         .map((part) => ("content" in part ? part.content : ""))
         .join("")
         .trim()
-      if (!query) throw new Error("请输入研究问题")
+      if (draft.researchMode && !query) throw new Error("请输入研究问题")
       if (state.mode === "quick" && query.length > 20000) throw new Error("快速研究问题不能超过 20000 个字符")
       if (!(await attachments.prepareAll()) || !valid()) return
-      if (state.mode === "deep") {
+      if (state.mode !== "quick") {
         await deepSubmit()
         return
       }
@@ -194,7 +233,7 @@ export default function ResearchComposer() {
   }
   const research: NonNullable<PromptInputProps["research"]> = {
     get mode() {
-      return state.mode
+      return draft.researchMode
     },
     get pending() {
       return pending()
@@ -204,13 +243,15 @@ export default function ResearchComposer() {
     },
     changeMode: (mode) => void changeMode(mode),
     readAttachment: attachments.read,
+    onUploadPending: (value) => setState("editorUploading", value),
     removeAttachment: (id) => {
-      if (!pending()) void attachments.remove(id).catch(error)
+      if (!busy()) void attachments.remove(id).catch(error)
     },
     submit,
   }
   return (
-    <Show when={prompt.ready()}>
+    <NewSessionDesignView team={expert()} onTeamChange={(team) => void selectTeam(team)} teamDisabled={busy() || !prompt.ready()}>
+    <Show when={prompt.ready()} fallback={<NewSessionComposerLoading />}>
       <div class="flex flex-col gap-3" data-research-home>
         <Show
           when={state.mode === "deep"}
@@ -335,7 +376,8 @@ export default function ResearchComposer() {
           >
             <DeepResearchInput
               research={research}
-              agent={expert.leadAgent}
+              agent={draft.agent}
+              onAgentChange={(agent) => void selectTeam(cmccTeamExpertByAgent(agent))}
               model={() => selectedModel}
               remember={(model) => {
                 selectedModel = model
@@ -361,12 +403,14 @@ export default function ResearchComposer() {
         </Show>
       </div>
     </Show>
+    </NewSessionDesignView>
   )
 }
 
 function DeepResearchInput(props: {
   research: NonNullable<PromptInputProps["research"]>
-  agent: string
+  agent?: string
+  onAgentChange: (agent?: string) => void
   model: () => ModelKey | undefined
   remember: (model: ModelKey | undefined) => void
   ref: (element: HTMLDivElement) => void
@@ -391,6 +435,9 @@ function DeepResearchInput(props: {
 
 function DeepResearchEditor(props: Parameters<typeof DeepResearchInput>[0]) {
   const sync = useServerSync()
+  const comments = useComments()
+  useComposerCommands()
+  useSettingsCommand()
   const route = useSessionKey()
   const controls = createPromptInputController({
     sessionKey: route.sessionKey,
@@ -413,6 +460,8 @@ function DeepResearchEditor(props: Parameters<typeof DeepResearchInput>[0]) {
       controls={controls()}
       variant="new-session"
       selectedExpertAgent={props.agent}
+      onSelectedExpertAgentChange={props.onAgentChange}
+      onSubmit={() => comments.clear()}
       research={props.research}
       ref={props.ref}
     />

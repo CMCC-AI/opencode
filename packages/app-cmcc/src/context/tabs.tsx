@@ -28,6 +28,7 @@ export type DraftTab = {
   expertID?: string
   worktree?: string
   agent?: string
+  homeTeamPicker?: boolean
   researchMode?: "quick" | "deep"
 }
 

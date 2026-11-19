@@ -10,9 +10,9 @@ import { uuid } from "@/utils/uuid"
 export type ResearchMode = "quick" | "deep"
 export const RESEARCH_FILE_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.json"
 
-export function researchAttachmentIssue(item: ImageAttachmentPart, mode: ResearchMode, items: ImageAttachmentPart[]) {
+export function researchAttachmentIssue(item: ImageAttachmentPart, mode: ResearchMode, items: ImageAttachmentPart[], existingOpenCode = false) {
   const meta = item.research
-  if (!meta) return "请重新选择原文件"
+  if (!meta) return mode === "deep" && existingOpenCode ? "" : "请重新选择原文件"
   if (mode === "deep") {
     if (meta.size > ATTACHMENT_UPLOAD_LIMIT) return "文件不能超过 30 MB"
     if (item.mime === "application/octet-stream") return "深度模式不支持此文件格式"
@@ -32,6 +32,7 @@ export function createResearchAttachments(input: {
   valid: () => boolean
   storage: () => AttachmentStorage
   removeDeep: (path: string) => Promise<unknown>
+  existingOpenCode?: (item: ImageAttachmentPart) => boolean
   request: <T>(path: string, init?: RequestInit) => Promise<T>
 }) {
   const originals = new Map<string, File>()
@@ -46,14 +47,19 @@ export function createResearchAttachments(input: {
     if (!valid()) throw new Error("研究草稿已切换，请在当前草稿重新操作")
   }
   const items = () => input.prompt.current().filter((part): part is ImageAttachmentPart => part.type === "image")
+  const issueFor = (item: ImageAttachmentPart, mode: ResearchMode) =>
+    researchAttachmentIssue(item, mode, items(), input.existingOpenCode?.(item))
   const update = (item: ImageAttachmentPart) => {
     check()
     input.prompt.set(input.prompt.current().map((part) => (part.type === "image" && part.id === item.id ? item : part)))
   }
-  const prepare = async (item: ImageAttachmentPart, mode: ResearchMode): Promise<ImageAttachmentPart> => {
+  const prepare = async (
+    item: ImageAttachmentPart, mode: ResearchMode, storage?: AttachmentStorage,
+  ): Promise<ImageAttachmentPart> => {
     check()
     const meta = item.research
-    const issue = researchAttachmentIssue(item, mode, items())
+    const issue = issueFor(item, mode)
+    if (!meta) return item
     const copy: ImageAttachmentPart = {
       ...item,
       referenceUrl: undefined,
@@ -67,7 +73,7 @@ export function createResearchAttachments(input: {
         const file = originals.get(item.id)
         if (!file) throw new Error("缺少原文件，请重新选择后上传到当前模式")
         if (mode === "deep") {
-          const stored = await input.storage().store(file, item.mime, meta.relativePath)
+          const stored = await (storage ?? input.storage()).store(file, item.mime, meta.relativePath)
           copy.research.deep = { ...stored, mime: item.mime }
         } else {
           const form = new FormData()
@@ -100,11 +106,11 @@ export function createResearchAttachments(input: {
     items,
     issues: () =>
       items().flatMap((item) => {
-        const issue = researchAttachmentIssue(item, input.mode(), items()) || item.research?.error
+        const issue = issueFor(item, input.mode()) || item.research?.error
         return issue ? [`${item.filename}：${issue}`] : []
       }),
     uploadId: () => items().find((item) => item.research?.quick)?.research?.quick?.uploadId,
-    async read(file: File, relativePath?: string) {
+    async read(file: File, relativePath?: string, storage?: AttachmentStorage) {
       check()
       const filename = relativePath ?? file.name
       const previous = items().find(
@@ -125,7 +131,7 @@ export function createResearchAttachments(input: {
       }
       check()
       originals.set(item.id, file)
-      return prepare(item, input.mode())
+      return prepare(item, input.mode(), storage)
     },
     async prepareAll() {
       if (state.pending) return false
@@ -134,7 +140,7 @@ export function createResearchAttachments(input: {
         const mode = input.mode()
         for (const item of items()) update(await prepare(item, mode))
         return items().every(
-          (item) => !researchAttachmentIssue(item, mode, items()) && !item.research?.error && !!item.research?.[mode],
+          (item) => !issueFor(item, mode) && !item.research?.error && (item.research ? !!item.research[mode] : true),
         )
       } finally {
         if (valid()) setState("pending", false)

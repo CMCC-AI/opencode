@@ -69,6 +69,7 @@ import {
   cmccRuntimeWorkspace,
 } from "./utils/cmcc-workspace"
 import { cmccKnowledgeNotebooks } from "./utils/cmcc-knowledge"
+import { CMCC_DEFAULT_RESEARCH_EXPERT } from "./utils/cmcc-experts"
 import { showToast } from "./utils/toast"
 import { DeepInsightMark } from "@/components/brand"
 import { AppLoading } from "@/components/app-loading"
@@ -281,7 +282,7 @@ function ResolvedDraftRoute(props: { draft: DraftTab }) {
     <Show when={`${props.draft.server}\0${props.draft.directory}`} keyed>
       <ServerSDKProvider server={conn}>
         <ServerSyncProvider server={conn}>
-          <Show when={props.draft.researchMode} fallback={
+          <Show when={props.draft.homeTeamPicker || props.draft.researchMode} fallback={
           <TargetServerScopedProviders directory={directory}>
             <SDKProvider directory={directory}>
               <DirectoryDataProvider directory={directory} server={serverKey}>
@@ -746,7 +747,8 @@ function CmccDefaultRoute() {
     if (!directory || started || !tabs.ready()) return
     started = true
     const existing = tabs.store.findLast(
-      (tab) => tab.type === "draft" && tab.server === server.key && tab.directory === directory,
+      (tab) => tab.type === "draft" && tab.server === server.key && tab.directory === directory &&
+        tab.homeTeamPicker && tab.expertID === CMCC_DEFAULT_RESEARCH_EXPERT.id && tab.researchMode === "deep",
     )
     if (existing) {
       tabs.select(existing)
@@ -754,7 +756,10 @@ function CmccDefaultRoute() {
     }
     const artifactDirectory = cmccArtifactWorkspace(directory)
     if (!artifactDirectory) return
-    tabs.newDraft({ server: server.key, directory, artifactDirectory })
+    tabs.newDraft({
+      server: server.key, directory, artifactDirectory, homeTeamPicker: true,
+      expertID: CMCC_DEFAULT_RESEARCH_EXPERT.id, agent: CMCC_DEFAULT_RESEARCH_EXPERT.leadAgent, researchMode: "deep",
+    })
     cmccRememberConversationWorkspace(directory)
     server.projects.touch(directory)
     void cmccEnsureWorkspace(
@@ -770,7 +775,7 @@ function CmccDefaultRoute() {
     })
   })
 
-  return <NewSessionLoading />
+  return <NewSessionLoading team={CMCC_DEFAULT_RESEARCH_EXPERT} />
 }
 
 function LegacyTargetSessionRoute() {

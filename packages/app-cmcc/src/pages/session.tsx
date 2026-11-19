@@ -1783,6 +1783,7 @@ export default function Page() {
         controller={controller}
         promptInput={
           <PromptInput
+            variant="dock"
             controls={inputController()}
             hideVariantControl={generalChat()}
             hideAgentControl={dedicatedAnalysis()}

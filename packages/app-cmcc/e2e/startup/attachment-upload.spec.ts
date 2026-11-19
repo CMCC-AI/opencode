@@ -3,20 +3,21 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises"
 import path from "node:path"
 import { tmpdir } from "node:os"
 import { base64Encode } from "@opencode-ai/core/util/encode"
-import { setupHomePage, homeDirectory, homeSession } from "./home-fixture"
+import { setupHomePage, homeDirectory, homeSession, homeTeam, selectHomeTeam } from "./home-fixture"
 
 test.use({ locale: "zh-CN" })
 
 async function home(page: Page, width = 1440) {
   await page.setViewportSize({ width, height: 900 })
-  await setupHomePage(page, { models: true })
+  await setupHomePage(page, { models: true, teams: true })
   await page.goto("/app")
   await expect(page.locator('[data-component="prompt-input"]')).toBeVisible()
   await expect(page.locator('[data-action="prompt-model"]')).not.toBeDisabled()
   if (width < 760) {
     await page.getByRole("button", { name: "隐藏左栏" }).click()
-    await expect.poll(() => page.locator('aside[aria-label="CMCC conversations"]').evaluate((node) => node.getBoundingClientRect().width)).toBeLessThanOrEqual(1)
+    await expect(page.locator('aside[aria-label="CMCC conversations"]')).toHaveCSS("width", "0px")
   }
+  await selectHomeTeam(page, "灵犀")
   await page.evaluate(() => document.fonts.ready)
 }
 
@@ -159,6 +160,7 @@ test("preserves folder paths and blocks sending until the whole upload completes
     await page.getByRole("button", { name: "添加文件夹", exact: true }).click()
     await (await chooser).setFiles(directory)
     await expect(page.locator('[data-component="attachment-upload-progress"]')).toBeVisible()
+    await expect(homeTeam(page)).toBeDisabled()
     await expect(page.getByRole("button", { name: "发送", exact: true })).toBeDisabled()
     await expect.poll(() => uploads.length).toBe(1)
     gate.resolve()

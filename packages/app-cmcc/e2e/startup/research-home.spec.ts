@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { homeDirectory, homeSession, setupHomePage } from "./home-fixture"
+import { homeDirectory, homeSession, homeTeam, selectHomeTeam, setupHomePage } from "./home-fixture"
 
 test.use({ locale: "zh-CN" })
 const editor = (page: Page) => page.locator('[data-research-home] [data-component="prompt-input"]')
@@ -7,7 +7,7 @@ const mode = (page: Page, name: string) =>
   page.getByRole("group", { name: "研究模式" }).getByRole("button", { name, exact: true })
 
 async function setup(page: Page) {
-  await setupHomePage(page, { models: true })
+  await setupHomePage(page, { models: true, teams: true })
   const calls: { path: string; body: unknown }[] = []
   const deep: unknown[] = []
   const files: { saved_name: string; original_filename: string }[] = []
@@ -61,6 +61,106 @@ async function setup(page: Page) {
   })
   return { calls, deep }
 }
+
+test("login home and both sidebar entries open independent blank Deep Research drafts", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await setup(page)
+  await page.goto("/app")
+  const sidebar = page.getByRole("complementary", { name: "CMCC conversations" }).getByRole("navigation")
+  const drafts = new Set<string>()
+  for (const entry of [undefined, "新对话", "深度研究"]) {
+    if (entry) await sidebar.getByRole("button", { name: entry, exact: true }).click()
+    await expect(homeTeam(page)).toHaveAccessibleName("切换专家团，当前：深度研究专家团")
+    await expect(mode(page, "深度")).toHaveAttribute("aria-pressed", "true")
+    await expect(editor(page)).toHaveText("")
+    drafts.add(new URL(page.url()).searchParams.get("draftId")!)
+    await editor(page).fill("这个问题只属于当前草稿")
+  }
+  expect(drafts.size).toBe(3)
+  await homeTeam(page).click()
+  const menu = page.getByRole("menu", { name: "切换专家团" })
+  await expect(menu.getByRole("menuitem")).toHaveCount(8)
+  await expect(menu.getByRole("menuitem", { name: "多股对比" })).toHaveCount(0)
+  for (const [name, asset] of [
+    ["深度研究专家团", "deepinsight"],
+    ["DeepTrading 财经分析专家团", "deeptrading"],
+    ["Shoppers Pro 购买决策专家团", "shoppers-pro"],
+    ["DeepInspect 巡察分析专家团", "deepinspect"],
+    ["DeepEngage谈参高拜专家团", "zhengqi-visit-intel"],
+    ["DeepGeo 位置决策专家团", "deepgeo"],
+    ["AI for Science 科研专家团", "ai-for-science-team"],
+    ["灵犀", "draft-lingxi"],
+  ]) {
+    const avatar = menu.getByRole("menuitem", { name, exact: true }).locator("img")
+    await expect(avatar).toHaveAttribute("src", new RegExp(`/${asset}[-.]`))
+    await expect.poll(() => avatar.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
+  }
+  await expect(menu).toHaveCSS("opacity", "1")
+  await page.screenshot({ path: info.outputPath("team-menu.png") })
+  await page.keyboard.press("Escape")
+  await selectHomeTeam(page, "灵犀")
+  await expect(page.getByRole("button", { name: "执行", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "计划", exact: true })).toBeVisible()
+  await expect(editor(page)).toHaveText("这个问题只属于当前草稿")
+})
+
+test("switching Quick Research to a different team reconciles files and uses that team's OpenCode lead", async ({ page }) => {
+  const data = await setup(page)
+  const sent: { agent: string; parts: { type: string; url?: string }[] }[] = []
+  const bindings: string[] = []
+  await page.route("**/api/dockapi/sessions", (route) => {
+    if (route.request().method() !== "POST") return route.fulfill({ json: { code: 200, data: [] } })
+    bindings.push(route.request().postDataJSON().agentType)
+    return route.fulfill({ json: { code: 200, data: {
+      id: "trading-task", agentType: "deeptrading", directoryPath: homeDirectory,
+      openCodeSessionId: homeSession.id, openCodeSession: homeSession,
+    } } })
+  })
+  await page.route(`**/session/${homeSession.id}/prompt_async*`, (route) => {
+    sent.push(route.request().postDataJSON())
+    return route.fulfill({ status: 204 })
+  })
+  await page.goto("/app")
+  await mode(page, "快速").click()
+  await editor(page).fill("保留问题，切换到财经分析")
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: "report.docx",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    buffer: Buffer.from("word-original-content"),
+  })
+  await expect.poll(() => data.calls.filter((call) => call.path.endsWith("/files")).length).toBe(1)
+  const url = page.url()
+  await selectHomeTeam(page, "DeepTrading 财经分析专家团")
+  await expect(editor(page)).toHaveText("保留问题，切换到财经分析")
+  await expect(page.getByRole("group", { name: "研究模式" })).toHaveCount(0)
+  await expect(page.getByRole("group", { name: "执行模式" })).toHaveCount(0)
+  await expect(page.locator(".cmcc-home-greeting .cmcc-home-team-avatar img")).toHaveAttribute("src", /\/deeptrading[-.]/)
+  expect(page.url()).toBe(url)
+  expect(data.deep).toHaveLength(1)
+  expect(bindings).toEqual([])
+  await page.reload()
+  await expect(homeTeam(page)).toHaveAccessibleName("切换专家团，当前：DeepTrading 财经分析专家团")
+  await page.getByRole("button", { name: "发送", exact: true }).click()
+  await expect.poll(() => sent.length).toBe(1)
+  expect(bindings).toEqual(["deeptrading"])
+  expect(sent[0].agent).toBe("deeptrading/deeptrading-team-lead")
+  expect(sent[0].parts).toEqual(expect.arrayContaining([expect.objectContaining({ type: "file", url: expect.stringContaining("report.docx") })]))
+  expect(data.deep).toHaveLength(1)
+})
+
+test("industry summons keep the example prompt and use the same switchable team header", async ({ page }) => {
+  await setup(page)
+  await page.goto("/expert")
+  await page.getByRole("button").filter({ has: page.getByRole("heading", { name: "AI + 财经", exact: true }) }).click()
+  await page.getByRole("button", { name: "召唤产业专家团", exact: true }).click()
+  await expect(homeTeam(page)).toHaveAccessibleName("切换专家团，当前：DeepTrading 财经分析专家团")
+  await expect(editor(page)).not.toHaveText("")
+  const example = await editor(page).innerText()
+  const url = page.url()
+  await selectHomeTeam(page, "灵犀")
+  await expect(editor(page)).toHaveText(example)
+  expect(page.url()).toBe(url)
+})
 
 for (const width of [1440, 390]) {
   test(`unifies research modes and preserves the draft at ${width}`, async ({ page }, info) => {

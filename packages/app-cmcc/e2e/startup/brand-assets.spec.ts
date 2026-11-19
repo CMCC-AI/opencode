@@ -1,10 +1,10 @@
 import { expect, test, type Locator } from "@playwright/test"
-import { setupHomePage } from "./home-fixture"
+import { selectHomeTeam, setupHomePage } from "./home-fixture"
 
 test.use({ locale: "zh-CN", reducedMotion: "reduce" })
 const baseline = process.env.MARKDOWN_PHASE?.startsWith("logo-before")
 
-async function ready(image: Locator, source: string) {
+async function ready(image: Locator, source: string | RegExp) {
   await expect(image).toBeVisible()
   if (!baseline) await expect(image).toHaveAttribute("src", source)
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
@@ -40,23 +40,29 @@ for (const width of [1440, 390]) {
         await page.getByRole("button", { name: "隐藏左栏", exact: true }).click()
         await expect.poll(() => sidebar.evaluate((node) => node.getBoundingClientRect().width)).toBeLessThanOrEqual(1)
       }
-      const logo = page.locator(".cmcc-home-brand img")
-      await ready(logo, "/brand/logo.svg")
+      if (mode === "chat" && !baseline) await selectHomeTeam(page, "灵犀")
+      const greeting = page.locator(".cmcc-home-greeting")
+      const avatar = greeting.locator("img")
+      await ready(avatar, mode === "research" ? /\/deepinsight[-.]/ : /draft-lingxi/)
+      await expect(greeting).toHaveText(mode === "research" ? "您好，我是您的 深度研究专家团" : "您好，我是 灵犀")
+      await expect(page.locator(".cmcc-home-brand img")).toHaveCount(0)
       await expect(page.locator(".cmcc-home-brand h1")).toHaveText("DeepInsight深度洞察")
       await expect(page.locator('[data-component="session-new-composer"]')).toBeVisible()
       if (!baseline) await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/brand/logo.svg")
-      const geometry = await page.locator(".cmcc-home-brand").evaluate((node) => {
-        const image = node.querySelector("img")!.getBoundingClientRect()
-        const title = node.querySelector("h1")!.getBoundingClientRect()
+      const geometry = await page.locator(".cmcc-home").evaluate((node) => {
+        const image = node.querySelector(".cmcc-home-greeting img")!.getBoundingClientRect()
+        const title = node.querySelector(".cmcc-home-brand h1")!.getBoundingClientRect()
+        const composer = node.querySelector('[data-component="session-new-composer"]')!.getBoundingClientRect()
         return {
           image: { x: image.x, y: image.y, width: image.width, height: image.height },
           title: { x: title.x, y: title.y, width: title.width, height: title.height },
+          composer: { x: composer.x, y: composer.y, width: composer.width, height: composer.height },
         }
       })
-      expect(
-        geometry.image.x + geometry.image.width <= geometry.title.x ||
-          geometry.image.y + geometry.image.height <= geometry.title.y,
-      ).toBe(true)
+      expect(geometry.image.x).toBeCloseTo(geometry.title.x, 1)
+      expect(geometry.title.x).toBeCloseTo(geometry.composer.x, 1)
+      expect(geometry.image.y + geometry.image.height).toBeLessThanOrEqual(geometry.title.y)
+      expect(geometry.image.width).toBeCloseTo(width >= 1440 ? 43.2 : 36, 1)
       console.log(JSON.stringify({ benchmark: "brand-home-ready", mode, width, ms: Date.now() - started, geometry }))
       await page.screenshot({ path: info.outputPath("homepage.png") })
     })

@@ -4,17 +4,14 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { Navigate, useNavigate, useParams, useSearchParams } from "@solidjs/router"
 import { batch, createEffect, createMemo, createSignal, For, on, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
+import createNotebookArrow from "@/assets/knowledge/create-notebook-arrow.svg"
 import createNotebookCardArtwork from "@/assets/knowledge/create-notebook-card.optimized.webp"
 import createNotebookTipArtwork from "@/assets/knowledge/create-notebook-tip.svg"
-import featureGraphArtwork from "@/assets/knowledge/feature-graph.svg"
-import featureImportArtwork from "@/assets/knowledge/feature-import.svg"
-import featureParseArtwork from "@/assets/knowledge/feature-parse.svg"
-import featureUpdateArtwork from "@/assets/knowledge/feature-update.svg"
 import infoArtwork from "@/assets/knowledge/info.svg"
 import notebookQaArtwork from "@/assets/knowledge/notebook-qa.webp"
 import notebookSpecCardArtwork from "@/assets/knowledge/notebook-spec-card.optimized.webp"
 import uploadDropzoneArtwork from "@/assets/knowledge/upload-dropzone.svg"
-import wikiHeroArtwork from "@/assets/knowledge/wiki-hero.optimized.webp"
+import wikiBannerArtwork from "@/assets/knowledge/wiki-banner.svg"
 import { ArtifactPreview } from "@/components/artifact-preview"
 import { ProductIntroButton } from "@/components/dialog-product-intro"
 import { ForceKnowledgeGraph } from "@/components/force-knowledge-graph"
@@ -63,6 +60,7 @@ import {
   type KnowledgeGraphNode,
   type KnowledgeNotebook,
 } from "@/utils/cmcc-knowledge"
+import "./cmcc-knowledge-home.css"
 
 type ChatMessage = { info: Message; parts: Part[] }
 type PreviewTab = { path: string; name: string }
@@ -97,6 +95,9 @@ const SESSION_LIST_MAX_HEIGHT = 400
 const GRAPH_DETAIL_DEFAULT_HEIGHT = 180
 const GRAPH_DETAIL_MIN_HEIGHT = 80
 const GRAPH_DETAIL_MAX_HEIGHT = 400
+const wikiHomeDescription =
+  "导入文件后，LLM Wiki 会对原始材料进行结构化摄取、语义归档与跨文件关联，并保留每一条知识的来源和上下文。" +
+  " 在此基础上，系统构建可追溯的关系图谱，让分散文档从“能被检索”升级为“能被理解、能被追问、能持续校正”的知识网络。"
 
 export function CmccKnowledgeHomeRoute() {
   const navigate = useNavigate()
@@ -269,47 +270,63 @@ export function CmccKnowledgeHomeRoute() {
     setNotebooks(next)
     showToast({ title: pinned ? `已置顶“${notebook.name}”` : `已取消置顶“${notebook.name}”` })
   }
+  const openCreateDialog = () => setDialog("open", true)
 
   return (
-    <div class="relative size-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-transparent font-['PingFang_SC','Microsoft_YaHei',sans-serif] text-[#2a155a]">
-      <ProductIntroButton class="absolute right-5 top-3 z-30 flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-[#49386e] transition-colors hover:bg-white/55" />
-      <img
-        src={wikiHeroArtwork}
-        alt=""
-        width={1160}
-        height={432}
-        loading="eager"
-        fetchpriority="high"
-        decoding="async"
-        class="pointer-events-none absolute inset-x-0 top-0 h-[432px] w-full object-cover object-center mix-blend-multiply max-md:opacity-75 max-sm:h-[360px] max-sm:opacity-35"
-      />
-      <div class="relative mx-auto flex min-h-full w-full max-w-[1320px] flex-col px-6 pb-12 max-sm:px-4">
-        <header class="relative min-h-[432px] w-full max-sm:min-h-0 max-sm:pb-16 max-sm:pt-16">
-          <div class="relative z-10 max-w-[720px] pt-[100px] max-lg:max-w-[620px] max-sm:pt-0">
-            <h1 class="m-0 bg-gradient-to-r from-[#8800ff] to-[#2c5dff] bg-clip-text text-[32px] font-medium leading-10 tracking-[-0.5px] text-transparent max-sm:text-[28px]">
-              DeepInsight Wiki
-            </h1>
-            <h2 class="m-0 mt-2 text-[18px] font-medium leading-6 text-[#3c4055]">从原始材料到可对话的知识网络</h2>
-            <p class="m-0 mt-2 text-[16px] leading-6 text-[#585e73] max-sm:text-[14px]">
-              导入文件后，LLM Wiki 会对原始材料进行结构化摄取、语义归档与跨文件关联，并保留每一条知识的来源和上下文。
-              在此基础上，系统构建可追溯的关系图谱，让分散文档从“能被检索”升级为“能被理解、能被追问、能持续校正”的知识网络。
-            </p>
-            <div class="mt-4 flex flex-wrap gap-4 max-sm:gap-2">
-              <FeatureStep artwork={featureImportArtwork} label="导入来源" />
-              <FeatureStep artwork={featureParseArtwork} label="llm-wiki 解析" />
-              <FeatureStep artwork={featureGraphArtwork} label="生成图谱" />
-              <FeatureStep artwork={featureUpdateArtwork} label="知识更新" />
+    <div class="size-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-[var(--cmcc-home-background)] text-[#202630]">
+      <div class="cmcc-wiki-home mx-auto w-full max-w-[1160px] px-8 pb-12 max-sm:px-4">
+        <div class="flex min-h-12 justify-end pt-3">
+          <ProductIntroButton class="flex h-8 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium text-[#526173] transition-colors hover:bg-[#edf4fc] hover:text-[#285da3]" />
+        </div>
+        <header class="cmcc-wiki-heading pb-5 pt-12 max-sm:pt-6">
+          <h1>DeepInsight Wiki</h1>
+          <p>从原始材料到可对话的知识网络</p>
+        </header>
+        <section class="cmcc-wiki-banner-region" aria-label="AI 知识库">
+          <div class="cmcc-wiki-banner-original">
+            <img src={wikiBannerArtwork} alt="" width={928} height={199} decoding="async" />
+            <div class="sr-only">
+              <h2>AI 知识库</h2>
+              <p>{wikiHomeDescription}</p>
+              <p>导入来源、llm-wiki 解析、生成图谱、知识更新</p>
+            </div>
+            <button
+              type="button"
+              class="cmcc-wiki-banner-hotspot"
+              aria-label="创建笔记"
+              onClick={openCreateDialog}
+              disabled={discovering()}
+            />
+          </div>
+          <div class="cmcc-wiki-banner">
+            <div class="cmcc-wiki-banner-copy">
+              <h2 class="m-0 text-[21px] font-semibold leading-7">AI 知识库</h2>
+              <p class="m-0 mt-2 text-[14px] leading-6 text-[#565f6e]">{wikiHomeDescription}</p>
+            </div>
+            <div class="cmcc-wiki-banner-actions">
+              <div class="cmcc-wiki-features">
+                <FeatureStep label="导入来源" />
+                <FeatureStep label="llm-wiki 解析" tone="mint" />
+                <FeatureStep label="生成图谱" tone="amber" />
+                <FeatureStep label="知识更新" />
+              </div>
+              <button type="button" class="cmcc-wiki-banner-create" onClick={openCreateDialog} disabled={discovering()}>
+                <span class="cmcc-wiki-banner-create-icon">
+                  <img src={createNotebookArrow} alt="" width={19} height={19} />
+                </span>
+                创建笔记
+              </button>
             </div>
           </div>
-        </header>
+        </section>
 
-        <section class="min-w-0">
-          <div class="mb-3 flex items-center gap-2 text-[#49386e]">
-            <h2 class="m-0 text-[18px] font-normal leading-6">最近打开笔记</h2>
+        <section class="mt-10 min-w-0 max-sm:mt-7" aria-labelledby="cmcc-wiki-recent-title">
+          <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h2 id="cmcc-wiki-recent-title" class="m-0 text-[19px] font-semibold leading-7">最近打开笔记</h2>
             <Show when={notebooks().length > 11}>
               <button
                 type="button"
-                class="text-[14px] leading-6 text-[#49386e]/45 transition-colors hover:text-[#49386e]"
+                class="rounded-md px-1.5 text-[13px] leading-6 text-[#526173] transition-colors hover:bg-[#edf4fc] hover:text-[#285da3]"
                 aria-expanded={expanded()}
                 onClick={() => setExpanded((value) => !value)}
               >
@@ -317,23 +334,17 @@ export function CmccKnowledgeHomeRoute() {
               </button>
             </Show>
           </div>
-          <div class="flex min-w-0 flex-wrap gap-4 overflow-visible pb-4">
+          <div class="cmcc-wiki-notebooks">
             <button
               type="button"
-              class="group relative h-40 w-[196px] shrink-0 snap-start overflow-hidden rounded-[16px] bg-transparent p-0 text-[#2a155a] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(67,66,116,0.1)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff] disabled:cursor-wait disabled:opacity-60"
-              onClick={() => setDialog("open", true)}
+              class="cmcc-wiki-card cmcc-wiki-create-card"
+              onClick={openCreateDialog}
               disabled={discovering()}
             >
-              <img
-                src={createNotebookCardArtwork}
-                alt=""
-                width={196}
-                height={160}
-                loading="eager"
-                decoding="async"
-                class="pointer-events-none size-full object-contain"
-              />
-              <span class="sr-only">创建笔记</span>
+              <span class="cmcc-wiki-create-artwork">
+                <img src={createNotebookCardArtwork} alt="" width={196} height={160} loading="eager" decoding="async" />
+              </span>
+              <span>创建笔记</span>
             </button>
             <For each={displayedNotebooks()}>
               {(notebook, index) => (
@@ -351,14 +362,14 @@ export function CmccKnowledgeHomeRoute() {
         </section>
 
         <Show when={discovering()}>
-          <div class="mt-4 flex items-center gap-2 text-[12px] text-[#7f8290]">
+          <div class="mt-4 flex items-center gap-2 text-[12px] text-[#626e7e]">
             <span class="size-3 animate-spin rounded-full border border-current border-r-transparent" />
             正在扫描磁盘中的知识库目录...
           </div>
         </Show>
 
         <Show when={!discovering() && notebooks().length === 0}>
-          <div class="mt-4 rounded-xl bg-[#f7f7ff] px-5 py-4 text-[13px] leading-6 text-[#7f8290]">
+          <div class="mt-4 rounded-lg border border-[#e6eaf0] bg-[#f5f8fb] px-5 py-4 text-[13px] leading-6 text-[#626e7e]">
             还没有笔记本。创建后会先生成一个空白目录，你可以上传文件、拖入材料或导入整个目录。
           </div>
         </Show>
@@ -1896,16 +1907,7 @@ function NotebookCard(props: {
 }) {
   const [menuOpen, setMenuOpen] = createSignal(false)
   let menuElement: HTMLDivElement | undefined
-  const gradient = () => {
-    const colors = [
-      ["#e4eaff", "#f4f1ff", "#2a155a"],
-      ["#ddf8fb", "#f1f7ff", "#0c4852"],
-      ["#e5efff", "#f7f3ff", "#273e6f"],
-      ["#f0e8ff", "#f5f5ff", "#513467"],
-      ["#dcf4ff", "#edf0ff", "#1f4567"],
-    ][props.index % 5]
-    return { background: `linear-gradient(163deg, ${colors[0]} 3%, ${colors[1]} 62%)`, color: colors[2] }
-  }
+  const qa = () => props.index % 2 !== 0
 
   createEffect(() => {
     if (!menuOpen()) return
@@ -1919,58 +1921,43 @@ function NotebookCard(props: {
 
   return (
     <article
-      class="group relative h-40 w-[196px] shrink-0 snap-start rounded-[16px] text-left transition-transform hover:-translate-y-0.5"
+      class="relative min-w-0"
       classList={{ "z-30": menuOpen() }}
     >
       <button
         type="button"
-        class="relative flex size-full min-w-0 flex-col overflow-hidden rounded-[16px] p-4 pb-9 text-left shadow-[0_8px_24px_rgba(67,66,116,0.06)] transition-shadow group-hover:shadow-[0_12px_28px_rgba(67,66,116,0.12)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b4cff]"
-        style={gradient()}
+        class="cmcc-wiki-card cmcc-wiki-note-card"
+        classList={{ "cmcc-wiki-note-qa": qa() }}
         onClick={props.open}
       >
-        <Show when={props.index % 2 === 0}>
-          <img
-            src={notebookSpecCardArtwork}
-            alt=""
-            width={196}
-            height={160}
-            loading={props.index < 4 ? "eager" : "lazy"}
-            decoding="async"
-            class="pointer-events-none absolute inset-0 size-full object-contain"
-          />
-        </Show>
-        <Show when={props.index % 2 !== 0}>
-          <img
-            src={notebookQaArtwork}
-            alt=""
-            loading={props.index < 4 ? "eager" : "lazy"}
-            decoding="async"
-            class="pointer-events-none absolute inset-x-0 top-[57px] h-[82px] w-full object-cover opacity-95 transition-transform duration-300 group-hover:scale-[1.03]"
-          />
-        </Show>
-        <span class="absolute inset-x-0 top-0 h-[57px]" style={gradient()} />
-        <div class="relative z-10 flex min-w-0 items-start gap-2 pr-4">
-          <div class="min-w-0">
-            <h3 class="m-0 truncate text-[16px] font-medium leading-5">{props.notebook.name}</h3>
-            <p class="m-0 mt-1 line-clamp-1 text-[11px] leading-4 opacity-60">
-              {props.notebook.description || "可对话的个人知识空间"}
-            </p>
-          </div>
+        <span class="cmcc-wiki-note-copy">
+          <span class="block truncate text-[16px] font-semibold leading-5" title={props.notebook.name}>
+            {props.notebook.name}
+          </span>
+          <span class="mt-1 block truncate text-[12px] leading-4 text-[#596678]">
+            {props.notebook.description || "可对话的个人知识空间"}
+          </span>
           <Show when={props.notebook.pinned}>
-            <span class="shrink-0 text-[12px] leading-5" title="已置顶">
-              📌
-            </span>
+            <span class="absolute right-11 top-3 text-[12px] leading-5" title="已置顶">📌</span>
           </Show>
-        </div>
-        <span class="absolute inset-x-0 bottom-0 h-[29px] bg-white/80" />
-        <span class="absolute inset-x-4 bottom-1 truncate text-[12px] leading-5 text-[#49386e]">
+        </span>
+        <span class="cmcc-wiki-note-media">
+          <img
+            src={qa() ? notebookQaArtwork : notebookSpecCardArtwork}
+            alt=""
+            loading={props.index < 4 ? "eager" : "lazy"}
+            decoding="async"
+            classList={{ "cmcc-wiki-spec-artwork": !qa() }}
+          />
+        </span>
+        <span class="cmcc-wiki-note-footer">
           最近打开于 {formatDate(props.notebook.lastOpenedAt)} · {props.notebook.sourceCount ?? 0} 个来源
         </span>
       </button>
       <div ref={menuElement} class="absolute right-2.5 top-2.5 z-20">
         <button
           type="button"
-          class="flex size-7 items-center justify-center rounded-lg text-[20px] leading-none text-[#49386e]/35 opacity-0 transition-opacity hover:bg-white/55 hover:text-[#49386e] group-hover:opacity-100 focus:opacity-100"
+          class="flex size-7 items-center justify-center rounded-lg text-[20px] leading-none text-[#555f71] transition-colors hover:bg-white/75 hover:text-[#285da3]"
           aria-label={`更多${props.notebook.name}`}
           aria-expanded={menuOpen()}
           onClick={(event) => {
@@ -1981,7 +1968,7 @@ function NotebookCard(props: {
           ⋮
         </button>
         <Show when={menuOpen()}>
-          <div class="absolute right-0 top-8 flex w-[148px] flex-col gap-1 rounded-xl border border-[#e5e1f1] bg-[#ffffff] p-1.5 text-[#2a155a] shadow-[0_14px_40px_rgba(57,44,94,0.18)]">
+          <div class="absolute right-0 top-8 flex w-[148px] flex-col gap-1 rounded-lg border border-[#e3e9f0] bg-white p-1.5 text-[#303b4d] shadow-[0_10px_30px_rgba(35,50,72,0.13)]">
             <NotebookMenuItem
               icon={<Icon name="trash" class="size-4" />}
               label="删除"
@@ -2026,8 +2013,13 @@ function NotebookMenuItem(props: { icon: JSX.Element; label: string; action: () 
   )
 }
 
-function FeatureStep(props: { artwork: string; label: string }) {
-  return <img src={props.artwork} alt={props.label} class="h-10 w-auto shrink-0 max-sm:h-9" />
+function FeatureStep(props: { label: string; tone?: "mint" | "amber" }) {
+  return (
+    <div class="cmcc-wiki-feature" data-tone={props.tone}>
+      <Icon name="circle-check" size="small" />
+      {props.label}
+    </div>
+  )
 }
 
 function Modal(props: { title: string; close: () => void; children: import("solid-js").JSX.Element; large?: boolean }) {

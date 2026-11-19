@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { setupHomePage } from "./home-fixture"
+import { selectHomeTeam, setupHomePage } from "./home-fixture"
 
 test.use({ locale: "zh-CN" })
 
@@ -14,7 +14,7 @@ test("home applies the neutral and blue style without changing its controls", as
   const homeColor = await home.evaluate((el) => getComputedStyle(el).backgroundColor)
   await expect(shell).toHaveCSS("background-color", homeColor)
   await expect(sidebar).toHaveCSS("background-color", "rgb(248, 249, 251)")
-  await expect(sidebar.getByRole("button", { name: "新对话", exact: true }).first()).toHaveAttribute(
+  await expect(sidebar.getByRole("button", { name: "深度研究", exact: true })).toHaveAttribute(
     "data-selected",
     "",
   )
@@ -27,6 +27,7 @@ test("home applies the neutral and blue style without changing its controls", as
     "rgb(23, 28, 38)",
   )
   const composer = page.locator('[data-component="session-new-composer"]')
+  await selectHomeTeam(page, "灵犀")
   await expect(composer).toHaveCSS("border-top-width", "1px")
   await composer.locator('[data-component="prompt-input"]').fill("保留原来的对话操作与草稿")
   await expect(composer).toHaveCSS("border-top-color", "rgb(165, 181, 233)")

@@ -1,17 +1,16 @@
 import { Show, Suspense, createEffect, createResource, createSignal, lazy, untrack } from "solid-js"
 import { useSearchParams } from "@solidjs/router"
-import { NewSessionComposerLoading, NewSessionDesignView } from "@/components/session/session-new-design-view"
+import { NewSessionComposerLoading, NewSessionDesignView, NewSessionLoading } from "@/components/session/session-new-design-view"
 import { PromptInput } from "@/components/prompt-input"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { useComments } from "@/context/comments"
 import { usePrompt } from "@/context/prompt"
 import { useServerSync } from "@/context/server-sync"
-import { useLanguage } from "@/context/language"
 import { useTabs } from "@/context/tabs"
 import { createPromptInputController } from "@/pages/session/composer"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
-import { cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
+import { CMCC_TEAM_EXPERTS, cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
 
 const ResearchComposer = lazy(() => import("./general-deepinsight/research-composer"))
 
@@ -23,14 +22,22 @@ const ResearchComposer = lazy(() => import("./general-deepinsight/research-compo
 export default function NewSessionPage() {
   const tabs = useTabs()
   const [search] = useSearchParams<{ draftId?: string }>()
-  const research = () => tabs.store.some((tab) => tab.type === "draft" && tab.draftID === search.draftId && !!tab.researchMode)
+  const draft = () => tabs.store.find((tab) => tab.type === "draft" && tab.draftID === search.draftId)
+  const team = () => {
+    const tab = draft()
+    return tab?.type === "draft" ? CMCC_TEAM_EXPERTS.find((expert) => expert.id === tab.expertID) : undefined
+  }
+  const managed = () => {
+    const tab = draft()
+    return tab?.type === "draft" && !!(tab.homeTeamPicker || tab.researchMode)
+  }
   return (
     <div class="relative flex size-full min-h-0 flex-col overflow-hidden">
-      <NewSessionDesignView>
-        <Suspense fallback={<NewSessionComposerLoading />}>
-          <Show when={research()} fallback={<NewSessionComposer />}><ResearchComposer /></Show>
-        </Suspense>
-      </NewSessionDesignView>
+      <Suspense fallback={<NewSessionLoading team={team()} teamPicker={managed()} />}>
+        <Show when={managed()} fallback={<NewSessionDesignView team={team()}><NewSessionComposer /></NewSessionDesignView>}>
+          <ResearchComposer />
+        </Show>
+      </Suspense>
     </div>
   )
 }
@@ -39,7 +46,6 @@ function NewSessionComposer() {
   const prompt = usePrompt()
   const serverSync = useServerSync()
   const comments = useComments()
-  const language = useLanguage()
   const tabs = useTabs()
   const route = useSessionKey()
   const [searchParams, setSearchParams] = useSearchParams<{ draftId?: string; prompt?: string; agent?: string }>()
@@ -90,11 +96,7 @@ function NewSessionComposer() {
   return (
     <Show
       when={prompt.ready() || promptReady()}
-      fallback={
-        <div class="w-full min-h-32 md:min-h-40 rounded-md border border-border-weak-base bg-background-base/50 px-4 py-3 text-text-weak pointer-events-none">
-          {language.t("prompt.loading")}
-        </div>
-      }
+      fallback={<NewSessionComposerLoading />}
     >
       <div class="flex flex-col gap-3">
         <PromptInput

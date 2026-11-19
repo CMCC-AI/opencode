@@ -210,6 +210,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
 ]
 
 export const CMCC_TEAM_EXPERTS = CMCC_EXPERTS.filter((expert): expert is TeamExpert => expert.kind === "team")
+export const CMCC_DEFAULT_RESEARCH_EXPERT = CMCC_TEAM_EXPERTS.find((expert) => expert.id === "deepinsight")!
 
 export function cmccExpertHref(expert: CmccExpert) {
   return `/expert/${expert.id}`
