@@ -142,8 +142,8 @@ export default function ResearchComposer() {
       if (valid()) setState("switching", false)
     }
   }
-  const selectTeam = async (team?: TeamExpert) => {
-    if (!valid() || busy() || team?.id === expert()?.id) return
+  const selectTeam = async (team?: TeamExpert, agent = team?.leadAgent) => {
+    if (!valid() || busy() || (team?.id === expert()?.id && agent === draft.agent)) return
     if (draft.knowledgeNotebook) {
       showToast({ title: "请先移除知识库引用，再切换专家团", variant: "error" })
       return
@@ -152,12 +152,14 @@ export default function ResearchComposer() {
     try {
       if (team) {
         const agents = await queryClient.ensureQueryData(sync().queryOptions.agents(pathKey(directory)))
-        if (!agents.some((agent) => agent.name === team.leadAgent)) throw new Error(`未加载「${team.name}」的专家团配置`)
+        if (!agents.some((item) => item.name === team.leadAgent)) throw new Error(`未加载「${team.name}」的专家团配置`)
+        if (agent && agent !== team.leadAgent && !agents.some((item) => item.name === agent))
+          throw new Error(`未加载「${team.name}」的快速通道配置`)
       }
       if (!valid()) return
       const researchMode = team?.id === CMCC_DEFAULT_RESEARCH_EXPERT.id ? "deep" : undefined
       setState("mode", "deep")
-      tabs.updateDraft(draftID, { homeTeamPicker: true, expertID: team?.id, agent: team?.leadAgent, researchMode })
+      tabs.updateDraft(draftID, { homeTeamPicker: true, expertID: team?.id, agent, researchMode })
       await attachments.prepareAll()
     } catch (cause) {
       error(cause)
@@ -377,7 +379,7 @@ export default function ResearchComposer() {
             <DeepResearchInput
               research={research}
               agent={draft.agent}
-              onAgentChange={(agent) => void selectTeam(cmccTeamExpertByAgent(agent))}
+              onAgentChange={(agent) => void selectTeam(cmccTeamExpertByAgent(agent), agent)}
               model={() => selectedModel}
               remember={(model) => {
                 selectedModel = model

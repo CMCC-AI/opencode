@@ -22,6 +22,10 @@ export type TeamExpert = {
   name: string
   description: string
   leadAgent: string
+  // 「快速」模式使用的单代理（挂 quick skill）；未配置的团队（如深度研究）不显示快速/专家切换
+  quickAgent?: string
+  // 快速模式的轻量通道单代理（挂轻量 skill）；仅部分团队（如财经）提供
+  liteQuickAgent?: string
   defaultPrompt: string
   tags: string[]
   examples: string[]
@@ -70,6 +74,8 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     name: "DeepTrading 财经分析专家团",
     description: "多智能体财经分析团队：标的识别、多维并行分析，一站式投研交付。",
     leadAgent: "deeptrading/deeptrading-team-lead",
+    quickAgent: "deeptrading/deeptrading-quick",
+    liteQuickAgent: "deeptrading/deeptrading-lite-quick",
     defaultPrompt: "研究一下贵州茅台最近怎么样",
     tags: ["财经分析", "技术面分析", "基本面分析"],
     examples: [
@@ -86,6 +92,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     description:
       "全品类AI购买决策专家团。务实需求洞察 + 各平台比价 + 真实口碑分析 + 推荐指数，给你可点击的购买决策报告。",
     leadAgent: "shoppers-pro/shoppers-pro-team-lead",
+    quickAgent: "shoppers-pro/shoppers-pro-quick",
     defaultPrompt: "给父母买一台三千元左右的手机，操作简单、续航好，推荐一些并给购买入口",
     tags: ["商品推荐", "比价比渠道", "购买决策"],
     examples: [
@@ -109,6 +116,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     description:
       "基于AI技术深度识别现场安全风险，自动归并问题线索，生成结构化巡察报告与整改方案的专家协作团队。",
     leadAgent: "deepinspect/deepinspect-team-lead",
+    quickAgent: "deepinspect/deepinspect-quick",
     defaultPrompt: "帮我分析巡察材料，识别现场风险并生成巡察报告",
     tags: ["现场风险识别", "巡察报告生成", "整改方案制定"],
     examples: [
@@ -125,6 +133,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     description:
       "融合内部门户数据与公开情报，产出可溯源的政企拜访决策报告：为何拜访、谈什么、争取什么共识。",
     leadAgent: "zhengqi-visit-intel/zhengqi-visit-intel-team-lead",
+    quickAgent: "zhengqi-visit-intel/zhengqi-visit-intel-quick",
     defaultPrompt: "帮我生成某客户的谈参高拜报告，内部门户导出数据在这里：[文件路径]",
     tags: ["政企客户洞察", "高价值拜访准备", "商情研究与报告"],
     examples: [
@@ -140,6 +149,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     name: "DeepGeo 位置决策专家团",
     description: "把位置、客流、客群、商业和经营数据转化为可复算、可审查的位置决策报告。",
     leadAgent: "deepgeo/deepgeo-team-lead",
+    quickAgent: "deepgeo/deepgeo-quick",
     defaultPrompt: "我需要评估几个候选位置的选址可行性，请帮我分析客流、客群、商业环境和投资回报",
     tags: ["位置智能", "商业选址", "空间分析"],
     examples: [
@@ -168,6 +178,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     name: "AI for Science 科研专家团",
     description: "覆盖文献综述、论文复现、实验设计与科研写作的中文科研专家团。",
     leadAgent: "ai-for-science-team/ai-for-science-team-team-lead",
+    quickAgent: "ai-for-science-team/ai-for-science-team-quick",
     defaultPrompt: "帮我做一次关于「我的研究主题」的系统文献综述",
     tags: ["文献综述", "实验与复现", "科研写作"],
     examples: [
@@ -219,7 +230,7 @@ export function cmccExpertCenterHref() {
 
 export function cmccTeamExpertByAgent(agent: string | undefined) {
   if (!agent) return
-  return CMCC_TEAM_EXPERTS.find((expert) => expert.leadAgent === agent)
+  return CMCC_TEAM_EXPERTS.find((expert) => expert.leadAgent === agent || expert.quickAgent === agent || expert.liteQuickAgent === agent)
 }
 
 export const EXPERT_AVATARS = import.meta.glob("../../../../.opencode/experts/*/avatars/*.png", {
