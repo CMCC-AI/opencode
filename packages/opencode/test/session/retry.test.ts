@@ -240,6 +240,42 @@ describe("session.retry.retryable", () => {
     expect(SessionRetry.retryable(error, retryProvider)).toBeUndefined()
   })
 
+  test.each(["1113", 1113])("does not retry Zhipu billing error code %p", (code) => {
+    const providerID = ProviderV2.ID.make("zhipuai")
+    const error = MessageV2.fromError(
+      new APICallError({
+        message: "Billing error",
+        url: "https://provider.example.invalid/chat/completions",
+        requestBodyValues: {},
+        statusCode: 429,
+        isRetryable: true,
+        responseBody: JSON.stringify({ error: { code, message: "Billing error" } }),
+      }),
+      { providerID },
+    )
+
+    expect(SessionRetry.retryable(error, providerID)).toBeUndefined()
+  })
+
+  test("keeps retries when the Zhipu billing code does not match", () => {
+    const message = "\u4f59\u989d\u4e0d\u8db3"
+    for (const [provider, responseBody] of [
+      ["zhipuai", '{"error":{"code":"1302"}}'],
+      ["zhipuai", undefined],
+      ["zhipuai", "unstructured error 1113"],
+      [retryProvider, '{"error":{"code":"1113"}}'],
+    ] as const) {
+      const error = new SessionV1.APIError({
+        message,
+        statusCode: 429,
+        isRetryable: true,
+        responseBody,
+      }).toObject()
+
+      expect(SessionRetry.retryable(error, provider)).toEqual({ message })
+    }
+  })
+
   test("retries ZlibError decompression failures", () => {
     const error = Schema.decodeUnknownSync(SessionV1.APIError.Schema)(
       new SessionV1.APIError({

@@ -350,7 +350,7 @@ function CmccSidebar() {
             brandToggle.focus()
           }}
         >
-          <img src="/brand/logo.svg" alt="" class="size-6 object-contain" />
+          <Icon name="chevron-right" />
         </button>
       </Show>
       <aside
@@ -369,12 +369,7 @@ function CmccSidebar() {
         <div class="flex h-full min-w-0 flex-col overflow-hidden">
           <div class="cmcc-sidebar-brand flex shrink-0 items-center gap-2.5 px-4 py-4">
             <Show when={!rail()}>
-              <img
-                src="/brand/mobileai-horizontal.svg"
-                alt="深度洞察"
-                class="h-11 w-auto max-w-[101px] shrink-0 object-contain"
-              />
-              <span class="whitespace-nowrap text-[16px] font-semibold text-[#1a1a2e]">深度洞察</span>
+              <span class="whitespace-nowrap text-[20px] [font-weight:700] leading-7 text-[#171c26]">深度洞察</span>
             </Show>
             <button
               ref={brandToggle}
@@ -389,9 +384,7 @@ function CmccSidebar() {
                 if (!desktop() && !expanded()) mobileOpener?.focus()
               }}
             >
-              <Show when={rail()} fallback={<Icon name="chevron-left" />}>
-                <img src="/brand/logo.svg" alt="" class="size-7 object-contain" />
-              </Show>
+              <Icon name={expanded() ? "chevron-left" : "chevron-right"} />
             </button>
           </div>
           <nav class="flex shrink-0 flex-col gap-1 px-3 pb-3">

@@ -68,8 +68,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     kind: "team",
     id: "deeptrading",
     name: "DeepTrading 财经分析专家团",
-    description:
-      "多智能体财经分析团队：标的识别、四维并行分析（市场/舆情/新闻/基本面）、投资决策、交易方案与七章可视化报告，一站式投研交付。",
+    description: "多智能体财经分析团队：标的识别、多维并行分析，一站式投研交付。",
     leadAgent: "deeptrading/deeptrading-team-lead",
     defaultPrompt: "研究一下贵州茅台最近怎么样",
     tags: ["财经分析", "技术面分析", "基本面分析"],
@@ -139,8 +138,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     kind: "team",
     id: "deepgeo",
     name: "DeepGeo 位置决策专家团",
-    description:
-      "把位置、客流、客群、商业和经营数据转化为可复算、可审查的位置决策报告，十二位专家协同交付，覆盖商业选址、景区及场所经营优化。",
+    description: "把位置、客流、客群、商业和经营数据转化为可复算、可审查的位置决策报告。",
     leadAgent: "deepgeo/deepgeo-team-lead",
     defaultPrompt: "我需要评估几个候选位置的选址可行性，请帮我分析客流、客群、商业环境和投资回报",
     tags: ["位置智能", "商业选址", "空间分析"],
@@ -168,8 +166,7 @@ export const CMCC_EXPERTS: CmccExpert[] = [
     kind: "team",
     id: "ai-for-science-team",
     name: "AI for Science 科研专家团",
-    description:
-      "覆盖文献综述、论文复现、实验设计与科研写作的中文科研专家团，动态组队、G1-G4 人工闸门、证据全程可追溯，交付可审计研究包。",
+    description: "覆盖文献综述、论文复现、实验设计与科研写作的中文科研专家团。",
     leadAgent: "ai-for-science-team/ai-for-science-team-team-lead",
     defaultPrompt: "帮我做一次关于「我的研究主题」的系统文献综述",
     tags: ["文献综述", "实验与复现", "科研写作"],

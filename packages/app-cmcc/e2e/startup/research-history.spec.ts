@@ -196,7 +196,8 @@ for (const width of [1440, 390]) {
     await sidebar.screenshot({ path: info.outputPath("expanded.png") })
     await sidebar.getByRole("button", { name: "隐藏左栏" }).click()
     const opener = page.getByRole("button", { name: "展开左栏" })
-    await expect(opener.locator("img")).toHaveAttribute("src", "/brand/logo.svg")
+    await expect(opener.locator("svg")).toBeVisible()
+    await expect(opener.locator("img")).toHaveCount(0)
     if (width === 1440) {
       await expect(sidebar).toHaveCSS("width", "64px")
       await expect(nav.locator("button > span").first()).toBeHidden()

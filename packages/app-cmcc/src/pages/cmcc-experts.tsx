@@ -1,5 +1,6 @@
 import { Navigate, useNavigate, useParams } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
+import { useQueryClient } from "@tanstack/solid-query"
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js"
 import { Portal } from "solid-js/web"
 import { CmccPageBrandBar } from "@/components/cmcc-page-brand-bar"
@@ -41,6 +42,7 @@ import {
   type TeamMember,
 } from "@/utils/cmcc-experts"
 import { showToast } from "@/utils/toast"
+import { pathKey } from "@/utils/path-key"
 import { createDialogMotion } from "@/components/cmcc-motion"
 import "./cmcc-overview-layout.css"
 import "./cmcc-experts.css"
@@ -152,7 +154,6 @@ function FeaturedCarousel(props: { experts: TeamExpert[]; onOpen: (expert: TeamE
 
 export function CmccExpertCenterRoute() {
   const navigate = useNavigate()
-  const launch = useCmccExpertDraftLauncher()
   const [active, setActive] = createSignal<CmccExpert>()
 
   return (
@@ -183,7 +184,6 @@ export function CmccExpertCenterRoute() {
             expert={expert()}
             onClose={() => setActive(undefined)}
             onOpenExternal={(item) => navigate(cmccExpertHref(item))}
-            onSummon={(item, prompt) => void launch(item, prompt)}
           />
         )}
       </Show>
@@ -220,7 +220,7 @@ function ExternalExpertFrame(props: { expert: ExternalExpert }) {
 }
 
 function TeamExpertView(props: { expert: TeamExpert }) {
-  const launch = useCmccExpertDraftLauncher()
+  const { launch, pending } = useCmccExpertDraftLauncher()
 
   return (
     <div class="min-h-0 flex-1 overflow-y-auto bg-v2-background-bg-deep">
@@ -238,11 +238,13 @@ function TeamExpertView(props: { expert: TeamExpert }) {
           </div>
           <button
             type="button"
-            class="flex h-9 shrink-0 items-center gap-2 rounded-[6px] bg-v2-text-text-base px-3 text-[13px] leading-4 text-v2-background-bg-layer-01 hover:opacity-90"
+            class="flex h-9 min-w-[113px] shrink-0 items-center justify-center gap-2 rounded-[6px] bg-v2-text-text-base px-3 text-[13px] leading-4 text-v2-background-bg-layer-01 hover:opacity-90 disabled:cursor-wait"
+            disabled={pending()}
+            aria-busy={pending()}
             onClick={() => void launch(props.expert)}
           >
             <Icon name="new-session" class="size-4" />
-            召唤专家团
+            {pending() ? "正在准备…" : "召唤专家团"}
           </button>
         </div>
 
@@ -325,10 +327,10 @@ function ExpertDetailDialog(props: {
   expert: CmccExpert
   onClose: () => void
   onOpenExternal: (expert: ExternalExpert) => void
-  onSummon: (expert: TeamExpert, prompt?: string) => void
 }) {
   const navigate = useNavigate()
   const motion = createDialogMotion(props.onClose)
+  const { launch, pending } = useCmccExpertDraftLauncher(() => !motion.closing())
   const presentation = createMemo(
     () =>
       EXPERT_PRESENTATION[props.expert.id] ?? {
@@ -401,10 +403,11 @@ function ExpertDetailDialog(props: {
                       <button
                         type="button"
                         class="cmcc-expert-skill"
+                        disabled={pending()}
                         title={capability.description}
                         onClick={() => {
                           if (props.expert.kind === "team") {
-                            props.onSummon(props.expert, props.expert.examples[index()] ?? props.expert.defaultPrompt)
+                            void launch(props.expert, props.expert.examples[index()] ?? props.expert.defaultPrompt)
                             return
                           }
                           props.onOpenExternal(props.expert)
@@ -474,10 +477,12 @@ function ExpertDetailDialog(props: {
                 {(item) => (
                   <button
                     type="button"
-                    class="cmcc-expert-primary"
-                    onClick={() => props.onSummon(item())}
+                    class="cmcc-expert-primary min-w-[111px] min-[761px]:min-w-[130px] disabled:cursor-wait"
+                    disabled={pending()}
+                    aria-busy={pending()}
+                    onClick={() => void launch(item())}
                   >
-                    召唤产业专家团
+                    {pending() ? "正在准备…" : "召唤产业专家团"}
                   </button>
                 )}
               </Show>
@@ -492,38 +497,56 @@ function ExpertDetailDialog(props: {
   )
 }
 
-function useCmccExpertDraftLauncher() {
+function useCmccExpertDraftLauncher(canLaunch = () => true) {
   const server = useServer()
   const dockapi = useDockApi()
   const serverSDK = useServerSDK()
   const sync = useServerSync()
   const tabs = useTabs()
+  const queryClient = useQueryClient()
+  const [pending, setPending] = createSignal(false)
+  let active = true
+  onCleanup(() => { active = false })
 
-  return async (expert: TeamExpert, prompt = expert.defaultPrompt) => {
+  const launch = async (expert: TeamExpert, prompt = expert.defaultPrompt) => {
+    if (!active || !canLaunch() || pending()) return
     const directory = dockapi.workspace?.directoryPath
     const artifactDirectory = cmccArtifactWorkspace(directory)
     if (!directory || !artifactDirectory || !tabs.ready()) return
 
-    const agents = await serverSDK()
-      .client.app.agents({ directory }, { throwOnError: true })
-      .catch((error) => {
-        showToast({
-          title: "无法读取专家配置",
-          description: error instanceof Error ? error.message : String(error),
-          variant: "error",
-        })
-        return undefined
-      })
-    if (!agents?.data?.some((item) => item.name === expert.leadAgent)) {
+    const target = server.key
+    const user = dockapi.user?.id
+    const valid = () => active && canLaunch() && server.key === target && dockapi.user?.id === user &&
+      dockapi.workspace?.directoryPath === directory
+    const query = sync().queryOptions.agents(pathKey(directory))
+    setPending(true)
+    try {
+      const cached = queryClient.getQueryData(query.queryKey)
+      if (!cached?.some((item) => item.name === expert.leadAgent)) {
+        const agents = await queryClient.fetchQuery({ ...query, staleTime: 0 })
+        if (!valid()) return
+        if (!agents.some((item) => item.name === expert.leadAgent)) {
+          showToast({
+            title: "专家团配置未加载",
+            description: `后端还没有加载 ${expert.leadAgent}，请重启服务后再试。`,
+            variant: "error",
+          })
+          return
+        }
+      }
+    } catch (error) {
+      if (!valid()) return
       showToast({
-        title: "专家团配置未加载",
-        description: `后端还没有加载 ${expert.leadAgent}，请重启服务后再试。`,
+        title: "无法读取专家配置",
+        description: error instanceof Error ? error.message : String(error),
         variant: "error",
       })
       return
+    } finally {
+      setPending(false)
     }
 
-    tabs.newDraft({ server: server.key, directory, artifactDirectory, homeTeamPicker: true, expertID: expert.id }, prompt, {
+    tabs.newDraft({ server: target, directory, artifactDirectory, homeTeamPicker: true, expertID: expert.id }, prompt, {
       agent: expert.leadAgent,
     })
     cmccRememberConversationWorkspace(directory)
@@ -541,6 +564,7 @@ function useCmccExpertDraftLauncher() {
     })
     void sync().project.loadSessions(directory)
   }
+  return { launch, pending }
 }
 
 function TagList(props: { tags: readonly string[]; compact?: boolean }) {

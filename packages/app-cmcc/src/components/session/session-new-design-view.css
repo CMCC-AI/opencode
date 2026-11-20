@@ -204,7 +204,7 @@
 @container cmcc-home (min-width: 720px) {
   .cmcc-home-heading,
   .cmcc-home-composer {
-    --cmcc-home-scale: 1.32;
+    --cmcc-home-scale: 1.584;
   }
 }
 

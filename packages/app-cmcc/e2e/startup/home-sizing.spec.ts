@@ -56,7 +56,7 @@ for (const viewport of [
           title: bounds(`${home} h1`),
           greeting: document.querySelector(".cmcc-home-greeting") ? bounds(".cmcc-home-greeting") : undefined,
           subtitle: bounds(`${home} p`),
-          logo: bounds(`${home} img`),
+          logo: bounds(document.querySelector(".cmcc-home-greeting img") ? ".cmcc-home-greeting img" : `${home} img`),
           composer: bounds(composer),
           editor: bounds(editor),
         }
@@ -80,17 +80,17 @@ for (const viewport of [
     expect(metrics.title.x).toBeCloseTo(metrics.composer.x, 1)
     expect(metrics.subtitle.x).toBeCloseTo(metrics.composer.x, 1)
     const wide = viewport.width >= 1440
-    expect(metrics.editor.font).toBe(wide ? "16.8px" : "14px")
+    expect(metrics.editor.font).toBe(wide ? "22.176px" : "14px")
     expect(metrics.editor.y).toBeGreaterThanOrEqual(metrics.composer.y)
-    expect(metrics.composer.height).toBe(wide ? 144 : 200)
+    expect(metrics.composer.height).toBeCloseTo(wide ? 190.08 : 200, 1)
     await expect(page.locator(`${home} [data-action="prompt-model"]`)).toHaveCSS("font-size", "15px")
     await expect(page.getByRole("button", { name: "执行", exact: true })).toBeVisible()
     if (wide) {
-      expect(metrics.title.font).toBe("38.4px")
-      expect(metrics.subtitle.font).toBe("16.8px")
-      expect(metrics.logo.height).toBeCloseTo(43.2, 1)
-      expect(metrics.composer.width).toBe(720)
-      await expect(page.locator('aside img[alt="深度洞察"]')).toHaveCSS("height", "44px")
+      expect(metrics.title.font).toBe("50.688px")
+      expect(metrics.subtitle.font).toBe("22.176px")
+      expect(metrics.logo.height).toBeCloseTo(57.024, 1)
+      expect(metrics.composer.width).toBeCloseTo(950.4, 1)
+      await expect(page.locator(".cmcc-sidebar-brand").getByText("深度洞察", { exact: true })).toHaveCSS("font-size", "20px")
     }
     await page.locator(editor).fill("请帮我分析这个研究主题，保留当前输入内容。")
     await expect(page.locator(editor)).toHaveText("请帮我分析这个研究主题，保留当前输入内容。")

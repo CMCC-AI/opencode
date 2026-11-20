@@ -212,13 +212,25 @@ for (const width of [1680, 1440, 1280, 390, 320]) {
 
     const dialog = page.locator('section:has(> header [aria-label="关闭专家详情"])')
     if (width === 1440) {
-      const researchSlide = banner.getByRole("button", { name: "查看AI for Science 科研专家团" })
-      await researchSlide.click()
-      await expect(researchSlide).toHaveAttribute("aria-pressed", "true")
-      await banner.getByRole("button", { name: "创建任务", exact: true }).click()
-      await expect(dialog).toHaveAccessibleName("AI + 科研")
-      await dialog.getByRole("button", { name: "取消", exact: true }).click()
-      await expect(dialog).toHaveCount(0)
+      for (const [team, category, copy] of [
+        ["DeepTrading 财经分析专家团", "AI + 财经", "多智能体财经分析团队：标的识别、多维并行分析，一站式投研交付。"],
+        [
+          "DeepGeo 位置决策专家团",
+          "AI + 位置",
+          "把位置、客流、客群、商业和经营数据转化为可复算、可审查的位置决策报告。",
+        ],
+        ["AI for Science 科研专家团", "AI + 科研", "覆盖文献综述、论文复现、实验设计与科研写作的中文科研专家团。"],
+      ]) {
+        const slide = banner.getByRole("button", { name: `查看${team}`, exact: true })
+        await slide.click()
+        await expect(slide).toHaveAttribute("aria-pressed", "true")
+        await expect(banner.locator(".cmcc-expert-banner-copy p")).toHaveText(copy)
+        await banner.getByRole("button", { name: "创建任务", exact: true }).click()
+        await expect(dialog).toHaveAccessibleName(category)
+        await expect(dialog.locator(".cmcc-expert-summary p")).toHaveText(copy)
+        await dialog.getByRole("button", { name: "取消", exact: true }).click()
+        await expect(dialog).toHaveCount(0)
+      }
     }
     await cards.filter({ hasText: "AI + 财经" }).click()
     await expect(dialog).toBeVisible()
@@ -311,4 +323,75 @@ test("finance task dialog still launches skill drafts and stock comparison", asy
   await finance.click()
   await dialog.getByRole("button", { name: "多股对比", exact: true }).click()
   await expect(page).toHaveURL(/\/mstock$/)
+})
+
+test("industry summon reuses the prewarmed agent list", async ({ page }) => {
+  await setupHomePage(page, { models: true, teams: true })
+  let requests = 0
+  await page.route("**/agent?*", (route) => {
+    if (new URL(page.url()).pathname === "/expert") requests++
+    return route.fallback()
+  })
+  await page.goto("/expert")
+  await expect.poll(() => requests).toBe(1)
+  await page.getByRole("button", { name: /^AI \+ 财经/ }).click()
+  await page.getByRole("button", { name: "召唤产业专家团", exact: true }).click()
+
+  await expect(page).toHaveURL(/\/new-session\?.*draftId=/)
+  await expect(page.getByRole("button", { name: "切换专家团，当前：DeepTrading 财经分析专家团" })).toBeVisible()
+  expect(requests).toBe(1)
+})
+
+test("industry summon joins an in-flight check, shows progress and can retry", async ({ page }) => {
+  await setupHomePage(page, { models: true, teams: true })
+  const gate = Promise.withResolvers<void>()
+  let requests = 0
+  await page.route("**/agent?*", async (route) => {
+    if (++requests !== 1) return route.fallback()
+    await gate.promise
+    return route.fulfill({ json: [{ name: "build", mode: "primary" }] })
+  })
+  await page.goto("/expert")
+  await expect.poll(() => requests).toBe(1)
+  await page.getByRole("button", { name: /^AI \+ 财经/ }).click()
+  const dialog = page.getByRole("dialog", { name: "AI + 财经", exact: true })
+  const summon = dialog.getByRole("button", { name: "召唤产业专家团", exact: true })
+  await summon.click()
+  const preparing = dialog.getByRole("button", { name: "正在准备…", exact: true })
+  await expect(preparing).toBeDisabled()
+  await expect(preparing).toHaveAttribute("aria-busy", "true")
+  await expect(dialog.locator(".cmcc-expert-skill").first()).toBeDisabled()
+  await expect(page).toHaveURL(/\/expert$/)
+  expect(requests).toBe(1)
+
+  gate.resolve()
+  await expect(page.getByText("专家团配置未加载", { exact: true })).toBeVisible()
+  await expect(summon).toBeEnabled()
+  await summon.click()
+  await expect(page).toHaveURL(/\/new-session\?.*draftId=/)
+  expect(requests).toBe(2)
+})
+
+test("closing the expert dialog cancels navigation while validation is pending", async ({ page }) => {
+  await setupHomePage(page, { models: true, teams: true })
+  const gate = Promise.withResolvers<void>()
+  await page.route("**/agent?*", async (route) => {
+    await gate.promise
+    return route.fallback()
+  })
+  await page.goto("/expert")
+  const finance = page.getByRole("button", { name: /^AI \+ 财经/ })
+  await finance.click()
+  const dialog = page.getByRole("dialog", { name: "AI + 财经", exact: true })
+  await dialog.getByRole("button", { name: "召唤产业专家团", exact: true }).click()
+  await expect(dialog.getByRole("button", { name: "正在准备…" })).toBeDisabled()
+  const response = page.waitForResponse((item) => new URL(item.url()).pathname === "/agent")
+  await dialog.getByRole("button", { name: "取消", exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  gate.resolve()
+  await response
+
+  await finance.click()
+  await expect(dialog.getByRole("button", { name: "召唤产业专家团", exact: true })).toBeEnabled()
+  await expect(page).toHaveURL(/\/expert$/)
 })

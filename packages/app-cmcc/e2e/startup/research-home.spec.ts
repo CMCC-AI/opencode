@@ -77,9 +77,9 @@ test("login home and both sidebar entries open independent blank Deep Research d
     await expectPageBrandBar(page, heading)
     await expect(mode(page, "深度")).toHaveAttribute("aria-pressed", "true")
     await expect(editor(page)).toHaveText("")
-    await expect(heading).toHaveCSS("font-size", "42.24px")
-    await expect(composer).toHaveCSS("width", "792px")
-    await expect(composer.locator(".cmcc-home-composer-surface")).toHaveCSS("min-height", "158.4px")
+    await expect(heading).toHaveCSS("font-size", "50.688px")
+    expect((await composer.boundingBox())!.width).toBeCloseTo(950.4, 1)
+    await expect(composer.locator(".cmcc-home-composer-surface")).toHaveCSS("min-height", "190.08px")
     drafts.add(new URL(page.url()).searchParams.get("draftId")!)
     await editor(page).fill("这个问题只属于当前草稿")
   }
