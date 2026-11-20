@@ -132,7 +132,7 @@ export const QUICK_PRESETS_BY_TEAM: Record<string, TeamQuickPresets> = {
     ],
     lite: {
       id: "lite",
-      label: "轻量",
+      label: "快速问答",
       prompt: "一句话快速看下【股票/板块/问题】：给出结论与关键理由，不用写报告。",
     },
   },
