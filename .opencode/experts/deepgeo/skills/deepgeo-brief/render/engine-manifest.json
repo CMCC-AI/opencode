@@ -1,0 +1,11 @@
+{
+  "synced_at": "2026-11-20 02:17:46",
+  "source": "engines-src/",
+  "template": "deepgeo",
+  "files": [
+    "render.mjs",
+    "export-report-pdf.mjs",
+    "lib/",
+    "templates/deepgeo.html.tpl"
+  ]
+}

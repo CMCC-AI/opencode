@@ -34,3 +34,19 @@ logs/
 *.bun-build
 tsconfig.tsbuildinfo
 data/
+
+# Expert team artifacts
+05-*.yaml
+05-*.meta.json
+figures/
+reviews/
+runs/
+shoppers-runs/
+zhengqi-runs/
+zyzx-runs/
+deepgeo-runs/
+writing/
+
+# DeepGeo deterministic analytics bytecode cache
+.opencode/experts/deepgeo/skills/deepgeo-pipeline/analytics/**/__pycache__/
+.opencode/experts/deepgeo/skills/deepgeo-brief/analytics/**/__pycache__/

@@ -1,0 +1,195 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://shoppers.pro/contracts/recommendation.schema.json",
+  "title": "RecommendationResponse",
+  "description": "团长最终输出的结构化推荐。needInsight 与 products 为必填主体；扩展能力放入 extensions，避免前端把次要功能放到主体之前。",
+  "type": "object",
+  "required": ["needInsight", "products"],
+  "additionalProperties": false,
+  "properties": {
+    "needInsight": {
+      "type": "object",
+      "description": "需求洞察：让用户确认“它真的懂我”，是 Shoppers Pro 的信任入口",
+      "required": ["headline", "empathySummary", "decisionPriorities"],
+      "properties": {
+        "headline": { "type": "string", "description": "一句洞察标题，不复述原话、不罗列参数" },
+        "empathySummary": { "type": "string", "description": "2~4 句共情式分析：真实目标、隐含顾虑、关键取舍" },
+        "decisionPriorities": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 5,
+          "description": "3~5 个决策重点",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "summary": { "type": "string", "description": "一句话推荐结论" },
+    "groups": {
+      "type": "array",
+      "description": "轻量分组：最适合 / 性价比 / 特色选择 / 预算替代",
+      "items": {
+        "type": "object",
+        "required": ["name", "productIds"],
+        "properties": {
+          "name": { "type": "string" },
+          "productIds": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "products": {
+      "type": "array",
+      "description": "默认 6~12 个，首屏渲染最相关的 4~6 个，其余流式补充",
+      "items": { "$ref": "#/$defs/ProductRecommendation" }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "主体推荐之后的扩展能力按钮",
+      "properties": {
+        "followUps": { "type": "array", "items": { "type": "string" } },
+        "compare": { "type": "boolean" },
+        "priceHistory": { "type": "boolean" },
+        "priceAlert": { "type": "boolean" },
+        "refreshBatch": { "type": "boolean", "description": "换一批" }
+      }
+    }
+  },
+  "$defs": {
+    "Price": {
+      "type": "object",
+      "properties": {
+        "value": { "type": ["number", "null"] },
+        "currency": { "type": "string", "default": "CNY" },
+        "status": {
+          "type": "string",
+          "enum": ["observed", "estimated", "unknown"],
+          "description": "observed=页面观察价；estimated=估算；unknown=未知"
+        }
+      }
+    },
+    "Reputation": {
+      "type": "object",
+      "description": "真实口碑：来自电商评价 / 测评媒体 / 论坛长评的结构化抽取。dataSource 决定可信度，前端据此如实标注「口碑未联网核实」",
+      "properties": {
+        "rating": {
+          "type": "object",
+          "description": "量化评分（来自电商平台官方评价或聚合站）",
+          "properties": {
+            "score": { "type": ["number", "null"], "minimum": 0, "maximum": 5, "description": "五星制评分，如 4.8" },
+            "count": { "type": "integer", "minimum": 0, "description": "参评人数，体现统计意义" },
+            "goodRate": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "description": "好评率，如 0.97" },
+            "platform": { "type": "string", "description": "评分来源平台，如 jd / tmall / smzdm" },
+            "observedAt": { "type": "string", "description": "抓取日期 YYYY-MM-DD" }
+          }
+        },
+        "commonPraises": {
+          "type": "array",
+          "description": "共性好评：多人反复提到的优点（评价词云 / 长评抽取）",
+          "items": { "type": "string" }
+        },
+        "commonComplaints": {
+          "type": "array",
+          "description": "共性槽点：多人反复提到的缺点或通病（最重要的字段，是卡片 tradeoff 的依据）",
+          "items": { "type": "string" }
+        },
+        "longTermNotes": {
+          "type": "string",
+          "description": "长期使用反馈（3 个月以上）：衰减、固件修复情况、批次差异"
+        },
+        "categoryIssues": {
+          "type": "array",
+          "description": "品类通病 / 避坑提醒（如某机型主板虚焊、某家电异响、美妆假货风险）",
+          "items": { "type": "string" }
+        },
+        "dataSource": {
+          "type": "string",
+          "enum": ["official_api", "web_observed", "mixed", "model_memory"],
+          "description": "official_api=电商官方评价 API；web_observed=网页抓取；mixed=网页+LLM 混合；model_memory=纯模型记忆兜底（最弱，须前端如实标注）"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "口碑可信度：官方 API+多条共识=0.85+；纯模型记忆=0.3 以下"
+        },
+        "sources": {
+          "type": "array",
+          "description": "引用源（测评页 / 知乎 / 小红书 / SMZDM 等），便于追溯",
+          "items": {
+            "type": "object",
+            "required": ["title", "url"],
+            "properties": {
+              "title": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string", "enum": ["review", "forum", "ecommerce", "official", "video"] }
+            }
+          }
+        }
+      }
+    },
+    "Offer": {
+      "type": "object",
+      "description": "平台行动入口",
+      "required": ["platform", "url", "linkType"],
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": ["jd", "taobao", "pdd", "douyin", "vip", "alibaba1688", "other"]
+        },
+        "url": { "type": "string" },
+        "linkType": { "type": "string", "enum": ["product", "search", "demo"] },
+        "priceStatus": { "type": "string", "description": "链接价格状态说明" },
+        "price": {
+          "type": "object",
+          "description": "该平台的价格（用于价格对比）",
+          "properties": {
+            "value": { "type": ["number", "null"] },
+            "currency": { "type": "string" },
+            "status": { "type": "string", "enum": ["observed", "estimated", "unknown"] }
+          }
+        }
+      }
+    },
+    "ProductRecommendation": {
+      "type": "object",
+      "required": ["id", "title", "recommendationIndex", "aiSummary"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "brand": { "type": "string" },
+        "model": { "type": "string" },
+        "image": { "type": "string" },
+        "recommendationIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "0~100 整数，对当前用户需求的匹配度，不是永久评分"
+        },
+        "recommendationLabel": {
+          "type": "string",
+          "enum": ["强烈推荐", "推荐", "有条件推荐"]
+        },
+        "aiSummary": {
+          "type": "string",
+          "description": "1~3 句：为什么适合当前用户 + 需要接受的取舍，不写通用文案"
+        },
+        "fitReasons": {
+          "type": "array",
+          "description": "2~3 条针对当前需求的适合理由",
+          "items": { "type": "string" }
+        },
+        "tradeoff": { "type": "string", "description": "主要取舍（1 条）" },
+        "tradeoffs": {
+          "type": "array",
+          "description": "多条取舍（可选）",
+          "items": { "type": "string" }
+        },
+        "reputation": { "$ref": "#/$defs/Reputation" },
+        "price": { "$ref": "#/$defs/Price" },
+        "offers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Offer" }
+        }
+      }
+    }
+  }
+}
