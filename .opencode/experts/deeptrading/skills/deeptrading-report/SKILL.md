@@ -22,7 +22,7 @@ metadata:
 
 | 能力 | 优先用 | 降级 |
 |---|---|---|
-| **搜索** | `mobilework_search`（MobileWork 内置） | `mw_search_batch_collect_search_round`（OpenCode MCP）→ 都没有用 `webfetch` |
+| **搜索** | `web-search`（远程搜索 MCP，工具名 `web-search_*`） | `mobilework_search`（MobileWork 内置）→ `mw_search_batch_collect_search_round`（OpenCode MCP）→ 都没有用 `webfetch` |
 | **结构化行情** | `akshare_get_stock_data` / `akshare_get_indicators` / `akshare_get_fundamentals` / 三表 / `akshare_get_fund_flow` / `akshare_get_sector_fund_flow` / `akshare_get_index_data`（指数）/ `akshare_get_northbound_fund_flow`（北向已停止披露，南向正常）（有 AkShare MCP 时） | 全降级搜索 |
 | **渲染** | 本技能自带引擎：`node .opencode/experts/deeptrading/skills/deeptrading-report/render/render.mjs <workspace>` | 无 node 时交付纯 markdown |
 | **写文件** | `write` 工具 | 无法写文件时全文在对话中输出 |

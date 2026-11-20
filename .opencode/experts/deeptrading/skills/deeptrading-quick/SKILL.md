@@ -30,6 +30,7 @@ metadata:
 - `akshare_get_index_data`：指数日线（上证/深成/创业板/科创50/沪深300/中证500/中证1000）
 - `akshare_get_northbound_fund_flow`：沪深港通快照（注意：北向单日净买额 2024-08 起交易所停止披露，南向正常；北向维度可降级用板块主力净流入近似）
 - `akshare_get_news` / `akshare_get_company_announcements` / `akshare_get_market_news`：新闻/公告/宏观
+- `web-search`（工具名 `web-search_*`）：远程搜索 MCP（搜索链最高优先）
 - `mw_search_batch_collect_search_round`：360 智搜（定性内容）
 - `mobilework_search`：MobileWork 宿主搜索通道
 - 以上均无时用 `websearch`（OC 内置）+ `webfetch` 核验

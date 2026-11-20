@@ -4,10 +4,11 @@
 
 按会话实际可用的搜索工具执行，**任一可用即执行公开研究**：
 
-1. **首选**：`mw_search_batch_collect_search_round` 存在且**公开任务包可用**（试调用不返回"任务不存在/越界"）。任务包错配时立即降级，不重试、不猜 job_id
-2. `mobilework_search`（MobileWork宿主通道）
-3. `websearch` / `webfetch`——webfetch只读真实URL正文核验关键事实
-4. 全部不可用才跳过本环节，如实记录后继续流程
+1. **首选**：`web-search`（远程搜索 MCP，工具名 `web-search_*`，按其工具入参规范调用）
+2. `mw_search_batch_collect_search_round` 存在且**公开任务包可用**（试调用不返回"任务不存在/越界"）。任务包错配时立即降级，不重试、不猜 job_id
+3. `mobilework_search`（MobileWork宿主通道）
+4. `websearch` / `webfetch`——webfetch只读真实URL正文核验关键事实
+5. 全部不可用才跳过本环节，如实记录后继续流程
 
 原页读取用会话可用工具（fetch_public_pages / webfetch）；两者皆无时只用搜索摘要，数字断言降级表述。公开研究是补充不是替代：只为补齐行业趋势、政策动态、标杆案例、客户公开经营信息；内部材料优先，本地材料已有的数字不再用公开来源覆盖或"验证"。
 

@@ -18,6 +18,8 @@ permission:
   task: deny
   websearch: allow
   webfetch: allow
+  web-search_*: allow
+  akshare_*: allow
   question: allow
 ---
 

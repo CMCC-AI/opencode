@@ -24,7 +24,7 @@ metadata:
 
 | 能力 | 优先用 | 降级 |
 |---|---|---|
-| 搜索 | `mobilework_search`（MobileWork 宿主） | `websearch`（OC 内置）→ 都无时 `webfetch` 直抓品牌官网在售页 |
+| 搜索 | `web-search`（远程搜索 MCP，工具名 `web-search_*`）→ `mobilework_search`（MobileWork 宿主） | `websearch`（OC 内置）→ 都无时 `webfetch` 直抓品牌官网在售页 |
 | 澄清 | `question` 工具（选项式点选） | 纯文字列选项让用户回复序号 |
 | 文件 | `write` / `read`（workspace 落盘） | 无法写文件时全程内存执行，最终对话直接呈现 |
 
