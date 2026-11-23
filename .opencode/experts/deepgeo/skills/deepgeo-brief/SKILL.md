@@ -2,7 +2,7 @@
 name: deepgeo-brief
 description: 位置决策研究报告（商业选址/点位评估/景区与场所布局优化）。用户要求"选址分析/评估这几个点位/位置决策/客流与商圈分析/商铺布局优化/景区运营诊断"且给出数据目录（CSV 聚合数据，可有 case.json/CASE.md）时加载本技能；单点快问、无数据目录时不加载。单 agent 全流程：数据契约与质量 → 确定性配方分析 → 评分与财务情景 → 故事化成文 → HTML/PDF 渲染交付。核心数值一律由内置 analytics 确定性计算，不在对话中估算。
 metadata:
-  version: 1.0.0
+  version: 1.1.0
 ---
 
 # deepgeo-brief（位置决策研究）
@@ -76,7 +76,7 @@ python -m analytics.deepgeo.cli run --recipe <配方> --input <数据目录>\<�
 
 ### 第7步 渲染三件套
 1. 复制 40 为 60-quick-report.md：首行改为观点式 `# ` 标题（结论入题，如"# 星港中心与云澜广场进入优先洽谈，两点位因可达性硬伤出局"）；在解释性段落之后插入 `<!--CHART:xxx-id-->` 占位（4—6 处）；文末保留 `## 数据与来源` 章节。
-2. 写 61-quick-charts.json：`title` 与 60 首行 H1 逐字一致；`hero_stats` ≤5（推荐点位/综合得分/盈亏平衡客流/预测区间等决策卡）；`charts` ≤6，option 直写但**全部数字只取 20-analysis/30-model 已登记值**，每图附 `table`（列 ≥2 同源）；配色用商务蓝体系。
+2. 写 61-quick-charts.json：`title` 与 60 首行 H1 逐字一致；`hero_stats` ≤5（推荐点位/综合得分/盈亏平衡客流/预测区间等决策卡）；`charts` ≤6，option 直写但**全部数字只取 20-analysis/30-model 已登记值**，每图附 `table`（列 ≥2 同源）；配色用商务蓝体系。**图型多样性硬规则（详见 references/story-writing.md §3b）**：柱状图（含横向）≤ 一半、全报告 ≥3 种图型；时间趋势与预测区间用折线/区间带/蜡烛图，构成用环形/百分比堆叠，双变量用散点四象限，多维评分用雷达——禁止清一色柱状。
 3. 写 00-input.json：
 ```json
 {
