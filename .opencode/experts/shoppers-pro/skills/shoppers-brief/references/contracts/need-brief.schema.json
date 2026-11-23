@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://shoppers.pro/contracts/need-brief.schema.json",
+  "title": "NeedBrief",
+  "description": "Shoppers Pro 内部需求简报。团长从用户一句话抽取的稳定字段；品类特有条件由 Agent 在搜索中动态补充，不在此强约束。",
+  "type": "object",
+  "required": ["recipient", "scenario", "budget"],
+  "additionalProperties": true,
+  "properties": {
+    "recipient": {
+      "type": "object",
+      "description": "使用对象",
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string", "description": "给谁用，例如：父母、油皮通勤族、自己剪视频" },
+        "attributes": {
+          "type": "array",
+          "description": "对象关键属性，例如：老人、易用性敏感、油性肤质",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "scenario": {
+      "type": "string",
+      "description": "使用场景，例如：日常通勤、送领导、出租屋临时用"
+    },
+    "category": {
+      "type": "string",
+      "description": "推断出的品类 key，对应 category-profiles 目录下的文件名（无则走通用模板）"
+    },
+    "budget": {
+      "type": "object",
+      "description": "预算",
+      "properties": {
+        "min": { "type": ["number", "null"] },
+        "max": { "type": ["number", "null"], "description": "预算上限，最重要的硬约束之一" },
+        "currency": { "type": "string", "default": "CNY" },
+        "flexible": { "type": "boolean", "default": false, "description": "预算是否可松动" }
+      }
+    },
+    "hardConstraints": {
+      "type": "array",
+      "description": "硬性条件（不满足即淘汰），例如：必须 5G、必须国内保修",
+      "items": { "type": "string" }
+    },
+    "preferences": {
+      "type": "array",
+      "description": "偏好（满足更好，不满足不淘汰），例如：偏好大屏、偏好白色",
+      "items": { "type": "string" }
+    },
+    "platformPreference": {
+      "type": "array",
+      "description": "平台偏好，例如：jd、taobao、pdd",
+      "items": { "type": "string" }
+    },
+    "brandPreference": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "candidates": {
+      "type": "array",
+      "description": "用户已有的候选型号 / 商品",
+      "items": { "type": "string" }
+    },
+    "purchaseTiming": {
+      "type": "string",
+      "description": "购买时间，例如：近期、618、不急"
+    },
+    "decisionPriorities": {
+      "type": "array",
+      "description": "最关键的 3~5 个决策因素（排序后的品类关注维度）",
+      "items": { "type": "string" }
+    },
+    "implicitConcerns": {
+      "type": "array",
+      "description": "用户没明说但很重要的顾虑，例如：父母学不会、售后没人帮",
+      "items": { "type": "string" }
+    },
+    "missingInfo": {
+      "type": "array",
+      "description": "仍未覆盖、且会影响推荐结果的维度（按核心→重要→增强排序）；触发多轮渐进追问，每轮补 2~3 项，最多 3 轮",
+      "items": { "type": "string" }
+    }
+  }
+}

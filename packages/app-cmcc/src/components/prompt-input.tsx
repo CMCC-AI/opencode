@@ -70,6 +70,8 @@ import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
 import { PromptSendButton } from "./prompt-input/send-button"
 import { HomeActionsPopover, HomeAgentControl, HomeModelControl } from "./prompt-input/home-controls"
+import { QuickPresetBar } from "./prompt-input/quick-preset-bar"
+import { QUICK_PRESETS_BY_TEAM } from "@/utils/quick-presets"
 import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
@@ -428,6 +430,56 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     else setActions("selected", notebook)
   }
   const selectedTeamExpert = createMemo(() => cmccTeamExpertByAgent(props.selectedExpertAgent))
+  const teamQuickToggle = createMemo(() => {
+    const team = selectedTeamExpert()
+    return team?.quickAgent
+      ? {
+          quick: team.quickAgent,
+          lead: team.leadAgent,
+          liteActive: !!team.liteQuickAgent && props.selectedExpertAgent === team.liteQuickAgent,
+        }
+      : undefined
+  })
+  // 「快速」模式（含轻量通道）下不显示专家团头像 chip（与深度研究快速模式一致）
+  const teamExpertChip = createMemo(() => {
+    const team = selectedTeamExpert()
+    if (!team) return undefined
+    return team.quickAgent === props.selectedExpertAgent || team.liteQuickAgent === props.selectedExpertAgent
+      ? undefined
+      : team
+  })
+  const quickPresetView = createMemo(() => {
+    const team = selectedTeamExpert()
+    const presets = team ? QUICK_PRESETS_BY_TEAM[team.id] : undefined
+    if (!team?.quickAgent || !presets) return undefined
+    const liteActive = !!team.liteQuickAgent && props.selectedExpertAgent === team.liteQuickAgent
+    if (props.selectedExpertAgent !== team.quickAgent && !liteActive) return undefined
+    return { presets, liteActive, team }
+  })
+  // 切换专家团时清空未修改的快速预设模板；用户手输内容保留
+  createEffect(
+    on(
+      () => props.selectedExpertAgent,
+      (agent, prev) => {
+        if (!agent || !prev || agent === prev) return
+        const team = cmccTeamExpertByAgent(prev)
+        if (!team || cmccTeamExpertByAgent(agent)?.id === team.id) return
+        const presets = QUICK_PRESETS_BY_TEAM[team.id]
+        if (!presets) return
+        const text = prompt
+          .current()
+          .map((part) => ("content" in part ? part.content : ""))
+          .join("")
+          .trim()
+        if (!text) return
+        const templates = [presets.lite.prompt, ...presets.groups.flatMap((group) => group.items.map((item) => item.prompt))]
+        if (!templates.some((template) => template.trim() === text)) return
+        clearEditor()
+        prompt.set([...DEFAULT_PROMPT, ...imageAttachments()], 0)
+      },
+      { defer: true },
+    ),
+  )
   const buttonsSpring = useSpring(() => (store.mode === "normal" ? 1 : 0), { visualDuration: 0.2, bounce: 0 })
   const motion = (value: number) => ({
     opacity: value,
@@ -2011,7 +2063,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       {cmccActionButton()}
                     </HomeActionsPopover>
                   </Show>
-                  <Show when={props.research?.mode !== "quick" && selectedTeamExpert()}>
+                  <Show when={props.research?.mode !== "quick" && teamExpertChip()}>
                     {(expert) => (
                       <button
                         type="button"
@@ -2108,6 +2160,17 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       onClick={() => research().changeMode(mode)}>{mode === "quick" ? "快速" : "深度"}</button>}</For>
                   </div>}
                 </Show>
+                <Show when={!props.research?.mode && newSession() && teamQuickToggle()}>
+                  {(toggle) => <div class="home-agent-control" role="group" aria-label="团队模式">
+                    <For each={["quick", "expert"] as const}>{(mode) => <button type="button"
+                      aria-pressed={mode === "quick"
+                        ? props.selectedExpertAgent === toggle().quick || toggle().liteActive
+                        : props.selectedExpertAgent === toggle().lead}
+                      disabled={!!props.research?.pending || uploadStatus.pending > 0}
+                      onClick={() => props.onSelectedExpertAgentChange?.(mode === "quick" ? toggle().quick : toggle().lead)}>
+                      {mode === "quick" ? "快速" : "专家"}</button>}</For>
+                  </div>}
+                </Show>
                 <Show when={!props.research?.mode && newSession() && showAgentControl()}>
                   <HomeAgentControl
                     options={props.controls.agents.options}
@@ -2131,6 +2194,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </TooltipV2>
               </div>
             </DockShellForm>
+            <Show when={newSession() && quickPresetView()}>
+              {(view) => (
+                <QuickPresetBar
+                  presets={view().presets}
+                  liteActive={view().liteActive}
+                  onSelect={(input) => {
+                    const agent = input.lite ? view().team.liteQuickAgent : view().team.quickAgent
+                    if (agent && props.selectedExpertAgent !== agent) props.onSelectedExpertAgentChange?.(agent)
+                    if (input.prompt) setPlainPrompt(input.prompt)
+                  }}
+                />
+              )}
+            </Show>
             <Show when={!newSession() && actions.panel && (actions.panel !== "menu" || !floatingCmccActions())}>
               <div
                 ref={(el) => (cmccPanelRef = el)}

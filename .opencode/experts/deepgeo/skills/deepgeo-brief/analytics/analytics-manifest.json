@@ -1,0 +1,23 @@
+{
+  "synced_at": "2026-11-20 02:25:46",
+  "source": "../deepgeo/deepgeo-opencode/analytics",
+  "source_commit": "da8a8e6",
+  "note": "母版唯一在 deepgeo 仓库 analytics/；本目录为分发件，禁止手改，母版变更后重跑 scripts/sync-deepgeo-analytics.mjs",
+  "files": [
+    {
+      "path": "deepgeo/cli.py",
+      "sha256": "35a17e50374278f1",
+      "bytes": 1644
+    },
+    {
+      "path": "deepgeo/engine.py",
+      "sha256": "9bc9b2108ef0cb73",
+      "bytes": 32893
+    },
+    {
+      "path": "deepgeo/__init__.py",
+      "sha256": "f573867d838c4958",
+      "bytes": 84
+    }
+  ]
+}
