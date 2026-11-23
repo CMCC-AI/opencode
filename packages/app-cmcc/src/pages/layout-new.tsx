@@ -11,6 +11,7 @@ import sidebarIconsUrl from "@/assets/sidebar/menu-icons.svg?url"
 import { useSettingsDialog } from "@/components/settings-dialog"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { CasePublishDialog } from "@/components/case-publish-dialog"
+import { DeleteConfirmation } from "@/components/delete-confirmation"
 import { dockApiHistorySessions, useDockApi, type DockApiSession } from "@/context/dockapi"
 import { useLayout } from "@/context/layout"
 import { useServer } from "@/context/server"
@@ -154,6 +155,7 @@ function CmccSidebar() {
     startWidth: 0,
   })
   const [caseDialog, setCaseDialog] = createStore({ session: undefined as DockApiSession | undefined })
+  const [removal, setRemoval] = createStore({ session: undefined as Session | undefined, pending: false })
   const directory = createMemo(() => dockapi.workspace?.directoryPath)
   const conversations = createMemo(() => {
     const current = directory()
@@ -303,13 +305,14 @@ function CmccSidebar() {
     if (activeSession(session)) openNewSession()
   }
 
-  const deleteSession = async (session: Session) => {
-    const name = sessionTitle(session.title) ?? "未命名对话"
-    if (!window.confirm(`删除「${name}」？删除后将从历史列表移除。`)) return
-
+  const deleteSession = async () => {
+    const session = removal.session
+    if (!session || removal.pending) return
+    setRemoval("pending", true)
     await dockapi.sessions
       .remove(session.id)
       .then(() => {
+        setRemoval("session", undefined)
         removeSession(session)
       })
       .catch((error) => {
@@ -319,6 +322,7 @@ function CmccSidebar() {
           variant: "error",
         })
       })
+      .finally(() => setRemoval("pending", false))
   }
 
   const publishCase = (session: Session) => {
@@ -457,7 +461,7 @@ function CmccSidebar() {
                     cmccKnowledgeSessionReference(session)?.name
                   }
                   openSession={openSession}
-                  deleteSession={deleteSession}
+                  deleteSession={(session) => setRemoval("session", session)}
                   publishCase={
                     cmccCasePublishingAllowed(
                       dockapi.user?.casePublishAllowed,
@@ -523,6 +527,18 @@ function CmccSidebar() {
         class="relative z-20 h-full w-1 shrink-0 cursor-col-resize bg-transparent before:absolute before:inset-y-6 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-transparent hover:before:bg-[#a5b4fc]"
         onPointerDown={startDrag}
       />
+      <Show when={removal.session} keyed>
+        {(session) => (
+          <DeleteConfirmation
+            title="删除历史任务"
+            message={`确定删除“${sessionTitle(session.title) ?? "未命名对话"}”吗？`}
+            description="删除后，该会话将从历史任务列表移除。"
+            pending={removal.pending}
+            onCancel={() => setRemoval("session", undefined)}
+            onConfirm={() => void deleteSession()}
+          />
+        )}
+      </Show>
       <CasePublishDialog
         session={caseDialog.session}
         onClose={() => setCaseDialog("session", undefined)}

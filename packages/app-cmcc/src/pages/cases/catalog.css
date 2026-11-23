@@ -1,0 +1,199 @@
+.case-catalog {
+  width: min(calc(100% - 48px), 912px);
+  margin-inline: auto;
+  padding-block: 31px 80px;
+}
+.case-catalog-title {
+  margin: 0;
+  color: #142033;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 34px;
+}
+.case-catalog-intro {
+  margin-top: 8px;
+  color: #737577;
+  font-size: 14px;
+  line-height: 21px;
+}
+.case-catalog-toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 15px;
+  width: min(100%, 452px);
+}
+.case-catalog-search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 44px;
+  border: 1px solid #e3e4e6;
+  border-radius: 22px;
+  background: #fff;
+  padding-inline: 18px 13px;
+  box-shadow: 0 3px 5px #1d274415;
+}
+.case-catalog-search:focus-within {
+  border-color: #8eabef;
+}
+.case-catalog-filter {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  color: #777b83;
+}
+.case-catalog-filter:is(:hover, [data-active]) {
+  background: #e7efff;
+  color: #3574e8;
+}
+.case-catalog-filter-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: min(280px, 100%);
+  border: 1px solid #dce3ef;
+  border-radius: 8px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 14px 36px #2d3d5f29;
+}
+.case-catalog-tabs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-top: 16px;
+  padding: 1px 1px 6px;
+}
+.case-catalog-tab {
+  flex-shrink: 0;
+  min-height: 38px;
+  padding-inline: 16px;
+  border: 1px solid transparent;
+  border-radius: 19px;
+  background: #f0f0f0;
+  color: #66696e;
+  font-size: 14px;
+}
+.case-catalog-tab[data-selected] {
+  border-color: #ebecf0;
+  background: #fff;
+  color: #252a31;
+  box-shadow: 0 3px 5px #1d274413;
+}
+.case-catalog-groups {
+  margin-top: 28px;
+}
+.case-catalog-group + .case-catalog-group {
+  margin-top: 20px;
+}
+.case-catalog-group[data-case-group="deep-research"] + .case-catalog-group {
+  margin-top: 46px;
+}
+.case-catalog-group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-height: 24px;
+  margin-bottom: 16px;
+}
+.case-catalog-group-heading h2 {
+  margin: 0;
+  color: #142033;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 24px;
+}
+.case-catalog-group-heading p,
+.case-catalog-group-heading button {
+  color: #74777a;
+  font-size: 13px;
+  line-height: 18px;
+}
+.case-catalog-group-heading button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+}
+.case-catalog-group-heading button:hover {
+  color: #3566c2;
+}
+.case-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.case-catalog-results {
+  margin-top: 28px;
+}
+.case-catalog-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  height: 89px;
+  border: 1px solid #dfdfe0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff, #f4f4f4 86%);
+  padding: 11px;
+  text-align: left;
+  box-shadow: 0 4px 10px #2026310b;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+.case-catalog-card:hover {
+  border-color: #bccce6;
+  box-shadow: 0 5px 12px #20263114;
+}
+.case-catalog-card-deletable {
+  padding-right: 44px;
+}
+.case-catalog-icon {
+  flex: 0 0 60px;
+  width: 60px;
+  height: 65px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.case-catalog-icon-location {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #93b5ee, #5472c4 55%, #a697dc);
+  color: #fff;
+}
+.case-catalog-card-title {
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  color: #283247;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+}
+@media (max-width: 767px) {
+  .case-catalog {
+    width: calc(100% - 32px);
+    padding-block: 24px 52px;
+  }
+  .case-catalog-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .case-catalog-group[data-case-group="deep-research"] + .case-catalog-group {
+    margin-top: 28px;
+  }
+}

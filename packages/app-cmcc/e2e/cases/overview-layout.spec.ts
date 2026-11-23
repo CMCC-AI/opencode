@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { CMCC_CASE_CATEGORIES } from "../../src/utils/cmcc-cases"
-import { cmccHistoryProduct } from "../../src/utils/cmcc-history-product"
 import { fixture } from "../smoke/session-timeline.fixture"
 import { expectPageBrandBar } from "../utils/expect-page-brand-bar"
 import { mockOpenCodeServer } from "../utils/mock-server"
@@ -129,10 +128,10 @@ async function expectCompactCards(page: Page) {
     await cards.evaluateAll((elements) =>
       elements.every((element) => {
         const button = element.querySelector(":scope > button")!
-        const frame = button.firstElementChild!
         return (
-          button.children.length === 1 &&
-          Math.abs(button.getBoundingClientRect().height - frame.getBoundingClientRect().height) < 1
+          button.classList.contains("case-catalog-card") &&
+          button.querySelector(".case-catalog-icon") !== null &&
+          button.querySelector(".case-catalog-card-title") !== null
         )
       }),
     ),
@@ -150,9 +149,9 @@ for (const width of [1440, 1280, 768, 767, 390]) {
     const shellBackground = await page.locator(".cmcc-shell").evaluate((el) => getComputedStyle(el).backgroundColor)
     await expect(catalog).toHaveCSS("background-color", shellBackground)
     await expect(catalog.locator("[data-cmcc-page-background]")).toHaveCount(0)
-    for (const name of ["精选案例", "通用深度研究", "AI+产业洞察"]) {
+    for (const name of ["精选案例", "通用深度研究", "AI+科研"]) {
       const heading = catalog.getByRole("heading", { name, exact: true })
-      await expect(heading).toHaveCSS("color", "rgb(0, 0, 0)")
+      await expect(heading).toHaveCSS("color", "rgb(20, 32, 51)")
       await expect(heading).toHaveCSS("font-weight", "700")
     }
     await expectCompactCards(page)
@@ -161,7 +160,7 @@ for (const width of [1440, 1280, 768, 767, 390]) {
     await expect(science.locator("[data-case-card]")).toHaveCount(4)
     const a = await boxes(general.locator("[data-case-card]"))
     const b = await boxes(science.locator("[data-case-card]"))
-    const columns = width < 640 ? 1 : width < 768 ? 2 : 4
+    const columns = width < 768 ? 1 : 2
     expect(new Set(b.map((box) => Math.round(box.top))).size).toBe(4 / columns)
     for (let index = 0; index < 4; index += 1) {
       expect(b[index].left).toBeCloseTo(a[index].left, 0)
@@ -173,12 +172,15 @@ for (const width of [1440, 1280, 768, 767, 390]) {
     const scienceBox = await science.boundingBox()
     expect(scienceBox!.x).toBeCloseTo(generalBox!.x, 0)
     expect(scienceBox!.width).toBeCloseTo(generalBox!.width, 0)
-    await expect(science.locator('use[href$="#background-science"]')).toHaveCount(1)
     await expect(science.getByRole("heading", { name: "AI+科研" })).toHaveCount(1)
     await expect(page.locator('[data-case-group="finance"] [data-case-card]')).toHaveCount(2)
-    if (width >= 768) {
-      const finance = await page.locator('[data-case-group="finance"]').boundingBox()
-      expect(finance!.width).toBeLessThan(scienceBox!.width * 0.6)
+    const finance = await page.locator('[data-case-group="finance"]').boundingBox()
+    expect(finance!.width).toBeCloseTo(scienceBox!.width, 0)
+    if (width === 1440) {
+      expect(a[0].width).toBeCloseTo(450, 0)
+      expect(a[0].height).toBeCloseTo(89, 0)
+      await catalog.evaluate((element) => { element.scrollTop = 0 })
+      await page.screenshot({ path: info.outputPath("case-catalog-reference.png") })
     }
     await science.scrollIntoViewIfNeeded()
     await expect
@@ -205,7 +207,7 @@ for (const count of [0, 1, 2, 3]) {
     const scienceCards = await boxes(science.locator("[data-case-card]"))
     expect(scienceCards[0].width).toBeCloseTo(generalCards[0].width, 0)
     const section = await science.boundingBox()
-    expect(section!.x + section!.width - scienceCards.at(-1)!.right).toBeCloseTo(28, 0)
+    expect(section!.x + section!.width - scienceCards.at(-1)!.right).toBeCloseTo(count % 2 ? 462 : 0, 0)
   })
 }
 
@@ -220,35 +222,29 @@ test("science view-more still selects the complete science list", async ({ page 
   await expectCompactCards(page)
 })
 
-test("seven category badges use history colors while preserving case labels", async ({ page }, info) => {
+test("each group uses its category icon without requesting uploaded covers", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
+  const covers: string[] = []
+  page.on("request", (request) => {
+    if (request.url().includes("grid-07-CnyNXoAJ.png")) covers.push(request.url())
+  })
   await prepare(page)
-  const rgb = (hex: string) =>
-    `rgb(${[1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16)).join(", ")})`
   for (const category of CMCC_CASE_CATEGORIES) {
-    const badge = page.locator(`[data-case-group="${category.code}"] [data-slot="case-category-label"]`).first()
-    const product = cmccHistoryProduct(category.agentType)!
-    await expect(badge).toHaveText(category.label)
-    await expect(badge).toHaveAttribute("title", category.label)
-    await expect(badge).toHaveCSS("color", rgb(product.textColor))
-    await expect(badge).toHaveCSS("background-color", rgb(product.backgroundColor))
-    await expect(badge).toHaveCSS("border-top-color", rgb(product.borderColor))
-    await expect(badge).toHaveCSS("border-top-width", "1px")
-    await expect(badge).toHaveCSS("font-size", "11px")
-    await expect(badge).toHaveCSS("padding-left", "6px")
-    await expect(badge).toHaveCSS("padding-top", "2px")
-    await expect(badge).toHaveCSS("box-shadow", "none")
-    await expect(badge).toHaveCSS("backdrop-filter", "none")
-    expect(
-      await badge.evaluate((element) => Number.parseFloat(getComputedStyle(element).borderTopLeftRadius) > 1000),
-    ).toBe(true)
+    const group = page.locator(`[data-case-group="${category.code}"]`)
+    const icon = group.locator(".case-catalog-icon").first()
+    await group.scrollIntoViewIfNeeded()
+    await expect(icon).toHaveCSS("width", "60px")
+    await expect(icon).toHaveCSS("height", "65px")
+    if (category.code === "location") {
+      await expect(icon.locator("svg")).toBeVisible()
+    } else {
+      await expect(icon).toHaveAttribute("src", /catalog-.*\.webp$/)
+      await expect.poll(() => icon.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0)
+    }
+    await expect(group.getByRole("heading", { name: category.label, exact: true })).toBeVisible()
   }
-  await expect(
-    page.locator('[data-case-group="deep-research"] [data-slot="case-category-label"]').first(),
-  ).not.toHaveText("通用对话")
+  expect(covers).toEqual([])
   await expectCompactCards(page)
-  await page.locator('[data-case-group="science"]').scrollIntoViewIfNeeded()
-  await page.screenshot({ path: info.outputPath("case-colored-badges.png") })
 })
 
 test("search, sorting and date filters remain available without card metadata", async ({ page }) => {
@@ -275,6 +271,8 @@ test("search, sorting and date filters remain available without card metadata", 
 
 test("delete entry and opening the case retain their existing actions", async ({ page }) => {
   const errors: string[] = []
+  const deletes: string[] = []
+  page.on("request", (request) => { if (request.method() === "DELETE") deletes.push(request.url()) })
   page.on("pageerror", (error) => errors.push(error.message))
   await prepare(page, 4, true)
   await page.getByRole("button", { name: "删除案例 通用深度研究案例 1", exact: true }).click()
@@ -282,6 +280,7 @@ test("delete entry and opening the case retain their existing actions", async ({
   await expect(page).toHaveURL(/\/cases$/)
   await page.getByRole("button", { name: "取消", exact: true }).click()
   await expect(page.getByRole("dialog")).toHaveCount(0)
+  expect(deletes).toEqual([])
   await page.locator('[data-case-card="deep-research-1"] > button').first().click()
   await expect(page).toHaveURL(/\/cases\/deep-research-1$/)
   await expect(page.getByText("通用深度研究案例 1", { exact: true }).first()).toBeVisible()

@@ -2,14 +2,6 @@ import { expect, test, type Page } from "@playwright/test"
 import { homeDirectory, homeSession, setupHomePage } from "../startup/home-fixture"
 
 const researchId = "a1cce3d1-eaa2-4f6c-8432-37a2ccbc25df"
-const cover = {
-  name: "案例封面.png",
-  mimeType: "image/png",
-  buffer: Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6VDAAAAAASUVORK5CYII=",
-    "base64",
-  ),
-}
 
 async function prepare(page: Page, allowed = true) {
   await setupHomePage(page, { models: true, history: true })
@@ -17,7 +9,9 @@ async function prepare(page: Page, allowed = true) {
   page.on("pageerror", (error) => errors.push(error.message))
   const session = {
     id: researchId,
+    sourceId: researchId,
     source: "langgraph",
+    productType: "general-deepinsight",
     title: "快速研究发布测试",
     query: "研究资料治理",
     status: "completed",
@@ -90,15 +84,18 @@ async function openDialog(page: Page, mode: "quick" | "deep") {
 
 for (const mode of ["quick", "deep"] as const) {
   for (const width of [1440, 390]) {
-    test(`${mode} case publishing keeps the original cover-first dialog at ${width}px`, async ({ page }, info) => {
+    test(`${mode} case publishing shows title and classification without an upload at ${width}px`, async ({
+      page,
+    }, info) => {
       const errors = await prepare(page)
       await page.setViewportSize({ width, height: 740 })
       const dialog = await openDialog(page, mode)
       await expect(dialog).toBeVisible()
       await expect(dialog).toHaveCSS("transform", "none")
       await expect(dialog.locator("..")).toHaveCSS("opacity", "1")
-      await expect(dialog).toHaveCSS("border-radius", "20px")
-      await expect(dialog.getByText("点击上传封面图片", { exact: true })).toBeVisible()
+      await expect(dialog).toHaveCSS("border-radius", "14px")
+      await expect(dialog.locator(".cmcc-action-note")).toHaveCSS("background-color", "rgb(241, 241, 241)")
+      await expect(dialog.locator('input[type="file"]')).toHaveCount(0)
       await expect(dialog.getByLabel("案例名称", { exact: true })).toHaveValue(
         mode === "quick" ? "快速研究发布测试" : "深度研究发布测试",
       )
@@ -118,19 +115,14 @@ for (const mode of ["quick", "deep"] as const) {
           right: box.right,
           bottom: box.bottom,
           viewport: innerWidth,
-          cover: element.querySelector('input[type="file"]')!.parentElement!.getBoundingClientRect().top,
-          name: element.querySelector("#case-name-input")!.getBoundingClientRect().top,
           background: getComputedStyle(element).backgroundColor,
         }
       })
-      expect(positions.cover).toBeLessThan(positions.name)
-      expect(positions.width).toBeLessThanOrEqual(420)
+      expect(positions.width).toBeLessThanOrEqual(434)
       expect(positions.left).toBeGreaterThanOrEqual(0)
       expect(positions.right).toBeLessThanOrEqual(positions.viewport)
       expect(positions.bottom).toBeLessThanOrEqual(740)
-      expect(positions.background).toBe("rgb(247, 249, 255)")
-      await dialog.locator('input[type="file"]').setInputFiles(cover)
-      await expect(dialog.getByRole("img", { name: "案例封面预览" })).toBeVisible()
+      expect(positions.background).toBe("rgb(255, 255, 255)")
       await page.screenshot({ path: info.outputPath("case-publish-dialog.png") })
       await dialog.getByRole("button", { name: "取消", exact: true }).click()
       await expect(dialog).toHaveCount(0)
@@ -161,11 +153,11 @@ for (const mode of ["quick", "deep"] as const) {
       return route.fulfill({ json: { code: 200, data: {} } })
     })
     const dialog = await openDialog(page, mode)
-    await dialog.getByLabel("案例名称", { exact: true }).fill("修改后的案例名称")
+    await dialog.getByLabel("案例名称", { exact: true }).fill("")
     await dialog.getByRole("button", { name: "确定新增", exact: true }).click()
-    await expect(page.getByText("请上传案例封面", { exact: true })).toBeVisible()
+    await expect(page.getByText("请输入案例名称", { exact: true })).toBeVisible()
     expect(requests).toHaveLength(0)
-    await dialog.locator('input[type="file"]').setInputFiles(cover)
+    await dialog.getByLabel("案例名称", { exact: true }).fill("修改后的案例名称")
     try {
       await dialog.getByRole("button", { name: "确定新增", exact: true }).click()
       await expect(dialog.getByRole("button", { name: "添加中...", exact: true })).toBeDisabled()
@@ -176,38 +168,55 @@ for (const mode of ["quick", "deep"] as const) {
     }
     await expect(page.getByText("发布服务暂时不可用", { exact: true })).toBeVisible()
     await expect(dialog.getByLabel("案例名称", { exact: true })).toHaveValue("修改后的案例名称")
-    await expect(dialog.getByRole("img", { name: "案例封面预览" })).toBeVisible()
     await dialog.getByRole("button", { name: "确定新增", exact: true }).click()
     await expect(dialog).toHaveCount(0)
     expect(requests.map((item) => item.path)).toEqual([endpoint, endpoint])
     expect(requests[1].body).toContain("修改后的案例名称")
-    expect(requests[1].body).toContain('name="coverFile"')
+    expect(requests.every(({ body }) => !body.includes('name="coverFile"'))).toBe(true)
     if (mode === "deep") expect(requests[1].body).toContain("通用深度研究")
     if (mode === "quick") expect(requests[1].body).not.toContain('name="caseTag"')
     expect(errors).toEqual([])
   })
 }
 
-test("quick research keeps its PNG/JPEG limit and hides publishing without permission", async ({ page }) => {
-  await prepare(page)
-  const dialog = await openDialog(page, "quick")
-  await expect(dialog.locator('input[type="file"]')).toHaveAttribute("accept", "image/png,image/jpeg")
-  await dialog.locator('input[type="file"]').setInputFiles({ ...cover, name: "cover.webp", mimeType: "image/webp" })
-  await expect(page.getByText("封面仅支持 JPG、PNG", { exact: true })).toBeVisible()
-  await expect(dialog.getByRole("img", { name: "案例封面预览" })).toHaveCount(0)
-  await dialog.getByRole("button", { name: "取消", exact: true }).click()
-  await page.route("**/api/user/profile", (route) =>
-    route.fulfill({
-      json: {
-        code: 200,
-        data: {
-          user: { id: 1, name: "未授权用户", enabled: true, casePublishAllowed: false },
-          workspace: { id: 1, workspaceKey: "home-sizing-test", directoryPath: homeDirectory, status: "READY" },
-        },
-      },
-    }),
-  )
+test("quick research still hides publishing without permission", async ({ page }) => {
+  await prepare(page, false)
   await page.goto(`/general-deepinsight/session/${researchId}?publish=1`)
   await expect(page.locator(".general-research-result")).toBeVisible()
-  await expect(dialog).toHaveCount(0)
+  await expect(page.getByRole("dialog", { name: "添加至案例库", exact: true })).toHaveCount(0)
 })
+
+for (const source of ["opencode", "langgraph"] as const) {
+  test(`${source} history prompts before issuing a delete and cancel leaves the task intact`, async ({ page }) => {
+    await prepare(page)
+    const deleted: string[] = []
+    const endpoint =
+      source === "opencode"
+        ? "/api/dockapi/sessions/business-publish-test"
+        : `/api/dockapi/general-deepinsight/sessions/${researchId}`
+    await page.route(`**${endpoint}`, (route) => {
+      if (route.request().method() !== "DELETE") return route.fallback()
+      deleted.push(new URL(route.request().url()).pathname)
+      return route.fulfill({ json: { code: 200, data: null } })
+    })
+    await page.goto("/app")
+    const row = page.locator(`[data-component="cmcc-history-row"][data-source="${source}"]`).filter({
+      hasText: source === "opencode" ? "深度研究发布测试" : "快速研究发布测试",
+    })
+    const open = async () => {
+      await row.hover()
+      await row.getByRole("button", { name: source === "opencode" ? "更多" : "研究任务操作", exact: true }).click()
+      await page.getByRole("menuitem", { name: "删除", exact: true }).click()
+    }
+    await open()
+    const dialog = page.getByRole("dialog", { name: "删除历史任务", exact: true })
+    await expect(dialog).toHaveAttribute("data-cmcc-delete-confirmation", "")
+    await dialog.getByRole("button", { name: "取消", exact: true }).click()
+    await expect(row).toBeVisible()
+    expect(deleted).toEqual([])
+    await open()
+    await dialog.getByRole("button", { name: "确认删除", exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    expect(deleted).toEqual([endpoint])
+  })
+}

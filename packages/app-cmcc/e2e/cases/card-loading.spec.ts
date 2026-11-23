@@ -125,7 +125,7 @@ async function prepare(page: Page) {
 }
 
 for (const width of [1440, 390])
-  test(`card progress keeps its cover and dimensions at ${width}px until the snapshot is ready`, async ({
+  test(`card progress keeps its category icon and dimensions at ${width}px until the snapshot is ready`, async ({
     page,
   }, info) => {
     await page.setViewportSize({ width, height: 900 })
@@ -185,7 +185,7 @@ test("cancel stops the request and a late result cannot navigate", async ({ page
     await expect(card.locator("[data-case-loading]")).toHaveCount(0)
     await release()
     await expect(page).toHaveURL(/\/cases$/)
-    await expect(card.locator('[data-slot="case-category-label"]')).toBeVisible()
+    await expect(card.locator(".case-catalog-icon")).toBeVisible()
     expect(state.errors).toEqual([])
   } finally {
     await release()

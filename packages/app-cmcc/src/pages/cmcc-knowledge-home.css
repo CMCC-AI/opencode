@@ -298,3 +298,11 @@
     height: 178px;
   }
 }
+.cmcc-wiki-note-menu,
+.cmcc-wiki-note-menu button {
+  background-color: #fff;
+}
+
+.cmcc-wiki-note-menu button:is(:hover, :focus-visible) {
+  background-color: #edf3fb;
+}

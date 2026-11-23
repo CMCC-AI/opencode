@@ -510,12 +510,9 @@ export default function ResearchPage() {
           caseName={state.detail!.session.title}
           caseTag={cmccCaseCategoryByCode("deep-research")!.label}
           fixedCategory
-          coverAccept="image/png,image/jpeg"
-          maxCoverBytes={6 * 1024 * 1024}
           onPublish={async (input) => {
             const form = new FormData()
             form.append("caseName", input.caseName)
-            form.append("coverFile", input.coverFile)
             await request(`/cases/from-session/${params.id}`, { method: "POST", body: form })
             dockapi.cases.invalidate()
             window.dispatchEvent(new Event(CMCC_CASES_UPDATED_EVENT))

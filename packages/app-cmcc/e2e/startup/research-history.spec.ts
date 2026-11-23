@@ -239,8 +239,8 @@ test("research history updates running status and preserves research menu action
   await expect(renamed).toBeVisible()
   await renamed.hover()
   await renamed.getByRole("button", { name: "研究任务操作" }).click()
-  page.once("dialog", (dialog) => dialog.accept())
   await page.getByRole("menuitem", { name: "删除", exact: true }).click()
+  await page.getByRole("dialog", { name: "删除历史任务" }).getByRole("button", { name: "确认删除" }).click()
   await expect(renamed).toHaveCount(0)
   expect(fixture.calls.filter((call) => call.method !== "GET")).toEqual([
     { method: "PATCH", path: "/api/dockapi/general-deepinsight/sessions/quick-running" },

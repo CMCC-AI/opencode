@@ -1,6 +1,8 @@
 import { For, Show, createEffect, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useDockApi } from "@/context/dockapi"
+import { caseDeletionDescription } from "@/components/case-delete-dialog"
+import { DeleteConfirmation } from "@/components/delete-confirmation"
 import { managementApi, managementPageSize, type CaseCategory, type ManagedCase } from "./api"
 import { AdminError, AdminModal, AdminSelect, Pagination, ToolButton, formatAdminTime } from "./shared"
 import "./admin.css"
@@ -217,44 +219,42 @@ export function CaseManagementPanel(props: { embedded?: boolean; onBack?: () => 
         )}
       </Show>
       <Show when={state.confirm} keyed>
-        {(value) => (
-          <AdminModal
-            title={
-              value.action === "delete"
-                ? "永久删除案例"
-                : value.item.publishStatus === "published"
-                  ? "下架案例"
-                  : "上架案例"
-            }
-            pending={state.pending}
-            onClose={() => setState("confirm", undefined)}
-          >
-            <div class="admin-form-body">
-              <p>
-                确定
-                {value.action === "delete" ? "永久删除" : value.item.publishStatus === "published" ? "下架" : "上架"}“
-                {value.item.caseName}”吗？
-              </p>
-              <Show when={value.action === "delete"}>
-                <p class="admin-warning">案例快照、封面和案例文件将被永久删除，无法恢复。原研究任务不受影响。</p>
-              </Show>
+        {(value) =>
+          value.action === "delete" ? (
+            <DeleteConfirmation
+              title="永久删除案例"
+              message={`确定永久删除“${value.item.caseName}”吗？`}
+              description={caseDeletionDescription}
+              pending={state.pending}
+              onCancel={() => setState("confirm", undefined)}
+              onConfirm={() => void confirm()}
+            >
               <AdminError error={state.actionError} />
-            </div>
-            <footer>
-              <button type="button" disabled={state.pending} onClick={() => setState("confirm", undefined)}>
-                取消
-              </button>
-              <button
-                type="button"
-                class={value.action === "delete" ? "danger" : "primary"}
-                disabled={state.pending}
-                onClick={() => void confirm()}
-              >
-                {state.pending ? "处理中..." : "确认"}
-              </button>
-            </footer>
-          </AdminModal>
-        )}
+            </DeleteConfirmation>
+          ) : (
+            <AdminModal
+              title={value.item.publishStatus === "published" ? "下架案例" : "上架案例"}
+              pending={state.pending}
+              onClose={() => setState("confirm", undefined)}
+            >
+              <div class="admin-form-body">
+                <p>
+                  确定
+                  {value.item.publishStatus === "published" ? "下架" : "上架"}“{value.item.caseName}”吗？
+                </p>
+                <AdminError error={state.actionError} />
+              </div>
+              <footer>
+                <button type="button" disabled={state.pending} onClick={() => setState("confirm", undefined)}>
+                  取消
+                </button>
+                <button type="button" class="primary" disabled={state.pending} onClick={() => void confirm()}>
+                  {state.pending ? "处理中..." : "确认"}
+                </button>
+              </footer>
+            </AdminModal>
+          )
+        }
       </Show>
     </section>
   )

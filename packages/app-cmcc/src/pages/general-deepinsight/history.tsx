@@ -5,6 +5,7 @@ import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { useDockApi } from "@/context/dockapi"
 import { CmccHistoryRow } from "@/components/cmcc-history-row"
+import { DeleteConfirmation } from "@/components/delete-confirmation"
 import { CMCC_DEEP_RESEARCH_PRODUCT } from "@/utils/cmcc-history-product"
 import { cmccHistoryTime } from "@/utils/cmcc-history-time"
 import { showToast } from "@/utils/toast"
@@ -14,7 +15,11 @@ export function ResearchHistory(props: { sessions: Session[]; renderOpenCode: (s
   const dockapi = useDockApi()
   const navigate = useNavigate()
   const location = useLocation()
-  const [state, setState] = createStore({ items: [] as LangGraphHistoryItem[] })
+  const [state, setState] = createStore({
+    items: [] as LangGraphHistoryItem[],
+    removal: undefined as LangGraphHistoryItem | undefined,
+    deleting: false,
+  })
   let generation = 0
   let disposed = false
   let refreshTimer: ReturnType<typeof setTimeout> | undefined
@@ -62,7 +67,6 @@ export function ResearchHistory(props: { sessions: Session[]; renderOpenCode: (s
   const mutate = async (item: LangGraphHistoryItem, action: "rename" | "delete") => {
     const title = action === "rename" ? window.prompt("任务名称", item.title) : undefined
     if (action === "rename" && !title?.trim()) return
-    if (action === "delete" && !window.confirm(`删除「${item.title}」？`)) return
     try {
       await dockapi.research.request(`${RESEARCH_API}/sessions/${encodeURIComponent(item.sourceId)}`, {
         method: action === "rename" ? "PATCH" : "DELETE",
@@ -72,50 +76,76 @@ export function ResearchHistory(props: { sessions: Session[]; renderOpenCode: (s
       if (action === "delete" && location.pathname.endsWith(`/session/${item.sourceId}`))
         navigate("/general-deepinsight")
       window.dispatchEvent(new CustomEvent(RESEARCH_UPDATED, { detail: "mutation" }))
+      return true
     } catch (error) {
       showToast({ variant: "error", title: "操作失败", description: String(error) })
+      return false
+    }
+  }
+  const deleteTask = async () => {
+    const item = state.removal
+    if (!item || state.deleting) return
+    setState("deleting", true)
+    try {
+      if (await mutate(item, "delete")) setState("removal", undefined)
+    } finally {
+      setState("deleting", false)
     }
   }
   return (
-    <For each={history()} fallback={<div class="px-2 py-5 text-center text-[13px] text-[#9294ad]">暂无历史任务</div>}>
-      {(item) =>
-        item.source === "opencode" ? (
-          props.renderOpenCode(item.session)
-        ) : (
-          <CmccHistoryRow
-            source="langgraph"
-            title={item.session.title}
-            active={location.pathname.endsWith(`/session/${item.session.sourceId}`)}
-            running={item.session.status === "running"}
-            product={CMCC_DEEP_RESEARCH_PRODUCT}
-            timeLabel={cmccHistoryTime(Date.parse(item.session.updatedAt))}
-            disabled={!item.session.capabilities.open}
-            onOpen={() => navigate(`/general-deepinsight/session/${item.session.sourceId}`)}
-            menuLabel="研究任务操作"
-            menu={
-              <>
-                <Show when={dockapi.user?.casePublishAllowed && item.session.status === "completed"}>
-                  <DropdownMenu.Item
-                    onSelect={() => navigate(`/general-deepinsight/session/${item.session.sourceId}?publish=1`)}
-                  >
-                    <DropdownMenu.ItemLabel>添加至案例库</DropdownMenu.ItemLabel>
-                  </DropdownMenu.Item>
-                </Show>
-                <Show when={item.session.capabilities.rename}>
-                  <DropdownMenu.Item onSelect={() => void mutate(item.session, "rename")}>
-                    <DropdownMenu.ItemLabel>重命名</DropdownMenu.ItemLabel>
-                  </DropdownMenu.Item>
-                </Show>
-                <Show when={item.session.capabilities.delete}>
-                  <DropdownMenu.Item onSelect={() => void mutate(item.session, "delete")}>
-                    <DropdownMenu.ItemLabel>删除</DropdownMenu.ItemLabel>
-                  </DropdownMenu.Item>
-                </Show>
-              </>
-            }
+    <>
+      <For each={history()} fallback={<div class="px-2 py-5 text-center text-[13px] text-[#9294ad]">暂无历史任务</div>}>
+        {(item) =>
+          item.source === "opencode" ? (
+            props.renderOpenCode(item.session)
+          ) : (
+            <CmccHistoryRow
+              source="langgraph"
+              title={item.session.title}
+              active={location.pathname.endsWith(`/session/${item.session.sourceId}`)}
+              running={item.session.status === "running"}
+              product={CMCC_DEEP_RESEARCH_PRODUCT}
+              timeLabel={cmccHistoryTime(Date.parse(item.session.updatedAt))}
+              disabled={!item.session.capabilities.open}
+              onOpen={() => navigate(`/general-deepinsight/session/${item.session.sourceId}`)}
+              menuLabel="研究任务操作"
+              menu={
+                <>
+                  <Show when={dockapi.user?.casePublishAllowed && item.session.status === "completed"}>
+                    <DropdownMenu.Item
+                      onSelect={() => navigate(`/general-deepinsight/session/${item.session.sourceId}?publish=1`)}
+                    >
+                      <DropdownMenu.ItemLabel>添加至案例库</DropdownMenu.ItemLabel>
+                    </DropdownMenu.Item>
+                  </Show>
+                  <Show when={item.session.capabilities.rename}>
+                    <DropdownMenu.Item onSelect={() => void mutate(item.session, "rename")}>
+                      <DropdownMenu.ItemLabel>重命名</DropdownMenu.ItemLabel>
+                    </DropdownMenu.Item>
+                  </Show>
+                  <Show when={item.session.capabilities.delete}>
+                    <DropdownMenu.Item onSelect={() => setState("removal", item.session)}>
+                      <DropdownMenu.ItemLabel>删除</DropdownMenu.ItemLabel>
+                    </DropdownMenu.Item>
+                  </Show>
+                </>
+              }
+            />
+          )
+        }
+      </For>
+      <Show when={state.removal} keyed>
+        {(item) => (
+          <DeleteConfirmation
+            title="删除历史任务"
+            message={`确定删除“${item.title}”吗？`}
+            description="删除后，该研究任务将从历史任务列表移除。"
+            pending={state.deleting}
+            onCancel={() => setState("removal", undefined)}
+            onConfirm={() => void deleteTask()}
           />
-        )
-      }
-    </For>
+        )}
+      </Show>
+    </>
   )
 }

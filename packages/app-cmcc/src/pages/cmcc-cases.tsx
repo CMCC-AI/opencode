@@ -3,7 +3,7 @@ import { For, Show, Suspense, lazy, createEffect, on, onCleanup, onMount } from 
 import { createStore } from "solid-js/store"
 import { useNavigate } from "@solidjs/router"
 import type { DockApiCaseGroup, DockApiCatalogCaseSummary } from "@/context/dockapi"
-import { dockApiUrl, useDockApi } from "@/context/dockapi"
+import { useDockApi } from "@/context/dockapi"
 import { CaseDeleteDialog } from "@/components/case-delete-dialog"
 import { CmccPageBrandBar } from "@/components/cmcc-page-brand-bar"
 import {
@@ -13,26 +13,36 @@ import {
   cmccCaseKey,
   cmccCaseManagementAllowed,
 } from "@/utils/cmcc-cases"
-import { cmccHistoryProduct } from "@/utils/cmcc-history-product"
-import caseCategoryAssetsUrl from "@/assets/cases/case-category-assets.svg?url"
+import researchIcon from "@/assets/cases/catalog-research.webp"
+import governmentIcon from "@/assets/cases/catalog-government.webp"
+import inspectionIcon from "@/assets/cases/catalog-inspection.webp"
+import financeIcon from "@/assets/cases/catalog-finance.webp"
+import recommendationIcon from "@/assets/cases/catalog-recommendation.webp"
+import scienceIcon from "@/assets/cases/catalog-science.webp"
 import { loadCaseData } from "./cases/load-case"
 import { prepareResearchCase } from "./general-deepinsight/handoff"
 import type { ResearchDetail } from "./general-deepinsight/model"
 import "./cases/card-loading.css"
+import "./cases/catalog.css"
 
 type SortOrder = "latest" | "oldest"
 const CaseManagementPanel = lazy(() => import("./admin/cases").then((module) => ({ default: module.CaseManagementPanel })))
 type CaseOpening = { caseCode: string; phase: "loading" | "error"; error?: string }
 
-const CASE_CATEGORY_ARTWORK: Record<string, { background: string; title?: string; viewBox: string }> = {
-  "deep-research": { background: "deep-research", viewBox: "0 0 920 220" },
-  government: { background: "government", title: "government", viewBox: "0 0 420 206" },
-  inspection: { background: "inspection", title: "inspection", viewBox: "0 0 420 206" },
-  finance: { background: "finance", title: "finance", viewBox: "0 0 420 206" },
-  recommendation: { background: "recommendation", title: "recommendation", viewBox: "0 0 420 206" },
-  science: { background: "science", title: "science", viewBox: "0 0 420 206" },
-  location: { background: "location", title: "location", viewBox: "0 0 420 206" },
+const categoryArtwork: Record<string, string> = {
+  "deep-research": researchIcon,
+  government: governmentIcon,
+  inspection: inspectionIcon,
+  finance: financeIcon,
+  recommendation: recommendationIcon,
+  science: scienceIcon,
 }
+const categoryOrder = ["deep-research", "government", "inspection", "finance", "recommendation", "science", "location"]
+const orderOf = (value: string) => {
+  const index = categoryOrder.indexOf(value)
+  return index === -1 ? categoryOrder.length : index
+}
+const caseCategories = [...CMCC_CASE_CATEGORIES].sort((a, b) => orderOf(a.code) - orderOf(b.code))
 
 export function CmccCasesRoute() {
   const dockapi = useDockApi()
@@ -250,36 +260,38 @@ export function CmccCasesRoute() {
     <main class="relative size-full overflow-x-hidden overflow-y-auto bg-[var(--cmcc-home-background)]" data-page="cmcc-cases"
       onKeyDown={(event) => { if (event.key === "Escape" && state.opening) cancelOpening() }}>
       <CmccPageBrandBar />
-      <div class="relative mx-auto w-full max-w-[1320px] px-6 pb-12 pt-10 max-sm:px-4 max-sm:pt-6">
+      <div class="case-catalog">
         <header class="relative z-30">
-          <h1 class="text-[30px] [font-weight:700] leading-10 text-[#000000]">精选案例</h1>
-          <p class="mt-1 text-[17px] leading-7 text-[#596176] max-sm:text-[14px]">
+          <h1 class="case-catalog-title">精选案例</h1>
+          <p class="case-catalog-intro">
             沉淀真实研究成果，快速查看 Deep Research 与 AI+产业洞察的完整交付
           </p>
-          <div class="relative mt-4 flex items-center gap-3">
+          <div class="case-catalog-toolbar">
             <Show when={canManageCases()}><button type="button" hidden class="h-9 shrink-0 rounded-[6px] border border-[#d1d9ef] bg-white px-3 text-[13px] text-[#48546b]" onClick={() => { cancelOpening(); setState("maintenance", true) }}>案例维护</button></Show>
-            <label class="flex h-11 w-[400px] max-w-[calc(100%-56px)] items-center rounded-full border border-[#d1d9ef] bg-white px-4 text-[#9ba4b8] focus-within:border-[#8eabef]">
+            <label class="case-catalog-search">
               <input
                 type="search"
                 value={state.searchInput}
-                class="min-w-0 flex-1 bg-transparent text-[14px] text-[#34405a] outline-none placeholder:text-[#a8afbf]"
+                class="min-w-0 flex-1 bg-transparent text-[14px] text-[#333b4e] outline-none placeholder:text-[#85878b]"
                 placeholder="搜索案例行业或研究主题"
                 onInput={(event) => setState("searchInput", event.currentTarget.value)}
               />
-              <Icon name="magnifying-glass" class="size-5 shrink-0 text-[#2f74ee]" />
+              <Icon name="magnifying-glass" class="size-5 shrink-0 text-[#33373d]" />
             </label>
             <button
               type="button"
               aria-label="筛选案例"
               aria-expanded={state.filterOpen}
-              class="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#f0f2f8] text-[#536078] hover:bg-[#e8edf7] data-[active]:bg-[#e7efff] data-[active]:text-[#3574e8]"
+              class="case-catalog-filter"
               data-active={state.filterOpen || state.sort !== "latest" || state.from || state.to ? "" : undefined}
               onClick={() => { cancelOpening(); setState("filterOpen", !state.filterOpen) }}
             >
-              <Icon name="sliders" class="size-5" />
+              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <path d="M3 4h14l-5 7v8l-4-2v-6L3 4zM15 13h6m-6 4h6m-6 4h6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
             </button>
             <Show when={state.filterOpen}>
-              <div class="absolute left-[412px] top-12 z-50 w-[280px] rounded-[8px] border border-[#dce3ef] bg-[#fff] p-4 shadow-[0_14px_36px_rgba(45,61,95,0.16)] max-sm:left-auto max-sm:right-0">
+              <div class="case-catalog-filter-popover">
                 <label class="block text-[12px] font-medium text-[#59657e]">排序方式</label>
                 <div class="mt-2 grid grid-cols-2 gap-2">
                   <FilterChoice selected={state.sort === "latest"} label="最新发布" onClick={() => setState("sort", "latest")} />
@@ -307,9 +319,9 @@ export function CmccCasesRoute() {
               </div>
             </Show>
           </div>
-          <nav class="mt-4 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="案例分类">
+          <nav class="case-catalog-tabs" aria-label="案例分类">
             <CategoryButton label="全部" selected={state.category === "all"} onClick={() => setState("category", "all")} />
-            <For each={CMCC_CASE_CATEGORIES}>
+            <For each={caseCategories}>
               {(category) => (
                 <CategoryButton
                   label={category.label}
@@ -335,7 +347,7 @@ export function CmccCasesRoute() {
         </Show>
         <Show when={!state.loading && !state.error && hasCases()}>
           <Show when={!filtered()} fallback={
-            <section class="mt-7 grid grid-cols-4 gap-x-4 gap-y-6 max-lg:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1">
+            <section class="case-catalog-grid case-catalog-results">
               <For each={state.items}>
                 {(item) => (
                   <CaseCard
@@ -385,183 +397,61 @@ function OverviewGroups(props: {
   opening: (caseCode: string) => CaseOpening | undefined
   cancelOpening: () => void
 }) {
-  const general = () => props.groups.find((group) => group.category === "deep-research")
-  const others = () => props.groups.filter((group) => group.category !== "deep-research" && group.items.length)
+  const groups = () => props.groups.filter((group) => group.items.length > 0)
+    .sort((a, b) => orderOf(a.category) - orderOf(b.category))
   return (
-    <div
-      class="mt-5"
-      style={{
-        "container-type": "inline-size",
-        "--case-card-width": "calc((100cqw - 104px) / 4)",
-      }}
-    >
-      <Show when={general()?.items.length}>
-        <CaseSectionHeading category="deep-research" />
-        <section data-case-group="deep-research" class="relative mt-3 inline-block max-w-full overflow-hidden rounded-[8px] max-md:w-full">
-          <CaseCategoryBackground category="deep-research" />
-          <div
-            data-case-cards
-            class="relative z-10 grid grid-flow-col gap-4 px-7 py-5 max-md:grid-flow-row max-md:grid-cols-2 max-sm:grid-cols-1"
-            style={{ "grid-auto-columns": "var(--case-card-width)" }}
-          >
-            <For each={general()!.items}>
-              {(item) => (
-                <CaseCard
-                  item={item}
-                  onClick={() => props.open(item)}
-                  opening={props.opening(cmccCaseKey(item))}
-                  onCancel={props.cancelOpening}
-                  onDelete={props.remove ? () => props.remove?.(item) : undefined}
-                />
-              )}
-            </For>
-          </div>
-        </section>
-      </Show>
-      <Show when={others().length}>
-        <div class="mt-6 flex min-w-0 items-baseline gap-3">
-          <h2 class="shrink-0 text-[15px] [font-weight:700] text-[#000000]">AI+产业洞察</h2>
-          <p class="truncate text-[14px] text-[#596176]">垂类专家团专业化研究</p>
-        </div>
-      </Show>
-      <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-4 max-md:grid-cols-1">
-        <For each={others()}>
-          {(group) => {
-            const category = () => cmccCaseCategoryByCode(group.category)
-            const wide = () => group.category === "science"
-            return (
-              <section class={wide() ? "col-span-2 max-md:col-span-1" : undefined}>
-                <div
-                  data-case-group={group.category}
-                  class="relative inline-block max-w-full overflow-hidden rounded-[8px] max-sm:w-full"
-                  classList={{ "max-md:w-full": wide() }}
-                  style={{ background: category()?.tone ?? "#f4f6fb" }}
-                >
-                  <CaseCategoryBackground category={group.category} />
-                  <div class="relative z-10 flex flex-col pb-4 pt-3" classList={{ "px-7": wide(), "px-4": !wide() }}>
-                    <div class="flex h-6 items-center justify-between gap-4">
-                      <CaseCategoryTitle category={group.category} label={category()?.label ?? group.category} />
-                      <button
-                        type="button"
-                        class="flex shrink-0 items-center gap-0.5 text-[10px] text-[#667188] hover:text-[#3f66b0]"
-                        onClick={() => props.viewMore(group.category)}
-                      >
-                        查看更多
-                        <Icon name="chevron-right" class="size-3" />
-                      </button>
-                    </div>
-                    <div
-                      data-case-cards
-                      class="mt-2 grid grid-flow-col max-sm:grid-flow-row max-sm:grid-cols-1"
-                      classList={{ "gap-4 max-md:grid-flow-row max-md:grid-cols-2": wide(), "gap-3": !wide() }}
-                      style={{ "grid-auto-columns": "var(--case-card-width)" }}
-                    >
-                      <For each={group.items}>
-                        {(item) => (
-                          <CaseCard
-                            item={item}
-                            onClick={() => props.open(item)}
-                            opening={props.opening(cmccCaseKey(item))}
-                            onCancel={props.cancelOpening}
-                            onDelete={props.remove ? () => props.remove?.(item) : undefined}
-                          />
-                        )}
-                      </For>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )
-          }}
-        </For>
-      </div>
-    </div>
-  )
-}
-
-function CaseCategoryBackground(props: { category: string }) {
-  const artwork = () => CASE_CATEGORY_ARTWORK[props.category] ?? CASE_CATEGORY_ARTWORK["deep-research"]
-  return (
-    <svg
-      aria-hidden="true"
-      class="pointer-events-none absolute inset-0 size-full"
-      viewBox={artwork().viewBox}
-      preserveAspectRatio="none"
-    >
-      <use href={`${caseCategoryAssetsUrl}#background-${artwork().background}`} width="100%" height="100%" />
-    </svg>
-  )
-}
-
-function CaseCategoryTitle(props: { category: string; label: string }) {
-  const title = () => CASE_CATEGORY_ARTWORK[props.category]?.title
-  return (
-    <h2 class="flex h-[18px] min-w-0 items-center">
-      <span class="sr-only">{props.label}</span>
-      <Show when={title()} fallback={<span class="text-[14px] font-semibold text-[#6038e4]">{props.label}</span>}>
-        {(name) => (
-          <svg aria-hidden="true" class="h-[18px] w-16 shrink-0" viewBox="0 0 64 18">
-            <use href={`${caseCategoryAssetsUrl}#title-${name()}`} width="64" height="18" />
-          </svg>
+    <div class="case-catalog-groups">
+      <For each={groups()}>
+        {(group) => (
+          <section class="case-catalog-group" data-case-group={group.category}>
+            <header class="case-catalog-group-heading">
+              <h2>{cmccCaseCategoryByCode(group.category)?.label ?? group.label}</h2>
+              <Show when={group.category === "deep-research"} fallback={
+                <button type="button" onClick={() => props.viewMore(group.category)}>
+                  查看更多 <Icon name="chevron-right" class="size-3" />
+                </button>
+              }>
+                <p>{cmccCaseCategoryByCode(group.category)?.description}</p>
+              </Show>
+            </header>
+            <div class="case-catalog-grid" data-case-cards>
+              <For each={group.items}>
+                {(item) => (
+                  <CaseCard
+                    item={item}
+                    onClick={() => props.open(item)}
+                    opening={props.opening(cmccCaseKey(item))}
+                    onCancel={props.cancelOpening}
+                    onDelete={props.remove ? () => props.remove?.(item) : undefined}
+                  />
+                )}
+              </For>
+            </div>
+          </section>
         )}
-      </Show>
-    </h2>
-  )
-}
-
-function CaseSectionHeading(props: { category: string }) {
-  const category = () => cmccCaseCategoryByCode(props.category)
-  return (
-    <div class="flex min-w-0 items-baseline gap-3">
-      <h2 class="shrink-0 text-[15px] [font-weight:700] text-[#000000]">{category()?.label}</h2>
-      <p class="truncate text-[14px] text-[#596176]">{category()?.description}</p>
+      </For>
     </div>
   )
 }
 
 function CaseCard(props: { item: DockApiCatalogCaseSummary; onClick: () => void; onDelete?: () => void; opening?: CaseOpening; onCancel: () => void }) {
-  const [state, setState] = createStore({ coverFailed: false })
-  createEffect(on(() => props.item.coverUrl, () => setState("coverFailed", false)))
-  const product = () => cmccHistoryProduct(props.item.source === "langgraph" ? undefined : props.item.agentType)
+  const isLocation = () => props.item.category === "location" || props.item.category === "marketing"
+  const artwork = () => categoryArtwork[props.item.category] ?? researchIcon
   return (
     <div data-case-source={props.item.source ?? "opencode"} data-case-card={props.item.caseCode} class="group relative min-w-0 text-left">
-      <button type="button" class="block w-full text-left" onClick={props.onClick}
+      <button type="button" class="case-catalog-card" classList={{ "case-catalog-card-deletable": !!props.onDelete }} onClick={props.onClick}
         aria-label={props.item.caseName} aria-busy={props.opening?.phase === "loading"}>
-        <div class="overflow-hidden rounded-[8px] border border-[#e9edf5] bg-white shadow-[0_4px_12px_rgba(61,77,112,0.08)] transition-[transform,box-shadow] duration-150 group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_18px_rgba(61,77,112,0.13)]">
-          <div
-            class="line-clamp-2 min-h-[48px] px-3.5 pb-2 pt-3 text-[14px] font-medium leading-5 text-[#333b4e]"
-            classList={{ "pr-11": !!props.onDelete }}
-          >
-            {props.item.caseName}
-          </div>
-          <div class="relative aspect-[1.8] overflow-hidden bg-[#eef4ff]">
-            <Show when={props.item.coverUrl && !state.coverFailed} fallback={<div class="flex size-full items-center justify-center text-[30px] font-semibold text-[#7a8fbd]">{props.item.caseName.slice(0, 1)}</div>}>
-              <img
-                src={dockApiUrl(props.item.coverUrl)}
-                alt={props.item.caseName}
-                class="size-full object-fill"
-                loading="lazy"
-                decoding="async"
-                onError={() => setState("coverFailed", true)}
-              />
-            </Show>
-            <Show when={!props.opening}><span
-              data-slot="case-category-label"
-              class="absolute bottom-2 left-2 max-w-[min(104px,calc(100%-16px))] truncate rounded-full border border-[#e1e6ef] bg-[#f0f2f8] px-1.5 py-0.5 text-[11px] font-normal leading-[1.4] text-[#5d6679]"
-              title={props.item.caseTag}
-              style={{
-                color: product()?.textColor,
-                background: product()?.backgroundColor,
-                "border-color": product()?.borderColor,
-              }}
-            >
-              {props.item.caseTag}
-            </span></Show>
-            <Show when={props.item.category === "deep-research"}>
-              <span class="absolute bottom-2 right-2 rounded-full bg-white/95 px-2 py-0.5 text-[11px] text-[#536078]">{props.item.source === "langgraph" ? "快速" : "深度"}</span>
-            </Show>
-          </div>
-        </div>
+        <Show when={isLocation()} fallback={
+          <img class="case-catalog-icon" src={artwork()} width="60" height="65" loading="lazy" decoding="async" alt="" />
+        }>
+          <span class="case-catalog-icon case-catalog-icon-location" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" class="size-8">
+              <path d="M16 29s8-9 8-16a8 8 0 0 0-16 0c0 7 8 16 8 16Z" stroke-linejoin="round" />
+              <circle cx="16" cy="13" r="3" />
+            </svg>
+          </span>
+        </Show>
+        <span class="case-catalog-card-title" title={props.item.caseName}>{props.item.caseName}</span>
       </button>
       <Show when={props.opening}>
         {(opening) => (
@@ -612,7 +502,8 @@ function CategoryButton(props: { label: string; selected: boolean; onClick: () =
     <button
       type="button"
       data-selected={props.selected ? "" : undefined}
-      class="h-[38px] shrink-0 rounded-[16px] border border-[#eceff6] bg-white px-4 text-[14px] text-[#656d7e] shadow-[0_3px_9px_rgba(62,75,105,0.08)] data-[selected]:border-transparent data-[selected]:bg-[#e5edff] data-[selected]:font-medium data-[selected]:text-[#2f70ef]"
+      class="case-catalog-tab"
+      aria-pressed={props.selected}
       onClick={props.onClick}
     >
       {props.label}
@@ -635,9 +526,9 @@ function FilterChoice(props: { selected: boolean; label: string; onClick: () => 
 
 function CaseSkeletons() {
   return (
-    <div class="mt-8 grid grid-cols-4 gap-4 max-md:grid-cols-2 max-sm:grid-cols-1">
+    <div class="case-catalog-grid case-catalog-results">
       <For each={Array.from({ length: 8 })}>
-        {() => <div class="h-[166px] animate-pulse rounded-[8px] bg-[#f1f4f9]" />}
+        {() => <div class="case-catalog-card animate-pulse" />}
       </For>
     </div>
   )

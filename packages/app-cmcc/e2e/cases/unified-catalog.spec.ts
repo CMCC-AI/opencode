@@ -216,7 +216,7 @@ test("deleting a quick case does not remove the same-code deep case", async ({ p
   const requests = await setup(page)
   await page.goto("/cases")
   await page.getByRole("button", { name: "删除案例 快速案例", exact: true }).click()
-  await page.getByRole("button", { name: "永久删除", exact: true }).click()
+  await page.getByRole("button", { name: "确认删除", exact: true }).click()
   await expect(page.locator("[data-case-card]")).toHaveCount(1)
   await expect(page.getByRole("button", { name: "深度案例", exact: true })).toBeVisible()
   expect(requests.filter((r) => r.method === "DELETE").map((r) => r.path)).toEqual([

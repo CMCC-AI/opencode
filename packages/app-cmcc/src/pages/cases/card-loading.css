@@ -3,6 +3,7 @@
   inset-inline: 1px;
   bottom: 1px;
   z-index: 20;
+  pointer-events: none;
   min-height: 52px;
   padding: 7px 10px 10px;
   border-top: 1px solid #dce6f5;
@@ -10,6 +11,10 @@
   background: rgb(248 251 255 / 96%);
   color: #3e66a9;
   transition: transform 150ms;
+}
+
+.case-card-loading button {
+  pointer-events: auto;
 }
 
 [data-case-card]:hover > .case-card-loading {

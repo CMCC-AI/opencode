@@ -1,3 +1,4 @@
+import { Icon } from "@opencode-ai/ui/icon"
 import { Portal } from "solid-js/web"
 import { For, Show, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -6,6 +7,7 @@ import { useDockApi } from "@/context/dockapi"
 import { CMCC_CASE_CATEGORIES, cmccCaseCategoryByAgentType } from "@/utils/cmcc-cases"
 import { showToast } from "@/utils/toast"
 import { createDialogMotion } from "./cmcc-motion"
+import "./cmcc-action-dialog.css"
 
 export function CasePublishDialog(props: { session?: DockApiSession; onClose: () => void; onPublished: () => void }) {
   const dockapi = useDockApi()
@@ -28,9 +30,7 @@ export function CasePublishForm(props: {
   caseName: string
   caseTag: string
   fixedCategory?: boolean
-  coverAccept?: string
-  maxCoverBytes?: number
-  onPublish: (input: { caseName: string; caseTag: string; coverFile: File }) => Promise<unknown>
+  onPublish: (input: { caseName: string; caseTag: string }) => Promise<unknown>
   onClose: () => void
   onPublished?: () => void
 }) {
@@ -38,21 +38,11 @@ export function CasePublishForm(props: {
   const [form, setForm] = createStore({
     caseName: props.caseName,
     caseTag: props.caseTag,
-    coverFile: undefined as File | undefined,
-    coverPreview: "",
     submitting: false,
   })
   let alive = true
-  const accept = () => props.coverAccept ?? "image/png,image/jpeg,image/webp"
-  const maxBytes = () => props.maxCoverBytes ?? 5 * 1024 * 1024
-
-  const revokePreview = () => {
-    if (form.coverPreview) URL.revokeObjectURL(form.coverPreview)
-  }
-
   onCleanup(() => {
     alive = false
-    revokePreview()
   })
 
   const close = () => {
@@ -60,34 +50,8 @@ export function CasePublishForm(props: {
     motion.close()
   }
 
-  const selectCover = (event: Event) => {
-    const target = event.currentTarget as HTMLInputElement
-    const file = target.files?.[0]
-    if (!file) return
-    const extension = file.name.split(".").at(-1)?.toLowerCase()
-    if (!extension || !["jpg", "jpeg", "png", "webp"].includes(extension) || !accept().split(",").includes(file.type)) {
-      showToast({
-        variant: "default",
-        title: accept().includes("image/webp") ? "封面仅支持 JPG、PNG、WebP" : "封面仅支持 JPG、PNG",
-      })
-      target.value = ""
-      return
-    }
-    if (file.size > maxBytes()) {
-      showToast({ variant: "default", title: `封面图片不能超过 ${maxBytes() / 1024 / 1024}MB` })
-      target.value = ""
-      return
-    }
-    revokePreview()
-    setForm({ coverFile: file, coverPreview: URL.createObjectURL(file) })
-  }
-
   const submit = async () => {
     if (form.submitting || motion.closing()) return
-    if (!form.coverFile) {
-      showToast({ variant: "default", title: "请上传案例封面" })
-      return
-    }
     if (!form.caseName.trim()) {
       showToast({ variant: "default", title: "请输入案例名称" })
       return
@@ -101,7 +65,6 @@ export function CasePublishForm(props: {
       .onPublish({
         caseName: form.caseName.trim(),
         caseTag: form.caseTag,
-        coverFile: form.coverFile,
       })
       .then(() => {
         if (!alive) return
@@ -129,7 +92,7 @@ export function CasePublishForm(props: {
   return (
     <Portal>
       <div
-        class="cmcc-modal-overlay fixed inset-0 z-[620] flex items-center justify-center p-5"
+        class="cmcc-action-overlay fixed inset-0 z-[620] flex items-center justify-center p-3"
         style={motion.overlay()}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) close()
@@ -139,34 +102,25 @@ export function CasePublishForm(props: {
           role="dialog"
           aria-modal="true"
           aria-labelledby="case-publish-title"
-          data-cmcc-dialog
+          data-cmcc-case-publish
           inert={motion.closing()}
           style={motion.content()}
-          class="isolate max-h-[calc(100dvh-40px)] w-full max-w-[420px] overflow-y-auto rounded-[8px] border border-[#cbd8f0] bg-[#f7f9ff] opacity-100 shadow-[0_22px_60px_rgba(46,66,110,0.20)]"
+          class="cmcc-action-dialog isolate w-full"
         >
-          <header class="flex h-14 items-center justify-between border-b border-[#dbe4f3] bg-[#eef3ff] px-[18px]">
-            <h2 id="case-publish-title" class="text-[15px] font-semibold text-[#27334f]">
-              添加至案例库
-            </h2>
+          <header>
+            <h2 id="case-publish-title">添加至案例库</h2>
             <button
               type="button"
               aria-label="关闭"
-              class="flex size-7 items-center justify-center rounded-[6px] bg-[#f1f5ff] text-[18px] text-[#6475a1] hover:bg-[#e7eeff]"
+              class="cmcc-action-close"
+              disabled={form.submitting}
               onClick={close}
             >
-              ×
+              <Icon name="close" class="size-4" />
             </button>
           </header>
-          <div class="px-[18px] pb-2 pt-4">
-            <label class="mb-2 block text-[13px] font-medium text-[#46516b]">案例图片</label>
-            <label class="flex aspect-[1.8] w-full cursor-pointer items-center justify-center overflow-hidden rounded-[8px] border border-dashed border-[#9fb7ec] bg-[#f8faff] text-[13px] text-[#7182a8] hover:border-[#6f96ec]">
-              <input type="file" class="sr-only" accept={accept()} onChange={selectCover} />
-              <Show when={form.coverPreview} fallback={<span>点击上传封面图片</span>}>
-                <img src={form.coverPreview} alt="案例封面预览" class="size-full object-fill" />
-              </Show>
-            </label>
-
-            <label class="mb-2 mt-4 block text-[13px] font-medium text-[#46516b]" for="case-name-input">
+          <div class="px-5 py-5">
+            <label class="mb-2 block text-[13px] font-medium text-[#46516b]" for="case-name-input">
               案例名称
             </label>
             <input
@@ -190,25 +144,13 @@ export function CasePublishForm(props: {
             >
               <For each={CMCC_CASE_CATEGORIES}>{(item) => <option value={item.label}>{item.label}</option>}</For>
             </select>
-            <p class="mt-3 rounded-[6px] bg-[#f4f7ff] px-3 py-2 text-[12px] leading-5 text-[#7180a2]">
-              发布后，当前会话的分析过程和产物将对系统内所有登录用户可见。
-            </p>
+            <p class="cmcc-action-note">发布后，当前会话的分析过程和产物将对系统内所有登录用户可见。</p>
           </div>
-          <footer class="flex justify-end gap-2 border-t border-[#e3e9f4] bg-[#f2f5fc] px-[18px] py-4">
-            <button
-              type="button"
-              disabled={form.submitting}
-              class="h-9 rounded-[6px] border border-[#d9e1ef] bg-white px-4 text-[13px] text-[#5d6880] hover:bg-[#f7f9fd] disabled:opacity-50"
-              onClick={close}
-            >
+          <footer>
+            <button type="button" disabled={form.submitting} class="cmcc-action-cancel" onClick={close}>
               取消
             </button>
-            <button
-              type="button"
-              disabled={form.submitting}
-              class="h-9 rounded-[6px] bg-[#4f7ff0] px-5 text-[13px] font-medium text-[#fff] hover:bg-[#416fdd] disabled:cursor-wait disabled:opacity-60"
-              onClick={() => void submit()}
-            >
+            <button type="button" disabled={form.submitting} class="cmcc-action-primary" onClick={() => void submit()}>
               {form.submitting ? "添加中..." : "确定新增"}
             </button>
           </footer>

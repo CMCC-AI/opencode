@@ -13,6 +13,7 @@ import notebookSpecCardArtwork from "@/assets/knowledge/notebook-spec-card.optim
 import uploadDropzoneArtwork from "@/assets/knowledge/upload-dropzone.svg"
 import wikiBannerArtwork from "@/assets/knowledge/wiki-banner.svg"
 import { ArtifactPreview } from "@/components/artifact-preview"
+import { DeleteConfirmation } from "@/components/delete-confirmation"
 import { ProductIntroButton } from "@/components/dialog-product-intro"
 import { ForceKnowledgeGraph } from "@/components/force-knowledge-graph"
 import { PromptInput } from "@/components/prompt-input"
@@ -447,37 +448,14 @@ export function CmccKnowledgeHomeRoute() {
 
       <Show when={removal.notebook} keyed>
         {(notebook) => (
-          <Modal title="删除笔记本" close={() => !removal.removing && setRemoval("notebook", undefined)}>
-            <div class="flex flex-col gap-4">
-              <p class="m-0 text-[14px] leading-6 text-v2-text-text-base">
-                确定从 DeepInsight 中删除“{notebook.name}”吗？
-              </p>
-              <div class="rounded-[7px] border border-red-500/35 bg-red-500/8 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
-                此操作会永久删除知识库目录、关联对话、原始资料、LLM Wiki 产物和其他全部文件，删除后无法恢复。
-              </div>
-              <div class="flex justify-end gap-2">
-                <button
-                  type="button"
-                  class="h-9 rounded-[7px] border border-v2-border-border-base px-4 text-[13px] text-v2-text-text-base hover:bg-v2-background-bg-layer-02"
-                  disabled={removal.removing}
-                  onClick={() => setRemoval("notebook", undefined)}
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  class="flex h-9 items-center gap-2 rounded-[7px] bg-v2-text-text-base px-4 text-[13px] font-medium text-v2-background-bg-layer-01 disabled:opacity-50"
-                  disabled={removal.removing}
-                  onClick={() => void removeNotebook()}
-                >
-                  <Show when={removal.removing} fallback={<Icon name="trash" class="size-4" />}>
-                    <span class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-                  </Show>
-                  {removal.removing ? "正在删除..." : "确认删除"}
-                </button>
-              </div>
-            </div>
-          </Modal>
+          <DeleteConfirmation
+            title="删除笔记本"
+            message={`确定从 DeepInsight 中删除“${notebook.name}”吗？`}
+            description="此操作会永久删除知识库目录、关联对话、原始资料、LLM Wiki 产物和其他全部文件，删除后无法恢复。"
+            pending={removal.removing}
+            onCancel={() => setRemoval("notebook", undefined)}
+            onConfirm={() => void removeNotebook()}
+          />
         )}
       </Show>
 
@@ -1827,70 +1805,26 @@ export function CmccKnowledgeNotebookRoute() {
           </Show>
           <Show when={fileRemoval.file} keyed>
             {(file) => (
-              <Modal title="删除文档" close={() => !fileRemoval.removing && setFileRemoval("file", undefined)}>
-                <div class="flex flex-col gap-4">
-                  <p class="m-0 text-[14px] leading-6 text-v2-text-text-base">确定永久删除“{file.name}”吗？</p>
-                  <div class="rounded-[7px] border border-red-500/35 bg-red-500/8 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
-                    文件将从知识库目录中物理删除且无法恢复；如果其他知识页引用了它，相关链接可能失效。
-                  </div>
-                  <div class="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      class="h-9 rounded-[7px] border border-v2-border-border-base px-4 text-[13px] text-v2-text-text-base hover:bg-v2-background-bg-layer-02"
-                      disabled={fileRemoval.removing}
-                      onClick={() => setFileRemoval("file", undefined)}
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      class="flex h-9 items-center gap-2 rounded-[7px] bg-red-600 px-4 text-[13px] font-medium text-white hover:bg-red-500 disabled:opacity-50"
-                      disabled={fileRemoval.removing}
-                      onClick={() => void removeFile()}
-                    >
-                      <Show when={fileRemoval.removing} fallback={<Icon name="trash" class="size-4" />}>
-                        <span class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-                      </Show>
-                      {fileRemoval.removing ? "正在删除..." : "永久删除"}
-                    </button>
-                  </div>
-                </div>
-              </Modal>
+              <DeleteConfirmation
+                title="删除文档"
+                message={`确定永久删除“${file.name}”吗？`}
+                description="文件将从知识库目录中物理删除且无法恢复；如果其他知识页引用了它，相关链接可能失效。"
+                pending={fileRemoval.removing}
+                onCancel={() => setFileRemoval("file", undefined)}
+                onConfirm={() => void removeFile()}
+              />
             )}
           </Show>
           <Show when={sessionRemoval.session} keyed>
             {(session) => (
-              <Modal title="删除对话" close={() => !sessionRemoval.removing && setSessionRemoval("session", undefined)}>
-                <div class="flex flex-col gap-4">
-                  <p class="m-0 text-[14px] leading-6 text-v2-text-text-base">
-                    确定永久删除“{knowledgeSessionLabel(session, activeNotebook().name)}”吗？
-                  </p>
-                  <div class="rounded-[7px] border border-red-500/35 bg-red-500/8 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
-                    此对话及其中的全部消息会被永久删除，删除后无法恢复。知识库文件不会受到影响。
-                  </div>
-                  <div class="flex justify-end gap-2">
-                    <button
-                      type="button"
-                      class="h-9 rounded-[7px] border border-v2-border-border-base px-4 text-[13px] text-v2-text-text-base hover:bg-v2-background-bg-layer-02"
-                      disabled={sessionRemoval.removing}
-                      onClick={() => setSessionRemoval("session", undefined)}
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      class="flex h-9 items-center gap-2 rounded-[7px] bg-red-600 px-4 text-[13px] font-medium text-white hover:bg-red-500 disabled:opacity-50"
-                      disabled={sessionRemoval.removing}
-                      onClick={() => void removeKnowledgeSession()}
-                    >
-                      <Show when={sessionRemoval.removing} fallback={<Icon name="trash" class="size-4" />}>
-                        <span class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-                      </Show>
-                      {sessionRemoval.removing ? "正在删除..." : "永久删除"}
-                    </button>
-                  </div>
-                </div>
-              </Modal>
+              <DeleteConfirmation
+                title="删除对话"
+                message={`确定永久删除“${knowledgeSessionLabel(session, activeNotebook().name)}”吗？`}
+                description="此对话及其中的全部消息会被永久删除，删除后无法恢复。知识库文件不会受到影响。"
+                pending={sessionRemoval.removing}
+                onCancel={() => setSessionRemoval("session", undefined)}
+                onConfirm={() => void removeKnowledgeSession()}
+              />
             )}
           </Show>
         </div>
@@ -1970,7 +1904,7 @@ function NotebookCard(props: {
           ⋮
         </button>
         <Show when={menuOpen()}>
-          <div class="absolute right-0 top-8 flex w-[148px] flex-col gap-1 rounded-lg border border-[#e3e9f0] bg-white p-1.5 text-[#303b4d] shadow-[0_10px_30px_rgba(35,50,72,0.13)]">
+          <div class="cmcc-wiki-note-menu absolute right-0 top-8 flex w-[148px] flex-col gap-1 rounded-lg border border-[#e3e9f0] p-1.5 text-[#303b4d] shadow-[0_10px_30px_rgba(35,50,72,0.13)]">
             <NotebookMenuItem
               icon={<Icon name="trash" class="size-4" />}
               label="删除"
@@ -2006,7 +1940,7 @@ function NotebookMenuItem(props: { icon: JSX.Element; label: string; action: () 
   return (
     <button
       type="button"
-      class="flex h-9 w-full items-center gap-3 rounded-[6px] px-2.5 text-left text-[13px] hover:bg-v2-overlay-simple-overlay-hover"
+      class="flex h-9 w-full items-center gap-3 rounded-[6px] px-2.5 text-left text-[13px]"
       onClick={props.action}
     >
       <span class="flex size-5 items-center justify-center text-v2-icon-icon-muted">{props.icon}</span>

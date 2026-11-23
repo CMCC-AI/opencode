@@ -637,11 +637,10 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
         discardNavigation(token: string) {
           caseHandoff.clear(token)
         },
-        async publish(input: { businessSessionId: string; caseName: string; caseTag: string; coverFile: File }) {
+        async publish(input: { businessSessionId: string; caseName: string; caseTag: string }) {
           const form = new FormData()
           form.append("caseName", input.caseName)
           form.append("caseTag", input.caseTag)
-          form.append("coverFile", input.coverFile)
           const result = await request<DockApiCaseSummary>(
             `/api/dockapi/cases/from-session/${encodeURIComponent(input.businessSessionId)}`,
             { method: "POST", body: form },
