@@ -1,4 +1,4 @@
-import { Show, createEffect } from "solid-js"
+import { Show, createEffect, lazy } from "solid-js"
 import { createStore } from "solid-js/store"
 import { A, Navigate, Route, Router } from "@solidjs/router"
 import { Icon } from "@opencode-ai/ui/icon"
@@ -9,6 +9,11 @@ import { AdminError } from "./shared"
 import { AdminUsers } from "./users"
 import { CaseManagementPanel } from "./cases"
 import "./admin.css"
+
+const AdminSecurity = lazy(() => import("./security"))
+const AdminStatistics = lazy(() => import("./statistics"))
+const AdminTasks = lazy(() => import("./tasks"))
+const showObservabilityNavigation = false
 
 export default function AdminApp() {
   const dockapi = useDockApi()
@@ -120,6 +125,20 @@ export default function AdminApp() {
                         <Icon name="archive" />
                         案例管理
                       </A>
+                      <Show when={showObservabilityNavigation}>
+                        <A href="/admin/security" activeClass="selected">
+                          <Icon name="shield" />
+                          安全管理
+                        </A>
+                        <A href="/admin/statistics" activeClass="selected">
+                          <Icon name="bullet-list" />
+                          统计报表
+                        </A>
+                        <A href="/admin/tasks" activeClass="selected">
+                          <Icon name="magnifying-glass" />
+                          任务状态管理
+                        </A>
+                      </Show>
                     </nav>
                     <div class="admin-account">
                       <DropdownMenu gutter={8} placement="top-start" modal={false}>
@@ -152,6 +171,9 @@ export default function AdminApp() {
               <Route path="/admin" component={() => <Navigate href="/admin/users" />} />
               <Route path="/admin/users" component={AdminUsers} />
               <Route path="/admin/cases" component={() => <CaseManagementPanel />} />
+              <Route path="/admin/security" component={AdminSecurity} />
+              <Route path="/admin/statistics" component={AdminStatistics} />
+              <Route path="/admin/tasks" component={AdminTasks} />
               <Route path="/admin/*" component={() => <Navigate href="/admin/users" />} />
             </Router>
           </Show>

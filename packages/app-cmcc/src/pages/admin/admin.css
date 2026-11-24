@@ -917,3 +917,117 @@
     font-size: 20px;
   }
 }
+.admin-ops-toolbar {
+  align-items: end;
+}
+.admin-ops-filter {
+  flex: 0 1 154px;
+}
+.admin-ui .admin-ops-filter select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--admin-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--admin-ink);
+  padding: 6px 10px;
+  font: inherit;
+}
+.admin-ui .admin-ops-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 24px 0;
+}
+.admin-ui .admin-ops-tabs button.active {
+  color: #2953a0;
+  background: #eaf1ff;
+  font-weight: 600;
+}
+.admin-ops-note,
+.admin-ops-muted,
+.admin-ops-status {
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+.admin-ops-changes {
+  display: block;
+  margin-top: 4px;
+}
+.admin-ops-status {
+  padding: 12px 24px;
+}
+.admin-ops-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.admin-ops-note {
+  padding: 6px 24px;
+}
+.admin-ops-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 152px), 1fr));
+  margin: 0;
+  padding: 12px 14px;
+  background: #f4f7fc;
+}
+.admin-ops-metrics > div {
+  padding: 12px 10px;
+}
+.admin-ops-metrics dt,
+.admin-ops-detail dt {
+  color: var(--admin-muted);
+}
+.admin-ops-metrics dd {
+  margin: 3px 0 0;
+  font-size: 20px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.admin-ops-section {
+  padding: 14px 24px;
+}
+.admin-ops-section h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.admin-ui table.admin-ops-table {
+  min-width: 590px;
+}
+.admin-ops-breakdown {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 18px;
+}
+.admin-ui .admin-ops-breakdown table {
+  min-width: 300px;
+}
+.admin-ui .admin-ops-empty {
+  color: var(--admin-muted);
+  text-align: center;
+}
+.admin-ops-id {
+  overflow-wrap: anywhere;
+}
+.admin-ops-detail {
+  padding: 18px 24px;
+}
+.admin-ops-detail dl {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+}
+.admin-ops-detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .admin-ops-breakdown {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-ops-section {
+    padding-inline: 14px;
+  }
+}
