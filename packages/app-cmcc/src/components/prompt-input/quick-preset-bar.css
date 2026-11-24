@@ -1,0 +1,125 @@
+.quick-preset-bar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 6px;
+  padding: 8px 14px;
+  border-radius: 0 0 16px 16px;
+  background: #f0f0f0;
+}
+
+.quick-preset-modes,
+.quick-preset-items {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-preset-bar button {
+  display: inline-flex;
+  min-height: 30px;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 2px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.quick-preset-bar .quick-preset-mode {
+  border-color: #e5e5e5;
+  color: #333;
+  background: #fff;
+  box-shadow: 0 2px 5px rgb(42 49 70 / 12%);
+}
+
+.quick-preset-mode[aria-pressed="true"] {
+  border-color: #328eff;
+  color: #fff;
+  background: linear-gradient(150deg, #51b6fa, #237cfa 47%, #1c64ea);
+  box-shadow: inset 0 1px 3px rgb(136 255 251 / 45%), 0 3px 7px rgb(28 100 234 / 23%);
+}
+
+.quick-preset-mode[aria-pressed="false"]:hover,
+.quick-preset-mode[aria-pressed="false"][data-expanded] {
+  border-color: #cdddf6;
+}
+
+.quick-preset-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  background: currentColor;
+  mask: var(--quick-preset-icon) center / contain no-repeat;
+}
+
+.quick-preset-mode-icon {
+  color: #1c64ea;
+}
+
+.quick-preset-arrow {
+  width: 12px;
+  color: #777;
+}
+
+.quick-preset-mode[aria-pressed="true"] .quick-preset-icon {
+  color: #fff;
+}
+
+.quick-preset-divider {
+  width: 1px;
+  height: 16px;
+  flex: none;
+  margin: 0 1px;
+  background: #dedede;
+}
+
+.quick-preset-item {
+  color: #606060;
+}
+
+.quick-preset-item:hover {
+  background: #fff;
+}
+
+.quick-preset-item[aria-pressed="true"] {
+  color: #175ccf;
+  background: #e5f0ff;
+}
+
+.quick-preset-bar button:focus-visible {
+  outline: 2px solid #1c64ea;
+  outline-offset: 2px;
+}
+
+.quick-preset-menu[data-component="dropdown-menu-content"] {
+  z-index: 60;
+  min-width: 144px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 6px 22px rgb(42 49 70 / 15%);
+}
+
+.quick-preset-menu .quick-preset-menu-option {
+  min-height: 32px;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.quick-preset-menu .quick-preset-menu-option[data-checked] {
+  color: #175ccf;
+  background: #e5f0ff;
+}

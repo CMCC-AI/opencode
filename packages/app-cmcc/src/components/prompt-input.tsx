@@ -435,6 +435,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     return team?.quickAgent
       ? {
           quick: team.quickAgent,
+          lite: team.liteQuickAgent,
           lead: team.leadAgent,
           liteActive: !!team.liteQuickAgent && props.selectedExpertAgent === team.liteQuickAgent,
         }
@@ -2167,7 +2168,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                         ? props.selectedExpertAgent === toggle().quick || toggle().liteActive
                         : props.selectedExpertAgent === toggle().lead}
                       disabled={!!props.research?.pending || uploadStatus.pending > 0}
-                      onClick={() => props.onSelectedExpertAgentChange?.(mode === "quick" ? toggle().quick : toggle().lead)}>
+                       onClick={() => {
+                         if (mode === "quick" && (props.selectedExpertAgent === toggle().quick || toggle().liteActive)) return
+                         props.onSelectedExpertAgentChange?.(mode === "quick" ? toggle().lite ?? toggle().quick : toggle().lead)
+                       }}>
                       {mode === "quick" ? "快速" : "专家"}</button>}</For>
                   </div>}
                 </Show>
