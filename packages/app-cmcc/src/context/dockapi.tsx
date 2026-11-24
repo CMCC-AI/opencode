@@ -10,11 +10,9 @@ import { createCaseListCache } from "@/utils/case-list-cache"
 import { createCaseHandoff } from "@/utils/case-handoff"
 import { CMCC_CASES_UPDATED_EVENT } from "@/utils/cmcc-cases"
 import { parseQuotaSnapshot, requireResearchQuota } from "@/utils/token-quota"
-import { sameDockApiSession, sameDockApiTokens, type DockApiTokens } from "@/utils/dockapi-auth-session"
 
 const ACCESS_TOKEN_KEY = "dockapi.accessToken"
 const REFRESH_TOKEN_KEY = "dockapi.refreshToken"
-const REFRESH_RACE_WAIT_MS = 1500
 
 type ApiResponse<T> = {
   code: number
@@ -248,33 +246,6 @@ function storageSet(key: string, value: string | null) {
   localStorage.setItem(key, value)
 }
 
-function storedTokens(): DockApiTokens {
-  return {
-    accessToken: storageGet(ACCESS_TOKEN_KEY) ?? undefined,
-    refreshToken: storageGet(REFRESH_TOKEN_KEY) ?? undefined,
-  }
-}
-
-function isAuthStorageEvent(event: StorageEvent) {
-  return event.key === null || event.key === ACCESS_TOKEN_KEY || event.key === REFRESH_TOKEN_KEY
-}
-
-function waitForSharedRenewal(previous: DockApiTokens) {
-  if (!sameDockApiTokens(previous, storedTokens())) return Promise.resolve()
-  return new Promise<void>((resolve) => {
-    const finish = () => {
-      clearTimeout(timer)
-      window.removeEventListener("storage", changed)
-      resolve()
-    }
-    const changed = (event: StorageEvent) => {
-      if (isAuthStorageEvent(event) && storedTokens().refreshToken !== previous.refreshToken) finish()
-    }
-    const timer = setTimeout(finish, REFRESH_RACE_WAIT_MS)
-    window.addEventListener("storage", changed)
-  })
-}
-
 function dockApiBaseUrl() {
   const configured = import.meta.env.VITE_DOCKAPI_URL?.trim()
   if (configured) return configured.replace(/\/+$/, "")
@@ -301,7 +272,8 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
     const platform = usePlatform()
     const [state, setState] = createStore({
       status: "loading" as AuthStatus,
-      ...storedTokens(),
+      accessToken: storageGet(ACCESS_TOKEN_KEY) ?? undefined,
+      refreshToken: storageGet(REFRESH_TOKEN_KEY) ?? undefined,
       user: undefined as DockApiUser | undefined,
       workspace: undefined as DockApiWorkspace | undefined,
       sessions: [] as DockApiSession[],
@@ -332,38 +304,22 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       })
     }
 
-    const resetAuth = (tokens: DockApiTokens) => {
+    const clear = () => {
       authEpoch += 1
-      refreshRequest = undefined
-      profileRequest = undefined
-      // Unmount the authenticated app before its consumers lose the old workspace.
-      setState("status", tokens.accessToken || tokens.refreshToken ? "loading" : "unauthenticated")
       clearCaseCache()
       window.dispatchEvent(new Event("dockapi-auth-cleared"))
+      storageSet(ACCESS_TOKEN_KEY, null)
+      storageSet(REFRESH_TOKEN_KEY, null)
       removePersisted(Persist.global("tabs"), platform)
       removePersisted(Persist.global("tabs.recent"), platform)
       setState({
-        ...tokens,
+        status: "unauthenticated",
+        accessToken: undefined,
+        refreshToken: undefined,
         user: undefined,
         workspace: undefined,
         sessions: [],
       })
-    }
-
-    const clear = () => {
-      storageSet(ACCESS_TOKEN_KEY, null)
-      storageSet(REFRESH_TOKEN_KEY, null)
-      resetAuth({ accessToken: undefined, refreshToken: undefined })
-    }
-
-    const syncAuth = (tokens: DockApiTokens) => {
-      if (sameDockApiTokens(state, tokens)) return
-      if (state.status !== "unauthenticated" && sameDockApiSession(state, tokens, state.user?.id)) {
-        setState(tokens)
-        return
-      }
-      resetAuth(tokens)
-      void restore()
     }
 
     const refresh = async () => {
@@ -372,64 +328,51 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       const refreshToken = state.refreshToken
       if (!refreshToken) throw new DockApiError("登录已失效", 401)
 
-      const checkScope = () => {
-        if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
-      }
-      const locks = typeof navigator !== "undefined" ? navigator.locks : undefined
       const renew = async () => {
-        checkScope()
-        const previous = storedTokens()
-        syncAuth(previous)
-        checkScope()
-        if (previous.accessToken && previous.refreshToken !== refreshToken) return
-        const followOtherTab = () => {
-          checkScope()
-          const latest = storedTokens()
-          if (sameDockApiTokens(previous, latest)) return false
-          syncAuth(latest)
-          checkScope()
-          return true
+        if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
+        const latestRefresh = storageGet(REFRESH_TOKEN_KEY)
+        const latestAccess = storageGet(ACCESS_TOKEN_KEY)
+        if (latestRefresh && latestAccess && latestRefresh !== refreshToken) {
+          setState({ accessToken: latestAccess, refreshToken: latestRefresh })
+          return
         }
-        try {
-          const auth = await fetch(`${dockApiBaseUrl()}/api/auth/refresh`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken }),
-          }).then(readResponse<AuthResponse>)
-          if (!followOtherTab()) saveTokens(auth)
-        } catch (error) {
-          checkScope()
-          if (error instanceof DockApiError && error.status === 401) {
-            // On HTTP, another tab may have consumed the one-use token before storing its replacement.
-            if (!locks) await waitForSharedRenewal(previous)
-            if (followOtherTab()) return
-            clear()
-          }
-          throw error
-        }
+        const auth = await fetch(`${dockApiBaseUrl()}/api/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        }).then(readResponse<AuthResponse>)
+        if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
+        saveTokens(auth)
       }
-      const pending = (locks ? locks.request("dockapi-auth-refresh", renew) : Promise.resolve().then(renew))
+      // Coordinate refresh-token rotation across tabs when Web Locks are available (HTTPS/localhost).
+      refreshRequest = (
+        typeof navigator !== "undefined" && navigator.locks
+          ? navigator.locks.request("dockapi-auth-refresh", renew)
+          : renew()
+      )
         .then(() => undefined)
-        .finally(() => {
-          if (refreshRequest === pending) refreshRequest = undefined
+        .catch((error) => {
+          if (epoch === authEpoch) clear()
+          throw error
         })
-      refreshRequest = pending
-      return pending
+        .finally(() => {
+          refreshRequest = undefined
+        })
+      return refreshRequest
     }
 
     const authorizedFetch = async (path: string, init?: RequestInit, canRefresh = true): Promise<Response> => {
       const epoch = authEpoch
-      const token = state.accessToken
       const headers = new Headers(init?.headers)
       if (init?.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
         headers.set("Content-Type", "application/json")
       }
-      if (token) headers.set("Authorization", `Bearer ${token}`)
+      if (state.accessToken) headers.set("Authorization", `Bearer ${state.accessToken}`)
 
       const response = await fetch(`${dockApiBaseUrl()}${path}`, { ...init, headers })
       if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
-      if (response.status === 401 && canRefresh && (state.refreshToken || state.accessToken !== token)) {
-        if (state.accessToken === token) await refresh()
+      if (response.status === 401 && canRefresh && state.refreshToken) {
+        await refresh()
         if (epoch !== authEpoch) throw new DockApiError("登录状态已变化", 409)
         return authorizedFetch(path, init, false)
       }
@@ -449,10 +392,8 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
 
     const reloadProfile = () => {
       if (profileRequest) return profileRequest
-      const epoch = authEpoch
-      const pending = request<UserProfileResponse>("/api/user/profile")
+      profileRequest = request<UserProfileResponse>("/api/user/profile")
         .then((profile) => {
-          if (epoch !== authEpoch) return
           const previous = state.user
           const changed = previous?.id !== profile.user.id || previous?.userType !== profile.user.userType
             || previous?.casePublishAllowed !== profile.user.casePublishAllowed
@@ -461,9 +402,8 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           setState({ user: profile.user, workspace: profile.workspace })
           if (changed) clearCaseCache()
         })
-        .finally(() => { if (profileRequest === pending) profileRequest = undefined })
-      profileRequest = pending
-      return pending
+        .finally(() => { profileRequest = undefined })
+      return profileRequest
     }
 
     const loadSessions = async () => {
@@ -473,11 +413,9 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
     }
 
     const loadSessionsSafely = async () => {
-      const epoch = authEpoch
       try {
         return await loadSessions()
       } catch (error) {
-        if (epoch !== authEpoch) return []
         console.error("业务历史加载失败", error)
         showToast({
           variant: "error",
@@ -503,12 +441,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       } catch (error) {
         if (epoch !== authEpoch) return
         if (error instanceof DockApiError && error.status === 401) {
-          const latest = storedTokens()
-          if (sameDockApiTokens(state, latest)) clear()
-          else {
-            syncAuth(latest)
-            if (epoch === authEpoch) await restore()
-          }
+          clear()
           return
         }
         setState("status", "unauthenticated")
@@ -522,7 +455,18 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
 
     onMount(() => {
       const sync = (event: StorageEvent) => {
-        if (isAuthStorageEvent(event)) syncAuth(storedTokens())
+        if (event.key !== null && event.key !== ACCESS_TOKEN_KEY && event.key !== REFRESH_TOKEN_KEY) return
+        authEpoch += 1
+        clearCaseCache()
+        setState({
+          status: "loading",
+          accessToken: storageGet(ACCESS_TOKEN_KEY) ?? undefined,
+          refreshToken: storageGet(REFRESH_TOKEN_KEY) ?? undefined,
+          user: undefined,
+          workspace: undefined,
+          sessions: [],
+        })
+        void restore()
       }
       window.addEventListener("storage", sync)
       window.addEventListener(CMCC_CASES_UPDATED_EVENT, clearCaseCache)
@@ -546,9 +490,6 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
       },
       get workspace() {
         return state.workspace
-      },
-      get authScope() {
-        return authEpoch
       },
       get agentType() {
         return (import.meta.env.VITE_DOCKAPI_AGENT_TYPE?.trim() || "deepinsight").toLowerCase()
@@ -585,9 +526,7 @@ export const { use: useDockApi, provider: DockApiProvider } = createSimpleContex
           try {
             // Wait for revocation; a network failure must not pretend that SSO logout succeeded.
             await request<void>("/api/auth/logout", { method: "POST" })
-            const latest = storedTokens()
-            if (sameDockApiTokens(state, latest) || sameDockApiSession(state, latest, state.user?.id)) clear()
-            else syncAuth(latest)
+            clear()
           } catch (error) {
             showToast({ variant: "error", title: "退出失败，请重试", description: String(error) })
           }

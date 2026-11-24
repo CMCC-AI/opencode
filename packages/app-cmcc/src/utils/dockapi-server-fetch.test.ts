@@ -6,7 +6,7 @@ test("forwards login credentials but never trusts browser identity/service heade
   const send = dockApiServerFetch({
     origin: "http://example.test",
     token: () => "login",
-    scope: () => 7,
+    user: () => 7,
     refresh: async () => {},
     fetch: (async (_, init) => {
       sent = init
@@ -30,7 +30,7 @@ test("refreshes once and preserves the prompt request body", async () => {
   const send = dockApiServerFetch({
     origin: "http://example.test",
     token: () => token,
-    scope: () => 7,
+    user: () => 7,
     refresh: async () => {
       token = "new"
     },
@@ -51,7 +51,7 @@ test("does not attach DockAPI credentials to another origin", async () => {
   const send = dockApiServerFetch({
     origin: "http://example.test",
     token: () => "login",
-    scope: () => 7,
+    user: () => 7,
     refresh: async () => {},
     fetch: (async (_, init) => {
       expect(new Headers(init?.headers).has("x-dockapi-authorization")).toBe(false)
@@ -59,39 +59,4 @@ test("does not attach DockAPI credentials to another origin", async () => {
     }) as typeof fetch,
   })
   await send("https://external.test/file")
-})
-
-test("retries an old-token 401 without rotating a token picked up from another tab", async () => {
-  let token = "old"
-  const send = dockApiServerFetch({
-    origin: "http://example.test",
-    token: () => token,
-    scope: () => 1,
-    refresh: async () => { throw new Error("Unexpected refresh") },
-    fetch: (async (_, init) => {
-      if (new Headers(init?.headers).get("x-dockapi-authorization") === "Bearer old") {
-        token = "new"
-        return new Response(null, { status: 401 })
-      }
-      return new Response()
-    }) as typeof fetch,
-  })
-  expect((await send("http://example.test/session")).status).toBe(200)
-})
-
-test("rejects a late retry response after a new login session", async () => {
-  let token = "old"
-  let scope = 1
-  const send = dockApiServerFetch({
-    origin: "http://example.test",
-    token: () => token,
-    scope: () => scope,
-    refresh: async () => { token = "new" },
-    fetch: (async (_input, _init) => {
-      if (token === "old") return new Response(null, { status: 401 })
-      scope += 1
-      return new Response()
-    }) as typeof fetch,
-  })
-  await expect(send("http://example.test/session")).rejects.toThrow("登录状态已变化")
 })

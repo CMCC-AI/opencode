@@ -89,7 +89,7 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     dockApiServerFetch({
       origin: server.http.url,
       token: () => dockapi.state.accessToken,
-      scope: () => dockapi.authScope,
+      user: () => dockapi.user?.id,
       refresh: dockapi.auth.refresh,
       fetch: base,
     })
