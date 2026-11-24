@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "zhipuai/glm-5.3",
+  "model": "moonshotai-cn/kimi-k3",
   "disabled_providers": [
     "alibaba",
     "zai",
@@ -12,16 +12,16 @@
     "kimi-for-coding",
   ],
   "provider": {
-    "deepseek-cmcc": {
+    "jiutian-cmcc": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "CMCC",
       "env": ["CMCC_API_KEY"],
       "options": {
-        "baseURL": "http://123.57.26.236:18000/v1"
+        "baseURL": "http://8.130.156.14:8000/jt236b/v1"
       },
       "models": {
-        "deepseek-v4-flash-0731": {
-          "name": "DeepSeek V4 Flash",
+        "jt236b": {
+          "name": "Jiutian-236B",
           "reasoning": true,
           "tool_call": true
         }
