@@ -48,7 +48,7 @@ function provider(id: string, name: string, modelName: string) {
 
 export async function setupHomePage(
   page: Page,
-  options: { models?: boolean; history?: boolean; free?: boolean; duplicateModels?: boolean; bailian?: boolean; teams?: boolean } = {},
+  options: { models?: boolean; history?: boolean; free?: boolean; duplicateModels?: boolean; bailian?: boolean; teams?: boolean; vision?: boolean } = {},
 ) {
   await page.addInitScript(() => {
     if (window !== window.top) return
@@ -90,6 +90,13 @@ export async function setupHomePage(
         limit: { context: 200000 },
         cost: { input: 0, output: 0 },
       }
+  }
+  if (options.vision && providers[0]) {
+    const vision = {
+      id: "vision-test", name: "视觉测试模型", limit: { context: 200000 }, cost: { input: 0, output: 0 },
+      capabilities: { input: { image: true }, toolcall: true },
+    }
+    providers[0].models[vision.id] = vision
   }
   if (options.bailian && options.models && !options.free) {
     providers[0].name = "阿里云百炼"

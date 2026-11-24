@@ -34,10 +34,17 @@ function dataUrl(file: File, mime: string) {
 
 type PromptTarget = Pick<ReturnType<ReturnType<typeof usePrompt>["capture"]>, "current" | "cursor" | "set">
 type AttachmentReader = (file: File, relativePath?: string, storage?: AttachmentStorage) => Promise<ImageAttachmentPart>
-type AttachmentTarget = { prompt: PromptTarget; cursor: number | undefined; storage?: AttachmentStorage; read?: AttachmentReader }
+type AttachmentTarget = {
+  prompt: PromptTarget
+  cursor: number | undefined
+  storage?: AttachmentStorage
+  read?: AttachmentReader
+  acceptedMimes?: readonly string[]
+}
 
 type PromptAttachmentsCoreInput = {
   disabled?: () => boolean
+  acceptedMimes?: () => readonly string[] | undefined
   read?: AttachmentReader
   useCustomReader?: () => boolean
   capture: () => PromptTarget
@@ -53,6 +60,7 @@ type PromptAttachmentsCoreInput = {
 
 type PromptAttachmentsInput = {
   disabled?: () => boolean
+  acceptedMimes?: () => readonly string[] | undefined
   read?: AttachmentReader
   useCustomReader?: () => boolean
   prompt: ReturnType<typeof usePrompt>
@@ -78,13 +86,14 @@ export function createPromptAttachmentsCore(input: PromptAttachmentsCoreInput) {
     return {
       prompt, cursor: prompt.cursor() ?? getCursorPosition(editor), storage: input.storage?.(),
       read: input.useCustomReader?.() === false ? undefined : input.read,
+      acceptedMimes: input.acceptedMimes?.(),
     }
   }
 
   const read = async (file: File, target: AttachmentTarget, relativePath?: string, knownMime?: string) => {
     if (target.read) return target.read(file, relativePath, target.storage)
     const mime = knownMime ?? (await attachmentMime(file))
-    if (!mime) return
+    if (!mime || (target.acceptedMimes && !target.acceptedMimes.includes(mime))) return
     const stored = await target.storage?.store(file, mime, relativePath)
     const url = stored && !mime.startsWith("image/") ? "" : await dataUrl(file, mime)
     if (!stored && !url) return

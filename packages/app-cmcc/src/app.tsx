@@ -9,7 +9,7 @@ import { File } from "@opencode-ai/session-ui/file"
 import { Font } from "@opencode-ai/ui/font"
 import { ThemeProvider } from "@opencode-ai/ui/theme/context"
 import { MetaProvider } from "@solidjs/meta"
-import { type BaseRouterProps, Navigate, Route, Router, useParams, useSearchParams } from "@solidjs/router"
+import { type BaseRouterProps, Navigate, Route, Router, useLocation, useParams, useSearchParams } from "@solidjs/router"
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/solid-query"
 import { Effect } from "effect"
 import {
@@ -79,6 +79,7 @@ import { pathKey } from "@/utils/path-key"
 const LegacyLayout = lazy(() => import("@/pages/layout"))
 const Session = lazy(() => import("@/pages/session"))
 const NewSession = lazy(() => import("@/pages/new-session"))
+const Mobile = lazy(() => import("@/pages/mobile/page"))
 const LegacyHome = lazy(() => import("@/pages/home").then((module) => ({ default: module.LegacyHome })))
 const CmccExpertCenterRoute = lazy(() =>
   import("@/pages/cmcc-experts").then((module) => ({ default: module.CmccExpertCenterRoute })),
@@ -423,6 +424,47 @@ function NewAppLayout(props: ParentProps) {
   )
 }
 
+function BusinessLayout(props: ParentProps) {
+  const location = useLocation()
+  const settings = useSettings()
+  const mobile = () => /^\/mobile(?:\/|$)/.test(location.pathname)
+  return (
+    <Show when={mobile()} fallback={
+      <Show when={settings.general.newLayoutDesigns()} fallback={props.children}>
+        <NewAppLayout>{props.children}</NewAppLayout>
+      </Show>
+    }>
+      <SelectedServerProviders>
+        <ServerScopedProviders>{props.children}</ServerScopedProviders>
+      </SelectedServerProviders>
+    </Show>
+  )
+}
+
+function MobileRoute() {
+  const dockapi = useDockApi()
+  const server = useServer()
+  const identity = () => dockapi.user && dockapi.workspace?.directoryPath
+    ? `${dockapi.user.id}\0${dockapi.workspace.directoryPath}`
+    : undefined
+  return (
+    <Show when={identity()} keyed fallback={<AppLoading />}>
+      {(key) => {
+        const directory = () => key.slice(key.indexOf("\0") + 1)
+        return (
+          <TargetServerScopedProviders directory={directory}>
+            <SDKProvider directory={directory}>
+              <DirectoryDataProvider directory={directory} server={() => server.key} sessionID={() => undefined}>
+                <DraftProviders><Mobile /></DraftProviders>
+              </DirectoryDataProvider>
+            </SDKProvider>
+          </TargetServerScopedProviders>
+        )
+      }}
+    </Show>
+  )
+}
+
 function CmccRuntimePrewarm() {
   const queryClient = useQueryClient()
   const sync = useServerSync()
@@ -659,9 +701,7 @@ export function AppInterface(props: {
                     <TabsProvider>
                       <NotificationProvider>
                         <ServerShell>
-                          <Show when={useSettings().general.newLayoutDesigns()} fallback={routerProps.children}>
-                            <NewAppLayout>{routerProps.children}</NewAppLayout>
-                          </Show>
+                          <BusinessLayout>{routerProps.children}</BusinessLayout>
                         </ServerShell>
                       </NotificationProvider>
                     </TabsProvider>
@@ -708,6 +748,7 @@ function Routes() {
         <Route path="/cases/:caseCode" component={CmccCaseDetailRoute} />
         <Route path="/:dir/session/:id" component={LegacyTargetSessionRoute} />
       </Show>
+      <Route path={["/mobile", "/mobile/history/:source/:id"]} component={MobileRoute} />
       <Route path="/new-session" component={DraftRoute} />
       <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
     </>

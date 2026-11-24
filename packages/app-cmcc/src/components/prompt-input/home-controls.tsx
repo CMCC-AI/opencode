@@ -50,13 +50,18 @@ export function HomeModelControl(props: {
   style: JSX.CSSProperties
   onOpen: () => void
   onClose: () => void
+  modelFilter?: (model: ReturnType<ReturnType<typeof useLocal>["model"]["list"]>[number]) => boolean
 }) {
   const [state, setState] = createStore({ open: false, query: "", focusEditor: false })
+  const current = createMemo(() => {
+    const model = props.model.current()
+    return model && (props.modelFilter?.(model) ?? true) ? model : undefined
+  })
   const groups = createMemo(() =>
     modelSelectorGroups(
       modelSelectorItems({
-        items: props.model.list(),
-        current: props.model.current(),
+        items: props.model.list().filter((model) => props.modelFilter?.(model) ?? true),
+        current: current(),
         visible: (item) => props.model.visible(item),
       }).filter((item) =>
         `${modelSelectorCategory(item).name} ${item.provider.name} ${item.name} ${item.id}`
@@ -67,8 +72,8 @@ export function HomeModelControl(props: {
   )
 
   const currentKey = () => {
-    const current = props.model.current()
-    return current ? modelSelectorKey(current) : ""
+    const model = current()
+    return model ? modelSelectorKey(model) : ""
   }
 
   return (
@@ -93,13 +98,13 @@ export function HomeModelControl(props: {
         aria-label="选择模型"
         disabled={props.loading}
         style={props.style}
-        title={props.model.current()?.name ?? "选择模型"}
+        title={current()?.name ?? "选择模型"}
       >
         <ProviderIcon
-          id={props.model.current() ? modelSelectorCategory(props.model.current()!).icon : "synthetic"}
+          id={current() ? modelSelectorCategory(current()!).icon : "synthetic"}
           class="size-4 shrink-0"
         />
-        <span class="min-w-0 truncate">{props.model.current()?.name ?? (props.loading ? "加载中" : "选择模型")}</span>
+        <span class="min-w-0 truncate">{current()?.name ?? (props.loading ? "加载中" : "选择模型")}</span>
         <Icon name="chevron-down" class="size-3 shrink-0" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

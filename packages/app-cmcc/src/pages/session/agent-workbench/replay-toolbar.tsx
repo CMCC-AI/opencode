@@ -14,7 +14,7 @@ export function WorkbenchReplayToolbar(props: {
   stage: string
   progress: number
   onReplay: () => void
-  onCreateSame: () => void
+  onCreateSame?: () => void
 }) {
   const [collapsed, setCollapsed] = createSignal(false)
   const toggleLabel = () => (collapsed() ? "展开操作条" : "收起操作条")
@@ -46,7 +46,7 @@ export function WorkbenchReplayToolbar(props: {
           >
             {props.preparing ? "准备中" : props.playing ? "停止回放" : "看回放"}
           </button>
-          <Show when={!props.preparing && (!props.playing || props.allowSameDuringReplay)}>
+          <Show when={props.onCreateSame && !props.preparing && (!props.playing || props.allowSameDuringReplay)}>
             <button type="button" class={ACTION_CLASS} onClick={props.onCreateSame}>
               做同款
             </button>

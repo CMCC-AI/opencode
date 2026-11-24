@@ -52,6 +52,7 @@ import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge 
 import { RESEARCH_FILE_ACCEPT, type ResearchMode } from "@/pages/general-deepinsight/research-attachments"
 import { createPromptAttachments, type AttachmentStorage } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES, pickAttachmentFiles } from "./prompt-input/files"
+import { ACCEPTED_IMAGE_TYPES } from "@/constants/file-picker"
 import { createAttachmentStorage } from "./prompt-input/upload-storage"
 import {
   canNavigateHistoryAtCursor,
@@ -69,6 +70,8 @@ import { PromptImageAttachments } from "./prompt-input/image-attachments"
 import { PromptDragOverlay } from "./prompt-input/drag-overlay"
 import { promptPlaceholder } from "./prompt-input/placeholder"
 import { PromptSendButton } from "./prompt-input/send-button"
+import mobileAttachIcon from "@/assets/mobile/attach.svg"
+import mobileSendIcon from "@/assets/mobile/send.svg"
 import { HomeActionsPopover, HomeAgentControl, HomeModelControl } from "./prompt-input/home-controls"
 import { QuickPresetBar } from "./prompt-input/quick-preset-bar"
 import { QUICK_PRESETS_BY_TEAM } from "@/utils/quick-presets"
@@ -195,7 +198,10 @@ export interface PromptInputProps {
   hideVariantControl?: boolean
   hideAgentControl?: boolean
   class?: string
-  variant?: "dock" | "new-session"
+  variant?: "dock" | "new-session" | "mobile"
+  mobileImages?: boolean
+  mobileUnavailable?: boolean
+  artifactSkill?: string
   state?: PromptInputState
   history?: PromptInputHistory
   submission?: PromptInputSubmission
@@ -213,6 +219,9 @@ export interface PromptInputProps {
   selectedExpertAgent?: string
   onSelectedExpertAgentChange?: (agent: string | undefined) => void
 }
+
+const imageToolModel = (model: ReturnType<PromptInputControls["model"]["selection"]["current"]>) =>
+  model?.capabilities?.input?.image === true && model.capabilities.toolcall === true
 
 const EXAMPLES = [
   "prompt.example.1",
@@ -654,6 +663,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }
 
   const setMode = (mode: "normal" | "shell") => {
+    if (props.variant === "mobile" && mode === "shell") return
     setStore("mode", mode)
     setStore("popover", null)
     requestAnimationFrame(() => editorRef?.focus())
@@ -679,7 +689,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       title: language.t("command.prompt.mode.shell"),
       category: language.t("command.category.session"),
       keybind: shellModeKey,
-      disabled: store.mode === "shell",
+      disabled: props.variant === "mobile" || store.mode === "shell",
       onSelect: () => setMode("shell"),
     },
     {
@@ -1305,7 +1315,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
     const shellMode = store.mode === "shell"
 
-    if (!shellMode && !props.research?.mode) {
+    if (!shellMode && !props.research?.mode && props.variant !== "mobile") {
       const atMatch = rawText.substring(0, cursorPosition).match(/@(\S*)$/)
       const slashMatch = rawText.match(/^\/(\S*)$/)
 
@@ -1472,6 +1482,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const { addAttachment, addAttachments, addFolder, uploadStatus, removeAttachment, handlePaste } =
     createPromptAttachments({
       disabled: () => !!props.research?.pending,
+      acceptedMimes: () => props.mobileImages ? ACCEPTED_IMAGE_TYPES : undefined,
       read: props.research?.readAttachment,
       useCustomReader: () => !selectedKnowledge(),
       prompt,
@@ -1524,7 +1535,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         ref={(el) => (fileInputRef = el)}
         type="file"
         multiple
-        accept={props.research?.mode === "quick" ? RESEARCH_FILE_ACCEPT : ACCEPTED_FILE_TYPES.join(",")}
+        accept={props.mobileImages ? ACCEPTED_IMAGE_TYPES.join(",") : props.research?.mode === "quick" ? RESEARCH_FILE_ACCEPT : ACCEPTED_FILE_TYPES.join(",")}
         class="hidden"
         onChange={(e) => {
           const list = e.currentTarget.files
@@ -1585,13 +1596,36 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       onAbort: props.onAbort,
       onSubmit: props.onSubmit,
       selectedAgent: () => props.selectedExpertAgent,
-      get literal() { return !!props.research?.mode },
+      imageOnlyPrompt: () => props.mobileImages ? "请解读上传的图片" : undefined,
+      artifactSkill: () => props.artifactSkill,
+      get literal() { return !!props.research?.mode || props.variant === "mobile" },
       knowledge: selectedKnowledge,
     })
 
   const abort = submission.abort
   const initializing = () => props.research?.mode !== "quick" && !props.controls.session.id && props.controls.model.loading
+  createEffect(() => {
+    if (!props.mobileImages || props.controls.model.loading) return
+    const selection = props.controls.model.selection
+    if (imageToolModel(selection.current())) return
+    const fallback = selection.list().find((model) =>
+      imageToolModel(model) && selection.visible({ providerID: model.provider.id, modelID: model.id }),
+    )
+    if (fallback) selection.set({ providerID: fallback.provider.id, modelID: fallback.id })
+  })
+  const mobileBlock = () => {
+    if (props.mobileUnavailable) return "当前助手暂不可用"
+    if (!props.mobileImages) return
+    if (!props.controls.model.loading && !imageToolModel(props.controls.model.selection.current()))
+      return "需要支持图片和工具调用的模型"
+    if (imageAttachments().some((file) => !ACCEPTED_IMAGE_TYPES.includes(file.mime))) return "请移除非图片附件"
+    if (!props.controls.session.id && !imageAttachments().length) return "请先添加图片"
+  }
   const handleSubmit = (event: Event) => {
+    if (props.variant === "mobile" && (working() || mobileBlock())) {
+      event.preventDefault()
+      return
+    }
     if (!uploadStatus.pending && !initializing()) {
       if (!props.research) return submission.handleSubmit(event)
       event.preventDefault()
@@ -1627,7 +1661,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
       }
     }
 
-    if (!props.research?.mode && event.key === "!" && store.mode === "normal") {
+    if (!props.research?.mode && props.variant !== "mobile" && event.key === "!" && store.mode === "normal") {
       const cursorPosition = getCursorPosition(editorRef)
       if (cursorPosition === 0) {
         setStore("mode", "shell")
@@ -1777,6 +1811,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   )
 
   const designPlaceholder = () => {
+    if (props.mobileImages && !props.controls.session.id) return "上传图片开始解读"
+    if (props.variant === "mobile") return "请输入您想知道的内容"
     if (props.research?.mode) return "请告诉您要研究的问题？"
     if (store.mode === "shell") return placeholder()
     if (newSession()) return "请告诉您要研究的问题？@召唤领域专家团，/调用技能与指令"
@@ -1814,6 +1850,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   }))
 
   const newSession = () => props.variant === "new-session"
+  const mobile = () => props.variant === "mobile"
   const floatingCmccActions = () => newSession() || props.variant === "dock"
   const bindEditorRef = (el: HTMLDivElement) => {
     editorRef = el
@@ -1963,8 +2000,23 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         </div>
       </Show>
       <Switch>
-        <Match when={props.controls.newLayoutDesigns}>
+        <Match when={props.controls.newLayoutDesigns || mobile()}>
           <div class="flex min-w-0 flex-col">
+            <Show when={mobile()}>
+              <div class="cmcc-mobile-model">
+                <HomeModelControl
+                  model={props.controls.model.selection}
+                  loading={providersLoading()}
+                  style={control()}
+                  onOpen={cancelFocusRestore}
+                  onClose={() => {}}
+                  modelFilter={props.mobileImages ? imageToolModel : undefined}
+                />
+              </div>
+              <Show when={!blank() || mobileBlock() !== "请先添加图片"}>
+                <Show when={mobileBlock()}>{(message) => <p class="cmcc-mobile-input-hint" role="status">{message()}</p>}</Show>
+              </Show>
+            </Show>
             <DockShellForm
               data-component={newSession() ? "session-new-composer" : "session-composer"}
               onSubmit={handleSubmit}
@@ -1972,7 +2024,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 "group/prompt-input w-full bg-v2-background-bg-base": true,
                 "cmcc-home-composer-surface min-h-[140px]": newSession(),
                 "rounded-[16px] border border-[#2c5dff] shadow-[0_4px_8px_rgba(50,6,249,0.15)] min-h-[96px]":
-                  !newSession(),
+                  !newSession() && !mobile(),
+                "cmcc-mobile-input": mobile(),
                 "border-icon-info-active border-dashed": store.draggingType !== null,
                 [props.class ?? ""]: !!props.class,
               }}
@@ -2051,9 +2104,10 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                   </div>
                 </div>
               </div>
-              <div class="flex h-11 items-center px-2" classList={{ "home-composer-toolbar": newSession() }}>
+              <div class="flex h-11 items-center px-2" classList={{ "home-composer-toolbar": newSession(), "cmcc-mobile-input-tools": mobile() }}>
                 <div class="flex min-w-0 flex-1 items-center gap-1">
                   {fileAttachmentInput()}
+                  <Show when={mobile()} fallback={<>
                   <Show when={floatingCmccActions()} fallback={cmccActionButton()}>
                     <HomeActionsPopover
                       open={newSession() ? !!actions.panel : actions.panel === "menu"}
@@ -2153,6 +2207,11 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                       </TooltipV2>
                     </div>
                   </Show>
+                  </>}>
+                    <button type="button" aria-label={props.mobileImages ? "上传图片" : "上传附件"} class="cmcc-mobile-input-icon" onClick={pick}>
+                      <img src={mobileAttachIcon} alt="" />
+                    </button>
+                  </Show>
                 </div>
                 <Show when={props.research?.mode && props.research}>
                   {(research) => <div class="home-agent-control" role="group" aria-label="研究模式">
@@ -2186,6 +2245,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     }}
                   />
                 </Show>
+                <Show when={mobile()} fallback={
                 <TooltipV2 placement="top" inactive={!working() && blank()} value={tip()}>
                   <PromptSendButton
                     data-action="prompt-submit"
@@ -2196,6 +2256,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                     aria-label={stopping() ? language.t("prompt.action.stop") : language.t("prompt.action.send")}
                   />
                 </TooltipV2>
+                }>
+                  <button
+                    type={working() ? "button" : "submit"}
+                    disabled={!working() && (blank() || initializing() || uploadStatus.pending > 0 || !!mobileBlock())}
+                    aria-label={working() ? "停止回复" : "发送"}
+                    class="cmcc-mobile-input-icon"
+                    onClick={() => { if (working()) void abort() }}
+                  >
+                    <Show when={!working()} fallback={<Icon name="stop" />}>
+                      <img src={mobileSendIcon} alt="" />
+                    </Show>
+                  </button>
+                </Show>
               </div>
             </DockShellForm>
             <Show when={newSession() && quickPresetView()}>

@@ -208,6 +208,8 @@ type PromptSubmitInput = {
   onAbort?: () => void
   onSubmit?: () => void
   selectedAgent?: Accessor<string | undefined>
+  imageOnlyPrompt?: Accessor<string | undefined>
+  artifactSkill?: Accessor<string | undefined>
   knowledge?: Accessor<KnowledgeReference | undefined>
 }
 
@@ -307,10 +309,14 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       prompt: target.current(),
       context: target.context.items().slice(),
     })
-    const currentPrompt = submission.prompt
     const context = submission.context
-    const text = currentPrompt.map((part) => ("content" in part ? part.content : "")).join("")
     const images = input.imageAttachments().slice()
+    const enteredText = submission.prompt.map((part) => ("content" in part ? part.content : "")).join("")
+    const imageOnlyText = !params.id && !enteredText.trim() && images.length ? input.imageOnlyPrompt?.() : undefined
+    const text = imageOnlyText ?? enteredText
+    const currentPrompt: Prompt = imageOnlyText
+      ? [{ type: "text", content: imageOnlyText, start: 0, end: imageOnlyText.length }, ...images]
+      : submission.prompt
     const mode = input.mode()
 
     if (text.trim().length === 0 && images.length === 0 && input.commentCount() === 0) {
@@ -429,7 +435,14 @@ export function createPromptSubmit(input: PromptSubmitInput) {
               client = sdk().createClient({ directory: sessionDirectory, throwOnError: true })
             }
             serverSync().child(sessionDirectory)
-            return { ...openCodeSession, title: binding.title, directory: binding.directoryPath }
+            return {
+              ...openCodeSession,
+              ...(draftID && tabs.draft(draftID).mobileOwner !== undefined && selectedAgent
+                ? { agent: selectedAgent }
+                : {}),
+              title: binding.title,
+              directory: binding.directoryPath,
+            }
           }
           return (
             await client.session.create({
@@ -485,7 +498,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       system: knowledge
         ? cmccKnowledgeSystemPrompt(knowledge)
         : artifactDirectory
-          ? cmccArtifactSystemPrompt(sessionDirectory, artifactDirectory)
+          ? cmccArtifactSystemPrompt(sessionDirectory, artifactDirectory, input.artifactSkill?.())
           : undefined,
       variant,
     }

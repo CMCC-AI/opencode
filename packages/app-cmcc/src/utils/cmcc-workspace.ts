@@ -106,10 +106,15 @@ export function cmccArtifactDirectory(metadata: unknown, runtime?: string): stri
   return artifact
 }
 
-export function cmccArtifactSystemPrompt(runtime: string, artifact: string): string {
+export function cmccArtifactSystemPrompt(runtime: string, artifact: string, skill?: string): string {
   return [
     `本次会话的独立产物目录是 ${artifact}，稳定运行目录是 ${runtime}。`,
-    "所有文件工具都必须使用该产物目录内的绝对路径；所有 shell 命令都必须把 workdir 指向该产物目录。",
+    skill
+      ? "处理用户材料和会话产物的文件工具必须使用该产物目录内的绝对路径；所有 shell 命令都必须把 workdir 指向该产物目录。"
+      : "所有文件工具都必须使用该产物目录内的绝对路径；所有 shell 命令都必须把 workdir 指向该产物目录。",
+    ...(skill ? [
+      `仅可从 skill 工具返回的 ${skill} 安装目录只读使用技能参考资料和脚本，不得写入该目录，也不放开其他外部路径。`,
+    ] : []),
     "所有新建、修改、下载和生成的文件都必须限制在该独立产物目录内；调用子 agent 时必须显式传递并让其继承同一目录边界。",
     "不得读取或覆盖 runs 下其他会话目录；相对工作区路径均以该独立产物目录为基准。",
   ].join("\n")

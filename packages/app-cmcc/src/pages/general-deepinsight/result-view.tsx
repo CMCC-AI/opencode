@@ -31,6 +31,7 @@ export function ResearchResultView(props: {
   elapsed: string
   busy: boolean
   readOnly: boolean
+  historyView?: boolean
   small: boolean
   editor?: JSX.Element
   editing: boolean
@@ -783,7 +784,7 @@ export function ResearchResultView(props: {
                   <button class="view-btn" onClick={props.onMarkdown}>
                     导出Markdown
                   </button>
-                  <Show when={!props.readOnly && completed()}>
+                  <Show when={(!props.readOnly || props.historyView) && completed()}>
                     <button class="view-btn" disabled={props.busy} onClick={props.onPdf}>
                       导出 PDF
                     </button>
@@ -933,7 +934,7 @@ export function ResearchResultView(props: {
           stage={labels[activeNode()!] ?? "正在回放"}
           progress={view.progress}
           onReplay={replay}
-          onCreateSame={props.onSame}
+          onCreateSame={props.historyView ? undefined : props.onSame}
         />
       </Show>
     </div>

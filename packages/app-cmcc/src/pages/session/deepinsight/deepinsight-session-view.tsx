@@ -6,7 +6,7 @@ import { AgentAvatar, StatusBadge } from "../deeptrading/deeptrading-session-vie
 import { deepInsightAvatar, deepInsightTeamAvatar } from "./config"
 import { useDeepInsightWorkbench } from "./workbench-context"
 
-export function DeepInsightSessionView() {
+export function DeepInsightSessionView(props: { readOnly?: boolean } = {}) {
   const context = useDeepInsightWorkbench()
   let scroller: HTMLDivElement | undefined
   const selected = createMemo(() => {
@@ -78,7 +78,7 @@ export function DeepInsightSessionView() {
                       </div>
                       <Show
                         when={
-                          item().id !== "overview" &&
+                          !props.readOnly && item().id !== "overview" &&
                           "sessionId" in item() &&
                           item().sessionId &&
                           item().status === "failed"

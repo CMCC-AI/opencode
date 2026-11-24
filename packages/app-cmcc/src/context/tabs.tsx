@@ -30,6 +30,7 @@ export type DraftTab = {
   agent?: string
   homeTeamPicker?: boolean
   researchMode?: "quick" | "deep"
+  mobileOwner?: number
 }
 
 export type Tab = SessionTab | DraftTab
@@ -41,7 +42,9 @@ type RecentTab = {
 export const draftHref = (draftID: string) => `/new-session?draftId=${encodeURIComponent(draftID)}`
 
 export const tabHref = (tab: Tab) =>
-  tab.type === "draft" ? draftHref(tab.draftID) : sessionHref(tab.server, tab.sessionId)
+  tab.type === "draft"
+    ? tab.mobileOwner === undefined ? draftHref(tab.draftID) : `/mobile?draftId=${encodeURIComponent(tab.draftID)}`
+    : sessionHref(tab.server, tab.sessionId)
 
 export const tabKey = (tab: Tab) => (tab.type === "draft" ? `draft:${tab.draftID}` : `${tab.server}\n${tabHref(tab)}`)
 
@@ -176,14 +179,15 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
           setStore(
             produce((tabs) => {
               tabs.push({ type: "draft", draftID, ...draft,
-                researchMode: draft.researchMode ?? (draft.expertID === "deepinsight" ? "deep" : undefined),
+                researchMode: draft.researchMode ?? (draft.mobileOwner === undefined && draft.expertID === "deepinsight" ? "deep" : undefined),
                 agent: options?.agent ?? draft.agent })
             }),
           )
           const params = new URLSearchParams({ draftId: draftID })
           if (prompt) params.set("prompt", prompt)
           if (options?.agent) params.set("agent", options.agent)
-          navigate(`/new-session?${params.toString()}`)
+          const mobile = draft.mobileOwner !== undefined
+          navigate(`${mobile ? "/mobile" : "/new-session"}?${params.toString()}`, { replace: mobile && location.pathname === "/mobile" })
         })
       },
       updateDraft(draftID: string, draft: Partial<Omit<DraftTab, "type" | "draftID">>) {
@@ -207,6 +211,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
         // Keep the replacement and navigation atomic so /new-session never renders
         // after its backing draft tab has been removed from the store.
         const active = location.pathname === "/new-session" && location.query.draftId === draftID
+        const mobile = location.pathname === "/mobile" && location.query.draftId === draftID
         const next = { type: "session" as const, ...session }
         void startTransition(() => {
           setStore(
@@ -217,6 +222,7 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
           )
           if (recent.key === `draft:${draftID}`) setRecentKey(tabKey(next))
           if (active) navigateTab(next)
+          if (mobile) navigate(`/mobile/history/opencode/${encodeURIComponent(next.sessionId)}`, { replace: true })
         })
         memory.remove(`draft:${draftID}`)
         removeDraftPersisted(draftID)

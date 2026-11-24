@@ -22,7 +22,7 @@ const TABS: Array<{ id: DeepInsightTab; label: string }> = [
   { id: "visual", label: "可视化报告" },
 ]
 
-export function DeepInsightResultsPanel(props: { onCreateSame?: () => void } = {}) {
+export function DeepInsightResultsPanel(props: { onCreateSame?: () => void; readOnly?: boolean } = {}) {
   const context = useDeepInsightWorkbench()
   const dockapi = useDockApi()
   const server = useServer()
@@ -152,7 +152,7 @@ export function DeepInsightResultsPanel(props: { onCreateSame?: () => void } = {
           stage={replayStageLabel(context.replay.stage())}
           progress={context.replay.progress()}
           onReplay={toggleReplay}
-          onCreateSame={createSame}
+          onCreateSame={props.readOnly ? undefined : createSame}
         />
       </Show>
     </div>
