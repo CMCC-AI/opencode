@@ -119,7 +119,10 @@ async function prepare(page: Page) {
     },
     async switchUser() {
       userId += 1
-      await page.evaluate(() => window.dispatchEvent(new StorageEvent("storage", { key: "dockapi.accessToken" })))
+      await page.evaluate((id) => {
+        localStorage.setItem("dockapi.accessToken", `case-loading-user-${id}`)
+        window.dispatchEvent(new StorageEvent("storage", { key: "dockapi.accessToken" }))
+      }, userId)
     },
   }
 }
