@@ -43,10 +43,53 @@
 - 红色只用于风险与异常；普通序列用商务蓝体系（#173f5f/#2d6da3/#6b9bd1/#c9a227 点缀）；
 - 坐标轴不截断夸大差异。
 
+## 3b. 图型多样性（硬规则）
+
+**整份报告柱状图（含横向 bar）不超过一半；至少出现 3 种不同图型。** 时间序列类信息（节律、趋势、预测）禁止用柱状图表达；构成类信息优先环形/百分比堆叠而非柱。
+
+| 内容 | 首选图型 | 备注 |
+|---|---|---|
+| 排名/单指标跨点位对比 | bar（横/竖） | 每报告此类最多 2—3 张 |
+| 时间趋势、峰谷节律 | line | 异常日可叠 markPoint |
+| 预测区间 | line + 区间带（见下） | 禁用三根柱表达区间 |
+| 客群/业态/来源构成 | pie/donut（半径 42%—68%） | 多点位构成用百分比堆叠柱 |
+| 多维评分对比（≤3 候选） | radar | 维度即七维评分子集 |
+| 利润 × 亏损概率等双变量 | scatter + markLine 四象限 | 风险收益图，点标点位名 |
+| 供需四象限 | scatter + markLine（需求/供给中线） | 象限内标点位名 |
+| 区域 × 时段热度 | heatmap | 分区客流/坪效常用 |
+| 预测/指标区间（跨少量点位） | candlestick（box=上下限）+ scatter（推演点） | 比三根柱清晰 |
+
+**预测区间带（时间轴）标准写法**——下界透明线 +（上界−下界）面积线堆叠：
+
+```js
+series: [
+  { name: "下界", type: "line", stack: "band", symbol: "none", lineStyle: { opacity: 0 }, data: lower },
+  { name: "推演区间", type: "line", stack: "band", symbol: "none", lineStyle: { opacity: 0 },
+    areaStyle: { color: "rgba(45,109,163,0.16)" }, data: upper.map((v, i) => +(v - lower[i]).toFixed(1)) },
+  { name: "推演值", type: "line", data: mid, itemStyle: { color: "#173f5f" }, lineStyle: { width: 2.5 } }
+]
+```
+
+**区间蜡烛图（类目轴，跨点位区间）标准写法**——`[open, close, low, high]` 四元组，box 即区间。**类目轴必须放 xAxis（竖向蜡烛）：本引擎打包的 echarts 5.5.1 横向蜡烛图（yAxis category）会在渲染时抛 `reading 'sign'` 崩溃**，竖向已实测可用：
+
+```js
+series: [
+  { name: "推演区间", type: "candlestick",
+    itemStyle: { color: "#dce8f3", color0: "#dce8f3", borderColor: "#2d6da3", borderColor0: "#2d6da3" },
+    data: lower.map((l, i) => [l, upper[i], l, upper[i]]) },   // xAxis 为 category（点位名）
+  { name: "推演日均值", type: "scatter", symbolSize: 10,
+    itemStyle: { color: "#173f5f" }, label: { show: true, position: "top", fontSize: 10 },
+    data: mid.map((v, i) => [i, v]) }                          // x 为类目索引，y 为数值
+]
+```
+
+**环形构成**：`{ type: "pie", radius: ["42%", "68%"], label: { formatter: "{b} {d}%" }, data: [{ name, value }, ...] }`
+**四象限散点**：`series: [{ type: "scatter", data: [{ name: "云澜广场", value: [9.63, 18.0] }, ...], label: { show: true, position: "top", formatter: "{b}" }, markLine: { data: [{ xAxis: 0 }, { yAxis: 50 }] } }]`
+
 ## 4. 61-quick-charts.json 写法
 
 - `hero_stats`（≤5）：决策级数据卡，如"推荐点位 SITE-X""综合得分 8.2/10""盈亏平衡客流 1,847 人/日""预测区间 ±12%"；
-- `charts`（≤8，渲染引擎上限 6——**优先 ≤6**）：每图 id/title/option，附 `table`（列 ≥2，与图同源）；全部数字只取 20-analysis/30-model 已登记值，**禁止未入稿、不可比、编造数值进图**；
+- `charts`（≤8，渲染引擎上限 6——**优先 ≤6**）：每图 id/title/option，附 `table`（列 ≥2，与图同源）；全部数字只取 20-analysis/30-model 已登记值，**禁止未入稿、不可比、编造数值进图**；**图型遵守 §3b 多样性硬规则（柱状 ≤ 一半、≥3 种图型、时序禁柱）**，常用 option 模式照抄 §3b 片段；
 - option 中的颜色用商务蓝体系；数字格式与正文一致（千分位、单位、小数位）。
 
 ## 5. 一致性自核（成文后、渲染前，对照检查一次）
