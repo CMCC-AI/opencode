@@ -115,6 +115,7 @@ export function CmccCasesRoute() {
     }
   }
   let generation = 0
+  let overviewGeneration = 0
   createEffect(on(() => dockapi.user?.id, cancelOpening))
   let sentinel: HTMLDivElement | undefined
   let observer: IntersectionObserver | undefined
@@ -122,19 +123,25 @@ export function CmccCasesRoute() {
   const filtered = () =>
     !!state.keyword || state.category !== "all" || state.sort !== "latest" || !!state.from || !!state.to
 
+  const hasCategoryCases = (category: string) =>
+    state.overview.some((group) => group.category === category && group.items.length > 0)
+
   const loadOverview = async () => {
-    const run = ++generation
+    const overviewRun = ++overviewGeneration
+    const run = filtered() ? undefined : ++generation
     const cached = dockapi.cases.cachedOverview()
-    setState({ loading: !cached, refreshing: !!cached, loadingMore: false, error: "" })
+    if (run !== undefined) setState({ loading: !cached, refreshing: !!cached, loadingMore: false, error: "" })
     if (cached) setState("overview", cached.groups)
     await dockapi.cases
       .overview()
       .then((result) => {
-        if (run !== generation) return
-        setState({ overview: result.groups, loading: false, refreshing: false })
+        if (overviewRun !== overviewGeneration) return
+        setState("overview", result.groups)
+        if (run === generation) setState({ loading: false, refreshing: false })
+        if (state.category !== "all" && !hasCategoryCases(state.category)) setState("category", "all")
       })
       .catch((error) => {
-        if (run !== generation) return
+        if (overviewRun !== overviewGeneration || run !== generation) return
         setState({
           loading: false,
           refreshing: false,
@@ -211,7 +218,7 @@ export function CmccCasesRoute() {
   const reload = () => {
     cancelOpening()
     if (filtered()) void loadList(1)
-    else void loadOverview()
+    void loadOverview()
   }
 
   onMount(() => {
@@ -237,6 +244,7 @@ export function CmccCasesRoute() {
   onCleanup(() => {
     cancelOpening()
     generation += 1
+    overviewGeneration += 1
     window.removeEventListener(CMCC_CASES_UPDATED_EVENT, reload)
     window.removeEventListener("dockapi-auth-cleared", cancelOpening)
     observer?.disconnect()
@@ -321,7 +329,7 @@ export function CmccCasesRoute() {
           </div>
           <nav class="case-catalog-tabs" aria-label="案例分类">
             <CategoryButton label="全部" selected={state.category === "all"} onClick={() => setState("category", "all")} />
-            <For each={caseCategories}>
+            <For each={caseCategories.filter((category) => hasCategoryCases(category.code))}>
               {(category) => (
                 <CategoryButton
                   label={category.label}

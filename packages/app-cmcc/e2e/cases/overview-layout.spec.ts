@@ -58,6 +58,11 @@ async function prepare(page: Page, scienceCount = 4, canManage = false) {
     const detail = groups
       .flatMap((group) => group.items)
       .find((item) => url.pathname === `/api/dockapi/cases/${item.caseCode}`)
+    if (detail && route.request().method() === "DELETE") {
+      const group = groups.find((group) => group.category === detail.category)!
+      group.items = group.items.filter((item) => item.caseCode !== detail.caseCode)
+      return json(null)
+    }
     if (detail)
       return json({
         ...detail,
@@ -201,6 +206,9 @@ for (const count of [0, 1, 2, 3]) {
     await page.setViewportSize({ width: 1440, height: 900 })
     await prepare(page, count)
     const science = page.locator('[data-case-group="science"]')
+    const categories = page.getByRole("navigation", { name: "案例分类" })
+    await expect(categories.getByRole("button", { name: "全部", exact: true })).toBeVisible()
+    await expect(categories.getByRole("button", { name: "AI+科研", exact: true })).toHaveCount(count ? 1 : 0)
     await expect(science.locator("[data-case-card]")).toHaveCount(count)
     if (!count) return expect(science).toHaveCount(0)
     const generalCards = await boxes(page.locator('[data-case-group="deep-research"] [data-case-card]'))
@@ -249,6 +257,8 @@ test("each group uses its category icon without requesting uploaded covers", asy
 
 test("search, sorting and date filters remain available without card metadata", async ({ page }) => {
   const { listRequests } = await prepare(page)
+  const categories = page.getByRole("navigation", { name: "案例分类" })
+  const tabs = await categories.getByRole("button").allTextContents()
   await page.getByPlaceholder("搜索案例行业或研究主题").fill("科研")
   await expect.poll(() => listRequests.at(-1)?.get("keyword")).toBe("科研")
   await expect(page.locator("[data-case-card]")).toHaveCount(4)
@@ -267,6 +277,22 @@ test("search, sorting and date filters remain available without card metadata", 
   await page.getByRole("button", { name: "完成", exact: true }).click()
   await expect(page.locator('input[type="date"]')).toHaveCount(0)
   await expectCompactCards(page)
+  await page.getByPlaceholder("搜索案例行业或研究主题").fill("无匹配案例")
+  await expect(page.getByText("暂无符合条件的案例", { exact: true })).toBeVisible()
+  await expect(categories.getByRole("button")).toHaveText(tabs)
+})
+
+test("deleting the last case in a selected category returns to all cases", async ({ page }) => {
+  await prepare(page, 1, true)
+  const categories = page.getByRole("navigation", { name: "案例分类" })
+  const science = categories.getByRole("button", { name: "AI+科研", exact: true })
+  await science.click()
+  await expect(science).toHaveAttribute("aria-pressed", "true")
+  await page.getByRole("button", { name: "删除案例 AI+科研案例 1", exact: true }).click()
+  await page.getByRole("button", { name: "确认删除", exact: true }).click()
+  await expect(science).toHaveCount(0)
+  await expect(categories.getByRole("button", { name: "全部", exact: true })).toHaveAttribute("aria-pressed", "true")
+  await expect(page.locator('[data-case-group="deep-research"] [data-case-card]')).toHaveCount(4)
 })
 
 test("delete entry and opening the case retain their existing actions", async ({ page }) => {
