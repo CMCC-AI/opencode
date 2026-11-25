@@ -71,7 +71,7 @@ test("login home and both sidebar entries open independent blank Deep Research d
   const heading = page.getByRole("heading", { name: "DeepInsight深度洞察", exact: true })
   const composer = page.locator(".cmcc-home-composer")
   const drafts = new Set<string>()
-  for (const entry of [undefined, "新对话", "深度研究"]) {
+  for (const entry of [undefined, "深度研究"]) {
     if (entry) await sidebar.getByRole("button", { name: entry, exact: true }).click()
     await expect(homeTeam(page)).toHaveAccessibleName("切换专家团，当前：深度研究专家团")
     await expectPageBrandBar(page, heading)
@@ -83,7 +83,16 @@ test("login home and both sidebar entries open independent blank Deep Research d
     drafts.add(new URL(page.url()).searchParams.get("draftId")!)
     await editor(page).fill("这个问题只属于当前草稿")
   }
+  await sidebar.getByRole("button", { name: "新对话", exact: true }).click()
+  await expect(homeTeam(page)).toHaveAccessibleName("切换专家团，当前：灵犀")
+  await expectPageBrandBar(page, heading)
+  await expect(page.getByRole("group", { name: "研究模式" })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "执行", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "计划", exact: true })).toBeVisible()
+  await expect(editor(page)).toHaveText("")
+  drafts.add(new URL(page.url()).searchParams.get("draftId")!)
   expect(drafts.size).toBe(3)
+  await editor(page).fill("这个问题只属于当前草稿")
   await homeTeam(page).click()
   const menu = page.getByRole("menu", { name: "切换专家团" })
   await expect(menu.getByRole("menuitem")).toHaveCount(7)
