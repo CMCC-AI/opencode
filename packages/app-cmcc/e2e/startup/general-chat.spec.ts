@@ -235,3 +235,64 @@ test("tool records retain details and the right panel stays usable", async ({ pa
   await page.screenshot({ path: info.outputPath("tools-and-panels.png") })
   expect(data.errors).toEqual([])
 })
+
+test("desktop classic conversations fold the process, not the final answer", async ({ page, baseURL }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const data = await setupGeneralChat(page, { turns: 1 })
+  const parts = data.messages.at(-1)!.parts
+  const tool = parts[0]!
+  const answer = parts[1]!
+  parts.splice(
+    0, parts.length,
+    { ...answer, id: "part-01", text: "先检查输入材料。" },
+    { ...tool, id: "part-02" },
+    { ...answer, id: "part-03", text: "工作目录已建好，开始核对。" },
+    { ...tool, id: "part-04", callID: "call-next" },
+    { ...answer, id: "part-05", text: "## 研究结论\n\n这是保留在思考区之外的正式回答。" },
+  )
+  await page.goto(data.href(baseURL!))
+  const thinking = page.getByRole("button", { name: "已完成思考" })
+  const body = page.locator(".cmcc-chat-progress-body")
+  const finalAnswer = page.locator('[data-timeline-part-id="part-05"]')
+  await expect(thinking).toHaveAttribute("aria-expanded", "true")
+  await expect(body.getByText("工作目录已建好，开始核对。")).toBeVisible()
+  await expect(body.locator(".tool-collapsible").first()).toHaveCSS("background-color", "rgb(245, 245, 246)")
+  await expect(body.locator('[data-timeline-part-id="part-05"]')).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath("classic-progress.png") })
+  await thinking.click()
+  await expect(thinking).toHaveAttribute("aria-expanded", "false")
+  await expect(body).toHaveCount(0)
+  await expect(finalAnswer.getByText("研究结论")).toBeVisible()
+  await thinking.click()
+  await expect(body.getByText("先检查输入材料。")).toBeVisible()
+  expect(data.errors).toEqual([])
+})
+
+for (const [agentType, agent, name] of [
+  ["deeptrading", "deeptrading/deeptrading-lite-quick", "DeepTrading 财经分析专家团"],
+  ["deeptrading", "deeptrading/deeptrading-quick", "DeepTrading 财经分析专家团"],
+  ["shoppers-pro", "shoppers-pro/shoppers-pro-quick", "Shoppers Pro 购买决策专家团"],
+  ["deepinspect", "deepinspect/deepinspect-quick", "DeepInspect 巡察分析专家团"],
+  ["zhengqi-visit-intel", "zhengqi-visit-intel/zhengqi-visit-intel-quick", "DeepEngage 谈参高拜专家团"],
+  ["deepgeo", "deepgeo/deepgeo-quick", "DeepGeo 位置决策专家团"],
+  ["ai-for-science-team", "ai-for-science-team/ai-for-science-team-quick", "AI for Science 科研专家团"],
+] as const) {
+  test(`desktop classic layout keeps ${agent} for follow-up`, async ({ page, baseURL }) => {
+    const data = await setupGeneralChat(page, { agentType, agent, turns: 1 })
+    let submitted: string | undefined
+    await page.route(`**/session/${data.session.id}/prompt_async*`, async (route) => {
+      submitted = route.request().postDataJSON().agent
+      await route.fulfill({ status: 204 })
+    })
+    await page.goto(data.href(baseURL!))
+    await expect(page.locator('[data-cmcc-general-chat="true"]')).toHaveCount(1)
+    const avatar = page.getByAltText(name, { exact: true })
+    await expect.poll(() => avatar.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0)
+    await expect(avatar).toHaveAttribute("src", /(?:\/assets\/team-|^data:image\/png;base64,)/)
+    await expect(page.getByAltText("灵犀", { exact: true })).toHaveCount(0)
+    await page.locator('[data-component="prompt-input"]').fill("继续分析")
+    await page.locator('[data-action="prompt-submit"]').click()
+    await expect.poll(() => submitted).toBe(agent)
+    expect(data.errors).toEqual([])
+  })
+}

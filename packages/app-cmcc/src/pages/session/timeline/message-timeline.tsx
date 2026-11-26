@@ -2,6 +2,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  createUniqueId,
   For,
   Index,
   on,
@@ -93,7 +94,8 @@ type FramedTimelineRow = Exclude<TimelineRow.TimelineRow, { _tag: "TurnGap" }>
 type TimelineRowByTag<T extends TimelineRow.TimelineRow["_tag"]> = Extract<TimelineRow.TimelineRow, { _tag: T }>
 
 const timelineFallbackItemSize = 60
-const timelineCache = new Map<string, { measurements: VirtualItem[]; toolOpen: Record<string, boolean | undefined> }>()
+type DisclosureState = Record<string, boolean | undefined>
+const timelineCache = new Map<string, { measurements: VirtualItem[]; toolOpen: DisclosureState; progressOpen: DisclosureState }>()
 
 const taskDescription = (part: PartType, sessionID: string) => {
   if (part.type !== "tool" || part.tool !== "task") return
@@ -243,6 +245,8 @@ function TimelineDiffView(props: { diff: SummaryDiff }) {
 
 export function MessageTimeline(props: {
   generalChat?: boolean
+  classicProgress?: boolean
+  assistantIdentity?: { name: string; avatar?: string }
   actions?: UserActions
   scroll: { overflow: boolean; bottom: boolean; jump: boolean }
   onResumeScroll: () => void
@@ -342,6 +346,7 @@ export function MessageTimeline(props: {
     parts: getMsgParts,
     status: sessionStatus,
     showReasoningSummaries: settings.general.showReasoningSummaries,
+    classicProgress: () => props.classicProgress ?? false,
   })
   const activeMessageID = projection.activeMessageID
   const assistantMessagesByParent = projection.assistantMessagesByParent
@@ -413,7 +418,8 @@ export function MessageTimeline(props: {
     prependAnchorFrame = requestAnimationFrame(apply)
   }
 
-  const [toolOpen, setToolOpen] = createStore<Record<string, boolean | undefined>>(cached?.toolOpen ?? {})
+  const [toolOpen, setToolOpen] = createStore<DisclosureState>(cached?.toolOpen ?? {})
+  const [progressOpen, setProgressOpen] = createStore<DisclosureState>(cached?.progressOpen ?? {})
   const [renderOverscan, setRenderOverscan] = createSignal(initialMeasurements?.length || coldBottomMount ? 6 : 20)
   let resizePinnedIndexes: number[] = []
   let resizePinFrame: number | undefined
@@ -543,7 +549,11 @@ export function MessageTimeline(props: {
   onCleanup(() => {
     clearPrependAnchor()
     timelineCache.delete(ownerSessionKey)
-    timelineCache.set(ownerSessionKey, { measurements: virtualizer.takeSnapshot(), toolOpen: { ...toolOpen } })
+    timelineCache.set(ownerSessionKey, {
+      measurements: virtualizer.takeSnapshot(),
+      toolOpen: { ...toolOpen },
+      progressOpen: { ...progressOpen },
+    })
     while (timelineCache.size > 16) timelineCache.delete(timelineCache.keys().next().value!)
     if (bottomAnchorFrame !== undefined) cancelAnimationFrame(bottomAnchorFrame)
     if (resizePinFrame !== undefined) cancelAnimationFrame(resizePinFrame)
@@ -993,7 +1003,11 @@ export function MessageTimeline(props: {
     }
   }
 
-  const renderAssistantPartGroup = (row: Accessor<TimelineRowMap["AssistantPart"]>, onSizeChange?: () => void) => {
+  const renderAssistantPartGroup = (
+    row: Accessor<Pick<TimelineRowMap["AssistantPart"], "group" | "userMessageID">>,
+    onSizeChange?: () => void,
+    isProgress = false,
+  ) => {
     if (row().group.type === "context") {
       const parts = createMemo(() => {
         const group = row().group
@@ -1038,7 +1052,7 @@ export function MessageTimeline(props: {
               <MessagePart
                 part={part()}
                 message={message()}
-                showAssistantCopyPartID={assistantCopyPartID(row().userMessageID)}
+                showAssistantCopyPartID={isProgress ? null : assistantCopyPartID(row().userMessageID)}
                 turnDurationMs={turnDurationMs(row().userMessageID)}
                 useV2Actions={settings.general.newLayoutDesigns()}
                 defaultOpen={defaultOpen()}
@@ -1055,8 +1069,52 @@ export function MessageTimeline(props: {
     )
   }
 
+  function TimelineProgress(input: { row: Accessor<TimelineRowMap["Progress"]>; onSizeChange?: () => void }) {
+    const key = () => `${input.row().userMessageID}:${input.row().section}`
+    const open = () => progressOpen[key()] ?? true
+    const body = createUniqueId()
+    const groups = createMemo(() => new Map(input.row().groups.map((group) => [group.key, group] as const)))
+    const groupKeys = createMemo(() => Array.from(groups().keys()))
+    const running = () => !input.row().stopped && workingTurn(input.row().userMessageID)
+
+    return (
+      <div class="cmcc-chat-progress">
+        <button
+          type="button"
+          class="cmcc-chat-progress-toggle"
+          aria-expanded={open()}
+          aria-controls={open() ? body : undefined}
+          onClick={() => {
+            setProgressOpen(key(), !open())
+            input.onSizeChange?.()
+          }}
+        >
+          <Icon name="brain" size="small" />
+          <span>{input.row().stopped ? "思考已结束" : running() ? "正在思考" : "已完成思考"}</span>
+          <Icon name={open() ? "chevron-down" : "chevron-right"} size="small" />
+        </button>
+        <Show when={open()}>
+          <div id={body} class="cmcc-chat-progress-body">
+            <For each={groupKeys()}>
+              {(key) => (
+                <Show when={groups().get(key)}>
+                  {(group) => renderAssistantPartGroup(
+                    () => ({ userMessageID: input.row().userMessageID, group: group() }),
+                    input.onSizeChange,
+                    true,
+                  )}
+                </Show>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+    )
+  }
+
   function TimelineRowFrame(input: { row: Accessor<FramedTimelineRow>; children: JSX.Element }) {
     const speaker = () => (props.generalChat ? generalChatSpeaker(input.row()) : undefined)
+    const assistantName = () => props.assistantIdentity?.name ?? "灵犀"
     const showAvatar = () => {
       if (speaker() === "user") return true
       const first = replyStarts().get(input.row().userMessageID)
@@ -1090,8 +1148,8 @@ export function MessageTimeline(props: {
               <div class="cmcc-chat-avatar">
                 <Show when={showAvatar()}>
                   <img
-                    src={speaker() === "user" ? userAvatar : lingxiAvatar}
-                    alt={speaker() === "user" ? "用户" : "灵犀"}
+                    src={speaker() === "user" ? userAvatar : (props.assistantIdentity?.avatar ?? lingxiAvatar)}
+                    alt={speaker() === "user" ? "用户" : assistantName()}
                     width="36"
                     height="36"
                   />
@@ -1099,7 +1157,7 @@ export function MessageTimeline(props: {
               </div>
               <div class="cmcc-chat-message-body">
                 <Show when={speaker() === "assistant" && showAvatar()}>
-                  <div class="cmcc-chat-speaker">灵犀</div>
+                  <div class="cmcc-chat-speaker">{assistantName()}</div>
                 </Show>
                 {input.children}
               </div>
@@ -1211,6 +1269,14 @@ export function MessageTimeline(props: {
                 {renderAssistantPartGroup(assistantPartRow, onSizeChange)}
               </div>
             </div>
+          </TimelineRowFrame>
+        )
+      }
+      case "Progress": {
+        const progressRow = row as Accessor<TimelineRowByTag<"Progress">>
+        return (
+          <TimelineRowFrame row={progressRow}>
+            <TimelineProgress row={progressRow} onSizeChange={onSizeChange} />
           </TimelineRowFrame>
         )
       }

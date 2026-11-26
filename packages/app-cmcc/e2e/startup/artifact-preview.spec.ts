@@ -117,6 +117,10 @@ test("general chat side panel keeps its actions and file preview at narrow width
     "## 研究材料整理\n\n### 分析步骤\n\n1. 核对输入材料和引用来源。\n2. 整理关键事实，标记待核对项。\n\n| 项目 | 状态 |\n| --- | --- |\n| 材料完整性 | 已核对 |\n| 引用来源 | 待复核 |",
   )
   await page.goto(data.href(baseURL!))
+  const thinking = page.getByRole("button", { name: "已完成思考" })
+  await expect(thinking).toHaveAttribute("aria-expanded", "true")
+  await thinking.click()
+  await expect(thinking).toHaveAttribute("aria-expanded", "false")
   await openRight(page)
   const panel = page.locator("#review-panel")
   const artifact = panel.getByRole("button", { name: /^产出/ })

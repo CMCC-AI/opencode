@@ -30,7 +30,7 @@ export async function setupGeneralChat(
         sessionID: session.id,
         role: "user",
         time: { created: 1000 + index * 100 },
-        agent: "build",
+        agent: session.agent,
         model: { providerID: "alibaba-cn", modelID: "chat-test", variant: "high" },
       },
       parts: [
@@ -50,7 +50,7 @@ export async function setupGeneralChat(
         sessionID: session.id,
         role: "assistant",
         time: { created: 1001 + index * 100, completed: 1050 + index * 100 },
-        agent: "build",
+        agent: session.agent,
         mode: "build",
         providerID: "alibaba-cn",
         modelID: "chat-test",

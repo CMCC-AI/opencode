@@ -2,8 +2,11 @@ import { parseCommentNote, readCommentMetadata } from "@/utils/comment-note"
 import { AssistantMessage, Part, SessionStatus, SnapshotFileDiff, UserMessage } from "@opencode-ai/sdk/v2"
 import { groupParts, PartGroup, renderable } from "@opencode-ai/session-ui/message-part"
 import { Data, Equal } from "effect"
+import { splitClassicProgress } from "./classic-progress"
 
 export type SummaryDiff = SnapshotFileDiff & { file: string }
+
+type ProgressRow = { userMessageID: string; section: number; groups: PartGroup[]; stopped: boolean }
 
 export type TimelineRowMap = {
   TurnGap: { userMessageID: string }
@@ -23,6 +26,7 @@ export type TimelineRowMap = {
     group: PartGroup
     previousAssistantPart: boolean
   }
+  Progress: ProgressRow
   Thinking: { userMessageID: string; reasoningHeading?: string }
   Retry: { userMessageID: string }
   DiffSummary: { userMessageID: string; diffs: SummaryDiff[] }
@@ -49,6 +53,7 @@ export namespace TimelineRow {
     group: PartGroup
     previousAssistantPart: boolean
   }> {}
+  export class Progress extends Data.TaggedClass("Progress")<ProgressRow> {}
   export class Thinking extends Data.TaggedClass("Thinking")<{
     userMessageID: string
     reasoningHeading?: string
@@ -71,6 +76,7 @@ export namespace TimelineRow {
     | UserMessage
     | TurnDivider
     | AssistantPart
+    | Progress
     | Thinking
     | DiffSummary
     | Error
@@ -88,6 +94,8 @@ export namespace TimelineRow {
         return `turn-divider:${row.userMessageID}:${row.label}`
       case "AssistantPart":
         return `assistant-part:${row.userMessageID}:${row.group.key}`
+      case "Progress":
+        return `progress:${row.userMessageID}:${row.section}`
       case "Thinking":
         return `thinking:${row.userMessageID}`
       case "DiffSummary":
@@ -113,6 +121,7 @@ export namespace Timeline {
     showReasoning: boolean,
     status: SessionStatus["type"],
     isActive: boolean,
+    classicProgress = false,
   ) {
     const rows: TimelineRow.TimelineRow[] = []
 
@@ -129,24 +138,29 @@ export namespace Timeline {
         .filter((part) => renderable(part, showReasoning))
         .map((part) => ({ messageID: message.id, messageIndex, part })),
     )
+    const working = isActive && status !== "idle"
+    const lastAssistant = assistantMessages.at(-1)
+    const finished =
+      !working &&
+      !!lastAssistant?.finish &&
+      !lastAssistant.error &&
+      !["tool-calls", "unknown"].includes(lastAssistant.finish)
+    const partsFor = (refs: typeof assistantPartRefs, section = 0, stopped = false) => {
+      const { progress, answer } = classicProgress
+        ? splitClassicProgress(refs, finished && !stopped)
+        : { progress: [], answer: refs }
+      const parts = groupParts(answer).map((group) => ({ type: "part" as const, group }))
+      if (!progress.length) return parts
+      return [{ type: "progress" as const, section, groups: groupParts(progress), stopped }, ...parts]
+    }
     const assistantItems =
       interrupted && !compaction
         ? [
-            ...groupParts(assistantPartRefs.filter((ref) => ref.messageIndex <= interruptedMessageIndex)).map(
-              (group) => ({
-                type: "part" as const,
-                group,
-              }),
-            ),
+            ...partsFor(assistantPartRefs.filter((ref) => ref.messageIndex <= interruptedMessageIndex), 0, true),
             { type: "interrupted" as const },
-            ...groupParts(assistantPartRefs.filter((ref) => ref.messageIndex > interruptedMessageIndex)).map(
-              (group) => ({
-                type: "part" as const,
-                group,
-              }),
-            ),
+            ...partsFor(assistantPartRefs.filter((ref) => ref.messageIndex > interruptedMessageIndex), 1, !!error),
           ]
-        : groupParts(assistantPartRefs).map((group) => ({ type: "part" as const, group }))
+        : partsFor(assistantPartRefs, 0, !!error || interrupted)
     if (previousUserMessage) rows.push(new TimelineRow.TurnGap({ userMessageID: userMessage.id }))
 
     if (comments.length > 0)
@@ -183,6 +197,15 @@ export namespace Timeline {
         )
         return
       }
+      if (item.type === "progress") {
+        rows.push(new TimelineRow.Progress({
+          userMessageID: userMessage.id,
+          section: item.section,
+          groups: item.groups,
+          stopped: item.stopped,
+        }))
+        return
+      }
 
       rows.push(
         new TimelineRow.AssistantPart({
@@ -194,7 +217,9 @@ export namespace Timeline {
       assistantGroupIndex += 1
     })
 
-    if (isActive && status === "busy" && !error && (showReasoning ? assistantPartRefs.length === 0 : true)) {
+    if (isActive && status === "busy" && !error && (
+      classicProgress || showReasoning ? assistantPartRefs.length === 0 : true
+    )) {
       const heading = assistantMessages
         .flatMap((message) => getMessageParts(message.id))
         .map((part) => (part.type === "reasoning" && part.text ? reasoningHeading(part.text) : undefined))

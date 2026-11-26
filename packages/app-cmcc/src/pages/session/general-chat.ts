@@ -13,7 +13,7 @@ export function isGeneralConversation(input: {
 
 export function generalChatSpeaker(row: { _tag: string }) {
   if (row._tag === "UserMessage") return "user"
-  if (["AssistantPart", "Thinking", "Retry", "Error"].includes(row._tag)) return "assistant"
+  if (["AssistantPart", "Progress", "Thinking", "Retry", "Error"].includes(row._tag)) return "assistant"
 }
 
 export function generalChatReplyStarts<T extends { _tag: string; userMessageID: string }>(rows: readonly T[]) {

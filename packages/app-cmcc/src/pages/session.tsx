@@ -46,6 +46,7 @@ import { useSync } from "@/context/sync"
 import { useTerminal } from "@/context/terminal"
 import { PromptInput } from "@/components/prompt-input"
 import { isGeneralConversation } from "./session/general-chat"
+import { cmccTeamAvatarUrl, cmccTeamExpertByAgent } from "@/utils/cmcc-experts"
 import "./session/general-chat.css"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { type FollowupDraft, sendFollowupDraft } from "@/components/prompt-input/submit"
@@ -319,24 +320,33 @@ export default function Page() {
       .filter((message): message is UserMessage => message.role === "user")
       .sort((left, right) => left.time.created - right.time.created || left.id.localeCompare(right.id))[0]?.agent
   })
-  const deepTrading = createMemo(() => shouldUseDeepTradingPage(info(), businessAgentType(), initialUserAgent()))
-  const deepInspect = createMemo(() => shouldUseDeepInspectPage(info(), businessAgentType(), initialUserAgent()))
-  const zhengqi = createMemo(() => shouldUseZhengqiPage(info(), businessAgentType(), initialUserAgent()))
-  const shoppers = createMemo(() => shouldUseShoppersPage(info(), businessAgentType(), initialUserAgent()))
-  const deepGeo = createMemo(() => shouldUseDeepGeoPage(info(), businessAgentType(), initialUserAgent()))
-  const aiScience = createMemo(() => shouldUseAiSciencePage(info(), businessAgentType(), initialUserAgent()))
-  const deepInsight = createMemo(() => shouldUseDeepInsightPage(info(), initialUserAgent()))
   const mstock = createMemo(() => shouldUseMstockPage(info(), businessAgentType(), mstockMention(sync().data.message[params.id ?? ""] ?? [], sync().data.part)))
+  const quickChat = createMemo(() => {
+    if (!params.id || info()?.parentID || mstock()) return
+    const agent = initialUserAgent() ?? info()?.agent
+    if (!agent) return
+    const team = cmccTeamExpertByAgent(agent)
+    if (team && (team.quickAgent === agent || team.liteQuickAgent === agent)) {
+      return { agent, name: team.name, avatar: cmccTeamAvatarUrl(team) }
+    }
+  })
+  const deepTrading = createMemo(() => !quickChat() && shouldUseDeepTradingPage(info(), businessAgentType(), initialUserAgent()))
+  const deepInspect = createMemo(() => !quickChat() && shouldUseDeepInspectPage(info(), businessAgentType(), initialUserAgent()))
+  const zhengqi = createMemo(() => !quickChat() && shouldUseZhengqiPage(info(), businessAgentType(), initialUserAgent()))
+  const shoppers = createMemo(() => !quickChat() && shouldUseShoppersPage(info(), businessAgentType(), initialUserAgent()))
+  const deepGeo = createMemo(() => !quickChat() && shouldUseDeepGeoPage(info(), businessAgentType(), initialUserAgent()))
+  const aiScience = createMemo(() => !quickChat() && shouldUseAiSciencePage(info(), businessAgentType(), initialUserAgent()))
+  const deepInsight = createMemo(() => !quickChat() && shouldUseDeepInsightPage(info(), initialUserAgent()))
   const dedicatedAnalysis = createMemo(() => deepTrading() || deepInspect() || zhengqi() || shoppers() || deepGeo() || aiScience() || deepInsight() || mstock())
   const contentPanelWidth = createMemo(() => (dedicatedAnalysis() ? "100%" : sessionPanelWidth()))
   const isChildSession = createMemo(() => !!info()?.parentID)
   const generalChat = createMemo(() =>
-    settings.general.newLayoutDesigns() && isGeneralConversation({
+    !!quickChat() || (settings.general.newLayoutDesigns() && isGeneralConversation({
       session: info(),
       agentType: businessAgentType(),
       initialAgent: initialUserAgent(),
       dedicated: dedicatedAnalysis(),
-    }),
+    })),
   )
   const diffs = createMemo(() => (params.id ? list(sync().data.session_diff[params.id]) : []))
   const canReview = createMemo(() => !!sync().project)
@@ -1787,6 +1797,7 @@ export default function Page() {
             controls={inputController()}
             hideVariantControl={generalChat()}
             hideAgentControl={dedicatedAnalysis()}
+            selectedExpertAgent={quickChat()?.agent}
             ref={(el) => {
               inputRef = el
             }}
@@ -2087,6 +2098,8 @@ export default function Page() {
                             <Match when={true}>
                             <MessageTimeline
                               generalChat={generalChat()}
+                              classicProgress={isDesktop() && generalChat()}
+                              assistantIdentity={quickChat()}
                               actions={actions}
                               scroll={ui.scroll}
                               onResumeScroll={resumeScroll}
