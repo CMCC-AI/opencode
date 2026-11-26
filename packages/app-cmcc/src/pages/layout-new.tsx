@@ -246,15 +246,17 @@ function CmccSidebar() {
 
   onCleanup(stopDrag)
 
-  const openNewSession = () => {
+  // research=false 时创建灵犀通用会话草稿（无专家团），research=true 时为深度研究专家团草稿
+  const openNewSession = (research = true) => {
     const current = directory()
     const artifactDirectory = cmccArtifactWorkspace(current)
     if (!current || !artifactDirectory || !tabs.ready()) return
 
-    const expert = CMCC_DEFAULT_RESEARCH_EXPERT
     tabs.newDraft({
       server: server.key, directory: current, artifactDirectory, homeTeamPicker: true,
-      expertID: expert.id, agent: expert.leadAgent, researchMode: "deep",
+      ...(research
+        ? { expertID: CMCC_DEFAULT_RESEARCH_EXPERT.id, agent: CMCC_DEFAULT_RESEARCH_EXPERT.leadAgent, researchMode: "deep" as const }
+        : {}),
     })
     cmccRememberConversationWorkspace(current)
     server.projects.touch(current)
@@ -396,12 +398,12 @@ function CmccSidebar() {
               icon="new-chat"
               label="新对话"
               active={location.pathname === "/new-session" && !tabs.store.some((tab) => tab.type === "draft" && tab.researchMode && location.search.includes(tab.draftID))}
-              onClick={() => void openNewSession()}
+              onClick={() => void openNewSession(false)}
             />
             <CmccSidebarAction
               icon="research"
               label="深度研究"
-              onClick={openNewSession}
+              onClick={() => void openNewSession()}
               active={location.pathname.startsWith("/general-deepinsight") || tabs.store.some((tab) => tab.type === "draft" && tab.researchMode && location.search.includes(tab.draftID))}
             />
             <CmccSidebarAction
@@ -442,7 +444,7 @@ function CmccSidebar() {
           </nav>
           <div class="cmcc-sidebar-section mx-3 mt-2 flex shrink-0 items-center justify-between border-t px-1 pb-1 pt-2">
             <span class="text-[14px] font-semibold">历史任务</span>
-            <button type="button" class="cmcc-sidebar-toggle" title="新对话" aria-label="新对话" onClick={openNewSession}>
+            <button type="button" class="cmcc-sidebar-toggle" title="新对话" aria-label="新对话" onClick={() => void openNewSession(false)}>
               <span aria-hidden="true" class="text-[14px] font-normal leading-none">+</span>
             </button>
           </div>
