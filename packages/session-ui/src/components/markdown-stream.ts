@@ -84,9 +84,16 @@ export function stream(text: string, live: boolean): Block[] {
   return [...result, { raw, src: openCode(code.raw), mode: "code", language: language(code.lang) }]
 }
 
-export function canReusePendingBlock(current: Pick<Block, "mode" | "raw"> | undefined, next: Block) {
+export function canReusePendingBlock(
+  current: (Pick<Block, "mode" | "raw"> & { complete?: boolean }) | undefined,
+  next: Block,
+) {
   if (!current || current.mode !== next.mode) return false
-  if (next.mode === "code") return next.raw.startsWith(current.raw)
+  if (next.mode === "code") {
+    // complete 翻转（围栏闭合）时必须放弃复用：流式中资源持续滞后，否则图表块永远停留在未完成态
+    if (!!next.complete !== !!current.complete) return false
+    return next.raw.startsWith(current.raw)
+  }
   return current.raw === next.raw
 }
 

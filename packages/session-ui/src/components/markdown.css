@@ -171,6 +171,30 @@
     position: relative;
   }
 
+  /* echarts 流式占位：围栏打开即显示，视觉同图片加载中 */
+  [data-component="markdown-echarts-chart"][data-loading] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  [data-component="markdown-echarts-chart"][data-loading]::after {
+    content: "";
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--v2-border-border-base);
+    border-top-color: transparent;
+    border-radius: 9999px;
+    opacity: 0.6;
+    animation: markdown-echarts-spin 0.8s linear infinite;
+  }
+
+  @keyframes markdown-echarts-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   [data-component="markdown-code"][data-code-kind="shell"] .shiki {
     background: var(--markdown-shell-code-background);
     border-color: var(--markdown-shell-code-border);

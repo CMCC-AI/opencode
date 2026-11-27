@@ -26,6 +26,7 @@ import { markdownBlockKey, type MarkdownToken } from "./markdown-worker-protocol
 import { shouldResetCodeTokens, type RenderedCodeState } from "./markdown-code-state"
 import { getCachedMarkdown, sanitizeMarkdown, touchCachedMarkdown, type MarkdownCacheEntry } from "./markdown-cache"
 import { inlineCodeKind } from "./markdown-inline-code-kind"
+import { loadEcharts, parseEchartsOption, type EChartsEntry } from "./markdown-echarts"
 
 type RenderedBlock =
   | (MarkdownCacheEntry & { key: string; mode: Exclude<Block["mode"], "code"> })
@@ -33,6 +34,8 @@ type RenderedBlock =
       key: string
       mode: "code"
       raw: string
+      /** 围栏内的纯内容（不含 ``` 标记），echarts 图表校验/挂载依赖它 */
+      src: string
       hash: string
       language: string
       complete: boolean
@@ -336,6 +339,7 @@ export function Markdown(
   const owner = createUniqueId()
   const activeCodeKeys = new Set<string>()
   const completedCode = new Map<string, Extract<RenderedBlock, { mode: "code" }>>()
+  const echartsBlocks = new Map<HTMLElement, EChartsEntry>()
   const projection = createMemo((previous: Projection | undefined) =>
     project(previous, local.text, local.streaming ?? false),
   )
@@ -375,11 +379,15 @@ export function Markdown(
             const result = await code(block.src, block.language, blockKey, block.complete)
             const rendered = {
               key: blockKey,
+              ...result,
+              // fence 原始语言必须在 spread 后保留：result.language 是 shiki 归一化值（echarts→text），
+              // 图表守卫依赖原始语言识别 ```echarts 块
+              language: block.language ?? result.language,
               mode: block.mode,
               raw: block.raw,
+              src: block.src,
               hash: String(block.raw.length),
               complete: !!block.complete,
-              ...result,
             }
             if (block.complete) completedCode.set(blockKey, rendered)
             return rendered
@@ -431,6 +439,11 @@ export function Markdown(
     if (!container) return
     if (isServer) return
     if (content.length === 0) {
+      for (const entry of echartsBlocks.values()) {
+        entry.observer.disconnect()
+        entry.chart.dispose()
+      }
+      echartsBlocks.clear()
       container.innerHTML = ""
       return
     }
@@ -445,8 +458,14 @@ export function Markdown(
     })
     activeCodeKeys.clear()
     nextCodeKeys.forEach((key) => activeCodeKeys.add(key))
-    content.forEach((block, index) => updateBlock(container, index, block, labels))
+    content.forEach((block, index) => updateBlock(container, index, block, labels, echartsBlocks))
     while (container.children.length > content.length) container.lastElementChild?.remove()
+    for (const [el, entry] of echartsBlocks) {
+      if (el.isConnected) continue
+      entry.observer.disconnect()
+      entry.chart.dispose()
+      echartsBlocks.delete(el)
+    }
     container
       .querySelectorAll<HTMLButtonElement>('[data-slot="markdown-copy-button"]')
       .forEach((button) => setCopyState(button, labels, button.dataset.copied === "true"))
@@ -460,6 +479,11 @@ export function Markdown(
   onCleanup(() => {
     if (copyCleanup) copyCleanup()
     activeCodeKeys.forEach(disposeCode)
+    for (const entry of echartsBlocks.values()) {
+      entry.observer.disconnect()
+      entry.chart.dispose()
+    }
+    echartsBlocks.clear()
     completedCode.clear()
   })
 
@@ -495,6 +519,7 @@ function pendingBlocks(
       key,
       mode: block.mode,
       raw: block.raw,
+      src: block.src,
       hash: String(block.raw.length),
       language: block.language ?? "text",
       complete: !!block.complete,
@@ -509,10 +534,16 @@ function disposeCode(key: string) {
   disposeStreamingCode(key)
 }
 
-function updateBlock(container: HTMLDivElement, index: number, block: RenderedBlock, labels: CopyLabels) {
+function updateBlock(
+  container: HTMLDivElement,
+  index: number,
+  block: RenderedBlock,
+  labels: CopyLabels,
+  echartsBlocks: Map<HTMLElement, EChartsEntry>,
+) {
   const current = container.children[index]
   if (block.mode === "code") {
-    updateCodeBlock(container, current, block, labels)
+    updateCodeBlock(container, current, block, labels, echartsBlocks)
     return
   }
   if (
@@ -532,6 +563,7 @@ function updateBlock(container: HTMLDivElement, index: number, block: RenderedBl
 
   if (!(current instanceof HTMLDivElement)) {
     container.appendChild(next)
+    if (block.mode === "full") decorateEcharts(next, echartsBlocks)
     return
   }
 
@@ -549,9 +581,29 @@ function updateBlock(container: HTMLDivElement, index: number, block: RenderedBl
       return true
     },
   })
+  if (block.mode === "full") decorateEcharts(current, echartsBlocks)
 }
 
 function updateCodeBlock(
+  container: HTMLDivElement,
+  current: Element | undefined,
+  block: Extract<RenderedBlock, { mode: "code" }>,
+  labels: CopyLabels,
+  echartsBlocks: Map<HTMLElement, EChartsEntry>,
+) {
+  // ```echarts 代码块：围栏打开时先显示加载占位（不闪 JSON 代码）；完整且符合纯 JSON 契约时原地升级为图表；
+  // 完成但解析失败退回普通代码块。注意用 src（围栏内纯内容）校验：raw 含 ``` 围栏，JSON.parse 必失败
+  if (block.language === "echarts") {
+    const option = block.complete ? parseEchartsOption(block.src) : undefined
+    if (option || !block.complete) {
+      updateEchartsBlock(container, current, block, echartsBlocks, !!option)
+      return
+    }
+  }
+  renderPlainCodeBlock(container, current, block, labels)
+}
+
+function renderPlainCodeBlock(
   container: HTMLDivElement,
   current: Element | undefined,
   block: Extract<RenderedBlock, { mode: "code" }>,
@@ -618,6 +670,103 @@ function updateCodeBlock(
   })
   if (current) current.replaceWith(next)
   else container.appendChild(next)
+}
+
+function updateEchartsBlock(
+  container: HTMLDivElement,
+  current: Element | undefined,
+  block: Extract<RenderedBlock, { mode: "code" }>,
+  echartsBlocks: Map<HTMLElement, EChartsEntry>,
+  ready: boolean,
+) {
+  const existing =
+    current instanceof HTMLDivElement &&
+    current.dataset.markdownKey === block.key &&
+    current.dataset.component === "markdown-echarts"
+      ? current
+      : undefined
+  if (existing) {
+    const el = existing.firstElementChild
+    if (!(el instanceof HTMLElement)) return
+    const entry = echartsBlocks.get(el)
+    if (entry) {
+      if (ready) entry.chart.setOption(JSON.parse(block.src), { notMerge: true })
+      return
+    }
+    // 占位阶段不重复触发挂载；echartsOption 已设置说明挂载进行中（脚本加载里），等内容冻结后不再重挂
+    if (!ready || el.dataset.echartsOption) return
+    el.dataset.echartsOption = block.src
+    delete el.dataset.loading
+    mountEcharts(el, echartsBlocks)
+    return
+  }
+
+  const next = document.createElement("div")
+  next.dataset.markdownBlock = ""
+  next.dataset.markdownKey = block.key
+  next.dataset.markdownHash = block.hash
+  next.dataset.component = "markdown-echarts"
+  next.style.display = "contents"
+  const el = document.createElement("div")
+  el.setAttribute("data-component", "markdown-echarts-chart")
+  el.style.cssText = "width:100%;height:320px;margin:12px 0"
+  if (!ready) {
+    // 流式中：先给加载占位容器（视觉同"图片加载中"），围栏闭合后原地升级为图表
+    el.dataset.loading = ""
+    next.appendChild(el)
+    if (current) current.replaceWith(next)
+    else container.appendChild(next)
+    return
+  }
+  el.dataset.echartsOption = block.src
+  next.appendChild(el)
+  if (current) current.replaceWith(next)
+  else container.appendChild(next)
+  mountEcharts(el, echartsBlocks)
+}
+
+// 完整文本块（历史消息/非流式）中的 ```echarts 代码块：合法 JSON 才替换为图表，解析失败保留原代码块
+function decorateEcharts(root: HTMLElement, echartsBlocks: Map<HTMLElement, EChartsEntry>) {
+  const blocks = Array.from(root.querySelectorAll("pre"))
+  for (const pre of blocks) {
+    const code = pre.querySelector("code")
+    if (!(code instanceof HTMLElement) || !/\blanguage-echarts\b/.test(code.className)) continue
+    const raw = code.textContent ?? ""
+    const option = parseEchartsOption(raw)
+    if (!option) continue
+    const target = pre.parentElement?.getAttribute("data-component") === "markdown-code" ? pre.parentElement : pre
+    const el = document.createElement("div")
+    el.setAttribute("data-component", "markdown-echarts-chart")
+    el.style.cssText = "width:100%;height:320px;margin:12px 0"
+    el.dataset.echartsOption = raw
+    target.replaceWith(el)
+    mountEcharts(el, echartsBlocks)
+  }
+}
+
+function mountEcharts(el: HTMLElement, echartsBlocks: Map<HTMLElement, EChartsEntry>) {
+  void loadEcharts().then((echarts) => {
+    const raw = el.dataset.echartsOption
+    const option = echarts && raw ? parseEchartsOption(raw) : undefined
+    if (!echarts || !option || !el.isConnected) {
+      // 加载或解析失败：退化为 JSON 文本展示，并移除图表标记以便下次更新重试
+      const wrapper = el.parentElement
+      if (wrapper instanceof HTMLElement) delete wrapper.dataset.component
+      const pre = document.createElement("pre")
+      pre.className = "shiki OpenCode"
+      const code = document.createElement("code")
+      code.className = "language-json"
+      code.textContent = raw ?? ""
+      pre.appendChild(code)
+      el.replaceWith(pre)
+      return
+    }
+    const chart = echarts.init(el)
+    chart.setOption(option)
+    const observer = new ResizeObserver(() => chart.resize())
+    observer.observe(el)
+    echartsBlocks.set(el, { chart, observer, el })
+  })
 }
 
 function sameToken(left: MarkdownToken, right: MarkdownToken | undefined) {

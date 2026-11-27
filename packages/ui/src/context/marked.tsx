@@ -440,6 +440,8 @@ async function highlightCodeBlocks(html: string): Promise<string> {
   let result = html
   for (const match of matches) {
     const [fullMatch, lang, escapedCode] = match
+    // 未知语言（如 echarts）保留原始代码块与 class 标记，不做 shiki 替换
+    if (!lang || !(lang in bundledLanguages)) continue
     const code = escapedCode
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
@@ -447,16 +449,12 @@ async function highlightCodeBlocks(html: string): Promise<string> {
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
 
-    let language = lang || "text"
-    if (!(language in bundledLanguages)) {
-      language = "text"
-    }
-    if (!highlighter.getLoadedLanguages().includes(language)) {
-      await highlighter.loadLanguage(language as BundledLanguage)
+    if (!highlighter.getLoadedLanguages().includes(lang)) {
+      await highlighter.loadLanguage(lang as BundledLanguage)
     }
 
     const highlighted = highlighter.codeToHtml(code, {
-      lang: language,
+      lang,
       theme: "OpenCode",
       tabindex: false,
     })
@@ -486,14 +484,22 @@ export const { use: useMarked, provider: MarkedProvider } = createSimpleContext(
       }),
       markedShiki({
         async highlight(code, lang) {
+          // 未知 fence 语言（如 echarts）不走 shiki：保留原始语言 class，供下游装饰器识别（markdown 图表块依赖它）
+          if (!(lang in bundledLanguages)) {
+            const lines = code
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .split("\n")
+              .map((line) => `<span class="line">${line}</span>`)
+              .join("")
+            return `<pre class="shiki OpenCode" style="background-color:var(--color-background-stronger);color:var(--text-base)"><code class="language-${lang}">${lines}</code></pre>`
+          }
           const highlighter = await getSharedHighlighter({
             themes: ["OpenCode"],
             langs: [],
             preferredHighlighter: "shiki-wasm",
           })
-          if (!(lang in bundledLanguages)) {
-            lang = "text"
-          }
           if (!highlighter.getLoadedLanguages().includes(lang)) {
             await highlighter.loadLanguage(lang as BundledLanguage)
           }
