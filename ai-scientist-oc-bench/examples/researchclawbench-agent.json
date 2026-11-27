@@ -1,0 +1,7 @@
+{
+  "ai_scientist_opencode": {
+    "label": "AI Scientist OpenCode",
+    "icon": "A",
+    "cmd": "bash /ABSOLUTE/PATH/TO/ai-scientist-clawbenchmark/scripts/ai-scientist-oc-bench --prompt <PROMPT> --workspace <WORKSPACE>"
+  }
+}

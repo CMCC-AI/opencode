@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+prompt=""
+workspace=""
+dry_run=0
+opencode_bin="${OPENCODE_BIN:-opencode}"
+
+usage() {
+  cat <<'EOF'
+用法：ai-scientist-oc-bench --prompt <任务提示词> --workspace <benchmark workspace> [--dry-run]
+
+该 launcher 面向 ResearchClawBench。它在给定 workspace 中启动无交互的
+ai-scientist-benchmark 主 Agent，并在结束后校验 report/report.md 与 PNG 图表。
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --prompt) prompt="${2:-}"; shift 2 ;;
+    --workspace) workspace="${2:-}"; shift 2 ;;
+    --opencode-bin) opencode_bin="${2:-}"; shift 2 ;;
+    --dry-run) dry_run=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "ERROR: 未知参数：$1" >&2; usage >&2; exit 64 ;;
+  esac
+done
+
+[[ -n "$prompt" ]] || { echo "ERROR: --prompt 不能为空" >&2; exit 64; }
+[[ -n "$workspace" ]] || { echo "ERROR: --workspace 不能为空" >&2; exit 64; }
+[[ -d "$workspace" ]] || { echo "ERROR: workspace 不存在：$workspace" >&2; exit 66; }
+workspace="$(cd "$workspace" && pwd)"
+
+mkdir -p "$workspace/code" "$workspace/outputs" "$workspace/report/images"
+printf 'benchmark profile: researchclawbench-v1\nworkspace: %s\n' "$workspace"
+
+if [[ "$dry_run" -eq 1 ]]; then
+  echo "DRY-RUN: $opencode_bin run --auto --agent ai-scientist-benchmark <prompt>"
+  exit 0
+fi
+
+command -v "$opencode_bin" >/dev/null 2>&1 || {
+  echo "ERROR: 找不到 OpenCode CLI：$opencode_bin。请安装并完成模型提供商配置。" >&2
+  exit 69
+}
+
+export OPENCODE_CONFIG="$project_root/opencode.json"
+export OPENCODE_CONFIG_DIR="$project_root/.opencode"
+export AI_SCIENTIST_BENCHMARK=1
+export AI_SCIENTIST_BENCHMARK_CONFIG="$project_root"
+resource_policy_file="$project_root/benchmark/resource-policy.md"
+if [[ ! -s "$resource_policy_file" ]]; then
+  echo "ERROR: benchmark external-resource policy is missing or empty" >&2
+  exit 66
+fi
+resource_policy="$(cat "$resource_policy_file")"
+node "$project_root/scripts/research-guidance.mjs" prepare "$workspace"
+node "$project_root/scripts/objective-audit.mjs" prepare "$workspace"
+mkdir -p "$workspace/outputs/resource-recovery"
+cp "$project_root/.opencode/research-guidance/resource-access-playbook.md" "$workspace/outputs/resource-recovery/resource-access-playbook.md"
+guidance_prompt=$'\n\nFollow the built-in research workflow. Act only as chief orchestrator. Read the configured .opencode/research-guidance/delegation.md. Delegate inventory and canonical persistence/validation to as-research-package-curator, independent scope/method/goal-contract planning to as-research-planner, execution to engineering/operator/analysis specialists, and report/report.md writing to as-evidence-writer. Do not implement, write the report, assemble ledger JSON or run validation yourself. Each worker saves detailed artifacts and returns at most 1200 English characters with status, item/claim IDs, artifact paths, up to three findings/blockers and next owner/action. All workers retain task: deny.'
+guidance_prompt+=$'\nThe planner reads research-guidance catalog summary_only=true, retrieves relevant method_ids, plan-example.json and templates/task-deliverables.md, then saves schema_version 3.0 scope/ledger/plan proposals with original goal_contract metrics and units. The curator registers approved plans via research-guidance plan and ledgers via objective-audit save, preserves frozen definitions/history and runs checkpoint audits. Do not access hidden checklist or scoring artifacts or sibling workspaces. Use actual task evidence, not old task answers.'
+guidance_prompt+=$'\nAt scientific gaps delegate the first missing dependency using configured research-next-action.md and resource-recovery.md. Discovery gives concrete candidates; engineering acquires and validates authorized resources, runs real-input smoke tests then formal computation. Inventory dependencies in outputs/resource-recovery/resources.json and use resource-access-playbook.md/resource-access at concrete acquisition failures. Distinguish downloads, smoke tests and completed science; preserve genuine negative/incomplete results and budget.'
+guidance_prompt+=$'\nObtain independent outcome reviews at main-results/before-drafting/release checkpoints and separate final reliability and goal_coverage reviews. The curator persists genuine reviewer records via research-guidance review, maintains task-deliverables/manifest and a short run orchestration-state.md, and runs mechanical validation. Scientific defects go to their owners, never only to audit paperwork. A file or passed mechanical check is not goal completion. See configured docs/scientific-quality.md.'
+guidance_prompt+=$'\n\n'
+guidance_prompt+="$resource_policy"
+prompt="$prompt$guidance_prompt"
+
+run_agent() {
+  local agent_prompt="$1"
+  (
+  cd "$workspace"
+  if [[ -n "${RESEARCH_MODEL:-}" ]]; then
+    "$opencode_bin" run --auto --dir "$workspace" --agent ai-scientist-benchmark --model "$RESEARCH_MODEL" "$agent_prompt"
+  else
+    "$opencode_bin" run --auto --dir "$workspace" --agent ai-scientist-benchmark "$agent_prompt"
+  fi
+  )
+}
+
+
+set +e
+run_agent "$prompt"
+agent_status=$?
+set -e
+
+if [[ "$agent_status" -ne 0 ]]; then
+  echo "ERROR: OpenCode 运行失败，退出码：$agent_status" >&2
+  exit "$agent_status"
+fi
+
+
+set +e
+bash "$project_root/scripts/validate-benchmark-output.sh" "$workspace"
+validation_status=$?
+set -e
+
+if [[ "$validation_status" -ne 0 ]]; then
+  recovery_prompt="Resume as orchestrator from INSTRUCTIONS.md, Introduction.md if present and the run orchestration-state.md if present. Ask as-research-package-curator to inspect outputs/validation-report.md and audit files and return a bounded failure receipt. Delegate the actual missing P0 acquisition/computation, condition repair or report correction to its responsible specialist in one bounded recovery pass. Preserve original requirements and independent review authorship; inspect actual outputs through the appropriate reviewers. Do not implement or repair files yourself. If unresolved, have the writer retain incomplete/blocked status and actual failed recovery evidence in report/report.md. Have the curator update plans, submit genuine reviews, rerun evidence/scientific audits and return validation status. Then stop."
+  recovery_prompt="$recovery_prompt$guidance_prompt"
+  set +e
+  run_agent "$recovery_prompt"
+  recovery_status=$?
+  set -e
+  if [[ "$recovery_status" -ne 0 ]]; then
+    echo "ERROR: recovery OpenCode run failed, exit code: $recovery_status" >&2
+    exit "$recovery_status"
+  fi
+  bash "$project_root/scripts/validate-benchmark-output.sh" "$workspace"
+fi
+
+node "$project_root/scripts/research-guidance.mjs" audit "$workspace"

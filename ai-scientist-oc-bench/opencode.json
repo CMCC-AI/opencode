@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "subagent_depth": 5,
+  "enabled_providers": ["alibaba-cn", "moonshotai-cn"],
+  "provider": {
+    "moonshotai-cn": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Moonshot",
+      "options": {
+        "baseURL": "https://api.moonshot.cn/v1"
+      },
+      "models": {
+        "kimi-k3": {
+          "name": "Kimi",
+          "modalities": {
+            "input": ["text", "image"],
+            "output": ["text"]
+          }
+        }
+      }
+    }
+  }
+}

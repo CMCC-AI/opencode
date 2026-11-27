@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {classify,diagnose} from '../.opencode/lib/resource-access.mjs';
+test('classify transport and HTTP separately',()=>{for(const [c,s,e] of [[6,0,'dns_failure'],[28,0,'network_timeout'],[60,0,'tls_failure'],[0,403,'access_denied_unclassified'],[0,200,'metadata_reachable']])assert.equal(classify(c,s),e)});
+test('restriction causes no network request',async()=>{const r=await diagnose({url:'https://example.org'},()=>{throw Error('must not run')});assert.equal(r.network_attempted,false)});
+test('reject credential-bearing and signed URLs',async()=>{for(const url of ['https://u:p@example.org','https://example.org?token=SECRET','file:///etc/passwd'])await assert.rejects(diagnose({url,external_access_allowed:true}))});
+test('failures do not leak secrets or imply permission denial',async()=>{const r=await diagnose({url:'https://example.org',external_access_allowed:true},async()=>{throw Object.assign(Error('SECRET'),{code:28,stdout:'000',stderr:'SECRET'})});assert.equal(r.issue,'network_timeout');assert.equal(r.permission_blocked,false);assert.ok(!JSON.stringify(r).includes('SECRET'));assert.ok(r.next_actions.some(s=>s.includes('weight-shard')))});
+test('bounded HEAD and code acquisition advice',async()=>{const r=await diagnose({url:'https://example.org',kind:'code',external_access_allowed:true,ipv4:true},async(bin,args,opts)=>{assert.equal(bin,'curl');assert.ok(args.includes('--head'));assert.ok(args.includes('--ipv4'));assert.ok(opts.timeout<30000);return {stdout:'200'}});assert.equal(r.stage,'diagnosed');assert.ok(r.next_actions.some(s=>s.includes('git ls-remote')))});

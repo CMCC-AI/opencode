@@ -1,0 +1,14 @@
+{
+  "deployed_root": "/home/songz/ai-scientist-oc-bench",
+  "catalog_version": "1.4.0",
+  "policy_version": "reference-only-v3",
+  "method_ids_preserved": 61,
+  "observable_checks_unchanged": true,
+  "guidance_urls": 0,
+  "rsi_plugins": [],
+  "opencode_agent_loaded": true,
+  "tests": "Full project validation plus 26 research-guidance/objective tests passed",
+  "previous_backup": "/home/songz/agent-system-backups/agents-before-reference-only-20261111.tar.gz",
+  "previous_backup_sha256": "5295f98aa1885ef9c803f7a8308e4384d78827a1f0fd173005b6c11f52e339fd",
+  "boundary": "Minimal truthful provenance retained; no historical run logs edited. Prompt policy only, not a network sandbox."
+}

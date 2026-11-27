@@ -1,0 +1,49 @@
+{
+  "profile": "researchclawbench-v1",
+  "language": "zh-CN",
+  "mode": "fully-autonomous",
+  "gates": {
+    "G1": {
+      "name": "研究范围",
+      "decision": "PROCEED",
+      "policy": "以 INSTRUCTIONS.md 锁定原始研究目标，优先使用 data/ 与 related_work/；公开资源获取只用于补齐原目标所需证据，不扩展目标。任务显式禁止外部输入或联网时服从限制；不向用户追问。"
+    },
+    "G2": {
+      "name": "资源与权限",
+      "decision": "PROCEED_WITH_LIMITS",
+      "allowed": [
+        "任务 workspace 内文件",
+        "已有运行环境",
+        "普通用户权限下的可复现实验依赖",
+        "已配置且无需人工登录的工具",
+        "任务授权的原始输入及通用依赖；目标官方资源仅供查阅方法、自主实现；不运行官方代码或加载其权重、答案和结果；新增资产只写入 workspace"
+      ],
+      "denied": [
+        "密钥、账号或付费授权",
+        "敏感或私有数据",
+        "破坏性系统操作",
+        "湿实验和仪器操作",
+        "读取隐藏 checklist、隐藏评测答案或评分产物；以公开解答指导最终测试答案并冒称独立评测",
+        "将官方文字、证明、图表、预测或结果数据直接复制/改写成本次报告主结果；将官方实现运行冒称独立实现或原创贡献",
+        "仅为匹配目标数字而选种子、挑运行、改数据、填缺值或调整阈值/停止条件；伪造本次运行证据"
+      ],
+      "fallback": "按 reference-only-v3 执行资源恢复；目标官方资源只可查阅理解方法，自主实现和验证。保留真实来源与影响记录，不复制正文或源码，不隐藏访问。若无法自主完成则保留 incomplete/blocked。"
+    },
+    "G3": {
+      "name": "实验方案",
+      "decision": "PROCEED_COMPUTATIONAL_ONLY",
+      "policy": "只执行可复现的计算、仿真或 Dry Lab；data/ 与 related_work/ 只读。湿实验、仪器实验和不可获得资源只产出方案，不得宣称已执行。"
+    },
+    "G4": {
+      "name": "结论发布",
+      "decision": "RELEASE_IF_VALIDATED",
+      "required": [
+        "report/report.md",
+        "report/images/*.png",
+        "方法、结果、讨论和限制",
+        "可追溯的代码或输出"
+      ],
+      "fallback": "产物或证据不足时仍写入报告，清楚标为未完成或证据不足；launcher 以非零退出码标记失败。"
+    }
+  }
+}

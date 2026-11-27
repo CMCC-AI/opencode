@@ -1,0 +1,9 @@
+{
+  "profile": "no-rsi",
+  "original_unchanged": true,
+  "original_backup_sha256": "acb06e58bd8599234f95b7d7becf736183e76b3771ef459ccd8abb78c89f8afd",
+  "guidance_methods_retained": 61,
+  "specialists": 20,
+  "runtime_plugins": [],
+  "validation": "Full project validation, research-guidance/objective tests and OpenCode debug loading passed. No paid research run performed."
+}

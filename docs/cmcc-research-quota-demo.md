@@ -73,3 +73,9 @@ DeepXiv 如果只展示和检索论文，不经过 OpenCode Provider，则不会
 - `packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts`：登录用户与 Session 绑定。
 
 更完整的计量口径、表结构和个人策略 SQL 见 `docs/cmcc-token-quota.md`。
+
+## 独立 ResearchClawBench 科研专家团
+
+完整项目位于 [`ai-scientist-oc-bench/`](../ai-scientist-oc-bench/README.md)，通过该目录的 `scripts/ai-scientist-oc-bench` 启动独立 benchmark workspace。它与 `.opencode/experts/ai-for-science-team/` 的交互式团队配置分别维护；本次不改变交互式团队的人工闸门。
+
+Benchmark 首席仅负责目标、资源决策、调度与发布判断，研究执行和报告由子专家直接落盘，归档专家合并计划/台账并执行机械验证，保留独立可靠性与目标覆盖双审。职责、文件交接与验证边界见 [chief-delegation.md](../ai-scientist-oc-bench/docs/chief-delegation.md)。在项目目录运行 `bash scripts/validate-ai-scientist.sh` 验证，不从仓库根目录运行整个 OpenCode 测试套件。

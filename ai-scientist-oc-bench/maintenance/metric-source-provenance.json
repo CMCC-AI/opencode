@@ -1,0 +1,176 @@
+{
+  "purpose": "Offline abstraction only; source identities, values, weights and expected conclusions are excluded from runtime catalog.",
+  "source_root": "/home/songz/ResearchClawBench/tasks",
+  "sources": [
+    {
+      "source": "Astronomy_000/target_study/checklist.json",
+      "sha256": "a4a54de1918966d097e28ac14dc7039b3ee1c85c2fbb64b75a30a8a2646e0222"
+    },
+    {
+      "source": "Astronomy_001/target_study/checklist.json",
+      "sha256": "58838784bd633517014800d20f44d12f38e7813d7383086ca880fed93bc38b17"
+    },
+    {
+      "source": "Astronomy_002/target_study/checklist.json",
+      "sha256": "aff0027cdd4740865a8ae4487bb1389fcdfb57cf926a13e92d3a00959ebe6c41"
+    },
+    {
+      "source": "Astronomy_003/target_study/checklist.json",
+      "sha256": "eebac0b70b71420ab8ba14ef8df348228e27a35f963b095e20037616e9122618"
+    },
+    {
+      "source": "Chemistry_000/target_study/checklist.json",
+      "sha256": "8ceedfc72c220cdfbc4987a749b3f9a3b30cb76500b6e7cbce38c95528ccfad2"
+    },
+    {
+      "source": "Chemistry_001/target_study/checklist.json",
+      "sha256": "7f731329734e3bf6f1322d6b38d23a1ba0f56fcf93426f0a153dfe4591581ff0"
+    },
+    {
+      "source": "Chemistry_002/target_study/checklist.json",
+      "sha256": "ee8b20e6c8831056f37464412f5664180f85eb154aa72ab4964fb476feb81c95"
+    },
+    {
+      "source": "Chemistry_003/target_study/checklist.json",
+      "sha256": "369daba0a332a4abc1d54c32b4f93396aadfa3fb770f09bd88c85595147209cb"
+    },
+    {
+      "source": "Earth_000/target_study/checklist.json",
+      "sha256": "317b9ed8875d03267c2e6753752d3f6b9418bcc2808b90e0eb84bdc53dbb2323"
+    },
+    {
+      "source": "Earth_001/target_study/checklist.json",
+      "sha256": "449fc06d529b69c77f3614b40803f308113e31b9acdfc263cc45b5738a858d8d"
+    },
+    {
+      "source": "Earth_002/target_study/checklist.json",
+      "sha256": "525a30af418e169db7949dd86c1a42f58d0cacd9d8b572b1c77fa4bf0dd1f3ae"
+    },
+    {
+      "source": "Earth_003/target_study/checklist.json",
+      "sha256": "9a88beba37321bc7aefd0d95f08fc4c71d26a0c6d2ed0a2326863a05cc3b42cf"
+    },
+    {
+      "source": "Energy_000/target_study/checklist.json",
+      "sha256": "4e1e544adcad68cd82ecae8689cb7117fb7f7600cfecd5b8d156b65dd3ef4935"
+    },
+    {
+      "source": "Energy_001/target_study/checklist.json",
+      "sha256": "90b1ff9deeec67eb262d5bdba5c93cbf3e340dfa75565397e4c49d44345e5829"
+    },
+    {
+      "source": "Energy_002/target_study/checklist.json",
+      "sha256": "be08b21de1f2ca288a8573be9fc2090b6b5d798efe93812342fa6b8e2ecad8b0"
+    },
+    {
+      "source": "Energy_003/target_study/checklist.json",
+      "sha256": "675a8930bbc36e1f0bc28fda30ef93271f2567f41683070ea2bb612daca4d703"
+    },
+    {
+      "source": "Information_000/target_study/checklist.json",
+      "sha256": "d7bb8584762ff6ec716f56a2b02f5c69edf8b9f02ebe4da1fa20fc4714381a8c"
+    },
+    {
+      "source": "Information_001/target_study/checklist.json",
+      "sha256": "d7810f7e66945806a162b853f635dfc5b6e11bda90ded4af8266ae456fd8af4c"
+    },
+    {
+      "source": "Information_002/target_study/checklist.json",
+      "sha256": "b82b545bcfb434d4ee35d13931b8d7b8ca114581bc2352566bafae7ee7f12b92"
+    },
+    {
+      "source": "Information_003/target_study/checklist.json",
+      "sha256": "f0bb47a8cadb555617acd499a416442164d4b2b6ab2727cfd663191037a41fa0"
+    },
+    {
+      "source": "Life_000/target_study/checklist.json",
+      "sha256": "9a16cc724fbab41d7c9ea326def67d81be5dfde10f2710cb51f4d4e1eefc899e"
+    },
+    {
+      "source": "Life_001/target_study/checklist.json",
+      "sha256": "a974658f14e7352ef077e4dc9c642baa5cdf1f122119e4a3792cf4bd82dc00c2"
+    },
+    {
+      "source": "Life_002/target_study/checklist.json",
+      "sha256": "657352c742faa98615d9953573eb61bbb58455730f30611e9629fd1e35921fdb"
+    },
+    {
+      "source": "Life_003/target_study/checklist.json",
+      "sha256": "11b7befffcee56d991a6a33263c7bac33a1bb7d0a2ed03dac4c011245b0413d1"
+    },
+    {
+      "source": "Material_000/target_study/checklist.json",
+      "sha256": "f8a0fcb65ccddbf364f78f4cebba066a89efc898eaf2f1b5309c117210a8921e"
+    },
+    {
+      "source": "Material_001/target_study/checklist.json",
+      "sha256": "d1e4817130d1e7f1f541e4de216b5419643439e7cd3ca62e45572a7fbe0694f5"
+    },
+    {
+      "source": "Material_002/target_study/checklist.json",
+      "sha256": "419b49b8b301993727261c9352c3d9419d934efdca622bb410480bf2a1074f65"
+    },
+    {
+      "source": "Material_003/target_study/checklist.json",
+      "sha256": "e3906729badd1ea6ca284195b9837d206576e79832cb5d00f29d3e0e155dab62"
+    },
+    {
+      "source": "Math_000/target_study/checklist.json",
+      "sha256": "d6c97339c0d2998cd306e2188fdedef2f55cef4f959849e5bfdf6dbb54fb0e0f"
+    },
+    {
+      "source": "Math_001/target_study/checklist.json",
+      "sha256": "e5a58a0769e4e28bd4df93e5c53eb6613b50f916df61e07829c6015bf839b8eb"
+    },
+    {
+      "source": "Math_002/target_study/checklist.json",
+      "sha256": "58555158ab57a8c22267acf5d4d3b60311cd461abe0f83944b982956d971d18b"
+    },
+    {
+      "source": "Math_003/target_study/checklist.json",
+      "sha256": "80b8936b437b4b6c3e2fc7c682a7b7938ab1f9788acda571064978ed9a1f0a42"
+    },
+    {
+      "source": "Neuroscience_000/target_study/checklist.json",
+      "sha256": "8a03f69004dc843ecbb8d7f942c91fb6151c5e04dc6639b0854f0a74450fa605"
+    },
+    {
+      "source": "Neuroscience_001/target_study/checklist.json",
+      "sha256": "0407e885c997435a2992e4779845c81351c59b51d2c4bf756202551cde923d37"
+    },
+    {
+      "source": "Neuroscience_002/target_study/checklist.json",
+      "sha256": "952d30fad701eeeb661a89469f69e064287131e98ae57f5f0aa727f23b31d286"
+    },
+    {
+      "source": "Neuroscience_003/target_study/checklist.json",
+      "sha256": "442ec155e5eca0811fea6c0b4913c69d2f7958fad92658000f3a1b972c89fbad"
+    },
+    {
+      "source": "Physics_000/target_study/checklist.json",
+      "sha256": "4a9f2b9597f9190a71dc6a8ed336d2a848e3f390ed53738d54ac3e49487740c4"
+    },
+    {
+      "source": "Physics_001/target_study/checklist.json",
+      "sha256": "e78204664be0d2bd62a6d39a9746738a91a07c996f854972fccfda02d82fc85b"
+    },
+    {
+      "source": "Physics_002/target_study/checklist.json",
+      "sha256": "5f6982aaad192ca24e647d98a3858598fdff298aa92fde78f3bb3329acd9c0c4"
+    },
+    {
+      "source": "Physics_003/target_study/checklist.json",
+      "sha256": "67d87114db00c19352e76f5fb1177f049f4e9628ac46d24cebc20dc2923746e7"
+    }
+  ],
+  "method_ids": [
+    "goal-fidelity",
+    "prediction-diagnostics",
+    "generative-validation",
+    "optimization-efficiency",
+    "physical-observables",
+    "structural-biological-validation",
+    "spatiotemporal-inference",
+    "algorithmic-correctness"
+  ]
+}
